@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+class IncrementalFeatureRolloutContext;
+
 /**
  * Returns 'false' for query plans that can not be executed in SBE.
  */
@@ -42,9 +44,14 @@ bool isPlanSbeCompatible(const QuerySolution* solution);
 
 /**
  * Returns the engine of choice for executing the specified query plan.
+ *
+ * 'ifrContext' is used to snapshot IFR flag values for consistent reads within a single query
+ * operation. Tests that construct query solution trees directly should pass a
+ * default-constructed IncrementalFeatureRolloutContext, which falls back to direct flag reads.
  */
 EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
-                                             const QuerySolutionNode* dataAccessNode);
+                                             const QuerySolutionNode* dataAccessNode,
+                                             IncrementalFeatureRolloutContext& ifrContext);
 
 /**
  * Returns true iff 'keyPattern' has fields A and B where all of the following hold

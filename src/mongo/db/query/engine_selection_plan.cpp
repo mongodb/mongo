@@ -28,6 +28,8 @@
  */
 #include "mongo/db/query/engine_selection_plan.h"
 
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -402,62 +404,75 @@ private:
 static_assert(HasPreVisit<StateMachineRule, QuerySolutionNode>);
 static_assert(HasPostVisit<StateMachineRule, QuerySolutionNode>);
 
-StateMachineRule makeLookupUnwindRule() {
+// Builds a state machine rule that matches the enabled local-side data access patterns for
+// $lookup-$unwind (LU), gated by the three local access-plan IFR flags.
+StateMachineRule makeLookupUnwindRule(IncrementalFeatureRolloutContext& ifrContext) {
+    const bool collscanEnabled =
+        ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSbeEqLookupUnwindLocalCollscan);
+    const bool ixscanFetchEnabled =
+        ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagSbeEqLookupUnwindLocalIxscanFetch);
+    const bool complexEnabled = ifrContext.getSavedFlagValue(
+        feature_flags::gFeatureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans);
     static constexpr int kMaxBranchesInSbe = 100;
 
     StateMachineRule sm;
     int state = sm.getStartState();
 
-    // Collscan
-    {
+    if (collscanEnabled) {
         state = sm.addState(sm.getStartState(), STAGE_COLLSCAN, 0);
         sm.addMatch(state);
     }
 
-    const int fetch_state = sm.addState(sm.getStartState(), STAGE_FETCH, 0);
+    // Both ixscanFetch and complex patterns share a FETCH transition from the start state, so they
+    // are grouped here to ensure that transition is added only once.
+    if (ixscanFetchEnabled || complexEnabled) {
+        const int fetch_state = sm.addState(sm.getStartState(), STAGE_FETCH, 0);
 
-    // Ixscan + Fetch
-    {
-        state = sm.addState(fetch_state, STAGE_IXSCAN, 0);
-        sm.addMatch(state);
-    }
+        // Ixscan + Fetch
+        if (ixscanFetchEnabled) {
+            state = sm.addState(fetch_state, STAGE_IXSCAN, 0);
+            sm.addMatch(state);
+        }
 
-    // Ixscan + Sort (SortNodeDefault) + Fetch
-    {
-        state = sm.addState(
-            fetch_state, STAGE_SORT_DEFAULT, 0, PredicateType::kSortWithoutAbsorbedLimit);
-        state = sm.addState(state, STAGE_IXSCAN, 0);
-        sm.addMatch(state);
-    }
+        if (complexEnabled) {
+            // Ixscan + Sort (SortNodeDefault) + Fetch
+            {
+                state = sm.addState(
+                    fetch_state, STAGE_SORT_DEFAULT, 0, PredicateType::kSortWithoutAbsorbedLimit);
+                state = sm.addState(state, STAGE_IXSCAN, 0);
+                sm.addMatch(state);
+            }
 
-    // Ixscan + Or + Fetch
-    {
-        state = sm.addState(fetch_state, STAGE_OR, 0);
-        state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
-        sm.addMatch(state);
-    }
+            // Ixscan + Or + Fetch
+            {
+                state = sm.addState(fetch_state, STAGE_OR, 0);
+                state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
+                sm.addMatch(state);
+            }
 
-    // Ixscan + Fetch + Or
-    {
-        state = sm.addState(sm.getStartState(), STAGE_OR, 0);
-        state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
-        state = sm.addState(state, STAGE_IXSCAN, 0);
-        sm.addMatch(state);
-    }
+            // Ixscan + Fetch + Or
+            {
+                state = sm.addState(sm.getStartState(), STAGE_OR, 0);
+                state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
+                state = sm.addState(state, STAGE_IXSCAN, 0);
+                sm.addMatch(state);
+            }
 
-    // Ixscan + SortedMerge + Fetch
-    {
-        state = sm.addState(fetch_state, STAGE_SORT_MERGE, 0);
-        state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
-        sm.addMatch(state);
-    }
+            // Ixscan + SortedMerge + Fetch
+            {
+                state = sm.addState(fetch_state, STAGE_SORT_MERGE, 0);
+                state = sm.addState(state, STAGE_IXSCAN, Range(0, kMaxBranchesInSbe));
+                sm.addMatch(state);
+            }
 
-    // Ixscan + Fetch + SortedMerge
-    {
-        state = sm.addState(sm.getStartState(), STAGE_SORT_MERGE, 0);
-        state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
-        state = sm.addState(state, STAGE_IXSCAN, 0);
-        sm.addMatch(state);
+            // Ixscan + Fetch + SortedMerge
+            {
+                state = sm.addState(sm.getStartState(), STAGE_SORT_MERGE, 0);
+                state = sm.addState(state, STAGE_FETCH, Range(0, kMaxBranchesInSbe));
+                state = sm.addState(state, STAGE_IXSCAN, 0);
+                sm.addMatch(state);
+            }
+        }
     }
     return sm;
 }
@@ -473,7 +488,8 @@ StateMachineRule makeLookupUnwindRule() {
  */
 class PlanPushdownSelector {
 public:
-    PlanPushdownSelector(bool containsLuPattern) : _containsLuPattern(containsLuPattern) {}
+    PlanPushdownSelector(bool containsLuPattern, IncrementalFeatureRolloutContext& ifrContext)
+        : _containsLuPattern(containsLuPattern), _ifrContext(ifrContext) {}
 
     void preVisit(RuleEngine&, const GroupNode& node, size_t) {
         preVisitBase(node);
@@ -489,8 +505,9 @@ public:
             return;
         }
 
-        // $lookup + $unwind case.
-        if (_containsLuPattern) {
+        // $lookup + $unwind case: both the local-side access plan flag and the strategy flag must
+        // be enabled for this LU node to be pushed into SBE.
+        if (_containsLuPattern && _isStrategyEnabled(node.lookupStrategy)) {
             _enableSbe = true;
         } else {
             // Reset the cut point, since this LU node has to be left out from the SBE plan. If we
@@ -514,12 +531,41 @@ public:
     }
 
 private:
-    // 'true' when the solution tree contains a LookupUnwind pattern, 'false' otherwise.
+    // Returns true if the IFR flag for the given LU join strategy is enabled, meaning the strategy
+    // is eligible for SBE pushdown.
+    bool _isStrategyEnabled(EqLookupNode::LookupStrategy strategy) const {
+        switch (strategy) {
+            case EqLookupNode::LookupStrategy::kHashJoin:
+                return _ifrContext.getSavedFlagValue(
+                    feature_flags::gFeatureFlagSbeEqLookupUnwindHashJoin);
+            case EqLookupNode::LookupStrategy::kIndexedLoopJoin:
+                return _ifrContext.getSavedFlagValue(
+                    feature_flags::gFeatureFlagSbeEqLookupUnwindIndexedLoopJoin);
+            case EqLookupNode::LookupStrategy::kNestedLoopJoin:
+                return _ifrContext.getSavedFlagValue(
+                    feature_flags::gFeatureFlagSbeEqLookupUnwindNestedLoopJoin);
+            case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin:
+                return _ifrContext.getSavedFlagValue(
+                    feature_flags::gFeatureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin);
+            // The foreign collection doesn't exist, so the join produces no rows — semantically
+            // equivalent to NLJ with an empty inner side. Gate it by the same flag so operators
+            // can disable both failure modes together.
+            case EqLookupNode::LookupStrategy::kNonExistentForeignCollection:
+                return _ifrContext.getSavedFlagValue(
+                    feature_flags::gFeatureFlagSbeEqLookupUnwindNestedLoopJoin);
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    // 'true' when the solution tree contains a LookupUnwind access plan pattern, 'false' otherwise.
     bool _containsLuPattern = false;
 
+    // Used to read strategy IFR flags with per-operation snapshot semantics.
+    IncrementalFeatureRolloutContext& _ifrContext;
+
     // Indicates whether the query (either as a whole or after a cut) must be executed in SBE or
-    // not. It's set to true by nodes that trigger SBE usage (e.g. GroupNode, EqLookupNode, or
-    // EqLookupUnwindNode).
+    // not. It's set to true by nodes that trigger SBE usage (e.g. GroupNode or EqLookupNode;
+    // both $lookup and $lookup+$unwind are represented as EqLookupNode).
     bool _enableSbe = false;
 
     // Represents the topmost QSN that must run in SBE. This is chosen so as to leave out the nodes
@@ -608,7 +654,8 @@ bool isPlanSbeCompatible(const QuerySolution* solution) {
 }
 
 EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
-                                             const QuerySolutionNode* dataAccessNode) {
+                                             const QuerySolutionNode* dataAccessNode,
+                                             IncrementalFeatureRolloutContext& ifrContext) {
     LOGV2_DEBUG(11986305,
                 1,
                 "Plan-based engine selection logic invoked.",
@@ -627,9 +674,10 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
         }
     }
 
-    bool containsLuPattern = treeMatchesAny(dataAccessNode, makeLookupUnwindRule());
+    const bool containsLuPattern = treeMatchesAny(dataAccessNode, makeLookupUnwindRule(ifrContext));
+
     const QuerySolutionNode* planPushdownRoot =
-        treeSearch(solution->root(), PlanPushdownSelector(containsLuPattern));
+        treeSearch(solution->root(), PlanPushdownSelector(containsLuPattern, ifrContext));
 
     return {planPushdownRoot ? EngineChoice::kSbe : EngineChoice::kClassic, planPushdownRoot};
 }

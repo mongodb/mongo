@@ -35,6 +35,13 @@ rollout:
   featureFlagGetExecutorDeferredEngineChoice: {}
   featureFlagSbeAccumulators: {}
   featureFlagSbeEqLookupUnwind: {}
+  featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: {}
+  featureFlagSbeEqLookupUnwindHashJoin: {}
+  featureFlagSbeEqLookupUnwindIndexedLoopJoin: {}
+  featureFlagSbeEqLookupUnwindLocalCollscan: {}
+  featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: {}
+  featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
+  featureFlagSbeEqLookupUnwindNestedLoopJoin: {}
   featureFlagSbeNonLeadingMatch: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}

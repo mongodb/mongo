@@ -178,7 +178,7 @@ EngineSelectionResult shouldUseRegularSbeDeferredEngineSelection(
 
     const QuerySolutionNode* dataAccessNode = solution->root();
     extendSolutionWithPipelineFn();
-    return engineSelectionForPlan(solution, dataAccessNode);
+    return engineSelectionForPlan(solution, dataAccessNode, *cq.getExpCtx()->getIfrContext());
 }
 
 /**

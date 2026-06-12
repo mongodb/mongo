@@ -452,6 +452,55 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: rollout
 
+    featureFlagSbeEqLookupUnwindHashJoin:
+        description: "Enables executing $lookup-$unwind in SBE using the hash join strategy."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindHashJoin
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
+    featureFlagSbeEqLookupUnwindIndexedLoopJoin:
+        description: "Enables executing $lookup-$unwind in SBE using the indexed loop join strategy."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindIndexedLoopJoin
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
+    featureFlagSbeEqLookupUnwindNestedLoopJoin:
+        description: "Enables executing $lookup-$unwind in SBE using the nested loop join strategy."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindNestedLoopJoin
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
+    featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin:
+        description: "Enables executing $lookup-$unwind in SBE using the dynamic indexed loop join strategy."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
+    featureFlagSbeEqLookupUnwindLocalCollscan:
+        description: "Enables executing $lookup-$unwind in SBE with a collection scan local-side access plan."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalCollscan
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
+    featureFlagSbeEqLookupUnwindLocalIxscanFetch:
+        description: "Enables executing $lookup-$unwind in SBE with an index scan + fetch local-side access plan."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalIxscanFetch
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
+    featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans:
+        description: "Enables executing $lookup-$unwind in SBE with complex local-side access plans (sort, OR, and sorted merge variants)."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans
+        default: true
+        fcv_gated: false
+        incremental_rollout_phase: rollout
+
     featureFlagGetExecutorDeferredEngineChoice:
         description: "Feature flag to enable engine selection based on query plan, rather than query text."
         cpp_varname: gFeatureFlagGetExecutorDeferredEngineChoice
