@@ -212,6 +212,7 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -496,6 +497,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     initializeCommandHooks(serviceContext);
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(serviceContext));
+
+    transport::initMessageFilterPluginLoader("mongod");
 
     // Set up the periodic runner for background job execution. This is required to be running
     // before both the storage engine or the transport layer are initialized.

@@ -103,6 +103,7 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/executor_stats',
+        'message_filter_hooks',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
@@ -151,6 +152,21 @@ tlEnv.Library(
     ],
 )
 
+_enterpriseLinux = env.TargetOSIs('linux') and 'enterprise' in env['MONGO_MODULES']
+env.Clone().InjectModule("enterprise").Library(
+    target='message_filter_hooks',
+    source=[] if _enterpriseLinux else [
+        'message_filter_hooks.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ] + (['$BUILD_DIR/mongo/db/modules/enterprise/src/mfp/message_filter_hooks_enterprise']
+         if _enterpriseLinux else []) + [
+             '$BUILD_DIR/mongo/rpc/message',
+             'transport_layer_common',
+         ],
+)
+
 env.Library(
     target='service_entry_point',
     source=[
@@ -168,6 +184,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/processinfo',
+        'message_filter_hooks',
         'service_executor',
         'transport_layer_common',
     ],
