@@ -70,28 +70,29 @@ const runTestStoredSourceFalse = () => {
     ]);
     verifySortOptimizationApplied(validStage, [sortStageScore], false);
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
-    // TODO SERVER-127594: check that $sort is removed for these types of pipelines.
+    // TODO SERVER-127594: expect sort removal once intervening stages set preservesOrderAndMetadata=true.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$addFields: {"cats": 67}}]);
 };
 
 // storedSource=true desugars to [$testVectorSearch, $replaceRoot, ...].
-// $replaceRoot (DocumentSourceSingleDocumentTransformation) does not yet set
-// preservesOrderAndMetadata=true, so the backward walk stops there and the $sort cannot be removed.
-// TODO SERVER-127594: expect sort removal once $replaceRoot sets preservesOrderAndMetadata=true.
+// $replaceRoot sets preservesOrderAndMetadata=true, so the backward walk continues past it and
+// finds $testVectorSearch's sort pattern, removing the redundant $sort. Other intervening stages
+// (e.g. $addFields) do not yet set preservesOrderAndMetadata=true, so the walk stops there.
 const runTestStoredSourceTrue = () => {
     const validStage = buildTestVectorSearchOptStage({storedSource: true});
     const multiFieldSort = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}, x: 1}};
 
-    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false);
-    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore, sortStageVectorSearchScore], false);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], true);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore, sortStageVectorSearchScore], true);
     verifySortOptimizationApplied(
         validStage,
         [sortStageVectorSearchScore, sortStageVectorSearchScore, sortStageVectorSearchScore],
-        false,
+        true,
     );
     verifySortOptimizationApplied(validStage, [sortStageScore], false);
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
+    // TODO SERVER-127594: expect sort removal once intervening stages set preservesOrderAndMetadata=true.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$addFields: {"cats": 67}}]);
 };

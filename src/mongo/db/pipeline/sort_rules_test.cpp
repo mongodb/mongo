@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/pipeline_split_state.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -92,6 +93,9 @@ private:
 
 // Simulates a stage whose order-preservation depends on the pipeline split state: order-preserving
 // in kUnsplit (single-node pass-through) but not in kSplitForMerge (merge side, data reshuffled).
+// Poses as $_internalSearchIdLookup so sortKeyFieldsPreservedBy treats it as an audited
+// pass-through; the purpose of this mock is to test split-state-dependent
+// preservesOrderAndMetadata behavior, not stage identity.
 class DocumentSourceSplitStateMock final : public DocumentSourceMock {
 public:
     static boost::intrusive_ptr<DocumentSourceSplitStateMock> create(
@@ -99,6 +103,9 @@ public:
         return new DocumentSourceSplitStateMock(std::deque<GetNextResult>{}, expCtx);
     }
     using DocumentSourceMock::DocumentSourceMock;
+    Id getId() const override {
+        return DocumentSourceInternalSearchIdLookUp::id;
+    }
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints c = mockConstraints;
         c.preservesOrderAndMetadata = (pipeState != PipelineSplitState::kSplitForMerge);
@@ -239,7 +246,7 @@ TEST_F(SortRuleTest, ErasesRedundantSortAfterVectorSearchWhenNeedsMerge) {
 
 // [$vectorSearch, $_internalSearchIdLookup, $sort{vectorSearchScore}]: $_internalSearchIdLookup
 // preservesOrderAndMetadata=true, so the backward walk continues past it to find $vectorSearch's
-// sort pattern. This mirrors the storedSource=false desugaring path used by $testVectorSearch.
+// sort pattern.
 TEST_F(SortRuleTest, ErasesRedundantSortWhenIdLookupIntervenesBetweenVectorSearchAndSort) {
     auto pipeline = makePipeline(
         {fromjson(
@@ -253,6 +260,23 @@ TEST_F(SortRuleTest, ErasesRedundantSortWhenIdLookupIntervenesBetweenVectorSearc
     ASSERT(result[0].hasField("$vectorSearch")) << "Expected $vectorSearch, got: " << result[0];
     ASSERT(result[1].hasField("$_internalSearchIdLookup"))
         << "Expected $_internalSearchIdLookup, got: " << result[1];
+}
+
+// [$vectorSearch, $replaceRoot{newRoot:"$x"}, $sort{vectorSearchScore}]: newRoot is a non-object
+// field path expression, but the sort is entirely metadata-based (no named fieldPath), so
+// sortKeyFieldsPreservedBy returns true and the backward scan continues to find $vectorSearch.
+TEST_F(SortRuleTest, ErasesRedundantSortWhenReplaceRootIntervenesBetweenVectorSearchAndSort) {
+    auto pipeline = makePipeline(
+        {fromjson(
+             "{$vectorSearch: {queryVector: [1.0,0.0], path: \"v\", numCandidates: 10, limit: 5}}"),
+         fromjson("{$replaceRoot: {newRoot: \"$x\"}}"),
+         fromjson("{$sort: {score: {$meta: \"vectorSearchScore\"}}}")});
+    ASSERT_TRUE(isRedundantAt(*pipeline, 2));
+    eraseAt(*pipeline, 2);
+    auto result = pipeline->serializeToBson();
+    ASSERT_EQ(result.size(), 2U);
+    ASSERT(result[0].hasField("$vectorSearch")) << result[0];
+    ASSERT(result[1].hasField("$replaceRoot")) << result[1];
 }
 
 // [$vectorSearch, $sort{a:1}]: sort pattern {a:1} doesn't match vectorSearch's output.
@@ -299,6 +323,55 @@ TEST_F(SortRuleTest, KeepsSortWhenSplitAwareMockBreaksOrderOnMergeSide) {
     rbr::PipelineRewriteContext ctx(*getExpCtx(), stages, sortItr);
     ASSERT_FALSE(sortIsRedundantGivenPrecedingStages(ctx));
     ASSERT_EQ(stages.size(), 3U);
+}
+
+// [$sort{a,b}, $replaceRoot{a:"$b",b:"$a"}, $sort{a,b}]: $replaceRoot swaps the values of sort key
+// fields 'a' and 'b'. Even though it preservesOrderAndMetadata, the field values change, so the
+// upstream sort guarantee does not carry through.
+TEST_F(SortRuleTest, DoesNotEraseWhenReplaceRootSwapsSortKeyFields) {
+    auto pipeline = makePipeline({fromjson("{$sort: {a: 1, b: 1}}"),
+                                  fromjson("{$replaceRoot: {newRoot: {a: \"$b\", b: \"$a\"}}}"),
+                                  fromjson("{$sort: {a: 1, b: 1}}")});
+    ASSERT_FALSE(isRedundantAt(*pipeline, 2));
+}
+
+// [$sort{a}, $addFields{b:1}, $sort{a}]: $addFields does not set preservesOrderAndMetadata, so the
+// backward walk stops even though field 'a' is untouched. Guards against SERVER-127594 silently
+// enabling the optimization for $addFields without adding field-mapping inspection.
+TEST_F(SortRuleTest, DoesNotEraseWhenAddFieldsIntervenesEvenIfSortKeyUntouched) {
+    auto pipeline = makePipeline({fromjson("{$sort: {a: 1}}"),
+                                  fromjson("{$addFields: {b: 1}}"),
+                                  fromjson("{$sort: {a: 1}}")});
+    ASSERT_FALSE(isRedundantAt(*pipeline, 2));
+}
+
+// sortKeyFieldsPreservedBy path coverage tests --------------------------------------------------
+
+// $replaceRoot with a non-object newRoot (field path expression) and a named sort key.
+// sortKeyFieldsPreservedBy can't verify named field mappings and returns false.
+TEST_F(SortRuleTest, DoesNotEraseWhenReplaceRootHasFieldPathNewRootAndNamedSortKey) {
+    auto pipeline = makePipeline({fromjson("{$sort: {a: 1, b: 1}}"),
+                                  fromjson("{$replaceRoot: {newRoot: \"$subdoc\"}}"),
+                                  fromjson("{$sort: {a: 1}}")});
+    ASSERT_FALSE(isRedundantAt(*pipeline, 2));
+}
+
+// $replaceRoot with an object newRoot that omits a sort key field entirely.
+// sortKeyFieldsPreservedBy returns false because 'a' is absent from newRoot.
+TEST_F(SortRuleTest, DoesNotEraseWhenReplaceRootDropsSortKeyField) {
+    auto pipeline = makePipeline({fromjson("{$sort: {a: 1, b: 1}}"),
+                                  fromjson("{$replaceRoot: {newRoot: {b: \"$b\"}}}"),
+                                  fromjson("{$sort: {a: 1}}")});
+    ASSERT_FALSE(isRedundantAt(*pipeline, 2));
+}
+
+// $replaceRoot with an object newRoot that identity-maps all sort key fields.
+// sortKeyFieldsPreservedBy returns true, backward scan finds the covering sort, and removes it.
+TEST_F(SortRuleTest, ErasesRedundantSortWhenReplaceRootIdentityMapsAllSortKeyFields) {
+    auto pipeline = makePipeline({fromjson("{$sort: {a: 1, b: 1}}"),
+                                  fromjson("{$replaceRoot: {newRoot: {a: \"$a\", b: \"$b\"}}}"),
+                                  fromjson("{$sort: {a: 1}}")});
+    ASSERT_TRUE(isRedundantAt(*pipeline, 2));
 }
 
 }  // namespace

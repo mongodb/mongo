@@ -37,7 +37,7 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     }
 
     const sortMatchesKey = (s, key) => keyMatches(s.$sort && s.$sort.sortKey, key);
-    const qpSortMatchesKey = (s, key) => keyMatches(s.sortPattern, key);
+    const planStageSortMatchesKey = (s, key) => keyMatches(s.sortPattern, key);
 
     // Asserts actual and reference have the same ordered values for the given fields.
     function assertOrderedFieldsMatch(actual, reference, fields, label) {
@@ -49,12 +49,15 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
         }
     }
 
-    // Counts $sort stages matching key in the explained plan and calls assertFn(count, expected).
-    // Prefers aggregation $sort stages; falls back to query-planner SORT stages only when the agg
-    // count is zero. The fallback handles topologies (e.g. auth standalone) where $sort is pushed
-    // entirely into the query planner. getAggPlanStages does not cover splitPipeline, so sharded
-    // explains need splitPipeline.shardsPart and mergerPart checked separately to avoid falling
-    // through to the per-shard QP count (which would inflate the total by the number of shards).
+    // Counts $sort stages matching key across ALL plan layers (aggregation pipeline stages and query
+    // planner 'PlanStage' nodes) and calls
+    // assertFn(count, expected). Summing both layers lets exact-match tests distinguish "trailing
+    // sort removed" from "trailing sort kept." Tests that check for 0 use a prefix-subset key that
+    // doesn't match the superset query-planner sort pattern, so planStageCount stays 0 for those.
+    // getAggPlanStages does not cover splitPipeline, so sharded explains check shardsPart and
+    // mergerPart separately. In sharded context, the $sort in shardsPart and the per-shard physical
+    // SORT plan nodes represent the same operation, so only aggCount is used when splitPipeline
+    // exists to avoid double-counting.
     function assertSortCount(pipeline, key, assertFn, expected, label) {
         const explained = coll.explain().aggregate(pipeline);
         const splitStages = [
@@ -64,8 +67,8 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
         const aggCount =
             getAggPlanStages(explained, "$sort").filter((s) => sortMatchesKey(s, key)).length +
             splitStages.filter((s) => sortMatchesKey(s, key)).length;
-        const qpCount = getPlanStages(explained, "SORT").filter((s) => qpSortMatchesKey(s, key)).length;
-        const count = aggCount > 0 ? aggCount : qpCount;
+        const planStageCount = getPlanStages(explained, "SORT").filter((s) => planStageSortMatchesKey(s, key)).length;
+        const count = explained.splitPipeline ? aggCount : aggCount + planStageCount;
         assertFn(count, expected, label + ": " + tojson(explained));
     }
 
@@ -121,5 +124,213 @@ describe("REDUNDANT_SORT_REMOVAL rule", function () {
     it("no preceding sort pattern [$match{a>0}, $sort{a}] keeps $sort{a}", function () {
         const pipeline = [{$match: {a: {$gt: 0}}}, {$sort: {a: 1}}];
         assertSortCount(pipeline, {a: 1}, assert.gte, 1, "expected $sort{a} to remain (no preceding sort pattern)");
+    });
+
+    // ---- $replaceRoot / $replaceWith as an intervening stage before the redundant $sort ----
+    //
+    // A "transparent" $replaceRoot/$replaceWith is one whose newRoot expression maps every sort key
+    // field to itself: {a: "$a", b: "$b"}. This is analogous to an identity inclusion projection
+    // where document order is preserved AND the sort key field values are unchanged, enabling the
+    // backward scan to safely proceed. A $replaceRoot that renames or computes a sort key
+    // field (e.g., {a: "$b"} or {a: {$add: ["$a", 1]}}) is NOT transparent for that sort pattern;
+    // the upstream ordering guarantee no longer applies to the output field names and the trailing
+    // sort must stay.
+    //
+    // TODO SERVER-127594: extend to $project, $addFields/$set/$unset once audited.
+
+    it("$replaceRoot intervening: exact multi-field sort match removed", function () {
+        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}, {$sort: {a: 1, b: 1}}];
+        assertOrderedFieldsMatch(
+            coll.aggregate(pipeline).toArray(),
+            coll.aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}]).toArray(),
+            ["a", "b"],
+            "$replaceRoot exact match",
+        );
+        assertSortCount(
+            pipeline,
+            {a: 1, b: 1},
+            assert.eq,
+            1,
+            "expected trailing $sort{a,b} removed through $replaceRoot",
+        );
+    });
+
+    it("$replaceWith intervening: descending superset sort removed", function () {
+        const pipeline = [{$sort: {a: -1, b: -1}}, {$replaceWith: {a: "$a", b: "$b"}}, {$sort: {a: -1}}];
+        assertOrderedFieldsMatch(
+            coll.aggregate(pipeline).toArray(),
+            coll.aggregate([{$sort: {a: -1, b: -1}}, {$replaceWith: {a: "$a", b: "$b"}}]).toArray(),
+            ["a", "b"],
+            "$replaceWith descending",
+        );
+        assertSortCount(pipeline, {a: -1}, assert.eq, 0, "expected $sort{a:-1} removed after $replaceWith");
+    });
+
+    // [$sort{a:-1,b:-1}, $replaceWith{a:"$a",b:"$b"}, $sort{a:1}]: initial sort is descending but
+    // trailing sort is ascending so the final $sort must remain.
+    it("$replaceWith intervening: opposite direction keeps trailing sort", function () {
+        const pipeline = [{$sort: {a: -1, b: -1}}, {$replaceWith: {a: "$a", b: "$b"}}, {$sort: {a: 1}}];
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.gte,
+            1,
+            "expected $sort{a:1} kept: direction mismatch with preceding $sort{a:-1}",
+        );
+    });
+
+    it("$replaceRoot renames sort key field: sort on new name kept", function () {
+        const pipeline = [{$sort: {a: 1}}, {$replaceRoot: {newRoot: {b: "$a"}}}, {$sort: {b: 1}}];
+        assertSortCount(pipeline, {b: 1}, assert.gte, 1, "expected $sort{b} kept: preceding sort is on 'a', not 'b'");
+    });
+
+    // [$sort{a,b}, $replaceRoot{a:"$a",b:"$b"}, $sort{a}]: $replaceRoot identity-maps every field
+    // referenced by the trailing $sort{a:1}, so the backward scan continues past it, finds the
+    // covering $sort{a:1,b:1}, and erases $sort{a:1}.
+    it("$replaceRoot identity-maps all sort key fields: superset covering sort removes trailing sort", function () {
+        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}, {$sort: {a: 1}}];
+        assertOrderedFieldsMatch(
+            coll.aggregate(pipeline).toArray(),
+            coll.aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}]).toArray(),
+            ["a", "b"],
+            "$replaceRoot identity-maps sort key fields",
+        );
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.eq,
+            0,
+            "expected $sort{a} removed through identity-mapping $replaceRoot",
+        );
+    });
+
+    // [$sort{a,b}, $replaceRoot{a:"$b",b:"$b"}, $sort{a}]: newRoot maps "$b" onto "a", overwriting
+    // the sort key field with a different value, so the trailing sort stays.
+    it("$replaceRoot overwrites sort key field with another field: trailing sort kept", function () {
+        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$b", b: "$b"}}}, {$sort: {a: 1}}];
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.gte,
+            1,
+            "expected $sort{a} kept: $replaceRoot overwrites 'a' with '$b'",
+        );
+    });
+
+    it("two consecutive transparent stages ($replaceRoot then $replaceWith): sort removed", function () {
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+            {$replaceWith: {a: "$a", b: "$b"}},
+            {$sort: {a: 1}},
+        ];
+        assertOrderedFieldsMatch(
+            coll.aggregate(pipeline).toArray(),
+            coll
+                .aggregate([
+                    {$sort: {a: 1, b: 1}},
+                    {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+                    {$replaceWith: {a: "$a", b: "$b"}},
+                ])
+                .toArray(),
+            ["a", "b"],
+            "two transparent stages",
+        );
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.eq,
+            0,
+            "expected $sort{a} removed: scan continues past both transparent stages",
+        );
+    });
+
+    // [$sort{a,b}, $replaceRoot, $sort{a}, $sort{a}]: two consecutive trailing sorts separated from
+    // the leading sort by a transparent stage. REDUNDANT_SORT_REMOVAL removes the last $sort{a}
+    // (redundant given the middle $sort{a}), then removes the middle $sort{a} (redundant given
+    // $sort{a,b} through $replaceRoot). Without the $replaceRoot separator, SORT_MERGE
+    // would collapse all three sorts into one $sort{a} before REDUNDANT_SORT_REMOVAL runs.
+    it("multiple consecutive redundant sorts through transparent stage: both trailing $sort{a} removed", function () {
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+            {$sort: {a: 1}},
+            {$sort: {a: 1}},
+        ];
+        assertOrderedFieldsMatch(
+            coll.aggregate(pipeline).toArray(),
+            coll.aggregate([{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}}]).toArray(),
+            ["a", "b"],
+            "consecutive redundant sorts through transparent",
+        );
+        assertSortCount(pipeline, {a: 1}, assert.eq, 0, "expected both trailing $sort{a} removed");
+    });
+
+    // [$sort{a,b}, $replaceRoot, $sort{a}, $replaceWith, $sort{a}]: two non-consecutive trailing
+    // sorts, each separated from the preceding sort by one transparent stage.
+    // REDUNDANT_SORT_REMOVAL walks through each transparent stage to find the preceding sort and
+    // removes both trailing sorts.
+    it("non-consecutive redundant sorts separated by transparent stages: both removed", function () {
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+            {$sort: {a: 1}},
+            {$replaceWith: {a: "$a", b: "$b"}},
+            {$sort: {a: 1}},
+        ];
+        assertOrderedFieldsMatch(
+            coll.aggregate(pipeline).toArray(),
+            coll
+                .aggregate([
+                    {$sort: {a: 1, b: 1}},
+                    {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+                    {$replaceWith: {a: "$a", b: "$b"}},
+                ])
+                .toArray(),
+            ["a", "b"],
+            "non-consecutive transparent",
+        );
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.eq,
+            0,
+            "expected both trailing $sort{a} removed through transparent stages",
+        );
+    });
+
+    // [$sort{a,b}, $replaceRoot, $sort{a}, $group{_id:"$a"}, $sort{a}]: the middle $sort{a} is
+    // removed (backward scan walks through transparent $replaceRoot to find $sort{a,b}), but the
+    // final $sort{a} is kept (backward scan hits $group which has no sort pattern).
+    it("blocking stage keeps later $sort while transparent stage removes earlier $sort", function () {
+        const pipeline = [
+            {$sort: {a: 1, b: 1}},
+            {$replaceRoot: {newRoot: {a: "$a", b: "$b"}}},
+            {$sort: {a: 1}},
+            {$group: {_id: "$a"}},
+            {$sort: {a: 1}},
+        ];
+        assertSortCount(
+            pipeline,
+            {a: 1},
+            assert.eq,
+            1,
+            "expected last $sort{a} kept (blocked by $group), middle $sort{a} removed",
+        );
+    });
+
+    // [$sort{a,b}, $replaceRoot{a:"$b",b:"$a"}, $sort{a,b}]: $replaceRoot swaps sort key field
+    // values. Even though this stage technically sets preservesOrderAndMetadata=true, the upstream
+    // sort guarantee for 'a' and 'b' no longer holds after the swap, so the trailing $sort{a,b}
+    // must NOT be removed.
+    it("$replaceRoot that swaps sort key fields: trailing sort kept", function () {
+        const pipeline = [{$sort: {a: 1, b: 1}}, {$replaceRoot: {newRoot: {a: "$b", b: "$a"}}}, {$sort: {a: 1, b: 1}}];
+        assertSortCount(
+            pipeline,
+            {a: 1, b: 1},
+            assert.gte,
+            2,
+            "expected trailing $sort{a,b} kept: $replaceRoot swaps sort key field values",
+        );
     });
 });

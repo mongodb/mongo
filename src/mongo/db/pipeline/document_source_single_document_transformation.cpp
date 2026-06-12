@@ -78,6 +78,13 @@ StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
                                  UnionRequirement::kAllowed,
                                  ChangeStreamRequirement::kAllowlist);
     constraints.preservesCardinality = true;
+    // TODO SERVER-127594: audit preservesOrderAndMetadata for all TransformerTypes; $replaceRoot
+    // and $replaceWith are fixed here to unblock vectorSearch storedSource:true sort optimization.
+    if (_transformationProcessor &&
+        _transformationProcessor->getTransformer().getType() ==
+            TransformerInterface::TransformerType::kReplaceRoot) {
+        constraints.preservesOrderAndMetadata = true;
+    }
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSkippingOrLimitingStage = true;
     constraints.isAllowedWithinUpdatePipeline = true;
