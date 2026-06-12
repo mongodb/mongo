@@ -474,8 +474,9 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         const sourceCollName = "crossDbRenameTestColl";
         const targetDBName = this.testDBName + "_crossDbTarget";
 
-        // The rename must be rejected with ReplicaSetWritesBlocked when issued directly against the shard's replica set primary and through mongos. The two paths differ only in the connection used, so run the same flow against both.
-        // in the connection used, so run the same flow against both.
+        // The rename must be rejected with ReplicaSetWritesBlocked when issued directly against the shard's
+        // replica set primary and through mongos. The two paths differ only in the connection used, so run
+        // the same flow against both.
         for (const {label, conn} of [
             {label: "mongos", conn: this.st.s},
             {label: "shard's replica set primary", conn: this.shard0Primary},
@@ -524,6 +525,46 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
 
             // Clean up the target database via the same connection used for the rename.
             assert.commandWorked(targetDB.dropDatabase());
+        }
+    });
+
+    it("Test that rename within the same database is not blocked when blockReplicaSetWrites is enabled", function () {
+        const sourceCollName = "sameDbRenameSource";
+        const targetCollName = "sameDbRenameTarget";
+
+        // A rename within the same database does not insert data into the destination collection, so it
+        // must succeed even while the write block is enabled. Issue it both through mongos and directly
+        // against the shard's replica set primary, which differ only in the connection used.
+        for (const {label, conn} of [
+            {label: "mongos", conn: this.st.s},
+            {label: "shard's replica set primary", conn: this.shard0Primary},
+        ]) {
+            const sourceColl = conn.getDB(this.testDBName).getCollection(sourceCollName);
+            const targetColl = conn.getDB(this.testDBName).getCollection(targetCollName);
+            assert.commandWorked(sourceColl.insert({x: 1}));
+
+            // Enable write blocking on shard0 and check that the same-database rename still succeeds.
+            enableReplicaSetWriteBlock(
+                this.shard0PrimaryAdminDB,
+                false /* allowDeletions */,
+                "InsufficientDiskSpace" /* reason */,
+            );
+            assert.commandWorked(
+                conn.adminCommand({
+                    renameCollection: `${this.testDBName}.${sourceCollName}`,
+                    to: `${this.testDBName}.${targetCollName}`,
+                }),
+                `Same-DB rename issued via ${label} should not be blocked`,
+            );
+            assert.eq(
+                1,
+                targetColl.find({x: 1}).itcount(),
+                "Target collection should contain the document after successful same-DB rename",
+            );
+
+            // Disable write blocking and drop the target collection to reset state for the next connection.
+            disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+            assert(targetColl.drop());
         }
     });
 

@@ -79,6 +79,7 @@
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -568,6 +569,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();
+
+                // If the rename is cross-DBs and the replica set write block is enabled, reject the
+                // operation.
+                if (fromNss.db_forSharding() != toNss.db_forSharding()) {
+                    ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(
+                        opCtx, toNss, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
+                }
 
                 const auto criticalSectionReason =
                     sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
