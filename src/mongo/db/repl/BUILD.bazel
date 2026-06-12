@@ -1050,6 +1050,7 @@ mongo_cc_library(
         ":oplog",
         ":primary_only_service",
         ":repl_coordinator_interface",
+        ":repl_server_parameters",
         ":repl_settings",
         ":replica_set_messages",
         ":replication_auth",

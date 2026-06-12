@@ -39,6 +39,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -59,6 +60,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
@@ -80,6 +82,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -529,6 +532,29 @@ public:
             uassert(31372,
                     "topologyVersion must have a non-negative counter",
                     clientTopologyVersion->getCounter() >= 0);
+
+            auto minWait = minWaitForStreamingHelloMillis.load();
+            if (minWait > 0 && maxAwaitTimeMS.value() < minWait) {
+                auto* authSession = AuthorizationSession::get(opCtx->getClient());
+                if (!authSession || !authSession->isAuthenticated()) {
+                    static auto& logSeverity = *new logv2::SeveritySuppressor{
+                        Seconds{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(3)};
+                    LOGV2_DEBUG(9830101,
+                                logSeverity().toInt(),
+                                "Pre-auth streamable hello with maxAwaitTimeMS below minimum",
+                                "maxAwaitTimeMS"_attr = maxAwaitTimeMS.value(),
+                                "minWaitForStreamingHelloMillis"_attr = minWait);
+
+                    uassert(ErrorCodes::InvalidOptions,
+                            fmt::format("maxAwaitTimeMS of {} ms is below the minimum of {} ms",
+                                        maxAwaitTimeMS.value(),
+                                        minWait),
+                            !abortStreamingHelloWithSmallTimeout.load());
+
+                    // Clamp the effective timeout to the configured minimum.
+                    maxAwaitTimeMS = minWait;
+                }
+            }
 
             LOGV2_DEBUG(23904,
                         3,

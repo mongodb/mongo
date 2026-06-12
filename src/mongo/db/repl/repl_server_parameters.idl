@@ -795,6 +795,31 @@ server_parameters:
             gte: 0
         redact: false
 
+    minWaitForStreamingHelloMillis:
+        description: >-
+            Minimum timeout in milliseconds for pre-auth streamable hello commands.
+            If a client supplies a maxAwaitTimeMS below this value, the server will
+            either abort the operation or clamp the timeout to this floor, depending
+            on the value of abortStreamingHelloWithSmallTimeout.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: minWaitForStreamingHelloMillis
+        default: 1000
+        validator:
+            gte: 0
+        redact: false
+
+    abortStreamingHelloWithSmallTimeout:
+        description: >-
+            When true, pre-auth streamable hello commands with a maxAwaitTimeMS below
+            minWaitForStreamingHelloMillis will fail. When false, the server will
+            clamp the effective timeout to minWaitForStreamingHelloMillis instead.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: abortStreamingHelloWithSmallTimeout
+        default: false
+        redact: false
+
 feature_flags:
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
