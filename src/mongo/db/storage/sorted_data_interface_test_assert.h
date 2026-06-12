@@ -51,6 +51,14 @@ T* get_if(boost::optional<T>* opt) {
         ASSERT_OK(*status);                         \
     }
 
+#define ASSERT_SDI_INSERT_KEY_EXISTS(EXPR)                \
+    {                                                     \
+        auto result = EXPR;                               \
+        auto status = std::get_if<Status>(&result);       \
+        ASSERT(status);                                   \
+        ASSERT_EQ(status->code(), ErrorCodes::KeyExists); \
+    }
+
 #define ASSERT_SDI_INSERT_DUPLICATE_KEY(EXPR, KEY, ID)                       \
     {                                                                        \
         using std::get_if;                                                   \

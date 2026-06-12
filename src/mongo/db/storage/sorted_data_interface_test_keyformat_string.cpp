@@ -141,10 +141,10 @@ TEST_F(SortedDataInterfaceTest, KeyFormatStringUniqueInsertRemoveDuplicates) {
                                             recoveryUnit(),
                                             makeKeyString(sorted.get(), key1, rid1),
                                             /*dupsAllowed*/ true));
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
-                                            recoveryUnit(),
-                                            makeKeyString(sorted.get(), key1, rid1),
-                                            /*dupsAllowed*/ false));
+        ASSERT_SDI_INSERT_KEY_EXISTS(sorted->insert(opCtx(),
+                                                    recoveryUnit(),
+                                                    makeKeyString(sorted.get(), key1, rid1),
+                                                    /*dupsAllowed*/ false));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
                                                        recoveryUnit(),
                                                        makeKeyString(sorted.get(), key1, rid2),

@@ -210,8 +210,8 @@ TEST_F(WiredTigerUniqueIndexTest, OldFormatKeys) {
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
         sdi->unindex(opCtx(), recoveryUnit(), ks, dupsAllowed);
 
-        auto res = sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed);
         ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
+        ASSERT_SDI_INSERT_KEY_EXISTS(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
         txn.commit();
     }
 }

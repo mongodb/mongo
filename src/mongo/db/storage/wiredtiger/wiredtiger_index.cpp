@@ -86,6 +86,9 @@ static CompiledConfiguration upperInclusiveBoundConfig("WT_CURSOR.bound",
                                                        "bound=upper,inclusive=true");
 static CompiledConfiguration clearBoundConfig("WT_CURSOR.bound", "action=clear");
 
+constexpr StringData kExactKeyWithRecordIdAlreadyExists =
+    "exact key, including RecordId, already exists in the index"_sd;
+
 /**
  * Returns the logv2::LogOptions controlling the behaviour after logging a data corruption error.
  * When the TestingProctor is enabled we will fatally assert. When the testing proctor is disabled
@@ -1569,7 +1572,7 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
         if (auto* duplicate = std::get_if<DuplicateKey>(&result)) {
             return *duplicate;
         } else if (std::get<bool>(result)) {
-            return Status::OK();
+            return Status(ErrorCodes::KeyExists, kExactKeyWithRecordIdAlreadyExists);
         }
     }
 
@@ -1605,9 +1608,12 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
                       fmt::format("WiredTigerIndexUnique::_insert: duplicate: {}; uri: {}",
                                   _indexName,
                                   _container.uri()));
+        return Status::OK();
     }
 
-    return Status::OK();
+    // New-format unique indexes append the RecordId to the key, so WT_DUPLICATE_KEY here means the
+    // exact key and RecordId are already present.
+    return Status(ErrorCodes::KeyExists, kExactKeyWithRecordIdAlreadyExists);
 }
 
 void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
@@ -1811,18 +1817,12 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexStandard:
         if (auto* duplicate = std::get_if<DuplicateKey>(&result)) {
             return *duplicate;
         } else if (std::get<bool>(result)) {
-            return Status::OK();
+            return Status(ErrorCodes::KeyExists, kExactKeyWithRecordIdAlreadyExists);
         }
     }
 
     auto [key, value] = makeKeyValueForNonUniqueIndex(keyString);
     auto ret = _container.insert(wtRu, *c, key, value);
-
-    // If the record was already in the index, we return OK. This can happen, for example, when
-    // building a background index while documents are being written and reindexed.
-    if (!ret || ret == WT_DUPLICATE_KEY) {
-        return Status::OK();
-    }
 
     return wtRCToStatus(ret, c->session, [this]() {
         return fmt::format(

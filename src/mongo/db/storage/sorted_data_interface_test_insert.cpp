@@ -73,6 +73,58 @@ TEST_F(SortedDataInterfaceTest, Insert) {
         IndexKeyEntry(key1, loc1));
 }
 
+// Re-inserting an identical key (same RecordId) is a no-op that returns KeyExists and leaves the
+// entry count unchanged, both with dupsAllowed (detected at the storage insert) and without it
+// (detected by the duplicate pre-check).
+TEST_F(SortedDataInterfaceTest, InsertNoop) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
+
+    auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
+
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, true));
+        txn.commit();
+    }
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
+
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_KEY_EXISTS(
+            sorted->insert(opCtx(), recoveryUnit(), keyString1, /*dupsAllowed=*/true));
+        ASSERT_SDI_INSERT_KEY_EXISTS(
+            sorted->insert(opCtx(), recoveryUnit(), keyString1, /*dupsAllowed=*/false));
+        txn.commit();
+    }
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
+}
+
+// Same as InsertNoop, but for a unique index.
+TEST_F(SortedDataInterfaceTest, InsertNoopUnique) {
+    const auto sorted(
+        harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
+
+    auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
+
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, true));
+        txn.commit();
+    }
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
+
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_KEY_EXISTS(
+            sorted->insert(opCtx(), recoveryUnit(), keyString1, /*dupsAllowed=*/true));
+        ASSERT_SDI_INSERT_KEY_EXISTS(
+            sorted->insert(opCtx(), recoveryUnit(), keyString1, /*dupsAllowed=*/false));
+        txn.commit();
+    }
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
+}
+
 // Insert a KeyString and verify that the number of entries in the index equals 1.
 TEST_F(SortedDataInterfaceTest, InsertKeyString) {
     const auto sorted(
@@ -190,7 +242,7 @@ TEST_F(SortedDataInterfaceTest, InsertSameKey) {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(sorted->insert(
             opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
+        ASSERT_SDI_INSERT_KEY_EXISTS(sorted->insert(
             opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
                                                        recoveryUnit(),
