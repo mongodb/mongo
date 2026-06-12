@@ -27,18 +27,28 @@
  *    it in the license file.
  */
 
+#include "mongo/db/global_catalog/chunk_manager.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 #include <memory>
 #include <utility>
@@ -47,6 +57,7 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+const ShardId kThisShard = ShardId{"thisShard"};
 
 class ChunkManagerTest : public RouterCatalogCacheTestFixture {
 public:
@@ -158,6 +169,85 @@ TEST_F(ChunkManagerTest, FindIntersectingWithConstantHashedPrefixAndVaryingRange
                           cri.getChunkManager(),
                           BSON("a.b" << hashedValueOfZero << "c.d" << BSONNULL),
                           BSON("a.b" << hashedValueOfZero << "c.d" << -100));
+}
+
+// CurrentChunkManager::makeUpdated is a thin wrapper: it forwards a delta of changed chunks (plus
+// the collection's timeseries/resharding/allowMigrations/unsplittable attributes) to
+// RoutingTableHistory::makeUpdated and rewraps the result. The delta-application semantics
+// themselves (dropping overlapped chunks, opening/filling gaps, version handling) live in the
+// routing-table layer and are exhaustively covered by routing_table_history_test.cpp. The single
+// test below only pins what this wrapper layer can independently break: forwarding the delta,
+// rewrapping the resulting version, and carrying the source's own attributes forward rather than
+// substituting defaults.
+class CurrentChunkManagerUpdateTest : public unittest::Test {
+public:
+    ChunkVersion chunkVersion(uint32_t major, uint32_t minor) const {
+        return ChunkVersion{{_epoch, _collTimestamp}, {major, minor}};
+    }
+
+    ChunkType makeChunk(const BSONObj& min,
+                        const BSONObj& max,
+                        const ChunkVersion& version,
+                        const ShardId& shard = kThisShard) const {
+        return ChunkType{_collUUID, ChunkRange{min, max}, version, shard};
+    }
+
+    BSONObj key(int value) const {
+        return BSON("a" << value);
+    }
+
+    // Builds a CurrentChunkManager over a gap-allowing routing table, wrapping it the same way
+    // CurrentChunkManager::makeUpdated does internally.
+    CurrentChunkManager makeCmAllowingGaps(const std::vector<ChunkType>& chunks) const {
+        auto rt = RoutingTableHistory::makeNewAllowingGaps(kNss,
+                                                           _collUUID,
+                                                           _shardKeyPattern,
+                                                           false, /* unsplittable */
+                                                           nullptr,
+                                                           false,
+                                                           _epoch,
+                                                           _collTimestamp,
+                                                           boost::none /* timeseriesFields */,
+                                                           boost::none /* reshardingFields */,
+                                                           true,
+                                                           chunks);
+        auto version = rt.getVersion();
+        auto handle = RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(rt)),
+            ComparableChunkVersion::makeComparableChunkVersion(version));
+        return CurrentChunkManager(std::move(handle));
+    }
+
+protected:
+    KeyPattern _shardKeyPattern{BSON("a" << 1)};
+    const OID _epoch{OID::gen()};
+    const Timestamp _collTimestamp{1, 1};
+    const UUID _collUUID{UUID::gen()};
+};
+
+// The wrapper forwards the delta to the routing-table layer and rewraps the result: the new chunk
+// is applied (overlapped old chunks dropped, as proven at the routing-table layer), the resulting
+// ChunkManager reports the delta's version, and the source collection's own attributes are carried
+// forward rather than replaced by defaults.
+TEST_F(CurrentChunkManagerUpdateTest, MakeUpdatedForwardsDeltaAndCarriesAttributes) {
+    auto cm = makeCmAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                  makeChunk(key(10), key(20), chunkVersion(1, 1)),
+                                  makeChunk(key(20), key(30), chunkVersion(1, 2))});
+
+    // [5, 15) overlaps [0, 10) and [10, 20); applying it must reach the routing-table layer.
+    auto updated = cm.makeUpdated({makeChunk(key(5), key(15), chunkVersion(2, 0))});
+
+    // Delta was forwarded and applied.
+    ASSERT_EQ(updated.numChunks(), 2);  // [5, 15) and the surviving [20, 30)
+    ASSERT_TRUE(updated.keyBelongsToShard(key(7), kThisShard));
+    ASSERT_FALSE(updated.keyBelongsToShard(key(2), kThisShard));
+
+    // Result is rewrapped at the delta's version.
+    ASSERT_EQ(updated.getVersion(), chunkVersion(2, 0));
+
+    // Source attributes are carried forward, not reset to defaults.
+    ASSERT_EQ(updated.isUnsplittable(), cm.isUnsplittable());
+    ASSERT_EQ(updated.allowMigrations(), cm.allowMigrations());
 }
 
 }  // namespace

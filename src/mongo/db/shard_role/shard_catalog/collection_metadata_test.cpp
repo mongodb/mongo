@@ -126,6 +126,63 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
     }
 }
 
+ChunkType makeChangedChunkWithVersion(const CollectionMetadata& metadata,
+                                      ChunkRange range,
+                                      const ShardId& shardId,
+                                      ChunkVersion version) {
+    ChunkType chunk(metadata.getUUID(), std::move(range), version, shardId);
+    chunk.setOnCurrentShardSince(Timestamp(200, 0));
+    chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
+    return chunk;
+}
+
+ChunkType makeChangedChunk(const CollectionMetadata& metadata,
+                           ChunkRange range,
+                           const ShardId& shardId) {
+    auto version = metadata.getCollPlacementVersion();
+    version.incMajor();
+
+    return makeChangedChunkWithVersion(metadata, std::move(range), shardId, version);
+}
+
+// Builds metadata whose routing table allows gaps and contains only the given chunks owned by
+// kThisShard, mirroring how the shard catalog builds filtering metadata from the chunks a shard
+// actually owns (RoutingTableHistory::makeNewAllowingGaps). Unlike
+// makeTrackedCollectionMetadataImpl, the unowned ranges are left as real gaps rather than
+// back-filled with kOtherShard chunks.
+CollectionMetadata makeGappedCollectionMetadata(
+    const KeyPattern& shardKeyPattern,
+    const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) {
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(1, 1);
+    const UUID uuid = UUID::gen();
+    const Timestamp kOnCurrentShardSince(100, 0);
+
+    std::vector<ChunkType> chunks;
+    ChunkVersion version({epoch, timestamp}, {1, 0});
+    for (const auto& range : ownedChunks) {
+        chunks.emplace_back(uuid, ChunkRange{range.first, range.second}, version, kThisShard);
+        auto& chunk = chunks.back();
+        chunk.setOnCurrentShardSince(kOnCurrentShardSince);
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
+        version.incMajor();
+    }
+
+    auto routingTableHistory = ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
+        RoutingTableHistory::makeNewAllowingGaps(kNss,
+                                                 uuid,
+                                                 shardKeyPattern,
+                                                 false, /* unsplittable */
+                                                 nullptr,
+                                                 false,
+                                                 epoch,
+                                                 timestamp,
+                                                 boost::none /* timeseriesFields */,
+                                                 boost::none /* reshardingFields */,
+                                                 true,
+                                                 chunks));
+    return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);
+}
 
 struct ConstructedRangeMap : public RangeMap {
     ConstructedRangeMap()
@@ -295,6 +352,163 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
     ASSERT(keyRange->getMax().woCompare(makeTrackedCollectionMetadata().getMaxKey()) == 0);
 
     ASSERT(!makeTrackedCollectionMetadata().getNextOrphanRange(pending, keyRange->getMax()));
+}
+
+TEST_F(SingleChunkFixture, CurrentChunkManagerMakeUpdatedAppliesChangedChunks) {
+    auto metadata = makeTrackedCollectionMetadata();
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+
+    auto updatedChunkManager = metadata.getCurrentChunkManager()->makeUpdated({changedChunk});
+
+    ASSERT_EQ(changedChunk.getVersion(), updatedChunkManager.getVersion());
+    ASSERT(!updatedChunkManager.keyBelongsToShard(BSON("a" << 15), kThisShard));
+    ASSERT(updatedChunkManager.keyBelongsToShard(BSON("a" << 15), kOtherShard));
+}
+
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedAppliesChangedChunks) {
+    auto metadata = makeTrackedCollectionMetadata();
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
+
+    ASSERT(metadata.keyBelongsToMe(BSON("a" << 15)));
+    ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 15)));
+    ASSERT_EQ(changedChunk.getVersion(), updatedMetadata.getCollPlacementVersion());
+}
+
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedDonorOfLastChunkReportsZeroVersion) {
+    // This shard owns a single chunk. Migrating it away leaves the shard owning no chunks, so
+    // its placement version must collapse to {generation, 0, 0} and its max-valid-after must
+    // reset, matching the value a shard with no chunks reports.
+    auto metadata = makeTrackedCollectionMetadata();
+    ASSERT(metadata.keyBelongsToMe(BSON("a" << 15)));
+
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
+
+    // The donor no longer owns the migrated key.
+    ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 15)));
+
+    // The collection version advances to the migrated chunk's version, while the donor's shard
+    // version drops to {0, 0} under the same generation.
+    ASSERT_EQ(changedChunk.getVersion(), updatedMetadata.getCollPlacementVersion());
+    const auto expectedDonorVersion = ChunkVersion(
+        static_cast<CollectionGeneration>(updatedMetadata.getCollPlacementVersion()), {0, 0});
+    ASSERT_EQ(expectedDonorVersion, updatedMetadata.getShardPlacementVersion());
+    ASSERT_EQ(Timestamp(0, 0), updatedMetadata.getShardMaxValidAfter());
+}
+
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedIsIdempotentForSplitDelta) {
+    auto metadata = makeTrackedCollectionMetadata();
+
+    auto version = metadata.getCollPlacementVersion();
+    version.incMajor();
+    auto splitFirst = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 10), BSON("a" << 15)}, kOtherShard, version);
+    version.incMinor();
+    auto splitSecond = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 15), BSON("a" << 20)}, kOtherShard, version);
+
+    auto updatedMetadata = metadata.makeUpdated({splitFirst, splitSecond});
+    auto reappliedMetadata = updatedMetadata.makeUpdated({splitFirst, splitSecond});
+
+    ASSERT_EQ(splitSecond.getVersion(), reappliedMetadata.getCollPlacementVersion());
+    ASSERT_EQ(updatedMetadata.getChunkManager()->numChunks(),
+              reappliedMetadata.getChunkManager()->numChunks());
+    ASSERT(!reappliedMetadata.keyBelongsToMe(BSON("a" << 12)));
+    ASSERT(!reappliedMetadata.keyBelongsToMe(BSON("a" << 17)));
+}
+
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedIgnoresOlderDelta) {
+    auto metadata = makeTrackedCollectionMetadata();
+    auto firstChangedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kOtherShard);
+    auto updatedMetadata = metadata.makeUpdated({firstChangedChunk});
+
+    auto newerChangedChunk =
+        makeChangedChunk(updatedMetadata, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, kThisShard);
+    auto newerMetadata = updatedMetadata.makeUpdated({newerChangedChunk});
+    auto reappliedOlderMetadata = newerMetadata.makeUpdated({firstChangedChunk});
+
+    ASSERT_EQ(newerChangedChunk.getVersion(), reappliedOlderMetadata.getCollPlacementVersion());
+    ASSERT(reappliedOlderMetadata.keyBelongsToMe(BSON("a" << 15)));
+}
+
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedWithEmptyDeltaIsNoOp) {
+    auto metadata = makeTrackedCollectionMetadata();
+
+    auto updatedMetadata = metadata.makeUpdated({});
+
+    // An empty delta carries no version, so the metadata is left untouched.
+    ASSERT_EQ(metadata.getCollPlacementVersion(), updatedMetadata.getCollPlacementVersion());
+    ASSERT_EQ(metadata.getChunkManager()->numChunks(),
+              updatedMetadata.getChunkManager()->numChunks());
+    ASSERT(updatedMetadata.keyBelongsToMe(BSON("a" << 15)));
+}
+
+TEST_F(SingleChunkFixture, CollectionMetadataMakeUpdatedSelectsMaxVersionRegardlessOfOrder) {
+    auto metadata = makeTrackedCollectionMetadata();
+
+    // Build a split delta whose highest-version chunk is listed FIRST. The version guard must
+    // compare against the maximum version in the delta, not the last element, so the delta is
+    // still recognized as newer and applied.
+    auto version = metadata.getCollPlacementVersion();
+    version.incMajor();
+    auto lowerVersionChunk = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 10), BSON("a" << 15)}, kOtherShard, version);
+    version.incMinor();
+    auto higherVersionChunk = makeChangedChunkWithVersion(
+        metadata, ChunkRange{BSON("a" << 15), BSON("a" << 20)}, kOtherShard, version);
+
+    // Highest-version chunk first, lowest last.
+    auto updatedMetadata = metadata.makeUpdated({higherVersionChunk, lowerVersionChunk});
+
+    ASSERT_EQ(higherVersionChunk.getVersion(), updatedMetadata.getCollPlacementVersion());
+    ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 12)));
+    ASSERT(!updatedMetadata.keyBelongsToMe(BSON("a" << 17)));
+
+    // Re-applying the same delta (again with the max version first) is recognized as already
+    // applied and changes nothing.
+    auto reappliedMetadata = updatedMetadata.makeUpdated({higherVersionChunk, lowerVersionChunk});
+    ASSERT_EQ(higherVersionChunk.getVersion(), reappliedMetadata.getCollPlacementVersion());
+    ASSERT_EQ(updatedMetadata.getChunkManager()->numChunks(),
+              reappliedMetadata.getChunkManager()->numChunks());
+}
+
+class GappedChunksFixture : public unittest::Test {
+protected:
+    CollectionMetadata makeGappedMetadata(
+        const std::vector<std::pair<BSONObj, BSONObj>>& ownedChunks) const {
+        return makeGappedCollectionMetadata(KeyPattern(BSON("a" << 1)), ownedChunks);
+    }
+};
+
+TEST_F(GappedChunksFixture, MakeUpdatedPreservesGapsWithNonAdjacentChunk) {
+    // This shard owns [0, 10) and [30, 40); the ranges [10, 30) and the outer ranges are real gaps
+    // in the routing table, as they are on a shard that owns only part of the key space.
+    auto metadata =
+        makeGappedMetadata({{BSON("a" << 0), BSON("a" << 10)}, {BSON("a" << 30), BSON("a" << 40)}});
+
+    ASSERT_EQ(metadata.getChunkManager()->numChunks(), 2);
+    ASSERT(metadata.keyBelongsToMe(BSON("a" << 5)));
+    ASSERT(metadata.keyBelongsToMe(BSON("a" << 35)));
+
+    // Receiving a new chunk [50, 60) that is not adjacent to any owned chunk must not be rejected
+    // as a gap: makeUpdated tolerates gaps because the routing table was built allowing them.
+    auto changedChunk =
+        makeChangedChunk(metadata, ChunkRange{BSON("a" << 50), BSON("a" << 60)}, kThisShard);
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
+
+    // The new chunk is applied and the pre-existing gaps are preserved (not back-filled with
+    // placeholder chunks).
+    ASSERT_EQ(updatedMetadata.getChunkManager()->numChunks(), 3);
+    ASSERT(updatedMetadata.keyBelongsToMe(BSON("a" << 5)));
+    ASSERT(updatedMetadata.keyBelongsToMe(BSON("a" << 35)));
+    ASSERT(updatedMetadata.keyBelongsToMe(BSON("a" << 55)));
+    ASSERT_EQ(changedChunk.getVersion(), updatedMetadata.getCollPlacementVersion());
 }
 
 /**

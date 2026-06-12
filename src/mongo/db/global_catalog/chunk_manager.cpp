@@ -909,6 +909,23 @@ boost::optional<Chunk> CurrentChunkManager::getNextChunkOnShard(const BSONObj& s
     return optChunk;
 }
 
+CurrentChunkManager CurrentChunkManager::makeUpdated(
+    const std::vector<ChunkType>& changedChunks) const {
+    tassert(12775501, "Expected routing table to be initialized", _rt->optRt);
+
+    auto rt = _rt->optRt->makeUpdated(getTimeseriesFields(),
+                                      getReshardingFields(),
+                                      allowMigrations(),
+                                      isUnsplittable(),
+                                      changedChunks);
+    auto version = rt.getVersion();
+    auto rtHandle =
+        RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(std::move(rt)),
+                                       ComparableChunkVersion::makeComparableChunkVersion(version));
+
+    return CurrentChunkManager(std::move(rtHandle));
+}
+
 ShardId ChunkManager::getMinKeyShardIdWithSimpleCollation() const {
     tassert(7626423, "Expected routing table to be initialized", _rt->optRt);
 

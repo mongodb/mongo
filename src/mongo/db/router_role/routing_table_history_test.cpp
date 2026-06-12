@@ -915,5 +915,251 @@ TEST_F(RoutingTableHistoryTest, TestFlatten) {
     ASSERT_EQ(chunk1->getMax().woCompare(BSON("a" << 10)), 0);
 }
 
+// ---------------------------------------------------------------------------
+// Tests for routing tables that allow gaps.
+//
+// The shard-local catalog only knows the chunks this shard owns or has recently owned, so its
+// routing table can have gaps between chunks. These tables are built with
+// RoutingTableHistory::makeNewAllowingGaps. With gaps allowed, chunks need not be contiguous, the
+// first chunk need not start at MinKey, the last need not end at MaxKey, and the table may be
+// empty. Overlap and chunk-version checks still apply. A key that falls in a gap resolves to no
+// chunk, so findIntersectingChunk returns nullptr for it.
+// ---------------------------------------------------------------------------
+
+const ShardId kOtherShard("otherShard");
+
+class RoutingTableHistoryGapTest : public RoutingTableHistoryTest {
+public:
+    // Builds a routing table that allows gaps between chunks, like the shard-local catalog. The
+    // random bucket size makes updates cross the internal chunk-vector boundaries.
+    RoutingTableHistory makeNewRtAllowingGaps(const std::vector<ChunkType>& chunks) const {
+        const auto chunkBucketSize =
+            _random.nextInt64(std::max<std::size_t>(chunks.size(), 1) * 1.2) + 1;
+        RAIIServerParameterControllerForTest chunkBucketSizeParameter(
+            "routingTableCacheChunkBucketSize", chunkBucketSize);
+        return RoutingTableHistory::makeNewAllowingGaps(kNss,
+                                                        collUUID(),
+                                                        getShardKeyPattern(),
+                                                        false, /* unsplittable */
+                                                        nullptr,
+                                                        false,
+                                                        collEpoch(),
+                                                        collTimestamp(),
+                                                        boost::none /* timeseriesFields */,
+                                                        boost::none /* reshardingFields */,
+                                                        true,
+                                                        chunks);
+    }
+
+    ChunkVersion chunkVersion(uint32_t major, uint32_t minor) const {
+        return ChunkVersion{{collEpoch(), collTimestamp()}, {major, minor}};
+    }
+
+    ChunkType makeChunk(const BSONObj& min,
+                        const BSONObj& max,
+                        const ChunkVersion& version,
+                        const ShardId& shard = kThisShard) const {
+        return ChunkType{collUUID(), ChunkRange{min, max}, version, shard};
+    }
+
+    BSONObj key(int value) const {
+        return BSON("a" << value);
+    }
+};
+
+// ---------------------------------------------------------------------------
+// General RoutingTableHistory behavior with gaps: construction and the read/query API.
+//
+// ChunkMap-level gap behavior (gap-fill, superset/subset/intersecting inserts, find on gaps, shard
+// migration, stale-version rejection) is covered by ChunkMapWithGapsTest in chunk_map_test.cpp. The
+// tests below focus on the RoutingTableHistory layer above it: makeNewAllowingGaps construction and
+// the version/shard accounting and iteration accessors.
+// ---------------------------------------------------------------------------
+
+// A partial table with no chunk at MinKey, a hole in the middle and no chunk at MaxKey is rejected
+// by makeNew but accepted by makeNewAllowingGaps.
+TEST_F(RoutingTableHistoryGapTest, CreateWithGapsSucceeds) {
+    const std::vector<ChunkType> chunks = {makeChunk(key(5), key(10), chunkVersion(1, 0)),
+                                           makeChunk(key(20), key(30), chunkVersion(1, 1))};
+
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
+
+    auto rt = makeNewRtAllowingGaps(chunks);
+    ASSERT_EQ(rt.numChunks(), 2);
+    ASSERT(rt.findIntersectingChunk(key(7)));
+    ASSERT(rt.findIntersectingChunk(key(25)));
+    ASSERT(!rt.findIntersectingChunk(key(0)));   // leading gap
+    ASSERT(!rt.findIntersectingChunk(key(15)));  // internal gap
+    ASSERT(!rt.findIntersectingChunk(key(40)));  // trailing gap
+}
+
+// Mirror of RandomCreateWithMissingChunkFail: a chunk vector with a chunk missing is rejected by
+// makeNew but accepted by makeNewAllowingGaps.
+TEST_F(RoutingTableHistoryGapTest, RandomCreateWithMissingChunkSucceedsAllowingGaps) {
+    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+    chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
+
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
+
+    auto rt = makeNewRtAllowingGaps(chunks);
+    ASSERT_EQ(rt.numChunks(), chunks.size());
+}
+
+// Mirror of RandomCreateWithChunkGapFail: shrinking a chunk to open a gap is rejected by makeNew
+// but accepted by makeNewAllowingGaps.
+TEST_F(RoutingTableHistoryGapTest, RandomCreateWithChunkGapSucceedsAllowingGaps) {
+    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+
+    auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
+    auto intermediateKey =
+        calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
+    if (_random.nextInt64(2)) {
+        shrinkedChunk.setRange({shrinkedChunk.getMin(), intermediateKey});
+    } else {
+        shrinkedChunk.setRange({intermediateKey, shrinkedChunk.getMax()});
+    }
+
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
+
+    auto rt = makeNewRtAllowingGaps(chunks);
+    ASSERT_EQ(rt.numChunks(), chunks.size());
+}
+
+// makeNewAllowingGaps accepts an empty chunk vector and produces an empty routing table.
+TEST_F(RoutingTableHistoryGapTest, CreateEmptyTableSucceeds) {
+    auto rt = makeNewRtAllowingGaps({});
+
+    ASSERT_EQ(rt.numChunks(), 0);
+    ASSERT_EQ(rt.getNShardsOwningChunks(), 0);
+    ASSERT(!rt.findIntersectingChunk(key(0)));
+
+    size_t visited = 0;
+    rt.forEachChunk([&](const auto&) {
+        ++visited;
+        return true;
+    });
+    ASSERT_EQ(visited, 0);
+
+    std::set<ShardId> shardIds;
+    rt.getAllShardIds(&shardIds);
+    ASSERT(shardIds.empty());
+
+    std::set<ChunkRange> ranges;
+    rt.getAllChunkRanges(&ranges);
+    ASSERT(ranges.empty());
+}
+
+// getAllChunkRanges returns the set of chunk ranges present in a gap table.
+TEST_F(RoutingTableHistoryGapTest, GetAllChunkRangesReturnsAllChunkRanges) {
+    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                     makeChunk(key(20), key(30), chunkVersion(1, 1))});
+
+    std::set<ChunkRange> ranges;
+    rt.getAllChunkRanges(&ranges);
+
+    const std::set<ChunkRange> expected{ChunkRange{key(0), key(10)}, ChunkRange{key(20), key(30)}};
+    ASSERT(ranges == expected);
+}
+
+// Per-shard and collection version and ownership counts are correct on a multi-shard gap table.
+TEST_F(RoutingTableHistoryGapTest, ShardAccountingWithGaps) {
+    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0), kThisShard),
+                                     makeChunk(key(20), key(30), chunkVersion(1, 2), kOtherShard),
+                                     makeChunk(key(40), key(50), chunkVersion(1, 3), kThisShard)});
+
+    ASSERT_EQ(rt.getNShardsOwningChunks(), 2);
+
+    std::set<ShardId> shardIds;
+    rt.getAllShardIds(&shardIds);
+    ASSERT(shardIds == (std::set<ShardId>{kThisShard, kOtherShard}));
+
+    ASSERT_EQ(rt.getVersion(), chunkVersion(1, 3));
+    ASSERT_EQ(rt.getVersion(kThisShard), chunkVersion(1, 3));
+    ASSERT_EQ(rt.getVersion(kOtherShard), chunkVersion(1, 2));
+
+    // A shard that owns no chunks has no validAfter.
+    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"absentShard"}), (Timestamp{0, 0}));
+}
+
+// Full iteration visits exactly the owned chunks, in ascending key order; gaps are skipped.
+TEST_F(RoutingTableHistoryGapTest, ForEachChunkVisitsOwnedChunksInOrder) {
+    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                     makeChunk(key(20), key(30), chunkVersion(1, 1)),
+                                     makeChunk(key(40), key(50), chunkVersion(1, 2))});
+
+    std::vector<ChunkRange> visited;
+    rt.forEachChunk([&](const auto& chunkInfo) {
+        visited.push_back(chunkInfo->getRange());
+        return true;
+    });
+
+    ASSERT_EQ(visited.size(), 3);
+    ASSERT(visited[0] == ChunkRange(key(0), key(10)));
+    ASSERT(visited[1] == ChunkRange(key(20), key(30)));
+    ASSERT(visited[2] == ChunkRange(key(40), key(50)));
+}
+
+// Iteration from a start key inside an owned chunk begins at that chunk and continues in order. (A
+// start key that lands in a gap depends on the chunk-bucket layout and is not tested here.)
+TEST_F(RoutingTableHistoryGapTest, ForEachChunkFromStartKeyInsideOwnedChunk) {
+    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                     makeChunk(key(20), key(30), chunkVersion(1, 1)),
+                                     makeChunk(key(40), key(50), chunkVersion(1, 2))});
+
+    std::vector<ChunkRange> visited;
+    rt.forEachChunk(
+        [&](const auto& chunkInfo) {
+            visited.push_back(chunkInfo->getRange());
+            return true;
+        },
+        key(25) /* start inside [20, 30) */);
+
+    ASSERT_EQ(visited.size(), 2);
+    ASSERT(visited[0] == ChunkRange(key(20), key(30)));
+    ASSERT(visited[1] == ChunkRange(key(40), key(50)));
+}
+
+// forEachOverlappingChunk yields only existing chunks: a range spanning gaps yields all overlapping
+// chunks, a range wholly inside a gap yields none, and isMaxInclusive decides whether the chunk
+// whose min equals the query max is included.
+TEST_F(RoutingTableHistoryGapTest, ForEachOverlappingChunkAcrossGaps) {
+    // [0, 10) and [10, 20) are contiguous; then a gap [20, 40); then [40, 50).
+    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                     makeChunk(key(10), key(20), chunkVersion(1, 1)),
+                                     makeChunk(key(40), key(50), chunkVersion(1, 2))});
+
+    const auto countOverlapping = [&](const BSONObj& min, const BSONObj& max, bool isMaxInclusive) {
+        int count = 0;
+        rt.forEachOverlappingChunk(min, max, isMaxInclusive, [&](const auto&) {
+            ++count;
+            return true;
+        });
+        return count;
+    };
+
+    // A range spanning the gap overlaps all three chunks.
+    ASSERT_EQ(countOverlapping(key(5), key(45), true), 3);
+    // A range wholly inside the gap overlaps nothing.
+    ASSERT_EQ(countOverlapping(key(25), key(35), true), 0);
+    // Max equals the boundary at key(10): inclusive also yields [10, 20).
+    ASSERT_EQ(countOverlapping(key(5), key(10), true), 2);
+    ASSERT_EQ(countOverlapping(key(5), key(10), false), 1);
+}
+
+// findIntersectingChunk respects the half-open [min, max) chunk bounds at gap edges: a chunk's min
+// is owned, while its max starts a gap and resolves to no chunk.
+TEST_F(RoutingTableHistoryGapTest, FindIntersectingChunkBoundaryPrecisionWithGaps) {
+    auto rt = makeNewRtAllowingGaps({makeChunk(key(0), key(10), chunkVersion(1, 0)),
+                                     makeChunk(key(20), key(30), chunkVersion(1, 1))});
+
+    ASSERT(rt.findIntersectingChunk(key(0)));  // min is inclusive
+    ASSERT(rt.findIntersectingChunk(key(9)));
+    ASSERT(!rt.findIntersectingChunk(key(10)));  // max is exclusive: start of internal gap
+    ASSERT(!rt.findIntersectingChunk(key(19)));  // internal gap
+    ASSERT(rt.findIntersectingChunk(key(20)));   // min is inclusive
+    ASSERT(rt.findIntersectingChunk(key(29)));
+    ASSERT(!rt.findIntersectingChunk(key(30)));  // max is exclusive: start of trailing gap
+}
+
 }  // namespace
 }  // namespace mongo

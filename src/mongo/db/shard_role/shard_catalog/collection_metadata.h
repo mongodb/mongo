@@ -86,6 +86,14 @@ public:
     CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId);
 
     /**
+     * Returns a new CollectionMetadata with the given chunk changes applied to the current
+     * routing table. If those changes have already been applied, returns this metadata unchanged.
+     * This is determined by comparing the collection version against the highest chunk version
+     * among the changed chunks.
+     */
+    CollectionMetadata makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+
+    /**
      * Returns a CollectionMetadata object for an untracked collection.
      */
     static CollectionMetadata UNTRACKED() {

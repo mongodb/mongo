@@ -154,12 +154,82 @@ public:
         return CollectionMetadata{cm, metadata.shardId()};
     }
 
+    // Builds sharded metadata over a gap-allowing routing table containing only the given owned
+    // chunks, mirroring how the shard catalog builds filtering metadata from the chunks a shard
+    // actually owns. Each entry is {min, max, owningShard}; unowned ranges are left as real gaps.
+    // `collectionShardId` is the shard whose perspective `keyBelongsToMe` answers from.
+    static CollectionMetadata makeGappedShardedMetadata(
+        const UUID& uuid,
+        const std::vector<std::tuple<int, int, ShardId>>& ownedChunks,
+        ShardId collectionShardId = ShardId("0")) {
+        const OID epoch = OID::gen();
+        const Timestamp timestamp(Date_t::now());
+
+        // Sleep to guarantee a distinct timestamp from any other metadata built in the same test.
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        std::vector<ChunkType> chunks;
+        ChunkVersion version({epoch, timestamp}, {1, 0});
+        for (const auto& [minVal, maxVal, owner] : ownedChunks) {
+            ChunkType chunk(uuid,
+                            ChunkRange(BSON(kShardKey << minVal), BSON(kShardKey << maxVal)),
+                            version,
+                            owner);
+            chunk.setOnCurrentShardSince(Timestamp(100, 0));
+            chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
+            chunks.push_back(std::move(chunk));
+            version.incMajor();
+        }
+
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
+            RoutingTableHistory::makeNewAllowingGaps(kTestNss,
+                                                     uuid,
+                                                     kShardKeyPattern,
+                                                     false, /* unsplittable */
+                                                     nullptr,
+                                                     false,
+                                                     epoch,
+                                                     timestamp,
+                                                     boost::none /* timeseriesFields */,
+                                                     boost::none /* reshardingFields */,
+                                                     true,
+                                                     chunks)));
+        return CollectionMetadata(std::move(cm), std::move(collectionShardId));
+    }
+
+    // Builds a delta of changed chunks to feed CollectionMetadata::makeUpdated, bumping the
+    // collection placement version once per chunk so each carries a strictly newer version.
+    static std::vector<ChunkType> makeChangedChunks(
+        const CollectionMetadata& metadata,
+        const std::vector<std::tuple<int, int, ShardId>>& changedChunks) {
+        auto version = metadata.getCollPlacementVersion();
+        std::vector<ChunkType> result;
+        for (const auto& [minVal, maxVal, owner] : changedChunks) {
+            version.incMajor();
+            ChunkType chunk(metadata.getUUID(),
+                            ChunkRange(BSON(kShardKey << minVal), BSON(kShardKey << maxVal)),
+                            version,
+                            owner);
+            chunk.setOnCurrentShardSince(Timestamp(200, 0));
+            chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
+            result.push_back(std::move(chunk));
+        }
+        return result;
+    }
+
     uint64_t getNumMetadataManagerChanges(CollectionShardingRuntime& csr) {
         return csr._numMetadataManagerChanges;
     }
 
     MetadataManager* getMetadataManager(CollectionShardingRuntime& csr) {
         return csr._metadataManager.get();
+    }
+
+    // Whether the CSR considers the collection tracked (its metadata carries a routing table).
+    // Kept as a predicate so the private MetadataType enum is only named inside this friend
+    // fixture.
+    bool isMetadataTracked(CollectionShardingRuntime& csr) {
+        return csr._metadataType == CollectionShardingRuntime::MetadataType::kTracked;
     }
 
     static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(const NamespaceString& nss,
@@ -234,6 +304,55 @@ TEST_F(CollectionShardingRuntimeTest,
     ScopedSetShardRole scopedSetShardRole{
         opCtx, kTestNss, ShardVersionFactory::make(metadata), boost::none /* databaseVersion */};
     ASSERT_TRUE(csr.getCollectionDescription(opCtx).isSharded());
+}
+
+TEST_F(CollectionShardingRuntimeTest, CheckShardVersionThrowsStaleConfigAfterDonatingLastChunk) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    // This shard ("0") owns the collection's only chunk.
+    auto metadata = makeShardedMetadata(opCtx, UUID::gen(), ShardId("0"), ShardId("0"));
+
+    // The version a stale router would still send after the chunk has moved away.
+    const auto staleShardVersion = ShardVersionFactory::make(metadata);
+
+    // Donate the last chunk to another shard through the authoritative delta path. The donor now
+    // owns no chunks, so its shard version collapses to {generation, 0, 0}.
+    auto newVersion = metadata.getCollPlacementVersion();
+    newVersion.incMajor();
+    ChunkType changedChunk(metadata.getUUID(),
+                           ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
+                           newVersion,
+                           ShardId("other"));
+    changedChunk.setOnCurrentShardSince(Timestamp(200, 0));
+    changedChunk.setHistory(
+        {ChunkHistory(*changedChunk.getOnCurrentShardSince(), changedChunk.getShard())});
+    auto updatedMetadata = metadata.makeUpdated({changedChunk});
+
+    csr.setFilteringMetadata_authoritative(
+        opCtx, updatedMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    // A CRUD operation arriving with the pre-donation shard version is rejected as stale.
+    {
+        ScopedSetShardRole scopedSetShardRole{
+            opCtx, kTestNss, staleShardVersion, boost::none /* databaseVersion */};
+        ASSERT_THROWS_CODE(
+            csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::StaleConfig);
+    }
+
+    // The donor now reports a {generation, 0, 0} placement version, since it owns no chunks.
+    const auto postDonationShardVersion = ShardVersionFactory::make(updatedMetadata);
+    ASSERT_EQ(
+        postDonationShardVersion.placementVersion(),
+        ChunkVersion(static_cast<CollectionGeneration>(updatedMetadata.getCollPlacementVersion()),
+                     {0, 0}));
+
+    // An operation arriving with the post-donation shard version is accepted.
+    {
+        ScopedSetShardRole scopedSetShardRole{
+            opCtx, kTestNss, postDonationShardVersion, boost::none /* databaseVersion */};
+        ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+    }
 }
 
 TEST_F(CollectionShardingRuntimeTest,
@@ -850,6 +969,145 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksA
 
     ASSERT_TRUE(future.isReady());
     future.get();
+}
+
+// An authoritative CSR that owns no chunks yet (its routing table is all gaps) receives its first
+// chunks assigned to this shard; afterwards the shard owns exactly those ranges.
+TEST_F(CollectionShardingRuntimeTest, AuthoritativeEmptyCsrReceivesFirstChunks) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const auto uuid = UUID::gen();
+
+    // Start authoritative with zero owned chunks: every key is a gap.
+    auto metadata = makeGappedShardedMetadata(uuid, {}, thisShard);
+    csr.setFilteringMetadata_authoritative(
+        opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    {
+        auto filter = csr.getOwnershipFilter(
+            opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+        ASSERT_FALSE(filter.keyBelongsToMe(BSON(kShardKey << 5)));
+    }
+
+    // Receive the first chunks, both assigned to this shard.
+    auto updated = metadata.makeUpdated(
+        makeChangedChunks(metadata, {{0, 10, thisShard}, {20, 30, thisShard}}));
+    csr.setFilteringMetadata_authoritative(
+        opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto filter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+    ASSERT_TRUE(csr.getCurrentMetadataIfKnown()->isSharded());
+    ASSERT(isMetadataTracked(csr));
+    ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 5)));
+    ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 25)));
+    ASSERT_FALSE(filter.keyBelongsToMe(BSON(kShardKey << 15)));  // interior gap
+}
+
+// An authoritative CSR receives new chunks that are assigned to another shard; this shard does not
+// own them, but the placement version still advances.
+TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForAnotherShard) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const ShardId otherShard("other");
+    const auto uuid = UUID::gen();
+
+    auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
+    csr.setFilteringMetadata_authoritative(
+        opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{20, 30, otherShard}}));
+    csr.setFilteringMetadata_authoritative(
+        opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto filter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+    ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 5)));    // still ours
+    ASSERT_FALSE(filter.keyBelongsToMe(BSON(kShardKey << 25)));  // owned by the other shard
+    ASSERT(isMetadataTracked(csr));
+    ASSERT(updated.getCollPlacementVersion() <=> metadata.getCollPlacementVersion() ==
+           std::partial_ordering::greater);
+}
+
+// An authoritative CSR receives new chunks assigned to this shard, extending what it owns.
+TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesChunksForCurrentShard) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const auto uuid = UUID::gen();
+
+    auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
+    csr.setFilteringMetadata_authoritative(
+        opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{20, 30, thisShard}}));
+    csr.setFilteringMetadata_authoritative(
+        opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto filter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+    ASSERT(isMetadataTracked(csr));
+    ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 5)));    // original chunk
+    ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 25)));   // newly received chunk
+    ASSERT_FALSE(filter.keyBelongsToMe(BSON(kShardKey << 15)));  // gap between them
+}
+
+// An authoritative CSR that owns exactly one chunk donates it to another shard; afterwards the
+// shard owns nothing, but the collection is still sharded.
+TEST_F(CollectionShardingRuntimeTest, AuthoritativeSingleChunkCsrDonatesItsOnlyChunk) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const ShardId otherShard("other");
+    const auto uuid = UUID::gen();
+
+    auto metadata = makeGappedShardedMetadata(uuid, {{0, 10, thisShard}}, thisShard);
+    csr.setFilteringMetadata_authoritative(
+        opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    {
+        auto filter = csr.getOwnershipFilter(
+            opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+        ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 5)));
+    }
+
+    // The same range is re-tagged to another shard, so this shard owns nothing afterwards.
+    auto updated = metadata.makeUpdated(makeChangedChunks(metadata, {{0, 10, otherShard}}));
+    csr.setFilteringMetadata_authoritative(
+        opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto filter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+    ASSERT_TRUE(csr.getCurrentMetadataIfKnown()->isSharded());
+    // The shard owns nothing now, yet the state stays kTracked because a routing table is present.
+    ASSERT(isMetadataTracked(csr));
+    ASSERT_FALSE(filter.keyBelongsToMe(BSON(kShardKey << 5)));  // donated away
+}
+
+// A single delta mixing a chunk for this shard and a chunk for another shard is applied atomically.
+TEST_F(CollectionShardingRuntimeTest, AuthoritativeCsrReceivesMixedChunkDelta) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    const ShardId thisShard("0");
+    const ShardId otherShard("other");
+    const auto uuid = UUID::gen();
+
+    auto metadata = makeGappedShardedMetadata(uuid, {}, thisShard);
+    csr.setFilteringMetadata_authoritative(
+        opCtx, metadata, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto updated = metadata.makeUpdated(
+        makeChangedChunks(metadata, {{0, 10, thisShard}, {20, 30, otherShard}}));
+    csr.setFilteringMetadata_authoritative(
+        opCtx, updated, CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+
+    auto filter = csr.getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup, true);
+    ASSERT(isMetadataTracked(csr));
+    ASSERT_TRUE(filter.keyBelongsToMe(BSON(kShardKey << 5)));    // assigned to this shard
+    ASSERT_FALSE(filter.keyBelongsToMe(BSON(kShardKey << 25)));  // assigned to the other shard
 }
 
 class CollectionShardingRuntimeTestWithMockedLoader

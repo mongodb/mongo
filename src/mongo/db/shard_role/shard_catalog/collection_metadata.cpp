@@ -61,6 +61,36 @@ CollectionMetadata::CollectionMetadata(CurrentChunkManager cm, const ShardId& th
 CollectionMetadata::CollectionMetadata(PointInTimeChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
+CollectionMetadata CollectionMetadata::makeUpdated(
+    const std::vector<ChunkType>& changedChunks) const {
+    tassert(12775502, "Expected metadata to have a routing table", hasRoutingTable());
+
+    const auto currentChunkManager = getCurrentChunkManager();
+    tassert(
+        12775503, "Expected current metadata to have a current chunk manager", currentChunkManager);
+
+    // This guard keeps `makeUpdated` idempotent. Applying the same delta twice must be a no-op,
+    // so a delta that is not newer than what we already have is skipped.
+    if (!changedChunks.empty()) {
+        const auto latestChangedChunk = std::max_element(
+            changedChunks.begin(),
+            changedChunks.end(),
+            [](const ChunkType& left, const ChunkType& right) {
+                return (left.getVersion() <=> right.getVersion()) == std::partial_ordering::less;
+            });
+        const auto compareResult =
+            currentChunkManager->getVersion() <=> latestChangedChunk->getVersion();
+        if (compareResult == std::partial_ordering::greater ||
+            compareResult == std::partial_ordering::equivalent) {
+            // Skip applying `changedChunks` if the current `ChunkManager` already has a
+            // version >= the highest version in `changedChunks`.
+            return CollectionMetadata(CurrentChunkManager(*currentChunkManager), _thisShardId);
+        }
+    }
+
+    return CollectionMetadata(currentChunkManager->makeUpdated(changedChunks), _thisShardId);
+}
+
 bool CollectionMetadata::allowMigrations() const {
     return _cm ? getChunkManagerBase().allowMigrations() : true;
 }

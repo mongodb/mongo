@@ -49,8 +49,11 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <string>
@@ -316,6 +319,33 @@ TEST_F(ChunkMapTest, UpdateChunkMapLowerVersion) {
 
     ASSERT_THROWS_CODE(chunkMap.createMerged({updateChunk}), AssertionException, 626840);
 }
+
+/*
+ * Re-applying a chunk whose version equals the current collection version is accepted (it is not
+ * rejected like a strictly-lower version) and leaves the map unchanged.
+ */
+TEST_F(ChunkMapTest, UpdateChunkMapSameVersion) {
+    auto chunkVector = toChunkInfoPtrVector(genRandomChunkVector());
+
+    auto chunkMap = makeChunkMap(chunkVector);
+    const auto collVersion = chunkMap.getVersion();
+
+    // Pick the chunk that carries the collection version and re-apply it verbatim.
+    const auto sameVersionChunkIt =
+        std::find_if(chunkVector.begin(), chunkVector.end(), [&](const auto& chunkPtr) {
+            return chunkPtr->getLastmod() == collVersion;
+        });
+    ASSERT(sameVersionChunkIt != chunkVector.end());
+
+    auto updatedChunkMap = chunkMap.createMerged({*sameVersionChunkIt});
+
+    ASSERT_EQ(updatedChunkMap.getVersion(), collVersion);
+    validateChunkMap(updatedChunkMap, chunkVector);
+
+    // The original map is still valid and usable.
+    validateChunkMap(chunkMap, chunkVector);
+}
+
 /*
  * Test update of ChunkMap with random chunk manipulation (splits/merges/moves);
  */
@@ -593,6 +623,180 @@ TEST_F(ChunkMapTest, TestChunkMapReverseIteration) {
     ASSERT_EQ((--chunkMapIt).get().get(), chunks.rbegin()->get());
 }
 
+/*
+ * Constructing a ChunkMap with chunks that do not cover the entire shard key space fails. The gap
+ * is produced by removing a random chunk, which also covers the case of a missing min or max key.
+ */
+TEST_F(ChunkMapTest, CreateWithMissingChunkFail) {
+    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+
+    // Remove one random chunk to simulate a gap in the shard key space.
+    chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
+
+    ASSERT_THROWS_CODE(makeChunkMap(toChunkInfoPtrVector(chunks)),
+                       DBException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
+
+/*
+ * Constructing a ChunkMap with a gap, produced by shrinking the range of a random chunk, fails.
+ */
+TEST_F(ChunkMapTest, CreateWithChunkGapFail) {
+    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+
+    auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
+    auto intermediateKey =
+        calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
+    if (_random.nextInt64(2)) {
+        // Shrink right bound
+        shrinkedChunk.setRange({shrinkedChunk.getMin(), intermediateKey});
+    } else {
+        // Shrink left bound
+        shrinkedChunk.setRange({intermediateKey, shrinkedChunk.getMax()});
+    }
+
+    ASSERT_THROWS_CODE(makeChunkMap(toChunkInfoPtrVector(chunks)),
+                       DBException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
+
+/*
+ * Updating a ChunkMap with a gap, produced by shrinking the range of a random chunk, fails.
+ */
+TEST_F(ChunkMapTest, UpdateWithChunkGapFail) {
+    auto chunks = genRandomChunkVector();
+
+    auto chunkMap = makeChunkMap(toChunkInfoPtrVector(chunks));
+    auto collVersion = chunkMap.getVersion();
+
+    auto shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
+    auto intermediateKey =
+        calculateIntermediateShardKey(shrinkedChunk.getMin(), shrinkedChunk.getMax());
+    if (_random.nextInt64(2)) {
+        // Shrink right bound
+        shrinkedChunk.setRange({shrinkedChunk.getMin(), intermediateKey});
+    } else {
+        // Shrink left bound
+        shrinkedChunk.setRange({intermediateKey, shrinkedChunk.getMax()});
+    }
+
+    // Bump chunk version
+    collVersion.incMajor();
+    shrinkedChunk.setVersion(collVersion);
+
+    ASSERT_THROWS_CODE(chunkMap.createMerged({std::make_shared<ChunkInfo>(shrinkedChunk)}),
+                       AssertionException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
+
+/*
+ * Constructing a ChunkMap with overlapping chunks fails.
+ */
+TEST_F(ChunkMapTest, CreateWithChunkOverlapFail) {
+    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+
+    auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
+
+    const auto canExtendLeft = chunkToExtendIt > chunks.begin();
+    const auto extendRight =
+        !canExtendLeft || ((chunkToExtendIt < std::prev(chunks.end())) && _random.nextInt64(2));
+    const auto extendLeft = !extendRight;
+    if (extendRight) {
+        auto newMax = calculateIntermediateShardKey(chunkToExtendIt->getMax(),
+                                                    std::next(chunkToExtendIt)->getMax(),
+                                                    0.0 /* minKeyProb */,
+                                                    0.1 /* maxKeyProb */);
+        // extend right bound
+        chunkToExtendIt->setRange({chunkToExtendIt->getMin(), newMax});
+        auto newVersion = chunkToExtendIt->getVersion();
+        newVersion.incMajor();
+        std::next(chunkToExtendIt)->setVersion(newVersion);
+    }
+
+    if (extendLeft) {
+        invariant(canExtendLeft);
+        auto newMin = calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
+                                                    chunkToExtendIt->getMin(),
+                                                    0.1 /* minKeyProb */,
+                                                    0.0 /* maxKeyProb */);
+        // extend left bound
+        chunkToExtendIt->setRange({newMin, chunkToExtendIt->getMax()});
+        auto newVersion = chunkToExtendIt->getVersion();
+        newVersion.incMajor();
+        std::prev(chunkToExtendIt)->setVersion(newVersion);
+    }
+
+    ASSERT_THROWS_CODE(makeChunkMap(toChunkInfoPtrVector(chunks)),
+                       DBException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
+
+/*
+ * Updating a ChunkMap with overlapping chunks fails.
+ */
+TEST_F(ChunkMapTest, UpdateWithChunkOverlapFail) {
+    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+
+    auto chunkMap = makeChunkMap(toChunkInfoPtrVector(chunks));
+    auto collVersion = chunkMap.getVersion();
+
+    auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
+
+    const auto canExtendLeft = chunkToExtendIt > chunks.begin();
+    const auto extendRight =
+        !canExtendLeft || (chunkToExtendIt < std::prev(chunks.end()) && _random.nextInt64(2));
+    const auto extendLeft = !extendRight;
+    if (extendRight) {
+        auto newMax = calculateIntermediateShardKey(chunkToExtendIt->getMax(),
+                                                    std::next(chunkToExtendIt)->getMax());
+        // extend right bound
+        chunkToExtendIt->setRange({chunkToExtendIt->getMin(), newMax});
+    }
+
+    if (extendLeft) {
+        invariant(canExtendLeft);
+        auto newMin = calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
+                                                    chunkToExtendIt->getMin());
+        // extend left bound
+        chunkToExtendIt->setRange({newMin, chunkToExtendIt->getMax()});
+    }
+
+    // Bump chunk version
+    collVersion.incMajor();
+    chunkToExtendIt->setVersion(collVersion);
+
+    ASSERT_THROWS_CODE(chunkMap.createMerged({std::make_shared<ChunkInfo>(*chunkToExtendIt)}),
+                       AssertionException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
+
+/*
+ * Constructing a ChunkMap whose first chunk does not start at MinKey fails.
+ */
+TEST_F(ChunkMapTest, CreateWrongMinFail) {
+    auto chunks = genRandomChunkVector();
+
+    chunks.begin()->setRange(
+        {BSON("a" << std::numeric_limits<int64_t>::min()), chunks.begin()->getMax()});
+
+    ASSERT_THROWS_CODE(makeChunkMap(toChunkInfoPtrVector(chunks)),
+                       DBException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
+
+/*
+ * Constructing a ChunkMap whose last chunk does not end at MaxKey fails.
+ */
+TEST_F(ChunkMapTest, CreateWrongMaxFail) {
+    auto chunks = genRandomChunkVector();
+
+    chunks.begin()->setRange(
+        {chunks.begin()->getMin(), BSON("a" << std::numeric_limits<int64_t>::max())});
+
+    ASSERT_THROWS_CODE(makeChunkMap(toChunkInfoPtrVector(chunks)),
+                       DBException,
+                       ErrorCodes::ChunkMetadataInconsistency);
+}
 
 class ChunkMapWithGapsTest : public unittest::Test {
 public:
@@ -644,6 +848,22 @@ public:
                                                 size_t minNumChunks = 1) const {
         return chunks_test_util::genRandomChunkVector(
             _uuid, _epoch, _collTimestamp, maxNumChunks, minNumChunks);
+    }
+
+    ChunkVersion version(uint32_t major, uint32_t minor) const {
+        return ChunkVersion{{_epoch, _collTimestamp}, {major, minor}};
+    }
+
+    std::shared_ptr<ChunkInfo> makeChunkInfo(const BSONObj& min,
+                                             const BSONObj& max,
+                                             const ChunkVersion& chunkVersion,
+                                             const ShardId& shard = kThisShard) const {
+        return std::make_shared<ChunkInfo>(
+            ChunkType{_uuid, ChunkRange{min, max}, chunkVersion, shard});
+    }
+
+    BSONObj key(int value) const {
+        return BSON("a" << value);
     }
 
 private:
@@ -840,6 +1060,281 @@ TEST_F(ChunkMapWithGapsTest, TestOldShardChunkMigration) {
 
     // insertion of older versions are throwing
     ASSERT_THROWS_CODE(chunkMap.createMerged({migratedChunk}), AssertionException, 626840);
+}
+
+// Splitting an owned chunk into several pieces leaves the surrounding gaps untouched.
+TEST_F(ChunkMapWithGapsTest, SplitWithinOwnedRangePreservesGaps) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    // Split [0, 10) into [0, 3), [3, 7), [7, 10) (minor-version bumps, same owner).
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(0), key(3), version(1, 2)),
+                                          makeChunkInfo(key(3), key(7), version(1, 3)),
+                                          makeChunkInfo(key(7), key(10), version(1, 4))});
+
+    ASSERT_EQ(updated.size(), 4);
+    ASSERT_EQ(updated.getVersion(), version(1, 4));
+    ASSERT(updated.findIntersectingChunk(key(5)));
+    ASSERT(updated.findIntersectingChunk(key(25)));
+    // The gap between the owned ranges is preserved.
+    ASSERT(!updated.findIntersectingChunk(key(15)));
+}
+
+// One incoming chunk that overlaps several existing chunks replaces them all (a merge). The gaps
+// around the merged range stay.
+TEST_F(ChunkMapWithGapsTest, MergeOverlappingMultipleChunks) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(3), version(1, 0)),
+                                          makeChunkInfo(key(3), key(7), version(1, 1)),
+                                          makeChunkInfo(key(7), key(10), version(1, 2)),
+                                          makeChunkInfo(key(20), key(30), version(1, 3))});
+    ASSERT_EQ(chunkMap.size(), 4);
+
+    // One chunk covering [0, 10) overlaps the three smaller chunks and merges them.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(0), key(10), version(2, 0))});
+
+    ASSERT_EQ(updated.size(), 2);
+    ASSERT_EQ(updated.getVersion(), version(2, 0));
+    auto merged = updated.findIntersectingChunk(key(5));
+    ASSERT(merged);
+    ASSERT_EQ(merged->getLastmod(), version(2, 0));
+    ASSERT(!updated.findIntersectingChunk(key(15)));
+}
+
+// A split whose pieces change ownership: half of [0, 10) stays on this shard and the other half
+// moves to another shard, in a single update.
+TEST_F(ChunkMapWithGapsTest, SplitWithOwnershipChange) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    auto updated =
+        chunkMap.createMerged({makeChunkInfo(key(0), key(5), version(2, 0), kThisShard),
+                               makeChunkInfo(key(5), key(10), version(2, 1), kAnotherShard)});
+
+    ASSERT_EQ(updated.size(), 3);
+    ASSERT_EQ(updated.findIntersectingChunk(key(2))->getShardId(), kThisShard);
+    ASSERT_EQ(updated.findIntersectingChunk(key(7))->getShardId(), kAnotherShard);
+    ASSERT_EQ(updated.findIntersectingChunk(key(25))->getShardId(), kThisShard);
+    ASSERT(!updated.findIntersectingChunk(key(15)));
+    ASSERT_EQ(getShardVersionMap(updated).size(), 2);
+}
+
+// Shrinking a chunk opens a gap where it used to reach. A complete map rejects this; a gap map
+// allows it.
+TEST_F(ChunkMapWithGapsTest, ShrinkChunkCreatesGapDoesNotThrow) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    // Shrink [0, 10) to [0, 8), opening a gap at [8, 10).
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(0), key(8), version(2, 0))});
+
+    ASSERT_EQ(updated.size(), 2);
+    ASSERT(updated.findIntersectingChunk(key(5)));
+    // The newly opened gap is not present.
+    ASSERT(!updated.findIntersectingChunk(key(9)));
+    ASSERT(updated.findIntersectingChunk(key(25)));
+}
+
+// An incoming chunk whose boundaries fall inside existing chunks drops every overlapped old chunk
+// wholesale (old chunks are never trimmed), leaving gaps on either side of the new chunk.
+TEST_F(ChunkMapWithGapsTest, InteriorBoundariesDropOverlappedChunks) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(10), key(20), version(1, 1)),
+                                          makeChunkInfo(key(20), key(30), version(1, 2))});
+
+    // [5, 15) partially overlaps [0, 10) and [10, 20); neither boundary matches an existing one.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(5), key(15), version(2, 0))});
+
+    ASSERT_EQ(updated.size(), 2);  // [5, 15) and the surviving [20, 30)
+    ASSERT_EQ(updated.getVersion(), version(2, 0));
+    ASSERT(!updated.findIntersectingChunk(key(2)));  // gap opened on the left
+    ASSERT(updated.findIntersectingChunk(key(7)));   // the new chunk
+    ASSERT(updated.findIntersectingChunk(key(12)));
+    ASSERT(!updated.findIntersectingChunk(key(17)));  // gap opened on the right
+    ASSERT(updated.findIntersectingChunk(key(25)));   // untouched old chunk
+}
+
+// Inserting a chunk strictly contained within a larger existing chunk drops the whole enclosing
+// chunk (no trimming), leaving the inner chunk surrounded by gaps.
+TEST_F(ChunkMapWithGapsTest, InnerChunkDropsEnclosingChunk) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(100), version(1, 0))});
+    ASSERT_EQ(chunkMap.size(), 1);
+
+    // [10, 20) is wholly inside [0, 100); the enclosing chunk overlaps it and is discarded.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(10), key(20), version(2, 0))});
+
+    ASSERT_EQ(updated.size(), 1);  // only [10, 20) remains
+    ASSERT_EQ(updated.getVersion(), version(2, 0));
+    ASSERT(!updated.findIntersectingChunk(key(5)));   // gap before
+    ASSERT(updated.findIntersectingChunk(key(15)));   // the inner chunk
+    ASSERT(!updated.findIntersectingChunk(key(50)));  // [0, 100) is gone, not trimmed
+}
+
+// Merging coalesces the contiguous chunks a shard owns. Ranges separated by a gap stay independent.
+TEST_F(ChunkMapWithGapsTest, MergeAllContiguousOwnedChunks) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(5), version(1, 0)),
+                                          makeChunkInfo(key(5), key(10), version(1, 1)),
+                                          makeChunkInfo(key(20), key(30), version(1, 2))});
+    ASSERT_EQ(chunkMap.size(), 3);
+
+    // Merge the contiguous [0, 5) + [5, 10) into [0, 10); the separated range is left alone.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(0), key(10), version(2, 0))});
+
+    ASSERT_EQ(updated.size(), 2);
+    ASSERT(updated.findIntersectingChunk(key(7)));
+    ASSERT(updated.findIntersectingChunk(key(25)));
+    ASSERT(!updated.findIntersectingChunk(key(15)));
+}
+
+// An update with no changed chunks is a no-op and leaves the map and its gaps unchanged.
+TEST_F(ChunkMapWithGapsTest, EmptyChangedChunksIsNoOp) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    auto updated = chunkMap.createMerged({});
+
+    ASSERT_EQ(updated.size(), 2);
+    ASSERT_EQ(updated.getVersion(), version(1, 1));
+    ASSERT(updated.findIntersectingChunk(key(5)));
+    ASSERT(updated.findIntersectingChunk(key(25)));
+    ASSERT(!updated.findIntersectingChunk(key(15)));
+}
+
+// A gap map whose first chunk does not start at MinKey can still be updated.
+TEST_F(ChunkMapWithGapsTest, FirstChunkNotAtMinKey) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(5), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    // Split the first owned chunk, which begins after MinKey.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(5), key(7), version(2, 0)),
+                                          makeChunkInfo(key(7), key(10), version(2, 1))});
+
+    ASSERT_EQ(updated.size(), 3);
+    ASSERT(updated.findIntersectingChunk(key(6)));
+    ASSERT(updated.findIntersectingChunk(key(8)));
+    // The leading gap before the first chunk is preserved.
+    ASSERT(!updated.findIntersectingChunk(key(2)));
+}
+
+// A gap map whose last chunk does not end at MaxKey can still be updated.
+TEST_F(ChunkMapWithGapsTest, LastChunkNotAtMaxKey) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    // Split the last owned chunk, which ends before MaxKey.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(20), key(25), version(2, 0)),
+                                          makeChunkInfo(key(25), key(30), version(2, 1))});
+
+    ASSERT_EQ(updated.size(), 3);
+    ASSERT(updated.findIntersectingChunk(key(22)));
+    ASSERT(updated.findIntersectingChunk(key(27)));
+    // The trailing gap after the last chunk is preserved.
+    ASSERT(!updated.findIntersectingChunk(key(35)));
+}
+
+// A single update can touch several separate regions at once: here it splits one owned range and
+// fills a separate gap in the same call.
+TEST_F(ChunkMapWithGapsTest, MultipleDisjointRegionsInOneCall) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(0), key(5), version(2, 0)),
+                                          makeChunkInfo(key(5), key(10), version(2, 1)),
+                                          makeChunkInfo(key(10), key(20), version(2, 2))});
+
+    ASSERT_EQ(updated.size(), 4);
+    ASSERT(updated.findIntersectingChunk(key(2)));
+    ASSERT(updated.findIntersectingChunk(key(7)));
+    // The former gap [10, 20) is now present.
+    ASSERT(updated.findIntersectingChunk(key(15)));
+    ASSERT(updated.findIntersectingChunk(key(25)));
+    ASSERT(!updated.findIntersectingChunk(key(-5)));
+    ASSERT(!updated.findIntersectingChunk(key(35)));
+}
+
+// An update chunk that spans a gap absorbs it: createMerged cannot tell the spanned range belongs
+// to another shard. Callers must never produce a chunk that crosses a range they do not own. This
+// documents the current behavior.
+TEST_F(ChunkMapWithGapsTest, ChunkSpanningGapAbsorbsIt) {
+    auto chunkMap = makeChunkMapWithGaps({makeChunkInfo(key(0), key(10), version(1, 0)),
+                                          makeChunkInfo(key(20), key(30), version(1, 1))});
+    ASSERT(!chunkMap.findIntersectingChunk(key(15)));
+
+    // [0, 30) overlaps both owned chunks and spans the gap [10, 20) between them.
+    auto updated = chunkMap.createMerged({makeChunkInfo(key(0), key(30), version(2, 0))});
+
+    ASSERT_EQ(updated.size(), 1);
+    // The previously absent range is now covered (incorrectly, ownership-wise).
+    ASSERT(updated.findIntersectingChunk(key(15)));
+}
+
+// Random stress test: build a partial map from a random subset of a fixed key grid (leaving random
+// gaps), then apply random in-place splits to the owned chunks. Splits never cross a gap, so the
+// set of owned cells stays the same. Checks that updates never throw and that owned cells stay
+// present while gap cells stay absent.
+TEST_F(ChunkMapWithGapsTest, RandomGapUpdatesNeverThrow) {
+    static constexpr int kNumCells = 10;
+    static constexpr int kCellWidth = 10;
+
+    // Randomly pick which grid cells this shard owns, keeping at least one owned cell and one gap.
+    std::vector<bool> ownedCell(kNumCells);
+    for (int i = 0; i < kNumCells; ++i) {
+        ownedCell[i] = _random.nextInt64(2) == 0;
+    }
+    if (std::all_of(ownedCell.begin(), ownedCell.end(), [](bool b) { return b; })) {
+        ownedCell[_random.nextInt64(kNumCells)] = false;
+    }
+    if (std::none_of(ownedCell.begin(), ownedCell.end(), [](bool b) { return b; })) {
+        ownedCell[_random.nextInt64(kNumCells)] = true;
+    }
+
+    std::vector<std::shared_ptr<ChunkInfo>> initialChunks;
+    for (int i = 0; i < kNumCells; ++i) {
+        if (ownedCell[i]) {
+            initialChunks.push_back(makeChunkInfo(key(i * kCellWidth),
+                                                  key((i + 1) * kCellWidth),
+                                                  version(1, static_cast<uint32_t>(i))));
+        }
+    }
+
+    auto chunkMap = makeChunkMapWithGaps(initialChunks);
+
+    // Run a random number of split rounds. Each round splits one owned chunk in half, within its
+    // own range, so no gap is ever crossed.
+    const int rounds = 1 + _random.nextInt32(5);
+    for (int r = 0; r < rounds; ++r) {
+        std::vector<std::pair<int, int>> splittable;
+        chunkMap.forEach([&](const auto& chunkInfo) {
+            if (chunkInfo->getShardId() == kThisShard) {
+                const int lo = chunkInfo->getMin()["a"].numberInt();
+                const int hi = chunkInfo->getMax()["a"].numberInt();
+                if (hi - lo >= 2) {
+                    splittable.emplace_back(lo, hi);
+                }
+            }
+            return true;
+        });
+        if (splittable.empty()) {
+            break;
+        }
+
+        const auto [lo, hi] = splittable[_random.nextInt64(splittable.size())];
+        const int mid = lo + (hi - lo) / 2;
+        auto v1 = chunkMap.getVersion();
+        v1.incMinor();
+        auto v2 = v1;
+        v2.incMinor();
+        chunkMap = chunkMap.createMerged(
+            {makeChunkInfo(key(lo), key(mid), v1), makeChunkInfo(key(mid), key(hi), v2)});
+    }
+
+    // The splits must not change which cells are owned and which are gaps.
+    for (int i = 0; i < kNumCells; ++i) {
+        const auto found = chunkMap.findIntersectingChunk(key(i * kCellWidth + kCellWidth / 2));
+        ASSERT_EQ(static_cast<bool>(found), static_cast<bool>(ownedCell[i])) << "cell " << i;
+        if (found) {
+            ASSERT_EQ(found->getShardId(), kThisShard);
+        }
+    }
 }
 }  // namespace
 

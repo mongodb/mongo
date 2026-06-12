@@ -1073,6 +1073,12 @@ public:
                                                const ShardId& shardId) const;
 
     /**
+     * Returns a new CurrentChunkManager with the given chunk changes applied to this manager's
+     * routing table.
+     */
+    CurrentChunkManager makeUpdated(const std::vector<ChunkType>& changedChunks) const;
+
+    /**
      * Returns the ids of all shards on which the collection has any chunks.
      * Can only be used when this ChunkManager is not at point-in-time.
      */
