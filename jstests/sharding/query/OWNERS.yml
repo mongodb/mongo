@@ -6,6 +6,10 @@ filters:
   - "collmod_upgrade_to_constraint_sharded.js":
     approvers:
       - 10gen/query-execution
+  # TODO SERVER-128915: Evaluate handing off ownership of collMod tests to CAR.
+  - "collmod_constraint_scan_with_chunk_migration.js":
+    approvers:
+      - 10gen/query-execution
   - "bulk_write*":
     approvers:
       - 10gen/query-execution-router
