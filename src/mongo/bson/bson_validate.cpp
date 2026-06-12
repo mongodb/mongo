@@ -373,11 +373,13 @@ public:
     ValidateBuffer(const char* data,
                    uint64_t maxLength,
                    BSONValidator validator,
-                   ValidationVersion validationVersion)
+                   ValidationVersion validationVersion,
+                   bool insideColumn = false)
         : _data(data),
           _maxLength(maxLength),
           _validator(validator),
-          _validationVersion(validationVersion) {
+          _validationVersion(validationVersion),
+          _insideColumn(insideColumn) {
         if constexpr (precise)
             _frames.resize(BSONDepth::getMaxAllowableDepth() + 1);
     }
@@ -547,6 +549,9 @@ private:
                 const char* columnStart = cursor.ptr;
                 cursor.skip(count);
                 if (subtype == BinDataType::Column && _validationVersion >= V2_Column) {
+                    uassert(InvalidBSONColumn,
+                            "BSONColumn cannot contain nested BSONColumn data",
+                            !_insideColumn);
                     /* do not pass down cursor; we want to reset the nesting depth */
                     uassert(NonConformantBSON,
                             "Invalid BSON column",
@@ -733,6 +738,7 @@ private:
     Frames _frames;  // Has end pointers to check and the containing element for precise mode.
     BSONValidator _validator;
     ValidationVersion _validationVersion;
+    bool _insideColumn;
     uint64_t _accumulatedUncompressedColumnSize;
     bool _firstFrameUpdated = false;  // Has the first frame received nested while measuring an elem
 };
@@ -909,21 +915,19 @@ public:
 
                     if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
                         size = ValidateBuffer<precise, DefaultValidator>(
-                                   ptr, end - ptr, DefaultValidator(), validationVersion)
+                                   ptr, end - ptr, DefaultValidator(), validationVersion, true)
                                    .validateAndMeasureElem();
                     else if (mode == BSONValidateModeEnum::kExtended)
                         size = ValidateBuffer<precise, ExtendedValidator>(
-                                   ptr, end - ptr, ExtendedValidator(), validationVersion)
+                                   ptr, end - ptr, ExtendedValidator(), validationVersion, true)
                                    .validateAndMeasureElem();
                     else if (mode == BSONValidateModeEnum::kFull)
                         size = ValidateBuffer<precise, FullValidator>(
-                                   ptr, end - ptr, FullValidator(), validationVersion)
+                                   ptr, end - ptr, FullValidator(), validationVersion, true)
                                    .validateAndMeasureElem();
                     else
                         MONGO_UNREACHABLE;
 
-                    // ptr is safe to dereference due to checks above, and we have confirmed size is
-                    // within the buffer.
                     memEstimator.onUncompressedElement(static_cast<BSONType>(*ptr), size);
                     ptr += size;
 
@@ -933,12 +937,26 @@ public:
                     // interleaved mode is not allowed.
                     uassert(InvalidBSONColumn, "Nested interleaved mode", !interleavedMode);
                     ++ptr;
-                    const auto validateResult = validateBSON(ptr, end - ptr, mode);
+                    const auto validateResult = [&]() -> Status {
+                        if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
+                            return ValidateBuffer<precise, DefaultValidator>(
+                                       ptr, end - ptr, DefaultValidator(), validationVersion, true)
+                                .validate();
+                        if (mode == BSONValidateModeEnum::kExtended)
+                            return ValidateBuffer<precise, ExtendedValidator>(
+                                       ptr, end - ptr, ExtendedValidator(), validationVersion, true)
+                                .validate();
+                        if (mode == BSONValidateModeEnum::kFull)
+                            return ValidateBuffer<precise, FullValidator>(
+                                       ptr, end - ptr, FullValidator(), validationVersion, true)
+                                .validate();
+                        MONGO_UNREACHABLE;
+                    }();
                     uassert(InvalidBSONColumn,
                             fmt::format("Invalid reference object for interleaved mode, {}",
                                         validateResult.reason()),
                             validateResult.isOK());
-                    // we now know due to validateBSON that it is safe to interpret *ptr
+                    // we now know the reference object is valid and safe to interpret
                     BSONObj reference(ptr);
                     ptr += reference.objsize();
 
