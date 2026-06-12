@@ -1,6 +1,9 @@
 // Tests the behavior of explain() when used with the aggregation pipeline.
 // - Explain() should not read or modify the plan cache.
 // - The result should always include serverInfo.
+// - Cursor is not required when running explain on an aggregate command.
+
+// @tags: [requires_fcv_90]
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.explain;
@@ -32,3 +35,16 @@ assert.eq(null, getAggPlanStage(result, "CACHED_PLAN"));
 result = coll.explain().aggregate([{$lookup: {from: "other_coll", pipeline: [], as: "docs"}}]);
 assert(result.hasOwnProperty("serverInfo"), result);
 assert.hasFields(result.serverInfo, ["host", "port", "version", "gitVersion"]);
+
+// Test that the 'cursor' option is not required for explain of an aggregate command using the
+// boolean 'explain' option or via the explain command itself.
+assert.commandWorked(
+    db.runCommand({
+        explain: {aggregate: coll.getName(), pipeline: [{$match: {x: 1}}]},
+        verbosity: "queryPlanner",
+    }),
+);
+
+assert.commandWorked(
+    db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {x: 1}}], explain: true}),
+);

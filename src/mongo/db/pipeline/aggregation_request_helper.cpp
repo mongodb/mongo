@@ -89,7 +89,7 @@ AggregateCommandRequest parseFromBSON(const BSONObj& cmdObj,
         request.setExplain(true);
     }
 
-    validate(request, cmdObj, request.getNamespace(), explainVerbosity);
+    validate(request, cmdObj, request.getNamespace());
 
     return request;
 }
@@ -111,26 +111,12 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
     }
 }
 
-// TODO SERVER-119402: Change explainVerbosity parameter to bool.
 void validate(const AggregateCommandRequest& aggregate,
               const BSONObj& cmdObj,
-              const NamespaceString& nss,
-              boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    // True if the aggregate command itself included an 'explain' field.
-    bool hasExplainElem = aggregate.getExplain().has_value();
-
-    // True if this request is being explained, either via a top-level 'explain'
-    // command (via explainVerbosity) or via an inline 'explain' field in the
-    // aggregation command.
-    bool hasExplain = explainVerbosity.has_value() || hasExplainElem;
+              const NamespaceString& nss) {
+    bool hasExplain = aggregate.getExplain().has_value();
     bool hasFromRouterElem = getFromRouter(aggregate).has_value();
     bool hasNeedsMergeElem = aggregate.getNeedsMerge().has_value();
-
-    if (explainVerbosity) {
-        uassert(ErrorCodes::FailedToParse,
-                "The 'explain' option is illegal when a explain verbosity is also provided",
-                !cmdObj.hasField(AggregateCommandRequest::kExplainFieldName));
-    }
 
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid collection name specified '{}'",
@@ -138,12 +124,11 @@ void validate(const AggregateCommandRequest& aggregate,
             cmdObj.firstElement().valueStringDataSafe() !=
                 NamespaceString::kCollectionlessAggregateCollection);
 
-    // 'hasExplainElem' implies an aggregate command-level explain option, which does not require
-    // a cursor argument.
+    // Explain of an aggregation command does not require the 'cursor' field.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The '" << AggregateCommandRequest::kCursorFieldName
                           << "' option is required, except for aggregate with the explain argument",
-            hasExplainElem || cmdObj.hasField(AggregateCommandRequest::kCursorFieldName));
+            hasExplain || cmdObj.hasField(AggregateCommandRequest::kCursorFieldName));
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Aggregation explain does not support the'"

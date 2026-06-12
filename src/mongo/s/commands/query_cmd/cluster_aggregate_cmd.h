@@ -155,11 +155,8 @@ public:
                                                              !Pipeline::aggHasWriteStage(body));
             uassertNoQuerySettings();
 
-            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides. We
-            // pass boost::none as explainVerbosity because 'validate()' interprets a non-none
-            // explainVerbosity as a top-level explain.
-            // TODO SERVER-119402: Change explainVerbosity parameter to bool.
-            aggregation_request_helper::validate(request(), body, ns(), boost::none);
+            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides.
+            aggregation_request_helper::validate(request(), body, ns());
 
             Impl::checkCanRunHere(opCtx);
 
@@ -181,12 +178,12 @@ public:
             // construction can see it.
             request().setExplain(true);
 
-            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides. We
-            // pass boost::none as explainVerbosity because 'validate()' interprets a non-none
-            // explainVerbosity as a top-level explain.
-            // TODO SERVER-119402: Change explainVerbosity parameter to bool.
-            aggregation_request_helper::validate(
-                request(), unparsedRequest().body, ns(), verbosity);
+            uassert(ErrorCodes::FailedToParse,
+                    "The 'explain' option is illegal when an explain verbosity is also provided",
+                    !unparsedRequest().body.hasField(AggregateCommandRequest::kExplainFieldName));
+
+            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides.
+            aggregation_request_helper::validate(request(), unparsedRequest().body, ns());
 
             auto bodyBuilder = result->getBodyBuilder();
             _runAggCommand(opCtx, &bodyBuilder, verbosity);

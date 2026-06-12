@@ -177,6 +177,16 @@ TEST(AggregationRequestTest, ShouldParseWithSeparateQueryPlannerExplainModeArgAn
         10);
 }
 
+TEST(AggregationRequestTest, ShouldParseWithSeparateExplainArgAndNoCursor) {
+    // The 'cursor' option is not required when explain verbosity is provided - parseFromBSON sets
+    // explain=true on the request before calling validate(), so validate() sees hasExplain=true.
+    const BSONObj inputBson = fromjson("{aggregate: 'collection', pipeline: [], $db: 'a'}");
+    auto request = unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(
+        inputBson, boost::none, ExplainOptions::Verbosity::kQueryPlanner));
+    ASSERT(request.getExplain());
+    ASSERT(request.getExplain().value());
+}
+
 TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
     // Non-local readConcern should not be allowed with the explain flag, but this is checked
@@ -581,6 +591,42 @@ TEST(AggregationRequestTest, ShouldRejectNoCursorNoExplain) {
     BSONObjBuilder cursorRequest(invalidRequest);
     cursorRequest.append("cursor", BSONObj());
     ASSERT_OK(aggregation_request_helper::parseFromBSONForTests(cursorRequest.done()).getStatus());
+}
+
+TEST(AggregationRequestTest, ValidateDirectlyAllowsNoCursorWhenExplainSet) {
+    // validate() no longer takes an explainVerbosity parameter. Callers set explain=true on the
+    // request before calling validate(), so validate() sees hasExplain=true and allows cursor to
+    // be absent.
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
+    request.setExplain(true);
+
+    const BSONObj cmdObj = fromjson("{aggregate: 'collection', pipeline: [], $db: 'a'}");
+    ASSERT_DOES_NOT_THROW(aggregation_request_helper::validate(request, cmdObj, nss));
+}
+
+TEST(AggregationRequestTest, ValidateDirectlyRequiresCursorWhenExplainNotSet) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
+
+    const BSONObj cmdObj = fromjson("{aggregate: 'collection', pipeline: [], $db: 'a'}");
+    ASSERT_THROWS_CODE(aggregation_request_helper::validate(request, cmdObj, nss),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST(AggregationRequestTest, ValidateDirectlyRejectsWriteConcernWithExplain) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
+    request.setExplain(true);
+    request.setWriteConcern(
+        WriteConcernOptions{1, WriteConcernOptions::SyncMode::NONE, Milliseconds{0}});
+
+    const BSONObj cmdObj = fromjson(
+        "{aggregate: 'collection', pipeline: [], explain: true, writeConcern: {w: 1}, $db: 'a'}");
+    ASSERT_THROWS_CODE(aggregation_request_helper::validate(request, cmdObj, nss),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonObjectCursor) {

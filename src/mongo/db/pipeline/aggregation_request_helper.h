@@ -117,8 +117,7 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
  */
 void validate(const AggregateCommandRequest& aggregate,
               const BSONObj& cmdObj,
-              const NamespaceString& nss,
-              boost::optional<ExplainOptions::Verbosity> explainVerbosity);
+              const NamespaceString& nss);
 
 /**
  * Validates if 'AggregateCommandRequest' specs complies with the current Client, which is required
