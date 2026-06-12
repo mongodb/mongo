@@ -171,7 +171,7 @@ oscrypto = { version = "^1.3.0", markers = "platform_machine != 's390x' and plat
 # Werkzeug is needed for ocsp tests in ocsp_mock.py
 Werkzeug = "<=3.1.6"
 PyGithub = "^1.58"
-urllib3 = "^2.2.2"
+urllib3 = "^2.7.0"
 distro = "^1.9.0"
 dnspython = "^2.6.1"
 proxy-protocol = "^0.11.3"
