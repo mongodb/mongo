@@ -186,6 +186,8 @@ estimateWithSubpipeline("many_rows", "many_rows", "c_idx", "c_idx");
 print("# Joins on a unique index");
 estimateNoSubpipeline("many_rows", "many_rows", "i_idx_unique", "d_idx");
 estimateNoSubpipeline("many_rows", "many_rows", "d_idx", "i_idx_unique");
+estimateWithSubpipeline("many_rows", "many_rows", "i_idx_unique", "d_idx");
+estimateWithSubpipeline("many_rows", "many_rows", "d_idx", "i_idx_unique");
 
 print("# Join where there is an index only on one side");
 estimateNoSubpipeline("many_rows", "many_rows", "i_idx", "i_noidx");
