@@ -36,6 +36,7 @@
 #include "mongo/db/query/fle/query_rewriter.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -66,8 +67,8 @@ protected:
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const NamespaceString nssEsc;
-    const std::map<NamespaceString, NamespaceString>
-        _escMap;  // Map collection Ns to ESC metadata collection nss.
+    // Map collection Ns to its EncryptedFieldConfig.
+    const std::map<NamespaceString, EncryptedFieldConfig> _efcMap;
 };
 
 /**
@@ -91,6 +92,7 @@ public:
     const BSONObj userFilter;
     BSONObj rewrittenFilter;
     EncryptedCollScanModeAllowed _mode;
+    const EncryptedFieldConfig _efc;
 };
 
 /**
@@ -115,6 +117,8 @@ protected:
     virtual QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl);
 
     std::unique_ptr<Pipeline> _pipeline;
+    // Unset for an unencrypted collection with encrypted $lookup sub-pipelines.
+    const boost::optional<EncryptedFieldConfig> _efc;
 };
 }  // namespace fle
 }  // namespace mongo

@@ -164,11 +164,13 @@ BSONObj rewriteEncryptedFilterV2(FLETagQueryInterface* queryImpl,
                                  const NamespaceString& nssEsc,
                                  boost::intrusive_ptr<ExpressionContext> expCtx,
                                  BSONObj filter,
-                                 const std::map<NamespaceString, NamespaceString>& escMap,
-                                 EncryptedCollScanModeAllowed mode) {
+                                 const std::map<NamespaceString, EncryptedFieldConfig>& efcMap,
+                                 EncryptedCollScanModeAllowed mode,
+                                 const EncryptedFieldConfig* efc) {
 
-    if (auto rewritten =
-            QueryRewriter(expCtx, queryImpl, nssEsc, escMap, mode).rewriteMatchExpression(filter)) {
+    QueryRewriter rewriter(expCtx, queryImpl, nssEsc, efcMap, mode);
+    rewriter.setEncryptedFieldConfigForValidation(efc);
+    if (auto rewritten = rewriter.rewriteMatchExpression(filter)) {
         return rewritten.value();
     }
 
@@ -229,27 +231,22 @@ NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encry
     return NamespaceStringUtil::deserialize(nss.dbName(), std::string{*efc.getEscCollection()});
 }
 
-std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
-    const DatabaseName& dbName, const EncryptionInformation& encryptInfo) {
-    std::map<NamespaceString, NamespaceString> escMap;
-    if (feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabled()) {
-        // Get the Esc collection namespace for every namespace in our encryption schema.
-        for (const auto& elem : encryptInfo.getSchema()) {
-            uassert(9775500,
-                    "Each namespace schema "
-                    "must be an object",
-                    elem.type() == BSONType::object);
-            auto schemaNs = NamespaceStringUtil::deserialize(
-                boost::none, elem.fieldNameStringData(), SerializationContext::stateDefault());
-            auto efc = EncryptionInformationHelpers::getAndValidateSchema(schemaNs, encryptInfo);
-
-            escMap.emplace(std::piecewise_construct,
-                           std::forward_as_tuple(std::move(schemaNs)),
-                           std::forward_as_tuple(NamespaceStringUtil::deserialize(
-                               dbName, std::string{*efc.getEscCollection()})));
-        }
+std::map<NamespaceString, EncryptedFieldConfig> generateEncryptInfoEfcMap(
+    const EncryptionInformation& encryptInfo) {
+    std::map<NamespaceString, EncryptedFieldConfig> efcMap;
+    if (!feature_flags::gFeatureFlagLookupEncryptionSchemasFLE.isEnabled()) {
+        return efcMap;
     }
-    return escMap;
+    // Get the EncryptedFieldConfig for every namespace in our encryption schema.
+    for (const auto& elem : encryptInfo.getSchema()) {
+        uassert(
+            9775500, "Each namespace schema must be an object", elem.type() == BSONType::object);
+        auto schemaNs = NamespaceStringUtil::deserialize(
+            boost::none, elem.fieldNameStringData(), SerializationContext::stateDefault());
+        auto efc = EncryptionInformationHelpers::getAndValidateSchema(schemaNs, encryptInfo);
+        efcMap.emplace(std::move(schemaNs), std::move(efc));
+    }
+    return efcMap;
 }
 }  // namespace
 
@@ -257,9 +254,7 @@ RewriteBase::RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nss,
                          const NamespaceString& escNss,
                          const EncryptionInformation& encryptInfo)
-    : expCtx(expCtx),
-      nssEsc(escNss),
-      _escMap(generateEncryptInfoEscMap(nss.dbName(), encryptInfo)) {}
+    : expCtx(expCtx), nssEsc(escNss), _efcMap(generateEncryptInfoEfcMap(encryptInfo)) {}
 
 FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const NamespaceString& nss,
@@ -273,12 +268,23 @@ FilterRewrite::FilterRewrite(boost::intrusive_ptr<ExpressionContext> expCtx,
                       nss.dbName(), std::string{*validatedConfig.getEscCollection()}),
                   encryptInfo),
       userFilter(toRewrite),
-      _mode(mode) {}
+      _mode(mode),
+      _efc(validatedConfig) {}
 
 void FilterRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
     rewrittenFilter =
-        rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _escMap, _mode);
+        rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _efcMap, _mode, &_efc);
 }
+
+namespace {
+boost::optional<EncryptedFieldConfig> efcForPrimaryNss(const NamespaceString& nss,
+                                                       const EncryptionInformation& encryptInfo) {
+    if (!encryptInfo.getSchema().hasField(nss.serializeWithoutTenantPrefix_UNSAFE())) {
+        return boost::none;
+    }
+    return EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
+}
+}  // namespace
 
 PipelineRewrite::PipelineRewrite(const NamespaceString& nss,
                                  const EncryptionInformation& encryptInfo,
@@ -287,7 +293,8 @@ PipelineRewrite::PipelineRewrite(const NamespaceString& nss,
                   nss,
                   getAndValidateEscNsFromSchema(encryptInfo, nss),
                   encryptInfo),
-      _pipeline(std::move(toRewrite)) {}
+      _pipeline(std::move(toRewrite)),
+      _efc(efcForPrimaryNss(nss, encryptInfo)) {}
 
 void PipelineRewrite::doRewrite(FLETagQueryInterface* queryImpl) {
     auto rewriter = getQueryRewriterForEsc(queryImpl);
@@ -303,7 +310,11 @@ std::unique_ptr<Pipeline> PipelineRewrite::getPipeline() {
 }
 
 QueryRewriter PipelineRewrite::getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) {
-    return QueryRewriter(expCtx, queryImpl, nssEsc, _escMap);
+    QueryRewriter rewriter(expCtx, queryImpl, nssEsc, _efcMap);
+    if (_efc) {
+        rewriter.setEncryptedFieldConfigForValidation(_efc.get_ptr());
+    }
+    return rewriter;
 }
 
 BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
@@ -315,7 +326,7 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
     NamespaceString nssEsc(
         NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection().value()));
 
-    return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, {{nss, nssEsc}}, mode);
+    return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, {{nss, efc}}, mode, &efc);
 }
 
 BSONObj rewriteQuery(OperationContext* opCtx,

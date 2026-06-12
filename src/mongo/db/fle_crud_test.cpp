@@ -1556,6 +1556,78 @@ TEST_F(FleCrudTest, validateIndexKeyInvalid) {
                              });
 }
 
+namespace {
+// Build an FLE2 insert payload BSON for a single text-search field. The payload is wrapped in
+// BinData(Encrypt) with the kFLE2InsertUpdatePayloadV2 type byte so downstream parsing succeeds.
+BSONObj makeTextInsertPayload(StringData path, const UUID& keyId, int64_t contentionFactor) {
+    auto bogusEncryptedTokens =
+        StateCollectionTokensV2({{}}, boost::none, boost::none).encrypt({{}});
+    FLE2InsertUpdatePayloadV2 payload({},
+                                      {},
+                                      bogusEncryptedTokens,
+                                      keyId,
+                                      stdx::to_underlying(BSONType::string),
+                                      {},
+                                      {},
+                                      {},
+                                      contentionFactor);
+    // Populate the prefix token-set array (the field is configured for Prefix) alongside the
+    // always- present exact token set, mirroring a real prefix insert payload.
+    payload.setTextSearchTokenSets(TextSearchTokenSets{
+        {{}, {}, {}, bogusEncryptedTokens}, {}, {}, {{{}, {}, {}, bogusEncryptedTokens}}});
+    auto iup = payload.toBSON();
+    std::vector<uint8_t> buf(iup.objsize() + 1);
+    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
+    std::copy(iup.objdata(), iup.objdata() + iup.objsize(), buf.data() + 1);
+    BSONObjBuilder builder;
+    builder.appendBinData(path, buf.size(), BinDataType::Encrypt, buf.data());
+    return builder.obj();
+}
+
+EncryptedFieldConfig makeTextEfcSingleField(StringData path,
+                                            const UUID& keyId,
+                                            int64_t contention) {
+    QueryTypeConfig qtc;
+    qtc.setQueryType(QueryTypeEnum::Prefix);
+    qtc.setContention(contention);
+    qtc.setStrMinQueryLength(2);
+    qtc.setStrMaxQueryLength(10);
+    qtc.setCaseSensitive(true);
+    qtc.setDiacriticSensitive(true);
+    EncryptedField ef(keyId, std::string{path});
+    ef.setBsonType("string"_sd);
+    ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtc)});
+    EncryptedFieldConfig efc({std::move(ef)});
+    efc.setEscCollection(std::string{"enxcol_.coll.esc"});
+    efc.setEcocCollection(std::string{"enxcol_.coll.ecoc"});
+    efc.setStrEncodeVersion(1);
+    return efc;
+}
+}  // namespace
+
+TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
+    RAIIServerParameterControllerForTest ffctrl{"featureFlagQETextSearchPreview", true};
+    const UUID keyId = UUID::gen();
+    auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
+    auto fields = efc.getFields();
+
+    auto doc = makeTextInsertPayload("encrypted"_sd, keyId, 100 /* sampled c */);
+    auto payload = EDCServerCollection::getEncryptedFieldInfo(doc);
+    ASSERT_THROWS_CODE(
+        validateInsertUpdatePayloads(_opCtx.get(), fields, payload), DBException, 9188700);
+}
+
+TEST_F(FleCrudTest, validateTextSearchInsertValidContention) {
+    RAIIServerParameterControllerForTest ffctrl{"featureFlagQETextSearchPreview", true};
+    const UUID keyId = UUID::gen();
+    auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
+    auto fields = efc.getFields();
+
+    auto doc = makeTextInsertPayload("encrypted"_sd, keyId, 1 /* sampled c */);
+    auto payload = EDCServerCollection::getEncryptedFieldInfo(doc);
+    validateInsertUpdatePayloads(_opCtx.get(), fields, payload);
+}
+
 TEST_F(FleTagsTest, InsertOne) {
     auto doc = BSON("encrypted" << "a");
 

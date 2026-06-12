@@ -87,7 +87,7 @@ protected:
         return isStubPayload;
     }
 
-    std::vector<PrfBlock> generateTags(BSONValue payload) const override {
+    std::vector<PrfBlock> generateTags(BSONValue payload, StringData) const override {
         return visit(
             OverloadedVisitor{[&](BSONElement p) {
                                   if (p.isABSONObj()) {

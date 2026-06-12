@@ -81,14 +81,14 @@ public:
     {                                                                              \
         auto input = fromjson(json);                                               \
         auto expr = uassertStatusOK(MatchExpressionParser::parse(input, _expCtx)); \
-        ASSERT_DOES_NOT_THROW(validateRanges(*expr.get()));                        \
+        ASSERT_DOES_NOT_THROW(validateRanges(*expr.get(), boost::none));           \
     }
 
-#define ASSERT_INVALID_RANGE_MATCH(code, json)                                     \
-    {                                                                              \
-        auto input = fromjson(json);                                               \
-        auto expr = uassertStatusOK(MatchExpressionParser::parse(input, _expCtx)); \
-        ASSERT_THROWS_CODE(validateRanges(*expr.get()), DBException, code);        \
+#define ASSERT_INVALID_RANGE_MATCH(code, json)                                           \
+    {                                                                                    \
+        auto input = fromjson(json);                                                     \
+        auto expr = uassertStatusOK(MatchExpressionParser::parse(input, _expCtx));       \
+        ASSERT_THROWS_CODE(validateRanges(*expr.get(), boost::none), DBException, code); \
     }
 
 
@@ -97,7 +97,7 @@ public:
         auto input = fromjson(json);                                                         \
         auto expr =                                                                          \
             Expression::parseExpression(_expCtx.get(), input, _expCtx->variablesParseState); \
-        ASSERT_DOES_NOT_THROW(validateRanges(*expr.get()));                                  \
+        ASSERT_DOES_NOT_THROW(validateRanges(*expr.get(), boost::none));                     \
     }
 
 #define ASSERT_INVALID_RANGE_EXPR(code, json)                                                \
@@ -105,7 +105,7 @@ public:
         auto input = fromjson(json);                                                         \
         auto expr =                                                                          \
             Expression::parseExpression(_expCtx.get(), input, _expCtx->variablesParseState); \
-        ASSERT_THROWS_CODE(validateRanges(*expr.get()), DBException, code);                  \
+        ASSERT_THROWS_CODE(validateRanges(*expr.get(), boost::none), DBException, code);     \
     }
 
 namespace {
@@ -260,6 +260,20 @@ std::string eq(std::string field, std::string rhs) {
     return queryOp("$eq", {quote(dollar(field)), rhs});
 }
 }  // namespace agg
+
+// Builds an EncryptedFieldConfig with a single range-indexed field at `path` and the given
+// contention, for exercising the EFC-aware validation path through validateRanges.
+EncryptedFieldConfig rangeEfc(StringData path, int64_t contention) {
+    QueryTypeConfig qtc;
+    qtc.setQueryType(QueryTypeEnum::Range);
+    qtc.setContention(contention);
+    EncryptedField ef(indexKeyId, std::string{path});
+    ef.setBsonType("int"_sd);
+    ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{std::move(qtc)});
+    EncryptedFieldConfig efc;
+    efc.setFields({std::move(ef)});
+    return efc;
+}
 }  // namespace
 
 ///////////////////////////////
@@ -678,5 +692,28 @@ TEST_F(RangeValidatorTest, PayloadUnderEqualityOp) {
 
     ASSERT_VALID_RANGE_MATCH(match::eq("age", stub("age", 0, Fle2RangeOperator::kGt, boost::none)));
     ASSERT_VALID_RANGE_EXPR(agg::eq("age", stub("age", 0, Fle2RangeOperator::kGt, boost::none)));
+}
+
+TEST_F(RangeValidatorTest, EfcValidationThroughValidateRanges) {
+    // Test-helper payloads carry contention 0. A field configured with a different contention must
+    // be rejected, and a matching one accepted, confirming the EFC threads through validateRanges
+    // into the payload validation.
+    auto p = payload("age", 0, Fle2RangeOperator::kGt, boost::none);
+
+    // The parsed MatchExpression/Expression reference the input BSONObj without owning it, so the
+    // inputs must outlive the validateRanges calls below.
+    auto matchInput = fromjson(match::range("age", Fle2RangeOperator::kGt, p));
+    auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(matchInput, _expCtx));
+    auto aggInput = fromjson(agg::range("age", Fle2RangeOperator::kGt, p));
+    auto aggExpr =
+        Expression::parseExpression(_expCtx.get(), aggInput, _expCtx->variablesParseState);
+
+    auto mismatched = rangeEfc("age", 8);
+    ASSERT_THROWS_CODE(validateRanges(*matchExpr.get(), mismatched), DBException, 9188701);
+    ASSERT_THROWS_CODE(validateRanges(*aggExpr.get(), mismatched), DBException, 9188701);
+
+    auto matching = rangeEfc("age", 0);
+    ASSERT_DOES_NOT_THROW(validateRanges(*matchExpr.get(), matching));
+    ASSERT_DOES_NOT_THROW(validateRanges(*aggExpr.get(), matching));
 }
 }  // namespace mongo::fle

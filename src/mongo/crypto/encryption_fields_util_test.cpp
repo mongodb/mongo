@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/container/small_vector.hpp>
-#include <boost/optional/optional.hpp>
-
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/crypto/encryption_fields_util.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/crypto/encryption_fields_util.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace mongo {
 

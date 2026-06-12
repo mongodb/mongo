@@ -82,4 +82,16 @@ bool visitQueryTypeConfigs(const EncryptedFieldConfig& efc,
     return false;
 }
 
+boost::optional<QueryTypeEnum> findStringSearchQueryType(const EncryptedField& field) {
+    boost::optional<QueryTypeEnum> result;
+    visitQueryTypeConfigs(field, [&](const EncryptedField&, const QueryTypeConfig& qtc) {
+        if (isFLE2TextQueryType(qtc.getQueryType())) {
+            result = qtc.getQueryType();
+            return true;
+        }
+        return false;
+    });
+    return result;
+}
+
 }  // namespace mongo

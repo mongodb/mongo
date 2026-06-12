@@ -39,8 +39,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_payload_validation.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
@@ -386,9 +388,9 @@ using VTS = auth::ValidatedTenancyScope;
 void validateInsertUpdatePayloads(OperationContext* opCtx,
                                   const std::vector<EncryptedField>& fields,
                                   const std::vector<EDCServerPayloadInfo>& payload) {
-    std::map<StringData, UUID> pathToKeyIdMap;
+    std::map<StringData, const EncryptedField*> pathToFieldMap;
     for (const auto& field : fields) {
-        pathToKeyIdMap.insert({field.getPath(), field.getKeyId()});
+        pathToFieldMap.insert({field.getPath(), &field});
     }
 
     uassert(9783803,
@@ -401,17 +403,20 @@ void validateInsertUpdatePayloads(OperationContext* opCtx,
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-    for (const auto& field : payload) {
-        auto& fieldPath = field.fieldPathName;
-        auto expect = pathToKeyIdMap.find(fieldPath);
+    for (const auto& info : payload) {
+        auto& fieldPath = info.fieldPathName;
+        auto expect = pathToFieldMap.find(fieldPath);
         uassert(6726300,
                 str::stream() << "Field '" << fieldPath << "' is unexpectedly encrypted",
-                expect != pathToKeyIdMap.end());
-        auto& indexKeyId = field.payload.getIndexKeyId();
+                expect != pathToFieldMap.end());
+        const auto& field = *expect->second;
+        auto& indexKeyId = info.payload.getIndexKeyId();
         uassert(6726301,
                 str::stream() << "Mismatched keyId for field '" << fieldPath << "' expected "
-                              << expect->second << ", found " << indexKeyId,
-                indexKeyId == expect->second);
+                              << field.getKeyId() << ", found " << indexKeyId,
+                indexKeyId == field.getKeyId());
+
+        validatePayloadAgainstQueryTypeConfig(fieldPath, field, toFLE2PayloadParams(info.payload));
     }
 }
 

@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
+
 namespace MONGO_MOD_PUB mongo {
 
+class EncryptedField;
 class FLETagQueryInterface;
 
 namespace fle {
@@ -71,6 +75,12 @@ public:
 
     virtual EncryptedCollScanMode getEncryptedCollScanMode() const = 0;
     virtual ExpressionContext* getExpressionContext() const = 0;
+
+    // EncryptedFieldConfig for the current namespace, or boost::none if validation isn't enabled.
+    virtual boost::optional<const EncryptedFieldConfig&> getEncryptedFieldConfigForValidation()
+        const {
+        return boost::none;
+    }
 };
 }  // namespace fle
 }  // namespace MONGO_MOD_PUB mongo

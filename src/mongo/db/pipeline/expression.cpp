@@ -5574,7 +5574,9 @@ ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx
         if (encryptedBinDataType == EncryptedBinDataType::kFLE2FindTextPayload) {
             // Parse the value as a ParsedFindTextSearchPayload, and use the server token to
             // initiate _evaluatorV2 with the zerosTokens.
-            auto tokens = ParsedFindTextSearchPayload(value);
+            // Pass empty string and boost::none to skip validation, since validation already
+            // happened in the rewrite layer and we have no schema context here.
+            auto tokens = ParsedFindTextSearchPayload(value, ""_sd, boost::none);
             _evaluatorV2 = EncryptedPredicateEvaluatorV2(
                 {ServerZerosEncryptionToken::deriveFrom(tokens.server)});
         } else {

@@ -1145,9 +1145,17 @@ struct ParsedFindEqualityPayload {
     // v2 fields
     ServerDerivedFromDataToken serverDataDerivedToken;
 
-    explicit ParsedFindEqualityPayload(BSONElement fleFindPayload);
-    explicit ParsedFindEqualityPayload(const Value& fleFindPayload);
-    explicit ParsedFindEqualityPayload(ConstDataRange cdr);
+    // Parses + validates the payload's params against the Equality QueryTypeConfig at `path` in
+    // `efc`. Pass efc=boost::none to opt out (only valid when no schema context is available).
+    ParsedFindEqualityPayload(BSONElement fleFindPayload,
+                              StringData path,
+                              boost::optional<const EncryptedFieldConfig&> efc);
+    ParsedFindEqualityPayload(const Value& fleFindPayload,
+                              StringData path,
+                              boost::optional<const EncryptedFieldConfig&> efc);
+    ParsedFindEqualityPayload(ConstDataRange cdr,
+                              StringData path,
+                              boost::optional<const EncryptedFieldConfig&> efc);
 };
 
 struct FLEFindEdgeTokenSet {
@@ -1171,9 +1179,17 @@ struct ParsedFindRangePayload {
     boost::optional<IDLAnyType> indexMin{};
     boost::optional<IDLAnyType> indexMax{};
 
-    explicit ParsedFindRangePayload(BSONElement fleFindRangePayload);
-    explicit ParsedFindRangePayload(const Value& fleFindRangePayload);
-    explicit ParsedFindRangePayload(ConstDataRange cdr);
+    // Parses + validates the payload's params against the Range QueryTypeConfig at `path` in `efc`.
+    // Pass efc=boost::none to opt out (only valid when no schema context is available).
+    ParsedFindRangePayload(BSONElement fleFindRangePayload,
+                           StringData path,
+                           boost::optional<const EncryptedFieldConfig&> efc);
+    ParsedFindRangePayload(const Value& fleFindRangePayload,
+                           StringData path,
+                           boost::optional<const EncryptedFieldConfig&> efc);
+    ParsedFindRangePayload(ConstDataRange cdr,
+                           StringData path,
+                           boost::optional<const EncryptedFieldConfig&> efc);
 
     bool isStub() {
         return !edges.has_value();
@@ -1186,9 +1202,18 @@ struct ParsedFindTextSearchPayload {
     boost::optional<mongo::TextSuffixFindTokenSet> suffixTokens;
     boost::optional<mongo::TextPrefixFindTokenSet> prefixTokens;
 
-    explicit ParsedFindTextSearchPayload(BSONElement fleFindPayload);
-    explicit ParsedFindTextSearchPayload(const Value& fleFindPayload);
-    explicit ParsedFindTextSearchPayload(ConstDataRange cdr);
+    // Parses + validates the payload's params against the text QueryTypeConfig at `path` in `efc`
+    // matching the payload's token variant. Pass efc=boost::none to opt out (only valid when no
+    // schema context is available).
+    ParsedFindTextSearchPayload(BSONElement fleFindPayload,
+                                StringData path,
+                                boost::optional<const EncryptedFieldConfig&> efc);
+    ParsedFindTextSearchPayload(const Value& fleFindPayload,
+                                StringData path,
+                                boost::optional<const EncryptedFieldConfig&> efc);
+    ParsedFindTextSearchPayload(ConstDataRange cdr,
+                                StringData path,
+                                boost::optional<const EncryptedFieldConfig&> efc);
 
     std::int64_t maxCounter{};
 

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/fle/text_search_predicate.h"
 
+#include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/server_feature_flags_gen.h"
 
@@ -47,8 +48,9 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrNormalizedEq,
                                                    TextSearchPredicate,
                                                    gFeatureFlagQETextSearchPreview);
 
-std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload) const {
-    ParsedFindTextSearchPayload tokens = parseFindPayload<ParsedFindTextSearchPayload>(payload);
+std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload, StringData path) const {
+    ParsedFindTextSearchPayload tokens = parseFindPayload<ParsedFindTextSearchPayload>(
+        payload, path, _rewriter->getEncryptedFieldConfigForValidation());
     return readTags(_rewriter->getTagQueryInterface(),
                     _rewriter->getESCNss(),
                     tokens.esc,
@@ -63,8 +65,9 @@ std::unique_ptr<Expression> TextSearchPredicate::rewriteToTagDisjunction(Express
         if (!isPayload(payload)) {
             return nullptr;
         }
+        auto path = textSearchExpr->getInput().getFieldPathWithoutCurrentPrefix().fullPath();
         return makeTagDisjunction(_rewriter->getExpressionContext(),
-                                  toValues(generateTags(std::ref(payload))));
+                                  toValues(generateTags(std::ref(payload), path)));
     }
     MONGO_UNREACHABLE_TASSERT(10112602);
 }
@@ -82,9 +85,10 @@ std::unique_ptr<MatchExpression> TextSearchPredicate::_rewriteToTagDisjunctionAs
     if (!isPayload(payload)) {
         return nullptr;
     }
+    auto path = expr.getInput().getFieldPathWithoutCurrentPrefix().fullPath();
     // Here we create a match style in list. It is only allowed when replacing a single
     // root level $expr predicate.
-    return makeTagDisjunction(toBSONArray(generateTags(payload)));
+    return makeTagDisjunction(toBSONArray(generateTags(payload, path)));
 }
 
 std::unique_ptr<Expression> TextSearchPredicate::rewriteToRuntimeComparison(

@@ -71,7 +71,7 @@ namespace fle {
  * mismatch, the server will return an error reminding the user to regenerate their encrypted
  * payloads for their new query.
  */
-void validateRanges(const MatchExpression& expr);
-void validateRanges(const Expression& expr);
+void validateRanges(const MatchExpression& expr, boost::optional<const EncryptedFieldConfig&> efc);
+void validateRanges(const Expression& expr, boost::optional<const EncryptedFieldConfig&> efc);
 }  // namespace fle
 }  // namespace mongo

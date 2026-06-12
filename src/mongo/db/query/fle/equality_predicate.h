@@ -54,7 +54,7 @@ public:
     EqualityPredicate(const QueryRewriterInterface* rewriter) : EncryptedPredicate(rewriter) {}
 
 protected:
-    std::vector<PrfBlock> generateTags(BSONValue payload) const override;
+    std::vector<PrfBlock> generateTags(BSONValue payload, StringData path) const override;
 
     std::unique_ptr<MatchExpression> rewriteToTagDisjunction(MatchExpression* expr) const override;
     std::unique_ptr<Expression> rewriteToTagDisjunction(Expression* expr) const override;
@@ -74,10 +74,10 @@ private:
         return EncryptedBinDataType::kFLE2FindEqualityPayloadV2;
     }
 
-    boost::optional<std::pair<ExpressionFieldPath*, ExpressionConstant*>>
-    extractDetailsFromComparison(ExpressionCompare* eqExpr) const;
+    boost::optional<std::pair<const ExpressionFieldPath*, const ExpressionConstant*>>
+    extractDetailsFromComparison(const ExpressionCompare* eqExpr) const;
 
-    boost::optional<const ExpressionFieldPath*> validateIn(ExpressionIn* inExpr,
-                                                           ExpressionArray* inList) const;
+    boost::optional<const ExpressionFieldPath*> validateIn(const ExpressionIn* inExpr,
+                                                           const ExpressionArray* inList) const;
 };
 }  // namespace mongo::fle

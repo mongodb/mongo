@@ -65,7 +65,7 @@ public:
     bool hasValidPayload(const ExpressionEncTextSearch& expr) const;
 
 protected:
-    std::vector<PrfBlock> generateTags(BSONValue payload) const override;
+    std::vector<PrfBlock> generateTags(BSONValue payload, StringData path) const override;
 
     std::unique_ptr<Expression> rewriteToTagDisjunction(Expression* expr) const override;
     std::unique_ptr<MatchExpression> rewriteToTagDisjunction(MatchExpression* expr) const override;

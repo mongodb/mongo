@@ -102,12 +102,13 @@ void validateOneSidedRange(Fle2RangeOperator ty, const ParsedFindRangePayload& p
             ty == payload.firstOp);
 }
 
-void validateOneSidedRange(const ComparisonMatchExpression& expr) {
+void validateOneSidedRange(const ComparisonMatchExpression& expr,
+                           boost::optional<const EncryptedFieldConfig&> efc) {
     auto data = expr.getData();
     if (!hasRangeTypeToValidate(data)) {
         return;
     }
-    auto payload = parseFindPayload<ParsedFindRangePayload>(data);
+    auto payload = parseFindPayload<ParsedFindRangePayload>(data, expr.path(), efc);
     validateOneSidedRange(matchTypeToRangeOp(expr.matchType()), payload);
 }
 
@@ -224,7 +225,8 @@ void updateValidatorForPayload(ValidatorMap& map,
     payloadEntry->second.update(rangeOp, payload);
 }
 
-void validateTwoSidedRanges(const AndMatchExpression& expr) {
+void validateTwoSidedRanges(const AndMatchExpression& expr,
+                            boost::optional<const EncryptedFieldConfig&> efc) {
     // Keep track of a map from payloadId to the validator struct.
     ValidatorMap payloads;
     for (size_t i = 0; i < expr.numChildren(); i++) {
@@ -242,7 +244,8 @@ void validateTwoSidedRanges(const AndMatchExpression& expr) {
                     continue;
                 }
 
-                auto payload = parseFindPayload<ParsedFindRangePayload>(data);
+                auto payload =
+                    parseFindPayload<ParsedFindRangePayload>(data, compExpr->path(), efc);
                 updateValidatorForPayload(
                     payloads, matchTypeToRangeOp(compExpr->matchType()), payload);
                 break;
@@ -250,7 +253,7 @@ void validateTwoSidedRanges(const AndMatchExpression& expr) {
             default:
                 // Make sure to recursively handle other children in case there are further nestings
                 // of $not, $nor, $or or $and.
-                validateRanges(*child);
+                validateRanges(*child, efc);
                 break;
         }
     }
@@ -266,7 +269,7 @@ void validateTwoSidedRanges(const AndMatchExpression& expr) {
 }  // namespace
 
 
-void validateRanges(const MatchExpression& expr) {
+void validateRanges(const MatchExpression& expr, boost::optional<const EncryptedFieldConfig&> efc) {
     switch (expr.matchType()) {
         case MatchExpression::GT:
         case MatchExpression::GTE:
@@ -274,20 +277,20 @@ void validateRanges(const MatchExpression& expr) {
         case MatchExpression::LTE: {
             auto compExpr = dynamic_cast<const ComparisonMatchExpression*>(&expr);
             tassert(7030712, "Expression must be a comparison expression.", compExpr);
-            validateOneSidedRange(*compExpr);
+            validateOneSidedRange(*compExpr, efc);
             break;
         }
         case MatchExpression::AND: {
             auto andExpr = dynamic_cast<const AndMatchExpression*>(&expr);
             tassert(7030713, "Expression must be a $and expression.", andExpr);
-            validateTwoSidedRanges(*andExpr);
+            validateTwoSidedRanges(*andExpr, efc);
             break;
         }
         case MatchExpression::OR:
         case MatchExpression::NOT:
         case MatchExpression::NOR: {
             for (size_t i = 0; i < expr.numChildren(); ++i) {
-                validateRanges(*expr.getChild(i));
+                validateRanges(*expr.getChild(i), efc);
             }
             break;
         }
@@ -316,40 +319,48 @@ Fle2RangeOperator cmpOpToRangeOp(ExpressionCompare::CmpOp op) {
     MONGO_UNREACHABLE_TASSERT(7030800);
 }
 
-// Gets the first constant value from a comparison. All enrypted range predicates will have one
-// fieldpath and one constant value. If no constant is found, returns none. If both are values, then
-// this is not an encrypted predicate, but that case is handled by the caller.
-boost::optional<Value> getFirstConstantFromComparison(const ExpressionCompare& expr) {
+// Gets the first constant value and the field path string from a comparison. All encrypted range
+// predicates have one ExpressionFieldPath and one ExpressionConstant. Returns none if the
+// comparison isn't a (fieldpath, constant) pair (in which case it's not an encrypted predicate and
+// the caller can skip).
+boost::optional<std::pair<Value, std::string>> getConstantAndPathFromComparison(
+    const ExpressionCompare& expr) {
     auto& ops = expr.getChildren();
-    auto leftConstant = dynamic_cast<ExpressionConstant*>(ops[0].get());
-    auto rightConstant = dynamic_cast<ExpressionConstant*>(ops[1].get());
+    auto leftConstant = dynamic_cast<const ExpressionConstant*>(ops[0].get());
+    auto rightConstant = dynamic_cast<const ExpressionConstant*>(ops[1].get());
+    auto leftFp = dynamic_cast<const ExpressionFieldPath*>(ops[0].get());
+    auto rightFp = dynamic_cast<const ExpressionFieldPath*>(ops[1].get());
 
-    if (leftConstant) {
-        return leftConstant->getValue();
-    } else if (rightConstant) {
-        return rightConstant->getValue();
-    } else {
-        return boost::none;
+    if (leftConstant && rightFp) {
+        return std::make_pair(leftConstant->getValue(),
+                              rightFp->getFieldPathWithoutCurrentPrefix().fullPath());
+    } else if (rightConstant && leftFp) {
+        return std::make_pair(rightConstant->getValue(),
+                              leftFp->getFieldPathWithoutCurrentPrefix().fullPath());
     }
+    return boost::none;
 }
 
-void validateOneSidedRange(const ExpressionCompare& expr) {
-    auto v = getFirstConstantFromComparison(expr);
+void validateOneSidedRange(const ExpressionCompare& expr,
+                           boost::optional<const EncryptedFieldConfig&> efc) {
+    auto v = getConstantAndPathFromComparison(expr);
     if (!v.has_value()) {
         return;
     }
+    auto& [data, path] = v.value();
 
-    if (!hasRangeTypeToValidate(v.value())) {
+    if (!hasRangeTypeToValidate(data)) {
         return;
     }
 
-    auto payload = parseFindPayload<ParsedFindRangePayload>(v.value());
+    auto payload = parseFindPayload<ParsedFindRangePayload>(data, path, efc);
 
     validateOneSidedRange(cmpOpToRangeOp(expr.getOp()), payload);
 }
 
 
-void validateTwoSidedRanges(const ExpressionAnd& expr) {
+void validateTwoSidedRanges(const ExpressionAnd& expr,
+                            boost::optional<const EncryptedFieldConfig&> efc) {
     ValidatorMap payloads;
     for (auto& child : expr.getOperandList()) {
         if (auto compExpr = dynamic_cast<const ExpressionCompare*>(child.get())) {
@@ -358,14 +369,15 @@ void validateTwoSidedRanges(const ExpressionAnd& expr) {
                 case ExpressionCompare::GTE:
                 case ExpressionCompare::LT:
                 case ExpressionCompare::LTE: {
-                    auto data = getFirstConstantFromComparison(*compExpr);
-                    if (!data.has_value()) {
+                    auto v = getConstantAndPathFromComparison(*compExpr);
+                    if (!v.has_value()) {
                         continue;
                     }
-                    if (!hasRangeTypeToValidate(data.value())) {
+                    auto& [data, path] = v.value();
+                    if (!hasRangeTypeToValidate(data)) {
                         continue;
                     }
-                    auto payload = parseFindPayload<ParsedFindRangePayload>(data.value());
+                    auto payload = parseFindPayload<ParsedFindRangePayload>(data, path, efc);
                     updateValidatorForPayload(payloads, cmpOpToRangeOp(compExpr->getOp()), payload);
                     break;
                 }
@@ -375,7 +387,7 @@ void validateTwoSidedRanges(const ExpressionAnd& expr) {
                     continue;
             }
         } else {
-            validateRanges(*child.get());
+            validateRanges(*child.get(), efc);
         }
     }
     // Once the entire operand list of the $and is traversed, make sure that all the
@@ -388,14 +400,14 @@ void validateTwoSidedRanges(const ExpressionAnd& expr) {
 }
 }  // namespace
 
-void validateRanges(const Expression& expr) {
+void validateRanges(const Expression& expr, boost::optional<const EncryptedFieldConfig&> efc) {
     if (auto compExpr = dynamic_cast<const ExpressionCompare*>(&expr)) {
         switch (compExpr->getOp()) {
             case ExpressionCompare::GT:
             case ExpressionCompare::GTE:
             case ExpressionCompare::LT:
             case ExpressionCompare::LTE: {
-                validateOneSidedRange(*compExpr);
+                validateOneSidedRange(*compExpr, efc);
                 break;
             }
             case ExpressionCompare::CMP:
@@ -404,10 +416,10 @@ void validateRanges(const Expression& expr) {
                 break;
         }
     } else if (auto andExpr = dynamic_cast<const ExpressionAnd*>(&expr)) {
-        validateTwoSidedRanges(*andExpr);
+        validateTwoSidedRanges(*andExpr, efc);
     } else {
         for (auto& child : expr.getChildren()) {
-            validateRanges(*child.get());
+            validateRanges(*child.get(), efc);
         }
     }
 }

@@ -118,7 +118,7 @@ std::unique_ptr<Expression> QueryRewriter::rewriteExpression(Expression* express
 
 boost::optional<BSONObj> QueryRewriter::rewriteMatchExpression(const BSONObj& filter) {
     auto expr = uassertStatusOK(MatchExpressionParser::parse(filter, _expCtx));
-    validateRanges(*expr.get());
+    validateRanges(*expr.get(), getEncryptedFieldConfigForValidation());
 
     _rewroteLastExpression = false;
     if (auto res = _rewrite(expr.get())) {

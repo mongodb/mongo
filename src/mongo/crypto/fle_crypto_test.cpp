@@ -2389,7 +2389,7 @@ TEST_F(ServiceContextTest, FLE_EDC_RangeParamtersFlow_Find) {
 
     auto result = client.encryptPlaceholders(obj, markedDoc, keyVault);
 
-    auto rangePayload = ParsedFindRangePayload(result.firstElement());
+    auto rangePayload = ParsedFindRangePayload(result.firstElement(), ""_sd, boost::none);
 
     ASSERT_EQ(rangePayload.precision.get(), 4);
     ASSERT_EQ(rangePayload.trimFactor.get(), 5);

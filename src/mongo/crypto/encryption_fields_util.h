@@ -258,4 +258,10 @@ bool visitQueryTypeConfigs(const EncryptedFieldConfig& efc,
                            const QueryTypeConfigVisitor& visit,
                            const UnindexedEncryptedFieldVisitor& onEmptyField = nullptr);
 
+
+/**
+ * Find any string search QueryTypeConfig in EncryptedField. Returns the query type or none.
+ */
+boost::optional<QueryTypeEnum> findStringSearchQueryType(const EncryptedField& field);
+
 }  // namespace MONGO_MOD_PUBLIC mongo

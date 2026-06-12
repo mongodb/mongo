@@ -76,15 +76,17 @@ namespace fle {
 using BSONValue = std::variant<BSONElement, std::reference_wrapper<Value>>;
 
 /**
- * Parse a find payload from either a BSONElement or a Value. All ParsedFindPayload types should
- * have constructors for both BSONElements and Values, which will enable this function to work on
- * both types.
+ * Parse a find payload from either a BSONElement or a Value, and validate it against the
+ * QueryTypeConfig at `path` in `efc`. Pass efc=boost::none to skip validation (only when there's no
+ * schema context, e.g. inside a runtime Expression constructor that runs after rewrite).
  */
 template <typename T>
-T parseFindPayload(BSONValue payload) {
-    return visit(OverloadedVisitor{[&](BSONElement payload) { return T(payload); },
+T parseFindPayload(BSONValue payload,
+                   StringData path,
+                   boost::optional<const EncryptedFieldConfig&> efc) {
+    return visit(OverloadedVisitor{[&](BSONElement payload) { return T(payload, path, efc); },
                                    [&](Value payload) {
-                                       return T(payload);
+                                       return T(payload, path, efc);
                                    }},
                  payload);
 }
@@ -215,7 +217,7 @@ protected:
      * Value so that it can be used in both the MatchExpression and Aggregation contexts. Virtual
      * functions can't also be templated, which is why we need the runtime dispatch on the variant.
      */
-    virtual std::vector<PrfBlock> generateTags(BSONValue payload) const = 0;
+    virtual std::vector<PrfBlock> generateTags(BSONValue payload, StringData path) const = 0;
 
     /**
      * Rewrite to a tag disjunction on the __safeContent__ field.

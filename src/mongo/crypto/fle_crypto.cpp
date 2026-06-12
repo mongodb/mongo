@@ -98,6 +98,7 @@ extern "C" {
 #include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/fle_numeric.h"
 #include "mongo/crypto/fle_options_gen.h"
+#include "mongo/crypto/fle_payload_validation.h"
 #include "mongo/crypto/fle_tokens_gen.h"
 #include "mongo/crypto/fle_util.h"
 #include "mongo/crypto/mongocryptbuffer.h"
@@ -3752,13 +3753,27 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
     return {subType, cdrc};
 }
 
-ParsedFindEqualityPayload::ParsedFindEqualityPayload(BSONElement fleFindPayload)
-    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)) {};
+namespace {
+const EncryptedField& findFieldByPath(const EncryptedFieldConfig& efc, StringData path) {
+    for (const auto& f : efc.getFields()) {
+        if (f.getPath() == path) {
+            return f;
+        }
+    }
+    uasserted(9188709, str::stream() << "EncryptedField does not exist for path " << path);
+}
+}  // namespace
 
-ParsedFindEqualityPayload::ParsedFindEqualityPayload(const Value& fleFindPayload)
-    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload)) {};
+ParsedFindEqualityPayload::ParsedFindEqualityPayload(
+    BSONElement fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc)
+    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload), path, efc) {}
 
-ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
+ParsedFindEqualityPayload::ParsedFindEqualityPayload(
+    const Value& fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc)
+    : ParsedFindEqualityPayload(binDataToCDR(fleFindPayload), path, efc) {}
+
+ParsedFindEqualityPayload::ParsedFindEqualityPayload(
+    ConstDataRange cdr, StringData path, boost::optional<const EncryptedFieldConfig&> efc) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
@@ -3774,15 +3789,26 @@ ParsedFindEqualityPayload::ParsedFindEqualityPayload(ConstDataRange cdr) {
     serverDataDerivedToken = payload.getServerDerivedFromDataToken();
 
     maxCounter = payload.getMaxCounter();
+
+    if (efc) {
+        validatePayloadAgainstQueryTypeConfig(
+            path, findFieldByPath(*efc, path), FLE2PayloadParams(*this));
+    }
 }
 
-ParsedFindRangePayload::ParsedFindRangePayload(BSONElement fleFindPayload)
-    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)) {};
+ParsedFindRangePayload::ParsedFindRangePayload(BSONElement fleFindPayload,
+                                               StringData path,
+                                               boost::optional<const EncryptedFieldConfig&> efc)
+    : ParsedFindRangePayload(binDataToCDR(fleFindPayload), path, efc) {}
 
-ParsedFindRangePayload::ParsedFindRangePayload(const Value& fleFindPayload)
-    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)) {};
+ParsedFindRangePayload::ParsedFindRangePayload(const Value& fleFindPayload,
+                                               StringData path,
+                                               boost::optional<const EncryptedFieldConfig&> efc)
+    : ParsedFindRangePayload(binDataToCDR(fleFindPayload), path, efc) {}
 
-ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
+ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr,
+                                               StringData path,
+                                               boost::optional<const EncryptedFieldConfig&> efc) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
 
@@ -3801,32 +3827,38 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
     indexMin = payload.getIndexMin();
     indexMax = payload.getIndexMax();
 
-    if (!payload.getPayload()) {
-        return;
+    if (payload.getPayload()) {
+        edges = std::vector<FLEFindEdgeTokenSet>();
+        auto& edgesRef = edges.value();
+        auto& info = payload.getPayload().value();
+
+        for (auto const& edge : info.getEdges()) {
+            edgesRef.push_back({edge.getEdcDerivedToken(),
+                                edge.getEscDerivedToken(),
+                                edge.getServerDerivedFromDataToken()});
+        }
+
+        maxCounter = info.getMaxCounter();
     }
 
-    edges = std::vector<FLEFindEdgeTokenSet>();
-    auto& edgesRef = edges.value();
-    auto& info = payload.getPayload().value();
-
-    for (auto const& edge : info.getEdges()) {
-        edgesRef.push_back({edge.getEdcDerivedToken(),
-                            edge.getEscDerivedToken(),
-                            edge.getServerDerivedFromDataToken()});
+    if (efc) {
+        validatePayloadAgainstQueryTypeConfig(
+            path, findFieldByPath(*efc, path), FLE2PayloadParams(*this));
     }
-
-    maxCounter = info.getMaxCounter();
 }
 
-ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(BSONElement fleFindPayload) {
+ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
+    BSONElement fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc) {
     // We should never parse a BSONElement payload since we don't support match expressions.
     MONGO_UNREACHABLE_TASSERT(10112804);
 };
 
-ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(const Value& fleFindPayload)
-    : ParsedFindTextSearchPayload(binDataToCDR(fleFindPayload)) {};
+ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
+    const Value& fleFindPayload, StringData path, boost::optional<const EncryptedFieldConfig&> efc)
+    : ParsedFindTextSearchPayload(binDataToCDR(fleFindPayload), path, efc) {}
 
-ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
+ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(
+    ConstDataRange cdr, StringData path, boost::optional<const EncryptedFieldConfig&> efc) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
     uassert(10112800,
@@ -3863,6 +3895,11 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
     }
 
     maxCounter = payload.getMaxCounter();
+
+    if (efc) {
+        validatePayloadAgainstQueryTypeConfig(
+            path, findFieldByPath(*efc, path), FLE2PayloadParams(*this));
+    }
 }
 
 

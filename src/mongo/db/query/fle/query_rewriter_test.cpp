@@ -93,7 +93,7 @@ protected:
         return !v.getDocument().getField("encrypt").missing();
     }
 
-    std::vector<PrfBlock> generateTags(fle::BSONValue) const override {
+    std::vector<PrfBlock> generateTags(fle::BSONValue, StringData) const override {
         // In some cases, we may have an empty nss, which implies that the query rewriter was
         // instantiated for an unencrypted collection. This can only happen in an aggregate command
         // when FLE2 queries are using along with unencrypted collections in a $lookup.
@@ -116,7 +116,7 @@ protected:
         // We would like to closely simulate the calls that are made when rewriteToTagDisjunction is
         // called, which includes a call to generateTags(). Our mock always returns an empty tags
         // array.
-        auto tags = generateTags(eqMatch->getData());
+        auto tags = generateTags(eqMatch->getData(), eqMatch->path());
         ASSERT_TRUE(tags.empty());
         return std::make_unique<GTMatchExpression>(eqMatch->path(),
                                                    eqMatch->getData().Obj().firstElement());
@@ -189,7 +189,7 @@ protected:
         return !v.getDocument().getField("foo").missing();
     }
 
-    std::vector<PrfBlock> generateTags(fle::BSONValue payload) const override {
+    std::vector<PrfBlock> generateTags(fle::BSONValue payload, StringData) const override {
         return {};
     };
 
@@ -266,7 +266,7 @@ protected:
         return v.getString() == kPayloadText;
     }
 
-    std::vector<PrfBlock> generateTags(fle::BSONValue payload) const override {
+    std::vector<PrfBlock> generateTags(fle::BSONValue payload, StringData) const override {
         /**
          * If we are in _forceCollScanOnAggAsMatchRewrite, we want text predicates to artifically
          * trigger a failure to generate tags for our testing. Note, this only happens when
@@ -397,9 +397,9 @@ class MockQueryRewriter : public fle::QueryRewriter {
 public:
     MockQueryRewriter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       const NamespaceString& mockNss,
-                      const std::map<NamespaceString, NamespaceString>& escMap,
+                      const std::map<NamespaceString, EncryptedFieldConfig>& efcMap,
                       const bool forceCollectionScanOnAggAsMatchRewrite)
-        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap, escMap),
+        : fle::QueryRewriter(expCtx, mockNss, aggRewriteMap, matchRewriteMap, efcMap),
           _forceCollectionScanOnAggAsMatchRewrite(forceCollectionScanOnAggAsMatchRewrite) {}
 
     BSONObj rewriteMatchExpressionForTest(const BSONObj& obj) {
@@ -419,11 +419,11 @@ public:
     static fle::QueryRewriter getQueryRewriterWithMockedMaps(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        const std::map<NamespaceString, NamespaceString>& escMap,
+        const std::map<NamespaceString, EncryptedFieldConfig>& efcMap,
         bool forceCollectionScanOnAggAsMatchRewrite) {
         // Workaround for protected fle::QueryRewriter constructor. Slices the mocked object,
         // leaving us with the copied base class with mocked maps.
-        return MockQueryRewriter(expCtx, nss, escMap, forceCollectionScanOnAggAsMatchRewrite);
+        return MockQueryRewriter(expCtx, nss, efcMap, forceCollectionScanOnAggAsMatchRewrite);
     }
 
 private:
@@ -448,16 +448,23 @@ public:
 
     void setUp() override {
         _mock = std::make_unique<MockQueryRewriter>(
-            _expCtx, _mockNss, _mockEscMap, false /*forceCollectionScanOnAggAsMatchRewrite*/);
+            _expCtx, _mockNss, _mockEfcMap, false /*forceCollectionScanOnAggAsMatchRewrite*/);
     }
 
     void tearDown() override {}
 
 protected:
+    static EncryptedFieldConfig makeMockEfc() {
+        EncryptedFieldConfig efc;
+        efc.setEscCollection("enxcol_.mock.esc"_sd);
+        efc.setFields({});
+        return efc;
+    }
+
     std::unique_ptr<MockQueryRewriter> _mock;
     boost::intrusive_ptr<ExpressionContext> _expCtx{new ExpressionContextForTest()};
     NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("test.mock"_sd);
-    std::map<NamespaceString, NamespaceString> _mockEscMap{{_mockNss, _mockNss}};
+    std::map<NamespaceString, EncryptedFieldConfig> _mockEfcMap{{_mockNss, makeMockEfc()}};
 };
 
 class FLEServerRewriteTestForceCollScanOnTextSearchPredicates : public FLEServerRewriteTest {
@@ -466,7 +473,7 @@ public:
 
     void setUp() override {
         _mock = std::make_unique<MockQueryRewriter>(
-            _expCtx, _mockNss, _mockEscMap, true /*forceCollectionScanOnAggAsMatchRewrite*/);
+            _expCtx, _mockNss, _mockEfcMap, true /*forceCollectionScanOnAggAsMatchRewrite*/);
     }
 
     void tearDown() override {}
@@ -477,7 +484,7 @@ public:
     FLEServerRewriteTestForceCollScan() : FLEServerRewriteTest() {}
 
     void setUp() override {
-        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEscMap, false);
+        _mock = std::make_unique<MockQueryRewriter>(_expCtx, _mockNss, _mockEfcMap, false);
         _mock->setForceEncryptedCollScanForTest();
     }
 
@@ -883,10 +890,15 @@ public:
 
     ~MockPipelineRewrite() override {};
 
+    // Test-only accessor for the namespace -> EFC map plumbed to sub-pipeline rewriters.
+    const std::map<NamespaceString, EncryptedFieldConfig>& efcMapForTest() const {
+        return _efcMap;
+    }
+
 protected:
     fle::QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) override {
         return MockQueryRewriter::getQueryRewriterWithMockedMaps(
-            expCtx, nssEsc, _escMap, /*forceTextSearchGenerateTagsAsMatchException*/ false);
+            expCtx, nssEsc, _efcMap, /*forceTextSearchGenerateTagsAsMatchException*/ false);
     }
 };
 
@@ -1394,6 +1406,25 @@ TEST_F(FLEServerRewritePipelineTest, MissingEscPrimaryCollectionFails_PipelineRe
                                      IDLParserContext("root")),
         std::move(pipeline));
     ASSERT_THROWS_CODE(pipelineRewrite.doRewrite(nullptr), AssertionException, 10026006);
+}
+
+// PipelineRewrite should populate its namespace -> EFC map with every schema in the supplied
+// EncryptionInformation, so sub-pipeline rewriters (e.g. $lookup) can validate find payloads
+// against the foreign collection's EFC.
+TEST_F(FLEServerRewritePipelineTest, BuildsEfcMapForAllSchemas_PipelineRewrite) {
+    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagLookupEncryptionSchemasFLE",
+                                                        true};
+    setResolvedNamespacesForTest({});
+    auto pipeline = jsonToPipeline(_expCtx, _primaryNss, "[]");
+    MockPipelineRewrite pipelineRewrite(
+        _primaryNss,
+        EncryptionInformation::parse(fromjson(kTwoEncryptionSchemaEncryptionInfo),
+                                     IDLParserContext("root")),
+        std::move(pipeline));
+    const auto& efcMap = pipelineRewrite.efcMapForTest();
+    ASSERT_EQ(efcMap.size(), 2u);
+    ASSERT_EQ(efcMap.count(_primaryNss), 1u);
+    ASSERT_EQ(efcMap.count(NamespaceString::createNamespaceString_forTest("test.coll_b"_sd)), 1u);
 }
 
 TEST_F(FLEServerRewritePipelineTest, MissingEscForeignCollectionFails_PipelineRewrite) {
