@@ -1341,6 +1341,7 @@ mongo_cc_library(
     ],
     deps = [
         ":hello_idl",
+        ":repl_server_parameters_idl",
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:dbhelpers",
