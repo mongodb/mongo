@@ -92,6 +92,11 @@ bool doesShardOwnChunks(OperationContext* opCtx,
     return !chunkList.empty();
 }
 
+bool doesShardOwnChunks(OperationContext* opCtx, const NamespaceString& nss) {
+    const auto coll = fetchCollection(opCtx, nss);
+    return doesShardOwnChunks(opCtx, nss, coll);
+}
+
 write_ops::UpdateOpEntry makeUpdateEntry(BSONObj filter, BSONObj replacement) {
     write_ops::UpdateOpEntry entry;
     entry.setQ(std::move(filter));
@@ -656,20 +661,53 @@ void ensureCollectionDoesNotExist(OperationContext* opCtx, const UUID& uuid) {
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // This is actually the expected path.
     }
-    // TODO SERVER-128550: Uncomment the following code once chunk migrations are authoritative.
-    // Otherwise the migration off of the shard today leaves the collection entry intact.
-    // DBDirectClient client{opCtx};
-    // const auto collCount = client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
-    //                                     BSON(CollectionType::kUuidFieldName << uuid));
-    // tassert(ErrorCodes::IllegalOperation,
-    //         "Collection entry must not exist in the shard catalog to drop stale chunks",
-    //         collCount == 0);
 }
 }  // namespace
 
-void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid) {
-    ensureCollectionDoesNotExist(opCtx, uuid);
-    return shard_catalog_commit::commitDropOfStaleChunksForRename(opCtx, uuid);
+void commitDropOfStaleChunksForRename(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const UUID& oldUuid) {
+    ensureCollectionDoesNotExist(opCtx, oldUuid);
+
+    // This function gets called without holding a critical section but the DDL lock as well as
+    // migrations are disabled. The order of operations here is quite deliberate in order to make
+    // PIT readers view either the entire old metadata (and therefore let the read through with a
+    // consistent view of the data) or none (and thus fail the read):
+    // * Dropping the collection entry first means that either the disk recovery sees all previous
+    //   metadata or nothing.
+    // * The invalidate is done first in order to inform concurrent recoverers that the data they
+    //   read is no longer valid.
+    // * And finally the last clear ensures that if any recovery succeeded before the invalidate got
+    //   received by the recoverer then it will leave the CSR in the cleared state for future
+    //   readers.
+    //
+    // This is exclusively a problem for PIT readers on shards that no longer own any chunk and
+    // getting called by a stale router after resharding since:
+    // 1. Owning shards will trigger a StaleConfig to the stale router.
+    // 2. PIT readers of shards that don't own chunks will see either the correct documents
+    //    (pre-resharding) or none at all as per the comment above.
+    // 3. non-PIT readers would see nothing if this shard has no owned chunks and therefore doesn't
+    //    matter whether the metadata is stale or not since the end result is the same on both
+    //    scenarios (no documents).
+    {
+        DBDirectClient dbClient(opCtx);
+        shard_catalog_commit::executeLocalDelete(
+            dbClient,
+            NamespaceString::kConfigShardCatalogCollectionsNamespace,
+            BSON(CollectionType::kUuidFieldName << oldUuid),
+            true /* multi */);
+    }
+    shard_catalog_commit::commitDropOfStaleChunksForRename(opCtx, oldUuid);
+
+    // This invalidation will only be done by shards that were only donors or shards that didn't
+    // participate in resharding. On both of these it's safe to do an invalidation since there's no
+    // data present on the shard.
+    bool shardOwnsChunks = shard_catalog_commit::doesShardOwnChunks(opCtx, nss);
+    if (!shardOwnsChunks) {
+        shard_catalog_commit::invalidateCollectionMetadataOnSecondaries(
+            opCtx, nss, oldUuid, true /* forDroppedCollection */);
+        shard_catalog_commit::clearShardCatalogCacheForDroppedCollection(opCtx, nss, oldUuid);
+    }
 }
 
 }  // namespace shard_catalog_commit_for_resharding

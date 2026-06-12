@@ -231,8 +231,12 @@ commands:
             shard catalog"
         command_name: _shardsvrReshardCleanupStaleChunks
         cpp_name: ShardsvrReshardCleanupStaleChunks
-        type: uuid
+        type: namespacestring
         strict: false
         namespace: type
         reply_type: OkReply
         api_version: ""
+        fields:
+            oldUUID:
+                type: uuid
+                description: "Old UUID of the collection before resharding succeeded"

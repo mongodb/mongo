@@ -64,7 +64,16 @@ jsTest.log("Untrack a collection on a new primary shard works but non-empty orph
     // Inject an orphaned document for the collection in the primary shard;
     // The upcoming untrackCollection command is expected to leave it untouched (since the
     // collection is not empty).
-    assert.commandWorked(st.rs1.getPrimary().getCollection(kNss).insert({x: 1}));
+    assert.soonRetryOnAcceptableErrors(() => {
+        const res = st.rs1.getPrimary().getCollection(kNss).insert({x: 1});
+        if (res.hasWriteError()) {
+            if (res.getWriteError().code === ErrorCodes.StaleConfig) {
+                return false;
+            }
+        }
+        assert.commandWorked(res);
+        return true;
+    }, ErrorCodes.StaleConfig);
 
     // Untrack the collection; the operation is only expected to succeed when its data are located
     // on the primary shard.

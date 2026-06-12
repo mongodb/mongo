@@ -807,7 +807,8 @@ const internalCommandsMap = {
     _shardsvrReshardCleanupStaleChunks: {
         testname: "_shardsvrReshardCleanupStaleChunks",
         command: {
-            _shardsvrReshardCleanupStaleChunks: UUID(),
+            _shardsvrReshardCleanupStaleChunks: "test.x",
+            oldUUID: UUID(),
         },
     },
     _shardsvrRefineCollectionShardKey: {

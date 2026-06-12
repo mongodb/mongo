@@ -130,6 +130,8 @@ void commitRenameOfTemporaryCollection(OperationContext* opCtx,
                                        bool isUpgrading,
                                        bool isDbPrimaryShard);
 
-void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid);
+void commitDropOfStaleChunksForRename(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const UUID& oldUuid);
 }  // namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding
 }  // namespace mongo

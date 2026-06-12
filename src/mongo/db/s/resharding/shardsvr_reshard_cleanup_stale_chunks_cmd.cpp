@@ -89,10 +89,11 @@ public:
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
                 shard_catalog_commit_for_resharding::commitDropOfStaleChunksForRename(
-                    newOpCtx.get(), uuid());
+                    newOpCtx.get(), ns(), uuid());
                 LOGV2(12779000,
                       "Cleanup of stale chunks finished for resharding",
-                      "sourceUUID"_attr = uuid());
+                      "sourceUUID"_attr = uuid(),
+                      "sourceNss"_attr = ns());
             }
 
             // Since no write happened on this txnNumber, we need to make a dummy write so that
@@ -107,11 +108,11 @@ public:
 
     private:
         UUID uuid() const {
-            return request().getCommandParameter();
+            return request().getOldUUID();
         }
 
         NamespaceString ns() const override {
-            return {};
+            return request().getCommandParameter();
         }
 
         bool supportsWriteConcern() const override {

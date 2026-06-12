@@ -59,15 +59,18 @@ void tellAllParticipantsToJoinMigrations(
         opCtx, osi, joinMigrationsCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
 }
 
-void tellAllParticipantsToCleanupStaleChunks(
+void tellAllShardsToCleanupStaleChunks(
     OperationContext* opCtx,
     const OperationSessionInfo& osi,
-    const ReshardingCoordinatorDocument& doc,
+    const std::vector<ShardId>& shardIds,
+    const NamespaceString& nss,
+    const UUID& oldUUID,
     CancellationToken stepdownToken,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    ShardsvrReshardCleanupStaleChunks cmd(doc.getSourceUUID());
+    ShardsvrReshardCleanupStaleChunks cmd(nss);
+    cmd.setOldUUID(oldUUID);
 
-    sendReshardingCommand(opCtx, osi, cmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+    sendReshardingCommand(opCtx, osi, cmd, stepdownToken, executor, shardIds);
 }
 
 void tellAllParticipantsToCommit(OperationContext* opCtx,

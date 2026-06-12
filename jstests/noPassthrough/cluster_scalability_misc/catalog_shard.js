@@ -384,7 +384,16 @@ const newShardName = assert.commandWorked(st.s.adminCommand({addShard: newShardR
     assert.commandWorked(st.configRS.getPrimary().getCollection(ns).remove({x: 1}));
 
     // Drained unsharded collection.
-    assert.commandWorked(st.configRS.getPrimary().getCollection(unshardedNs).insert({x: 1}));
+    assert.soonRetryOnAcceptableErrors(() => {
+        const res = st.configRS.getPrimary().getCollection(unshardedNs).insert({x: 1});
+        if (res.hasWriteError()) {
+            if (res.getWriteError().code === ErrorCodes.StaleConfig) {
+                return false;
+            }
+        }
+        assert.commandWorked(res);
+        return true;
+    }, ErrorCodes.StaleConfig);
     removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("pendingDataCleanup", removeRes.state);
     assert.eq("waiting for data to be cleaned up", removeRes.msg);

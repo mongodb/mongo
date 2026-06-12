@@ -2212,12 +2212,13 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                 // this can be done outside of a critical section.
                 if (coordinatorDoc.getAuthoritativeMetadataAccessLevel() >=
                     ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    resharding::tellAllParticipantsToCleanupStaleChunks(
-                        opCtx.get(),
-                        _getNewSession(opCtx.get()),
-                        coordinatorDoc,
-                        _ctHolder->getStepdownToken(),
-                        executor);
+                    resharding::tellAllShardsToCleanupStaleChunks(opCtx.get(),
+                                                                  _getNewSession(opCtx.get()),
+                                                                  allShardIds,
+                                                                  coordinatorDoc.getSourceNss(),
+                                                                  coordinatorDoc.getSourceUUID(),
+                                                                  _ctHolder->getStepdownToken(),
+                                                                  executor);
                 }
             }
 
