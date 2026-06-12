@@ -876,8 +876,14 @@ TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
         ASSERT_FALSE(donorShard.getDocumentsToCopy().has_value());
     }
 
-    stepDown(opCtx);
-    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+    coordinator->onOkayToEnterCritical();
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
+
+    makeDonorsProceedToDoneWithAssert(opCtx);
+    makeRecipientsProceedToDoneWithAssert(opCtx);
+    ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
