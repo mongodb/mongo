@@ -1248,8 +1248,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assertReshardingFinalState(ns, {originalUuid, expectedKey: newKey, isUnsplittable: false});
         });
 
-        // TODO SERVER-127443: Re-enable this test once stop/resume migrations properly use the authoritative enum in the coordinator rather than the feature flags.
-        it.skip("abort cleans up the temporary resharding collection and leaves the source intact", function () {
+        it("abort cleans up the temporary resharding collection and leaves the source intact", function () {
             const db = setupDb("reshard_abort");
             const ns = `${db.getName()}.coll`;
 
