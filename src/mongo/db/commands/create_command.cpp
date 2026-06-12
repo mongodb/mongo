@@ -329,6 +329,9 @@ public:
                         gFeatureFlagFLE2Range.isEnabled(
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
                 }
+
+                EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(
+                    *cmd.getEncryptedFields());
             }
 
             if (auto timeseries = cmd.getTimeseries()) {
