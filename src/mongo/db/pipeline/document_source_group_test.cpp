@@ -562,7 +562,7 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
             $willBeMerged: false
         }})");
 
-        SerializationOptions explainOpts;
+        query_shape::SerializationOptions explainOpts;
         explainOpts.verbosity = expCtx->getExplain();
         ASSERT_DOCUMENT_EQ(Document(expectedGroupSerializeOutput),
                            group->serialize(explainOpts).getDocument());

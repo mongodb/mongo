@@ -79,12 +79,12 @@ struct UniversalKeyComponents {
      */
     static BSONObj shapifyReadConcern(
         const BSONObj& readConcern,
-        const SerializationOptions& opts =
-            SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+        const query_shape::SerializationOptions& opts =
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     size_t size() const;
 
-    void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
+    void appendTo(BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const;
 
     // Avoid using boost::optional here because it creates extra padding at the beginning of the
     // struct. Since each QueryStatsEntry has its own Key subclass, it's better to minimize
@@ -280,7 +280,7 @@ public:
      * (as it is used for $queryStats) or perhaps one day persist it to storage.
      */
     BSONObj toBson(OperationContext* opCtx,
-                   const SerializationOptions& opts,
+                   const query_shape::SerializationOptions& opts,
                    const SerializationContext& serializationContext) const;
 
     /**
@@ -335,8 +335,8 @@ protected:
      * process often needs the context of things tracked in _universalComponents, which is hard to
      * access from the specific components.
      */
-    virtual void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                                 const SerializationOptions& opts) const = 0;
+    virtual void appendCommandSpecificComponents(
+        BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const = 0;
 
 private:
     UniversalKeyComponents _universalComponents;

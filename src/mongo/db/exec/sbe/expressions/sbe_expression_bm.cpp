@@ -119,7 +119,7 @@ public:
                     1,
                     "running sbe expression benchmark on expression",
                     "expression"_attr = expression
-                                            ->serialize(SerializationOptions{
+                                            ->serialize(query_shape::SerializationOptions{
                                                 .verbosity = boost::make_optional(
                                                     ExplainOptions::Verbosity::kQueryPlanner)})
                                             .toString());

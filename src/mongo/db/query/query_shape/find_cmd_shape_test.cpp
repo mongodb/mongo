@@ -89,7 +89,8 @@ public:
      */
     boost::optional<BSONObj> maybeRedactedSortShape(StringData sortJson) {
         auto shape = makeShapeFromSort(sortJson);
-        SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+        query_shape::SerializationOptions opts =
+            query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
         opts.transformIdentifiers = true;
         opts.transformIdentifiersCallback = applyHmacForTest;
         auto shapeBson = shape->toBson(

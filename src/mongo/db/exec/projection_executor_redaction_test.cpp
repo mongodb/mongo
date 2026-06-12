@@ -68,7 +68,8 @@ std::unique_ptr<projection_executor::ProjectionExecutor> compileProjection(BSONO
 }
 
 TEST(Redaction, ProjectionTest) {
-    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto redactProj = [&](std::string obj) {
         return compileProjection(fromjson(obj))->serializeTransformation(options);
     };

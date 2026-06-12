@@ -35,7 +35,7 @@ namespace mongo {
 
 std::vector<Value> mergeExplains(const Pipeline& p1,
                                  const exec::agg::Pipeline& p2,
-                                 const SerializationOptions& opts) {
+                                 const query_shape::SerializationOptions& opts) {
     auto e1 = p1.writeExplainOps(opts);
     auto e2 = p2.writeExplainOps(opts);
     return mergeExplains(e1, e2);

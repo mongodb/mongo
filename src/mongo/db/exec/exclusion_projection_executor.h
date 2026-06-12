@@ -190,7 +190,8 @@ public:
         return _root.get();
     }
 
-    Document serializeTransformation(const SerializationOptions& options = {}) const final {
+    Document serializeTransformation(
+        const query_shape::SerializationOptions& options = {}) const final {
         MutableDocument output;
 
         // The ExclusionNode tree in '_root' will always have a top-level _id node if _id is to be

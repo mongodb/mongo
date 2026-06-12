@@ -109,7 +109,7 @@ StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
 }
 
 Value DocumentSourceReshardingIterateTransaction::serialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

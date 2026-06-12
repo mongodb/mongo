@@ -81,7 +81,7 @@ public:
 
         // Serialize the DocumentSourceGroup and DocumentSourceSort from $bucket so that we can
         // check the explain output to make sure $group and $sort have the correct fields.
-        auto explain = SerializationOptions{
+        auto explain = query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
         vector<Value> explainedStages;
         groupStage->serializeToArray(explainedStages, explain);

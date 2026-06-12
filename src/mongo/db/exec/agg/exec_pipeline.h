@@ -122,7 +122,7 @@ public:
      * specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(
-        const SerializationOptions& opts = SerializationOptions{}) const;
+        const query_shape::SerializationOptions& opts = query_shape::SerializationOptions{}) const;
 
     void forceSpill();
 

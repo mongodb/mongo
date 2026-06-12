@@ -78,7 +78,7 @@ public:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates,
-        const SerializationOptions& opts) const final {
+        const query_shape::SerializationOptions& opts) const final {
         // The RenameNode sits in the update tree at the destination path, because that's the path
         // that may need to be synthesized if it's not already in the document. However, the
         // destination path is the _value_ and goes on the right side of the rename element (i.e.:

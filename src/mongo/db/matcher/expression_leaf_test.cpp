@@ -337,8 +337,8 @@ TEST(InMatchExpression, ChangingCollationAfterAddingEqualitiesPreservesEqualitie
 // Serializes expression 'expression' into the query shape format.
 BSONObj serializeToQueryShape(const MatchExpression& expression) {
     BSONObjBuilder objBuilder;
-    expression.serialize(&objBuilder,
-                         SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    expression.serialize(
+        &objBuilder, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     return objBuilder.obj();
 }
 

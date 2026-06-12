@@ -822,7 +822,7 @@ struct BoundMakerAsc {
     Key operator()(Key k, const Doc&) const {
         return k - 10;
     }
-    Document serialize(const SerializationOptions& opts = {}) const {
+    Document serialize(const query_shape::SerializationOptions& opts = {}) const {
         MONGO_UNREACHABLE;
     }
 };
@@ -830,7 +830,7 @@ struct BoundMakerDesc {
     Key operator()(Key k, const Doc&) const {
         return k + 10;
     }
-    Document serialize(const SerializationOptions& opts = {}) const {
+    Document serialize(const query_shape::SerializationOptions& opts = {}) const {
         MONGO_UNREACHABLE;
     }
 };
@@ -838,7 +838,7 @@ struct NoBoundAsc {
     Key operator()(Key k, const Doc&) const {
         return -1'000'000'000;
     }
-    Document serialize(const SerializationOptions& opts = {}) const {
+    Document serialize(const query_shape::SerializationOptions& opts = {}) const {
         MONGO_UNREACHABLE;
     }
 };

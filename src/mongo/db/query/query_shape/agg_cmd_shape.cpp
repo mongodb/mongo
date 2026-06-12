@@ -64,16 +64,17 @@ void AggCmdShapeComponents::HashValue(absl::HashState state) const {
     }
 }
 
-void AggCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                   OperationContext* opCtx,
-                                                   const SerializationOptions& opts) const {
+void AggCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     tassert(7633000,
             "We don't support serializing to the unmodified shape here, since we have already "
             "shapified and stored the representative query - we've lost the original literals",
             !opts.isKeepingLiteralsUnchanged());
 
     auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID, _components.let.shapifiedLet);
-    if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+    if (opts == query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // We have this copy stored already!
         _components.appendTo(bob, opts, expCtx);
         return;
@@ -94,7 +95,7 @@ void AggCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
 }
 
 void AggCmdShapeComponents::appendTo(BSONObjBuilder& bob,
-                                     const SerializationOptions& opts,
+                                     const query_shape::SerializationOptions& opts,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     let.appendTo(bob, opts, expCtx);
 

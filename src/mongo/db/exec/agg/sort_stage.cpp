@@ -82,7 +82,7 @@ bool SortStage::usedDisk() const {
                                 : _sortExecutor->wasDiskUsed();
 }
 
-Document SortStage::getExplainOutput(const SerializationOptions& opts) const {
+Document SortStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
     // TODO SERVER-108419: Move all execution stats.
     MutableDocument mutDoc(Stage::getExplainOutput(opts));
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {

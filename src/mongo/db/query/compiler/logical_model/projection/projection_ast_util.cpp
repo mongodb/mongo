@@ -58,7 +58,7 @@ class BSONPreVisitor : public ProjectionASTConstVisitor {
 public:
     using ProjectionASTConstVisitor::visit;
     BSONPreVisitor(PathTrackingVisitorContext<BSONVisitorContext>* context,
-                   SerializationOptions options)
+                   query_shape::SerializationOptions options)
         : _context(context), _builders(context->data().builders), _options(std::move(options)) {}
 
     void visit(const ProjectionPathASTNode* node) override {
@@ -101,7 +101,7 @@ protected:
 
     PathTrackingVisitorContext<BSONVisitorContext>* _context;
     std::stack<BSONObjBuilder>& _builders;
-    SerializationOptions _options;
+    query_shape::SerializationOptions _options;
 };
 
 class BSONPostVisitor : public ProjectionASTConstVisitor {
@@ -133,7 +133,7 @@ class DebugPreVisitor : public BSONPreVisitor {
 public:
     using BSONPreVisitor::visit;
     DebugPreVisitor(PathTrackingVisitorContext<BSONVisitorContext>* context)
-        : BSONPreVisitor(context, SerializationOptions{}) {}
+        : BSONPreVisitor(context, query_shape::SerializationOptions{}) {}
 
     void visit(const ProjectionPositionalASTNode* node) override {
         // ProjectionPositional always has the original query's match expression node as its
@@ -167,7 +167,7 @@ class SerializationPreVisitor : public BSONPreVisitor {
 public:
     using BSONPreVisitor::visit;
     SerializationPreVisitor(PathTrackingVisitorContext<BSONVisitorContext>* context,
-                            const SerializationOptions& options)
+                            const query_shape::SerializationOptions& options)
         : BSONPreVisitor(context, options) {}
 
     void visit(const ProjectionPositionalASTNode* node) override {
@@ -231,7 +231,8 @@ BSONObj astToDebugBSON(const ASTNode* root) {
     return context.data().builders.top().obj();
 }
 
-BSONObj serialize(const ProjectionPathASTNode& root, const SerializationOptions& options) {
+BSONObj serialize(const ProjectionPathASTNode& root,
+                  const query_shape::SerializationOptions& options) {
     PathTrackingVisitorContext<BSONVisitorContext> context;
     SerializationPreVisitor preVisitor{&context, options};
     SerializationPostVisitor postVisitor{&context.data()};

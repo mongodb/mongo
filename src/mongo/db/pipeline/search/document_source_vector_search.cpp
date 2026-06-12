@@ -143,7 +143,7 @@ bool DocumentSourceVectorSearch::rebuildWithNewFilterForFLE(
     return false;
 }
 
-Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceVectorSearch::serialize(const query_shape::SerializationOptions& opts) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
         BSONObjBuilder builder;
 

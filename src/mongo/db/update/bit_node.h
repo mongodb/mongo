@@ -83,7 +83,7 @@ private:
         return "$bit";
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final {
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final {
         BSONObjBuilder bob;
         {
             BSONObjBuilder subBuilder(bob.subobjStart(""));
@@ -102,9 +102,10 @@ private:
                     operand.toBSON(operandName, &subBuilder);
                 } else {
                     // Serialize dummy numeric value.
-                    // TODO SERVER-114855: Ideally, we should pass in SerializationOptions to the
-                    // SafeNum::toBSON(...) and handle serialization inside there. Unfortunately,
-                    // there is a circular dependency between both of those libraries.
+                    // TODO SERVER-114855: Ideally, we should pass in
+                    // query_shape::SerializationOptions to the SafeNum::toBSON(...) and handle
+                    // serialization inside there. Unfortunately, there is a circular dependency
+                    // between both of those libraries.
                     subBuilder << operandName << opts.serializeLiteral(1);
                 }
             }

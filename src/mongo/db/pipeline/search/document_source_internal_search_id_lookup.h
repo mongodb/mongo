@@ -99,7 +99,8 @@ public:
     /**
      * Serialize this stage - return is of the form { $_internalSearchIdLookup: {} }
      */
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     /**
      * This stage must be run on each shard, but that must be enforced at a higher-level in the

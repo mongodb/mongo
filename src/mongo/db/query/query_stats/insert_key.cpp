@@ -41,7 +41,8 @@ void InsertCmdComponents::HashValue(absl::HashState state) const {
     absl::HashState::combine(std::move(state), _ordered, _bypassDocumentValidation);
 }
 
-void InsertCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+void InsertCmdComponents::appendTo(BSONObjBuilder& bob,
+                                   const query_shape::SerializationOptions& opts) const {
     bob.append(write_ops::InsertCommandRequest::kOrderedFieldName, _ordered);
     bob.append(write_ops::InsertCommandRequest::kBypassDocumentValidationFieldName,
                _bypassDocumentValidation);
@@ -51,8 +52,8 @@ size_t InsertCmdComponents::size() const {
     return sizeof(InsertCmdComponents);
 }
 
-void InsertKey::appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                                const SerializationOptions& opts) const {
+void InsertKey::appendCommandSpecificComponents(
+    BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const {
     _components.appendTo(bob, opts);
 }
 

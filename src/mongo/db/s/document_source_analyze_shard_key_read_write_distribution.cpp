@@ -74,7 +74,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
 }
 
 Value DocumentSourceAnalyzeShardKeyReadWriteDistribution::serialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
 }
 

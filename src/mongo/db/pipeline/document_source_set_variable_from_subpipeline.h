@@ -153,7 +153,8 @@ protected:
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSetVariableFromSubPipelineToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     const std::shared_ptr<SetVariableFromSubPipelineSharedState> _sharedState;
     std::shared_ptr<Pipeline> _subPipeline;

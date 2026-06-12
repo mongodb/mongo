@@ -44,7 +44,7 @@ WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
 }
 
 void WindowFunctionStatement::serialize(MutableDocument& outputFields,
-                                        const SerializationOptions& opts) const {
+                                        const query_shape::SerializationOptions& opts) const {
     outputFields[opts.serializeFieldPathFromString(fieldName)] = expr->serialize(opts);
 }
 }  // namespace mongo

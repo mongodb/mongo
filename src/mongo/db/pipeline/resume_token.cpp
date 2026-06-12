@@ -310,7 +310,7 @@ ResumeTokenData ResumeToken::getData() const {
     return result;
 }
 
-Document ResumeToken::toDocument(const SerializationOptions& options) const {
+Document ResumeToken::toDocument(const query_shape::SerializationOptions& options) const {
     return Document{
         {kDataFieldName,
          options.serializeLiteral(_hexKeyString, Value(kDefaultTokenQueryStats._hexKeyString))},
@@ -325,7 +325,7 @@ Document ResumeToken::toDocument(const SerializationOptions& options) const {
              : options.serializeLiteral(_typeBits, kDefaultTokenQueryStats._typeBits)}};
 }
 
-BSONObj ResumeToken::toBSON(const SerializationOptions& options) const {
+BSONObj ResumeToken::toBSON(const query_shape::SerializationOptions& options) const {
     return toDocument(options).toBson();
 }
 

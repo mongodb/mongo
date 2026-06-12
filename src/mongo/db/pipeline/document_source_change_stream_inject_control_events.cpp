@@ -176,7 +176,7 @@ StringData DocumentSourceChangeStreamInjectControlEvents::getSourceName() const 
 }
 
 Value DocumentSourceChangeStreamInjectControlEvents::doSerialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isReplacingLiteralsWithRepresentativeValues()) {
         // 'actions' is an internal parameter. Don't serialize it for representative query shapes.
         return Value();

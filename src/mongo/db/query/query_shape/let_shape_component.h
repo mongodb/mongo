@@ -52,7 +52,7 @@ struct LetShapeComponent : public CmdSpecificShapeComponents {
      * Appends the shapified let parameter to the builder.
      */
     void appendTo(BSONObjBuilder&,
-                  const SerializationOptions&,
+                  const query_shape::SerializationOptions&,
                   const boost::intrusive_ptr<ExpressionContext>&) const;
 
     BSONObj shapifiedLet;

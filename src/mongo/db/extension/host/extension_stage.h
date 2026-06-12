@@ -48,8 +48,8 @@ public:
     ExtensionStage(StringData name,
                    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                    extension::ExecAggStageHandle execAggStageHandle);
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const override;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const override;
 
 private:
     void setSource(Stage* source) override;

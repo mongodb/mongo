@@ -91,8 +91,8 @@ public:
         return &_stats;
     }
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const final;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const final;
 
     /**
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a

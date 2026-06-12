@@ -58,8 +58,8 @@ public:
         return &_stats;
     }
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const final;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const final;
 
 private:
     void setSource(Stage* source) final {

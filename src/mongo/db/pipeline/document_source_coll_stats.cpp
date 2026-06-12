@@ -93,7 +93,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 
-Value DocumentSourceCollStats::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceCollStats::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _collStatsSpec.toBSON(opts)}});
 }
 

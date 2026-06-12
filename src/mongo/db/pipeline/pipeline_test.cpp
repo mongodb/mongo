@@ -105,7 +105,7 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest(kDBName, "collection");
 const NamespaceString kAdminCollectionlessNss =
     NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate");
-const auto kExplain = SerializationOptions{
+const auto kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 constexpr size_t getChangeStreamStageSize() {
@@ -153,7 +153,7 @@ class StubExplainInterface : public StubMongoProcessInterface {
             optimizePipeline(pipeline.get());
         }
         BSONArrayBuilder bab;
-        auto opts = SerializationOptions{.verbosity = boost::make_optional(verbosity)};
+        auto opts = query_shape::SerializationOptions{.verbosity = boost::make_optional(verbosity)};
         auto pipelineVec = pipeline->writeExplainOps(opts);
         for (auto&& stage : pipelineVec) {
             bab << stage;
@@ -208,7 +208,7 @@ protected:
         // We normalize match expressions in the pipeline here to ensure the stability of the
         // predicate order after optimizations.
         outputPipe = normalizeMatchStageInPipeline(std::move(outputPipe));
-        auto opts = SerializationOptions{
+        auto opts = query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
         ASSERT_VALUE_EQ(Value(outputPipe->writeExplainOps(opts)),
                         Value(outputPipeExpected["pipeline"]));
@@ -216,7 +216,7 @@ protected:
     }
 
     void assertPipelineSerializesTo(const Pipeline& pipeline,
-                                    boost::optional<const SerializationOptions&> opts,
+                                    boost::optional<const query_shape::SerializationOptions&> opts,
                                     const std::string& serializedPipeJson) {
         const BSONObj serializePipeExpected = pipelineFromJsonArray(serializedPipeJson);
         ASSERT_VALUE_EQ(Value(pipeline.serialize(opts)), Value(serializePipeExpected["pipeline"]));
@@ -471,7 +471,7 @@ TEST_F(PipelineOptimizationTest, SortSwapsBeforeUnwind) {
 
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -719,7 +719,7 @@ TEST_F(PipelineOptimizationTest, LimitDuplicatesBeforeSortUnwindAndIsMergedWithS
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {b: 1, $_internalLimit: 100}}"
         ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
@@ -749,7 +749,7 @@ TEST_F(PipelineOptimizationTest, SortAndLimitSwapsBeforeUnwindAndMerges) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort : {b: 1, $_internalLimit: 5}}"
         ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
@@ -805,7 +805,7 @@ TEST_F(PipelineOptimizationTest, SortMatchProjSkipLimBecomesMatchTopKSortSkipPro
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {a: 1}}"
         ",{$sort: {a: 1, $_internalLimit: 8}}"
@@ -842,7 +842,7 @@ TEST_F(PipelineOptimizationTest, SortMatchWithExprProjSkipLimBecomesMatchTopKSor
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {$expr: {$eq: ['$a', 1]}}}"
         ",{$sort: {a: 1, $_internalLimit: 8}}"
@@ -924,7 +924,7 @@ TEST_F(PipelineOptimizationTest, SortSortLimitBecomesFinalKeyTopKSort) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 5}}"
         "]";
@@ -953,7 +953,7 @@ TEST_F(PipelineOptimizationTest, SortSortSkipLimitBecomesTopKSortSkip) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 8}}"
         ",{$skip : 3}"
@@ -981,7 +981,7 @@ TEST_F(PipelineOptimizationTest, SortLimitSortLimitBecomesTopKSort) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 12}}"
         "]";
@@ -1007,7 +1007,7 @@ TEST_F(PipelineOptimizationTest, SortLimitSortRetainsLimit) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 12}}"
         "]";
@@ -1031,7 +1031,7 @@ TEST_F(PipelineOptimizationTest, SortLimitSortWithDifferentSortPatterns) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 12}}"
         ",{$sort: {b: 1}}"
@@ -1057,7 +1057,7 @@ TEST_F(PipelineOptimizationTest, SortSortLimitRetainsLimit) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 20}}"
         "]";
@@ -1093,7 +1093,7 @@ TEST_F(PipelineOptimizationTest, SortSortSortMatchProjSkipLimBecomesMatchTopKSor
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {a: 1}}"
         ",{$sort: {a: 1, $_internalLimit: 8}}"
@@ -1132,7 +1132,7 @@ TEST_F(PipelineOptimizationTest, SortSortSortMatchOnExprProjSkipLimBecomesMatchT
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {$expr: {$eq: ['$a', 1]}}}"
         ",{$sort: {a: 1, $_internalLimit: 8}}"
@@ -1168,7 +1168,7 @@ TEST_F(PipelineOptimizationTest, NonIdenticalSortsBecomeFinalKeyTopKSort) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 5}}"
         ",{$project : {_id: true, a: true}}"
@@ -1203,7 +1203,7 @@ TEST_F(PipelineOptimizationTest, SubsequentSortsMergeAndBecomeTopKSortWithFinalK
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: -1, $_internalLimit: 7}}"
         ",{$project : {_id: true, a: true}}"
@@ -1449,7 +1449,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAs) {
         "]";
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
         "'right', $_internalUnwind: {$unwind: {path: '$same'}}}}]";
@@ -1472,7 +1472,7 @@ TEST_F(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldCoalesceWithUnwin
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', let: {}, pipeline: [], "
         "$_internalUnwind: {$unwind: {path: '$same'}}}}"
@@ -1498,7 +1498,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithPreserveE
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
         "'right', "
@@ -1525,7 +1525,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAsWithIncludeAr
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
         "'right', "
@@ -1574,7 +1574,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldSwapWithMatch) {
 
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -1593,7 +1593,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldSwapWithMatchOnExpr) {
 
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -1625,7 +1625,7 @@ TEST_F(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldSwapWithMatchOnEx
 
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -1658,7 +1658,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldNotAbsorbMatchOnAs) {
 
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -1676,7 +1676,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldNotAbsorbMatchWithExprOnAs) {
 
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -1698,7 +1698,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldAbsorbUnwindMatch) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z',  let: {}, pipeline: [{$match: {subfield: {$eq: 1}}}], "
@@ -1724,7 +1724,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndTypeMatch) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z', let: {}, pipeline: [{$match: {subfield: {$type: [2]}}}], "
@@ -1749,7 +1749,7 @@ TEST_F(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldAbsorbUnwindMatch
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
         "pipeline: [{$match: {subfield: {$eq: 1}}}], "
@@ -1778,7 +1778,7 @@ TEST_F(PipelineOptimizationTest, LookupWithPipelineSyntaxShouldAbsorbUnwindAndTw
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', let: {}, "
         "pipeline: [{$match: {subfield1: {$eq: 1}}}, {$match: {$and: [{subfield2: {$eq: 1}}, "
@@ -1815,7 +1815,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldAbsorbUnwindAndSplitAndAbsorbMatch)
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {independentField: {$gt: 2}}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
@@ -1849,7 +1849,7 @@ TEST_F(PipelineOptimizationTest, LookupShouldNotSplitIndependentAndDependentOrCl
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
         "'z', $_internalUnwind: {$unwind: {path: '$asField'}}}},"
@@ -1887,7 +1887,7 @@ TEST_F(PipelineOptimizationTest, LookupWithMatchOnArrayIndexFieldShouldNotCoales
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {independent: {$eq: 1}}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
@@ -1924,7 +1924,7 @@ TEST_F(PipelineOptimizationTest, LookupWithUnwindPreservingNullAndEmptyArraysSho
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$match: {independent: {$eq: 1}}}, "
         " {$lookup: {from: 'lookupColl', as: 'asField', localField: 'y', foreignField: "
@@ -1958,7 +1958,7 @@ TEST_F(PipelineOptimizationTest, LookupDoesNotAbsorbElemMatch) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$lookup: {from: 'lookupColl', as: 'x', localField: 'y', foreignField: 'z', "
         " $_internalUnwind: {$unwind: {path: '$x'}}}}, "
@@ -3910,7 +3910,7 @@ TEST_F(PipelineOptimizationTest, SortLimProjLimBecomesTopKSortProj) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 5}}"
         ",{$project : {_id: true, a: true}}"
@@ -3944,7 +3944,7 @@ TEST_F(PipelineOptimizationTest, SortProjUnwindLimLimBecomesSortProjUnwindLim) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     assertPipelineSerializesTo(*pipeline, options, serializedPipe);
 }
 
@@ -3969,7 +3969,7 @@ TEST_F(PipelineOptimizationTest, SortSkipLimBecomesTopKSortSkip) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 7}}"
         ",{$skip: 2}"
@@ -4026,7 +4026,7 @@ TEST_F(PipelineOptimizationTest, SortProjSkipLimBecomesTopKSortSkipProj) {
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 8}}"
         ",{$skip: 3}"
@@ -4062,7 +4062,7 @@ TEST_F(PipelineOptimizationTest, SortSkipProjSkipLimSkipLimBecomesTopKSortSkipPr
     auto pipeline = assertPipelineOptimizesTo(inputPipe, outputPipe);
     assertPipelineSerializesTo(*pipeline, boost::none, serializedPipe);
 
-    SerializationOptions options{.serializeForCloning = true};
+    query_shape::SerializationOptions options{.serializeForCloning = true};
     serializedPipe =
         "[{$sort: {a: 1, $_internalLimit: 15}}"
         ",{$skip: 12}"
@@ -4859,7 +4859,7 @@ void assertTwoPipelinesOptimizeAndMergeTo(const std::string& inputPipe1,
         pipeline1->pushBack(source);
     }
     pipeline_optimization::optimizePipeline(*pipeline1);
-    auto opts = SerializationOptions{
+    auto opts = query_shape::SerializationOptions{
         .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
     ASSERT_VALUE_EQ(Value(pipeline1->writeExplainOps(opts)), Value(outputBson["pipeline"]));
 }
@@ -5185,7 +5185,7 @@ public:
 
         auto splitPipeline =
             sharded_agg_helpers::SplitPipeline::split(std::move(mergePipe), shardKey);
-        const auto explain = SerializationOptions{
+        const auto explain = query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
         ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(explain)),

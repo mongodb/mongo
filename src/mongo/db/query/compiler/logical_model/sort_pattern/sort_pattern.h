@@ -100,7 +100,7 @@ public:
      * Write out a Document whose contents are the sort key pattern.
      */
     Document serialize(SortKeySerialization serializationMode,
-                       const SerializationOptions& options = {}) const;
+                       const query_shape::SerializationOptions& options = {}) const;
 
     /**
      * Serializes the document to BSON, only keeping the paths specified in the sort pattern.

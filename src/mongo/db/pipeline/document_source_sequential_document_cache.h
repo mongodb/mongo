@@ -141,7 +141,8 @@ private:
     DocumentSourceSequentialDocumentCache(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           SequentialDocumentCachePtr cache);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     SequentialDocumentCachePtr _cache;
     bool _hasOptimizedPos = false;

@@ -628,7 +628,7 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, RepresentativeShapeIsReparseable) {
     // There is no need for closing remote cursors within this unit-test.
     dynamic_cast<DocumentSourceMergeCursors*>(stage.get())->dismissCursorOwnership();
 
-    auto opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    auto opts = query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
 
     std::vector<Value> serialization;
     stage->serializeToArray(serialization, opts);
@@ -664,7 +664,7 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, CanBeParsedDespiteRecordRemoteOpWait
     // There is no need for closing remote cursors within this unit-test.
     dynamic_cast<DocumentSourceMergeCursors*>(stage.get())->dismissCursorOwnership();
 
-    auto opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    auto opts = query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     std::vector<Value> newSerialization;
     stage->serializeToArray(newSerialization, opts);
     auto newRepresentativeShape = newSerialization[0].getDocument().toBson();

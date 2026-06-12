@@ -122,7 +122,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     return new DocumentSourceInternalSplitPipeline(expCtx, mergeType, mergeShardId);
 }
 
-Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalSplitPipeline::serialize(
+    const query_shape::SerializationOptions& opts) const {
     std::string mergeTypeString;
     Document specificShardDoc;
 

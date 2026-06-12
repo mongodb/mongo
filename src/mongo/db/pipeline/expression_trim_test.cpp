@@ -226,7 +226,7 @@ TEST(ExpressionTrimTest, DoesSerializeCorrectly) {
         &expCtx, BSON("$trim" << BSON("input" << " abc ")), expCtx.variablesParseState);
     ASSERT_VALUE_EQ(
         trim->serialize(),
-        trim->serialize(SerializationOptions{
+        trim->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
     ASSERT_VALUE_EQ(
         trim->serialize(),

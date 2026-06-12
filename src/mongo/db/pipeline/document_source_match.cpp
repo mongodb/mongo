@@ -120,7 +120,7 @@ StringData DocumentSourceMatch::getSourceName() const {
     return kStageName;
 }
 
-Value DocumentSourceMatch::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceMatch::serialize(const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain() || opts.isSerializingForQueryStats()) {
         return Value(
             DOC(getSourceName() << Document(_matchProcessor->getExpression()->serialize(opts))));
@@ -636,7 +636,8 @@ void DocumentSourceMatch::addVariableRefs(std::set<Variables::Id>* refs) const {
     dependency_analysis::addVariableRefs(_matchProcessor->getExpression().get(), refs);
 }
 
-Value DocumentSourceInternalChangeStreamMatch::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalChangeStreamMatch::serialize(
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForQueryStats()) {
         // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
         // query stats. For query stats we will serialize only the user specified $changeStream

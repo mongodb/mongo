@@ -126,7 +126,7 @@ UniversalKeyComponents::UniversalKeyComponents(
 }
 
 BSONObj UniversalKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
-                                                   const SerializationOptions& opts) {
+                                                   const query_shape::SerializationOptions& opts) {
     // Read concern should not be considered a literal.
     // afterClusterTime is distinct for every operation with causal consistency enabled. We
     // normalize it in order not to blow out the queryStats store cache.
@@ -159,14 +159,15 @@ size_t UniversalKeyComponents::size() const {
         (_hasField.writeConcern ? _writeConcern.objsize() : 0);
 }
 
-void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+void UniversalKeyComponents::appendTo(BSONObjBuilder& bob,
+                                      const query_shape::SerializationOptions& opts) const {
     if (_hasField.comment) {
         opts.appendLiteral(&bob, "comment", _comment);
     }
 
     if (_hasField.readConcern) {
         auto readConcernToAppend = _shapifiedReadConcern;
-        if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+        if (opts != query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
             // The options aren't the same as the first time we shapified, so re-computation is
             // necessary (e.g. use "?timestamp" instead of the representative Timestamp(0, 0)).
             readConcernToAppend = shapifyReadConcern(_shapifiedReadConcern, opts);
@@ -239,7 +240,7 @@ Key::Key(OperationContext* opCtx,
           originalQueryShapeHash) {}
 
 BSONObj Key::toBson(OperationContext* opCtx,
-                    const SerializationOptions& opts,
+                    const query_shape::SerializationOptions& opts,
                     const SerializationContext& serializationContext) const {
     BSONObjBuilder bob;
 

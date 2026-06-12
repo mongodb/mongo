@@ -70,7 +70,7 @@ public:
     ApplyResult applyUpdate(ApplyParams applyParams) const final;
 
     Value serialize() const final;
-    Value serialize(const SerializationOptions& opts) const;
+    Value serialize(const query_shape::SerializationOptions& opts) const;
 
     bool getCheckExistenceForDiffInsertOperations() const final {
         return _checkExistenceForDiffInsertOperations;

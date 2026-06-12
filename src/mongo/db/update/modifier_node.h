@@ -215,7 +215,7 @@ protected:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates,
-        const SerializationOptions& opts) const override {
+        const query_shape::SerializationOptions& opts) const override {
         (*operatorOrientedUpdates)[std::string{operatorName()}].emplace_back(
             opts.serializeFieldRef(*currentPath), operatorValue(opts));
     }
@@ -232,7 +232,7 @@ private:
      * the keyname. For example, for the input syntax: {$set: {a: 3}}, this function would return:
      * {"": 3} in BSON.
      */
-    virtual BSONObj operatorValue(const SerializationOptions& opts) const = 0;
+    virtual BSONObj operatorValue(const query_shape::SerializationOptions& opts) const = 0;
 
     ApplyResult applyToNonexistentElement(ApplyParams applyParams,
                                           UpdateNodeApplyParams updateNodeApplyParams) const;

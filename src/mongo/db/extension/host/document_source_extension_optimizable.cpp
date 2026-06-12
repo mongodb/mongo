@@ -312,7 +312,8 @@ void DocumentSourceExtensionOptimizable::registerStage(AggStageDescriptorHandle 
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);
 
-Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceExtensionOptimizable::serialize(
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         auto wrappedCtx = std::make_unique<QueryExecutionContext>(getExpCtx().get());
         host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));

@@ -83,7 +83,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const final;

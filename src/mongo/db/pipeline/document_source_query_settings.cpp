@@ -73,7 +73,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
     return make_intrusive<DocumentSourceQuerySettings>(expCtx, showDebugQueryShape);
 }
 
-Value DocumentSourceQuerySettings::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceQuerySettings::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << DOC("showDebugQueryShape" << Value(_showDebugQueryShape))));
 }
 }  // namespace mongo

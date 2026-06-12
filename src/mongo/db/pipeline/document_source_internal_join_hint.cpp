@@ -64,7 +64,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalJoinHint::createFromB
         expCtx, join_ordering::EnumerationStrategy::fromBSON(specObj));
 }
 
-Value DocumentSourceInternalJoinHint::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalJoinHint::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), Value{_joinStrategy.toBSON()}}});
 }
 

@@ -443,7 +443,7 @@ boost::intrusive_ptr<Expression> ExpressionMinMaxScaler::parse(
 
 template <typename WindowFunctionN, typename AccumulatorNType>
 Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     // Create but don't initialize the accumulator for serialization. This is because initialization
     // evaluates and validates the 'n' expression, which is unnecessary for this case and can cause
     // errors for query stats.
@@ -610,7 +610,8 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
 }
 
 template <typename AccumulatorTType>
-Value ExpressionQuantile<AccumulatorTType>::serialize(const SerializationOptions& opts) const {
+Value ExpressionQuantile<AccumulatorTType>::serialize(
+    const query_shape::SerializationOptions& opts) const {
     MutableDocument result;
 
     MutableDocument md;

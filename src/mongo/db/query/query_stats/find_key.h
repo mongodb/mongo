@@ -59,7 +59,7 @@ struct FindCmdComponents : public SpecificKeyComponents {
             std::move(state), _hasField, _allowPartialResults, _noCursorTimeout);
     }
 
-    void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
+    void appendTo(BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const;
 
     // Avoid using boost::optional here because it creates extra padding at the beginning of the
     // struct. Since each QueryStatsEntry can have its own FindKey, it's better to
@@ -132,8 +132,8 @@ public:
     }
 
 private:
-    void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const final {
+    void appendCommandSpecificComponents(
+        BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const final {
         _components.appendTo(bob, opts);
     }
 

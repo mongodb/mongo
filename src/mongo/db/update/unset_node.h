@@ -98,7 +98,7 @@ private:
         return "$unset";
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final {
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final {
         // Note that the value of $unset set by user is ignored and not stored in the update tree,
         // so it is currently serialized as a constant 1. We should investigate if we should allow
         // users to specify non-1 inputs. Perhaps we should track all the non-1 values through query

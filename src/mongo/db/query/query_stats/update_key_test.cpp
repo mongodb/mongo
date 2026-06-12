@@ -115,8 +115,8 @@ TEST_F(UpdateKeyTest, ReplacementUpdateCmdComponents) {
     // Confirm all the optional values are still present. They are provided with their default
     // values specified in the IDL.
     BSONObjBuilder bob;
-    updateComponents->appendTo(bob,
-                               SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    updateComponents->appendTo(
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(fromjson(R"({ ordered: true, bypassDocumentValidation: false })"), bob.obj());
 }
 
@@ -134,8 +134,8 @@ TEST_F(UpdateKeyTest, IncludesOptionalValues) {
 
     // Verify that the optional values are reflected in the stats key components.
     BSONObjBuilder bob;
-    updateComponents->appendTo(bob,
-                               SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    updateComponents->appendTo(
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(fromjson(R"({ ordered: false, bypassDocumentValidation: true })"), bob.obj());
 }
 

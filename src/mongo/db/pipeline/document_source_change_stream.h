@@ -474,7 +474,8 @@ public:
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx) {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const override {
         if (opts.isSerializingForQueryStats()) {
             // Stages made internally by 'DocumentSourceChangeStream' should not be serialized for
             // query stats. For query stats we will serialize only the user specified $changeStream
@@ -484,7 +485,7 @@ public:
         return doSerialize(opts);
     }
 
-    virtual Value doSerialize(const SerializationOptions& opts) const = 0;
+    virtual Value doSerialize(const query_shape::SerializationOptions& opts) const = 0;
 
     static const Id& id;
 

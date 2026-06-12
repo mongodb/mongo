@@ -173,7 +173,7 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     auto pipeline =
         Pipeline::parseFromLiteParsed(lpp, expCtx, nullptr, false, true /* useStubInterface */);
 
-    SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
+    query_shape::SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
     return {pipeline->serializeToBson(wireOpts), std::move(lpp)};
 }
 

@@ -91,7 +91,7 @@ public:
     static std::string serialize(const NamespaceString& ns, const SerializationContext& context);
 
     static std::string serialize(const NamespaceString& ns,
-                                 const SerializationOptions& options,
+                                 const query_shape::SerializationOptions& options,
                                  const SerializationContext& context);
 
     /**

@@ -71,9 +71,10 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
     return constraints;
 }
 
-Value DocumentSourceExtensionForQueryShape::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceExtensionForQueryShape::serialize(
+    const query_shape::SerializationOptions& opts) const {
     tassert(10978000,
-            "SerializationOptions should change literals while represented as a "
+            "query_shape::SerializationOptions should change literals while represented as a "
             "DocumentSourceExtensionForQueryShape",
             !opts.isKeepingLiteralsUnchanged());
 

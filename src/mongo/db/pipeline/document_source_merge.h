@@ -183,7 +183,8 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) final;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     /**
      * Creates a new $merge stage from the given arguments. AllowInsertWithUpdateBackupStrategies is

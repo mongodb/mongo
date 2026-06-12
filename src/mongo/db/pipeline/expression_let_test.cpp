@@ -48,7 +48,8 @@ namespace ExpressionTests {
 namespace {
 
 TEST(RedactionTest, ExpressionLet) {
-    SerializationOptions options = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     auto expCtx = ExpressionContextForTest{};
 

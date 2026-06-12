@@ -172,7 +172,7 @@ void assertRepresentativeShapeIsStable(auto expCtx,
     auto parsedStage =
         DocumentSourceInternalGeoNearDistance::createFromBson(inputStage.firstElement(), expCtx);
     std::vector<Value> serialization;
-    auto opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    auto opts = query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     parsedStage->serializeToArray(serialization, opts);
 
     auto serializedStage = serialization[0].getDocument().toBson();

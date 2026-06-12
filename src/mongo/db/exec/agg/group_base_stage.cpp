@@ -31,7 +31,7 @@
 
 namespace mongo::exec::agg {
 
-Document GroupBaseStage::getExplainOutput(const SerializationOptions& opts) const {
+Document GroupBaseStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
 
     MutableDocument accumulatorMemUsage;
     const auto& accumulatedFields = _groupProcessor->getAccumulationStatements();

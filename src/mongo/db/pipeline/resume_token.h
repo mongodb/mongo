@@ -184,16 +184,16 @@ public:
 
     /**
      * Convenience method to represent the ResumeToken as a Document.
-     * Provides support for specifying SerializationOptions, as this method is used to service the
-     * toBSON().
+     * Provides support for specifying query_shape::SerializationOptions, as this method is used to
+     * service the toBSON().
      */
-    Document toDocument(const SerializationOptions& options = {}) const;
+    Document toDocument(const query_shape::SerializationOptions& options = {}) const;
 
     /**
-     * Serialization to BSONObj. Provides support for specifying SerializationOptions,
+     * Serialization to BSONObj. Provides support for specifying query_shape::SerializationOptions,
      * as ResumeToken requires a "query_shape: custom" specification in its IDL uses.
      */
-    BSONObj toBSON(const SerializationOptions& options = {}) const;
+    BSONObj toBSON(const query_shape::SerializationOptions& options = {}) const;
 
     ResumeTokenData getData() const;
 

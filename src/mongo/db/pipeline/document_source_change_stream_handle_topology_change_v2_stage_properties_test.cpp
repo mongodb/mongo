@@ -170,8 +170,8 @@ TEST_F(ChangeStreamStageTestNoSetup, DSV2EmptyForQueryStats) {
         getStageSpec(),
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 

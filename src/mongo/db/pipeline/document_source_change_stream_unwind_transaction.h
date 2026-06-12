@@ -88,7 +88,8 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value doSerialize(const query_shape::SerializationOptions& opts =
+                          query_shape::SerializationOptions{}) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 

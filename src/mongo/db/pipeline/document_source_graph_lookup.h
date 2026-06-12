@@ -141,7 +141,8 @@ public:
     };
 
     void serializeToArray(std::vector<Value>& array,
-                          const SerializationOptions& opts = SerializationOptions{}) const final;
+                          const query_shape::SerializationOptions& opts =
+                              query_shape::SerializationOptions{}) const final;
 
     /**
      * Returns the 'as' path, and possibly the fields modified by an absorbed $unwind.
@@ -231,7 +232,8 @@ private:
         GraphLookUpParams params,
         boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final {
         // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE_TASSERT(7484306);
     }

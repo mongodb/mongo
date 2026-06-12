@@ -110,7 +110,7 @@ intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
     return this;
 }
 
-Value DocumentSourceRedact::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceRedact::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << _redactProcessor->getExpression().get()->serialize(opts)));
 }
 

@@ -134,7 +134,8 @@ Value getNearFieldRepresentativeValue(BSONType coordinateType) {
     }
 }
 
-Value DocumentSourceInternalGeoNearDistance::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalGeoNearDistance::serialize(
+    const query_shape::SerializationOptions& opts) const {
     MutableDocument out;
 
     out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,

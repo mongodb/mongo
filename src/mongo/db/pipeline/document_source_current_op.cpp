@@ -230,7 +230,7 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
                                        targetAllNodes);
 }
 
-Value DocumentSourceCurrentOp::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceCurrentOp::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(Document{
         {getSourceName(),
          Document{

@@ -228,7 +228,7 @@ public:
                                                  DocumentSourceContainer* container);
 
 protected:
-    Value serialize(const SerializationOptions& opts) const override;
+    Value serialize(const query_shape::SerializationOptions& opts) const override;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(

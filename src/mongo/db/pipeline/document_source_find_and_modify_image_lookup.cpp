@@ -118,7 +118,8 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
     return constraints;
 }
 
-Value DocumentSourceFindAndModifyImageLookup::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceFindAndModifyImageLookup::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

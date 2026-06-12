@@ -69,7 +69,7 @@ public:
     }
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const final {
         opts.appendLiteral(out, name(), 1);
     }

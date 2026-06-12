@@ -57,9 +57,10 @@ bool InternalBucketGeoWithinMatchExpression::equivalent(const MatchExpression* e
         _field == other->getField() && _indexVersion == other->_indexVersion;
 }
 
-void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
-                                                       const SerializationOptions& opts,
-                                                       bool includePath) const {
+void InternalBucketGeoWithinMatchExpression::serialize(
+    BSONObjBuilder* builder,
+    const query_shape::SerializationOptions& opts,
+    bool includePath) const {
     BSONObjBuilder bob(builder->subobjStart(InternalBucketGeoWithinMatchExpression::kName));
     // Serialize the geometry shape.
     BSONObjBuilder withinRegionBob(

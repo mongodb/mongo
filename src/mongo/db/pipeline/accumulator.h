@@ -154,7 +154,7 @@ public:
      */
     virtual Document serialize(boost::intrusive_ptr<Expression> initializer,
                                boost::intrusive_ptr<Expression> argument,
-                               const SerializationOptions& options = {}) const {
+                               const query_shape::SerializationOptions& options = {}) const {
         ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
         tassert(11294826, "Expecting initializer expression to be a constant", ec);
         tassert(

@@ -88,7 +88,8 @@ public:
                                                  DocumentSourceContainer* container);
 
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     const projection_ast::Projection& projection() const {
         return _projection;

@@ -118,7 +118,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;
@@ -218,7 +218,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;
@@ -260,7 +260,7 @@ public:
         : LeafMatchExpression(INTERNAL_2D_POINT_IN_ANNULUS, twoDPath), _annulus(annulus) {}
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const final {
         out->append("$TwoDPtInAnnulusExpression", true);
     }
@@ -270,7 +270,7 @@ public:
     //
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final {
         MONGO_UNREACHABLE_TASSERT(9911958);
     }

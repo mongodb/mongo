@@ -64,7 +64,7 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;
 
-    Value serialize(const SerializationOptions& opts) const override;
+    Value serialize(const query_shape::SerializationOptions& opts) const override;
 
     static const Id& id;
 

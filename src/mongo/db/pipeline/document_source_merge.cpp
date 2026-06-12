@@ -412,7 +412,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distr
     return getMergeShardId() ? DocumentSourceWriter::distributedPlanLogic(ctx) : boost::none;
 }
 
-Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceMerge::serialize(const query_shape::SerializationOptions& opts) const {
     DocumentSourceMergeSpec spec;
     spec.setTargetNss(getOutputNs());
     const auto& letVariables = _mergeProcessor->getLetVariables();

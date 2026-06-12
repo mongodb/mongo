@@ -145,7 +145,7 @@ QueryMetadataBitSet SortPattern::metadataDeps(
 }
 
 Document SortPattern::serialize(SortKeySerialization serializationMode,
-                                const SerializationOptions& options) const {
+                                const query_shape::SerializationOptions& options) const {
     MutableDocument keyObj;
     const size_t n = _sortPattern.size();
     for (size_t i = 0; i < n; ++i) {
@@ -159,7 +159,7 @@ Document SortPattern::serialize(SortKeySerialization serializationMode,
                 case SortKeySerialization::kForExplain:
                 case SortKeySerialization::kForPipelineSerialization: {
                     const bool isExplain = (serializationMode == SortKeySerialization::kForExplain);
-                    auto opts = SerializationOptions{};
+                    auto opts = query_shape::SerializationOptions{};
                     if (isExplain) {
                         opts.verbosity =
                             boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner);

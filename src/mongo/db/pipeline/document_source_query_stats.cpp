@@ -127,7 +127,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     });
 }
 
-Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceQueryStats::serialize(const query_shape::SerializationOptions& opts) const {
     auto hmacKey = opts.serializeLiteral(
         BSONBinData(_hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive));
     if (opts.isReplacingLiteralsWithRepresentativeValues()) {

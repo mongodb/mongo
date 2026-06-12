@@ -197,7 +197,8 @@ public:
     }
 
     void serializeToArray(std::vector<Value>& array,
-                          const SerializationOptions& opts = SerializationOptions{}) const final;
+                          const query_shape::SerializationOptions& opts =
+                              query_shape::SerializationOptions{}) const final;
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
@@ -276,16 +277,19 @@ private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceSortToStageFn(
         const boost::intrusive_ptr<DocumentSource>& documentSource);
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MONGO_UNREACHABLE_TASSERT(7484302);  // Should call serializeToArray instead.
     }
 
     /**
      * Helper functions used by serializeToArray() to serialize this stage.
      */
-    void serializeForBoundedSort(std::vector<Value>& array, const SerializationOptions& opts) const;
-    void serializeWithVerbosity(std::vector<Value>& array, const SerializationOptions& opts) const;
-    void serializeForCloning(std::vector<Value>& array, const SerializationOptions& opts) const;
+    void serializeForBoundedSort(std::vector<Value>& array,
+                                 const query_shape::SerializationOptions& opts) const;
+    void serializeWithVerbosity(std::vector<Value>& array,
+                                const query_shape::SerializationOptions& opts) const;
+    void serializeForCloning(std::vector<Value>& array,
+                             const query_shape::SerializationOptions& opts) const;
 
     QueryMetadataBitSet _requiredMetadata;
 

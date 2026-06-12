@@ -183,7 +183,7 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
 }
 
 Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     tassert(7481400, "expression has not been initialized", _expression);
 
     if (opts.isSerializingForExplain()) {
@@ -195,8 +195,8 @@ Value DocumentSourceChangeStreamUnwindTransaction::doSerialize(
         return Value(DOC(DocumentSourceChangeStream::kStageName << builder.obj()));
     }
 
-    // 'SerializationOptions' are not required here, since serialization for explain and query
-    // stats occur before this function call.
+    // 'query_shape::SerializationOptions' are not required here, since serialization for explain
+    // and query stats occur before this function call.
     return Value(Document{
         {kStageName, Value{DocumentSourceChangeStreamUnwindTransactionSpec{_filter}.toBSON()}}});
 }

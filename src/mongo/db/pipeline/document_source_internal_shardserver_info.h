@@ -138,7 +138,8 @@ private:
     DocumentSourceInternalShardServerInfo(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 };
 
 }  // namespace mongo

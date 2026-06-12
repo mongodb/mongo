@@ -74,7 +74,8 @@ public:
         return id;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     /**
      * Returns the unwound path, and the 'includeArrayIndex' path, if specified.

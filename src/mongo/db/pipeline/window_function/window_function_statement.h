@@ -67,6 +67,7 @@ struct WindowFunctionStatement {
         }
     }
 
-    void serialize(MutableDocument& outputFields, const SerializationOptions& opts) const;
+    void serialize(MutableDocument& outputFields,
+                   const query_shape::SerializationOptions& opts) const;
 };
 }  // namespace mongo

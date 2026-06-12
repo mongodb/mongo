@@ -110,8 +110,8 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithDollarFieldSerializesShapeCorrectly
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
 
     // Serialization is correct upon the first parse.
     auto serialized = objMatch.getValue()->serialize(opts);
@@ -140,8 +140,8 @@ TEST(SerializeBasic, ExpressionJsonSchemaWithKeywordDollarFieldSerializesShapeCo
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
 
     // Serialization is correct upon the first parse.
     auto serialized = objMatch.getValue()->serialize(opts);
@@ -171,8 +171,8 @@ TEST(SerializeBasic, NonLeafDollarPrefixedPathSerializesShapeCorrectly) {
     auto elemMatchValExpr = std::make_unique<ElemMatchValueMatchExpression>("$a"_sd);
     elemMatchValExpr->add(std::move(gt));
 
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
 
     // Serialization is correct upon the first parse.
     BSONObjBuilder bob;
@@ -190,8 +190,8 @@ TEST(SerializeBasic, ExpressionRegexWithoutOptionsSerializesShapeCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
     ASSERT_BSONOBJ_EQ_AUTO(R"({"x":{"$regex":"\\?"}})", objMatch.getValue()->serialize(opts));
 }
 
@@ -200,8 +200,8 @@ TEST(SerializeBasic, ExpressionRegexWithOptionsSerializesShapeCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
     ASSERT_BSONOBJ_EQ_AUTO(R"({"x":{"$regex":"\\?","$options":"i"}})",
                            objMatch.getValue()->serialize(opts));
 }
@@ -573,7 +573,8 @@ TEST(SerializeInternalSchema, AllowedPropertiesRedactsCorrectly) {
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
 
-    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -615,7 +616,7 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
 }
 
 TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto conditionQuery = BSON("age" << BSON("$lt" << 18));
     auto thenQuery = BSON("job" << "student");
     auto elseQuery = BSON("job" << "engineer");
@@ -647,7 +648,8 @@ TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, FmodMatchRedactsCorrectly) {
     InternalSchemaFmodMatchExpression m("a"_sd, Decimal128(1.7), Decimal128(2));
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     BSONObjBuilder bob;
     m.serialize(&bob, opts);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -664,7 +666,7 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
     ASSERT_OK(objMatch.getStatus());
 
     BSONObjBuilder bob;
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     objMatch.getValue()->serialize(&bob, opts);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -685,7 +687,7 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
     InternalSchemaMaxItemsMatchExpression maxItems("a.b"_sd, 2);
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMaxItems":"?number"})",
         maxItems.getSerializedRightHandSide(opts));
@@ -693,7 +695,7 @@ TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
     InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMaxLength":"?number"})",
         maxLength.getSerializedRightHandSide(opts));
@@ -701,7 +703,7 @@ TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
     InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMinItems":"?number"})",
@@ -710,7 +712,8 @@ TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, MinLengthRedactsCorrectly) {
     InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaMinLength":"?number"})",
         minLength.getSerializedRightHandSide(opts));
@@ -718,7 +721,8 @@ TEST(SerializeInternalSchema, MinLengthRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, MinPropertiesRedactsCorrectly) {
     InternalSchemaMinPropertiesMatchExpression minProperties(5);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
 
     BSONObjBuilder bob;
     minProperties.serialize(&bob, opts);
@@ -728,7 +732,7 @@ TEST(SerializeInternalSchema, MinPropertiesRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, ObjectMatchRedactsCorrectly) {
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
         "        c: {$eq: 3}"
@@ -745,7 +749,7 @@ TEST(SerializeInternalSchema, ObjectMatchRedactsCorrectly) {
 TEST(SerializeInternalSchema, RootDocEqRedactsCorrectly) {
     auto query = fromjson("{$_internalSchemaRootDocEq: {a:1, b: {c: 1, d: [1]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -767,7 +771,8 @@ TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
     typeSet.bsonTypes.insert(BSONType::string);
     typeSet.bsonTypes.insert(BSONType::date);
     InternalSchemaBinDataEncryptedTypeExpression e("a"_sd, std::move(typeSet));
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaBinDataEncryptedType":[2,9]})",
         e.getSerializedRightHandSide(opts));
@@ -775,7 +780,8 @@ TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, BinDataFLE2EncryptedTypeRedactsCorrectly) {
     InternalSchemaBinDataFLE2EncryptedTypeExpression e("ssn"_sd, BSONType::string);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaBinDataFLE2EncryptedType":[2]})",
         e.getSerializedRightHandSide(opts));
@@ -783,7 +789,8 @@ TEST(SerializeInternalSchema, BinDataFLE2EncryptedTypeRedactsCorrectly) {
 
 TEST(SerializesInternalSchema, MaxPropertiesRedactsCorrectly) {
     InternalSchemaMaxPropertiesMatchExpression maxProperties(5);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
 
     BSONObjBuilder bob;
     maxProperties.serialize(&bob, opts);
@@ -793,7 +800,7 @@ TEST(SerializesInternalSchema, MaxPropertiesRedactsCorrectly) {
 }
 
 TEST(SerializesInternalSchema, EqRedactsCorrectly) {
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto query = fromjson("{$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}");
     BSONObjBuilder bob;
     InternalSchemaEqMatchExpression e("a"_sd, query.firstElement());
@@ -823,7 +830,7 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RedactsExpressionCorrec
     auto elemMatchExpr = dynamic_cast<const InternalSchemaAllElemMatchFromIndexMatchExpression*>(
         expr.getValue().get());
 
-    auto opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -844,8 +851,8 @@ TEST(SerializeBasic, SerializesNestedElemMatchCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({"a": {
                 "$elemMatch": {

@@ -3825,7 +3825,8 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx);
     const auto pipeline = Pipeline::create(desugaredList, expCtx);
 
-    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson(opts));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -4079,7 +4080,8 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx);
     const auto pipeline = Pipeline::create(desugaredList, expCtx);
 
-    SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson(opts));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

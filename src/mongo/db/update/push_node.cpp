@@ -178,7 +178,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
     return Status::OK();
 }
 
-BSONObj PushNode::operatorValue(const SerializationOptions& opts) const {
+BSONObj PushNode::operatorValue(const query_shape::SerializationOptions& opts) const {
     BSONObjBuilder bob;
     {
         BSONObjBuilder subBuilder(bob.subobjStart(""));

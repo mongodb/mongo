@@ -43,7 +43,7 @@ namespace mongo {
 namespace {
 
 using TopKSortOptimization = AggregationContextFixture;
-const auto kExplain = SerializationOptions{
+const auto kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 const auto commonInitialUnpackSpecObj = fromjson(R"(

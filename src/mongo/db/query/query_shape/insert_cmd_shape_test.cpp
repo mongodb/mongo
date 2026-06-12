@@ -77,20 +77,22 @@ TEST_F(InsertCmdShapeTest, DefaultInsertShape) {
         command: "insert",
         documents: [ { "?": "?" } ]
     })");
-    ASSERT_BSONOBJ_EQ(expectedRepresentativeShape,
-                      shape.toBson(expCtx->getOperationContext(),
-                                   SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                                   {}));
+    ASSERT_BSONOBJ_EQ(
+        expectedRepresentativeShape,
+        shape.toBson(expCtx->getOperationContext(),
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     {}));
 
     const auto expectedDebugShape = fromjson(R"({
         cmdNs: { db: "testdb", coll: "testcoll" },
         command: "insert",
         documents: "?array<?object>"
     })");
-    ASSERT_BSONOBJ_EQ(expectedDebugShape,
-                      shape.toBson(expCtx->getOperationContext(),
-                                   SerializationOptions::kDebugQueryShapeSerializeOptions,
-                                   {}));
+    ASSERT_BSONOBJ_EQ(
+        expectedDebugShape,
+        shape.toBson(expCtx->getOperationContext(),
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     {}));
 }
 
 // Test that documents with different field names produce the same shape.
@@ -105,12 +107,13 @@ TEST_F(InsertCmdShapeTest, DocumentsIsAlwaysPlaceholderRegardlessOfFieldNames) {
         documents: [ { b: "hello", c: true } ],
         "$db": "testdb"
     })");
-    ASSERT_BSONOBJ_EQ(shape1.toBson(expCtx->getOperationContext(),
-                                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                                    {}),
-                      shape2.toBson(expCtx->getOperationContext(),
-                                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                                    {}));
+    ASSERT_BSONOBJ_EQ(
+        shape1.toBson(expCtx->getOperationContext(),
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      {}),
+        shape2.toBson(expCtx->getOperationContext(),
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      {}));
 }
 
 // Test that multiple documents produce the same shape as a single document.
@@ -125,12 +128,13 @@ TEST_F(InsertCmdShapeTest, DocumentsIsAlwaysPlaceholderRegardlessOfDocumentCount
         documents: [ { x: 1 }, { y: 2 }, { z: 3 } ],
         "$db": "testdb"
     })");
-    ASSERT_BSONOBJ_EQ(shape1.toBson(expCtx->getOperationContext(),
-                                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                                    {}),
-                      shape2.toBson(expCtx->getOperationContext(),
-                                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                                    {}));
+    ASSERT_BSONOBJ_EQ(
+        shape1.toBson(expCtx->getOperationContext(),
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      {}),
+        shape2.toBson(expCtx->getOperationContext(),
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      {}));
 }
 
 // Test that the debug format represents documents with a type placeholder.
@@ -140,8 +144,10 @@ TEST_F(InsertCmdShapeTest, InsertShapeDebugFormat) {
         documents: [ { x: 1 } ],
         "$db": "testdb"
     })");
-    const auto bson = shape.toBson(
-        expCtx->getOperationContext(), SerializationOptions::kDebugQueryShapeSerializeOptions, {});
+    const auto bson =
+        shape.toBson(expCtx->getOperationContext(),
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     {});
     // Verify 'documents' is present and shapified (not the original value).
     ASSERT_TRUE(bson.hasField("documents"));
     ASSERT_FALSE(bson["documents"].isABSONObj() && bson["documents"].Obj().hasField("x"));

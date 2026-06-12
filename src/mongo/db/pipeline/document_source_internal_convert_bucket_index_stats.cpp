@@ -96,7 +96,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
 }
 
 Value DocumentSourceInternalConvertBucketIndexStats::serialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     MutableDocument out;
     out.addField(timeseries::kTimeFieldName,
                  Value{opts.serializeFieldPathFromString(_timeseriesOptions.timeField)});

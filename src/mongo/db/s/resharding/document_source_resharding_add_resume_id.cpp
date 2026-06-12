@@ -85,7 +85,8 @@ StageConstraints DocumentSourceReshardingAddResumeId::constraints(
     return constraints;
 }
 
-Value DocumentSourceReshardingAddResumeId::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceReshardingAddResumeId::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{kStageName, Value(Document{})}});
 }
 

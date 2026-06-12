@@ -48,8 +48,8 @@ public:
         return _groupProcessor->usedDisk();
     }
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const final;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const final;
 
 protected:
     GroupBaseStage(StringData stageName,

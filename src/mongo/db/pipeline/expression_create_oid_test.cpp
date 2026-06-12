@@ -65,8 +65,9 @@ TEST_F(ExpressionCreateObjectIdTest, Basic) {
 
     // Serialize, re-parse, and validate a different ObjectId is returned.
     auto serialized =
-        exp->serialize(SerializationOptions{.verbosity = boost::make_optional(
-                                                ExplainOptions::Verbosity::kQueryPlanner)})
+        exp
+            ->serialize(query_shape::SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
             .getDocument()
             .toBson();
     ASSERT_BSONOBJ_EQ(fromjson(R"({$createObjectId: {}})"), serialized);

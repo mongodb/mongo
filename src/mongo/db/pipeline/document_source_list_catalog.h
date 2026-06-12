@@ -99,7 +99,8 @@ public:
 
     // virtuals from DocumentSource
     StringData getSourceName() const final;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     static const Id& id;
 

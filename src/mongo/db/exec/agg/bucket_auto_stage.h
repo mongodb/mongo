@@ -63,8 +63,8 @@ public:
                        : _stats.spillingStats.getSpills() > 0;
     }
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const final;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const final;
 
     /**
      * TODO SERVER-112710: Remove 'MONGO_MOD_PRIVATE' once document_source_bucket_auto_test.cpp is

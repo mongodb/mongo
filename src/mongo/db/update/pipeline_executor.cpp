@@ -156,10 +156,10 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
 }
 
 Value PipelineExecutor::serialize() const {
-    return serialize(SerializationOptions{});
+    return serialize(query_shape::SerializationOptions{});
 }
 
-Value PipelineExecutor::serialize(const SerializationOptions& opts) const {
+Value PipelineExecutor::serialize(const query_shape::SerializationOptions& opts) const {
     std::vector<Value> valueArray;
     for (const auto& stage : _pipeline->getSources()) {
         // The queue stage we add to adapt the pull-based '_pipeline' to our use case should not

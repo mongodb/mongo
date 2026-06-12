@@ -550,7 +550,7 @@ TEST_F(DocumentSourceGraphLookUpTest, CreateFromStageParamsUsesLiteParsedPipelin
     auto ds = DocumentSourceGraphLookUp::createFromStageParams(*typedParams, expCtx);
     auto* glu = static_cast<DocumentSourceGraphLookUp*>(ds.get());
 
-    SerializationOptions serOpts;
+    query_shape::SerializationOptions serOpts;
     serOpts.isSerializingForRemoteDispatch = true;
     std::vector<Value> serialized;
     glu->serializeToArray(serialized, serOpts);

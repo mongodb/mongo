@@ -72,7 +72,8 @@ DocumentSourceInternalApplyOplogUpdate::DocumentSourceInternalApplyOplogUpdate(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const BSONObj& oplogUpdate)
     : DocumentSource(kStageName, pExpCtx), _oplogUpdate(oplogUpdate) {}
 
-Value DocumentSourceInternalApplyOplogUpdate::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalApplyOplogUpdate::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{kStageName,
                            Document{{kOplogUpdateFieldName,
                                      opts.serializeLiteral(_oplogUpdate, Value(Document{}))}}}});

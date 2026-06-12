@@ -57,7 +57,7 @@ public:
                    Variables* variables,
                    const EvaluationContext& ctx) const final;
 
-    Value serialize(const SerializationOptions& options = {}) const final {
+    Value serialize(const query_shape::SerializationOptions& options = {}) const final {
         return Value(Document{{_exprName, Value(1)}});
     }
 

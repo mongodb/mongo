@@ -76,7 +76,7 @@ struct BoundMakerMin {
             doc.metadata().getTimeseriesBucketMinTime().toMillisSinceEpoch() + offset)};
     }
 
-    Document serialize(const SerializationOptions& opts) const {
+    Document serialize(const query_shape::SerializationOptions& opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMin},
                          {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
@@ -92,7 +92,7 @@ struct BoundMakerMax {
             doc.metadata().getTimeseriesBucketMaxTime().toMillisSinceEpoch() + offset)};
     }
 
-    Document serialize(const SerializationOptions& opts) const {
+    Document serialize(const query_shape::SerializationOptions& opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMax},
                          {DocumentSourceSort::kOffset, opts.serializeLiteral(offset / 1000)}}};
@@ -178,8 +178,8 @@ REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(_internalBoundedSort,
                                                  InternalBoundedSortStageParams::id,
                                                  _internalBoundedSortStageParamsToDocumentSourceFn)
 
-void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
-                                                 const SerializationOptions& opts) const {
+void DocumentSourceSort::serializeForBoundedSort(
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
     tassert(9028700, "_timeSorter is nullptr", _timeSorter);
     tassert(
         6369900, "$_internalBoundedSort should not absorb a $limit", !_sortExecutor->hasLimit());
@@ -215,7 +215,7 @@ void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
 }
 
 void DocumentSourceSort::serializeForCloning(std::vector<Value>& array,
-                                             const SerializationOptions& opts) const {
+                                             const query_shape::SerializationOptions& opts) const {
     MutableDocument mutDoc(_sortExecutor->sortPattern().serialize(
         SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
     if (_sortExecutor->hasLimit()) {
@@ -228,9 +228,9 @@ void DocumentSourceSort::serializeForCloning(std::vector<Value>& array,
     array.push_back(Value(DOC(kStageName << mutDoc.freeze())));
 }
 
-void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
-                                                const SerializationOptions& opts) const {
-    tassert(9028701, "SerializationOptions do not specify verbosity", opts.verbosity);
+void DocumentSourceSort::serializeWithVerbosity(
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
+    tassert(9028701, "query_shape::SerializationOptions do not specify verbosity", opts.verbosity);
     uint64_t limit = _sortExecutor->getLimit();
     MutableDocument mutDoc(
         DOC(kStageName << DOC(
@@ -265,7 +265,7 @@ void DocumentSourceSort::serializeWithVerbosity(std::vector<Value>& array,
 }
 
 void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
-                                          const SerializationOptions& opts) const {
+                                          const query_shape::SerializationOptions& opts) const {
     if (_timeSorter) {
         serializeForBoundedSort(array, opts);
     } else if (opts.isSerializingForExplain()) {

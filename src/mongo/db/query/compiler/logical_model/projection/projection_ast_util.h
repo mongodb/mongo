@@ -41,6 +41,7 @@ namespace projection_ast {
  */
 BSONObj astToDebugBSON(const ASTNode* root);
 
-BSONObj serialize(const ProjectionPathASTNode& root, const SerializationOptions& options);
+BSONObj serialize(const ProjectionPathASTNode& root,
+                  const query_shape::SerializationOptions& options);
 }  // namespace projection_ast
 }  // namespace mongo

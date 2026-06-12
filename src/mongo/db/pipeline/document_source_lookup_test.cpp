@@ -85,7 +85,7 @@ protected:
     }
 };
 
-const auto kExplain = SerializationOptions{
+const auto kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 // For tests which need to run in a replica set context.
@@ -537,7 +537,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwind)
     lookup->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 2UL);
     serialization.clear();
-    lookup->serializeToArray(serialization, SerializationOptions{.serializeForCloning = true});
+    lookup->serializeToArray(serialization,
+                             query_shape::SerializationOptions{.serializeForCloning = true});
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
@@ -570,7 +571,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwind)
 
     std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization,
-                                   SerializationOptions{.serializeForCloning = true});
+                                   query_shape::SerializationOptions{.serializeForCloning = true});
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
@@ -609,7 +610,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
     ASSERT_EQ(serializedDoc["$unwind"].getType(), BSONType::object);
 
     serialization.clear();
-    lookup->serializeToArray(serialization, SerializationOptions{.serializeForCloning = true});
+    lookup->serializeToArray(serialization,
+                             query_shape::SerializationOptions{.serializeForCloning = true});
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
@@ -643,7 +645,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
 
     std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization,
-                                   SerializationOptions{.serializeForCloning = true});
+                                   query_shape::SerializationOptions{.serializeForCloning = true});
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
@@ -685,7 +687,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
     ASSERT_EQ(serializedDoc["$unwind"].getType(), BSONType::object);
 
     serialization.clear();
-    lookup->serializeToArray(serialization, SerializationOptions{.serializeForCloning = true});
+    lookup->serializeToArray(serialization,
+                             query_shape::SerializationOptions{.serializeForCloning = true});
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
@@ -720,7 +723,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
 
     std::vector<Value> newSerialization;
     roundTripped->serializeToArray(newSerialization,
-                                   SerializationOptions{.serializeForCloning = true});
+                                   query_shape::SerializationOptions{.serializeForCloning = true});
 
     ASSERT_EQ(newSerialization.size(), 1UL);
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
@@ -882,8 +885,9 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipeli
     // Serialize the $lookup stage and confirm contents.
     //
     for (auto& opts :
-         {SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue},
-          SerializationOptions{}}) {
+         {query_shape::SerializationOptions{
+              query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue},
+          query_shape::SerializationOptions{}}) {
         std::vector<Value> serialization;
         lookupStage->serializeToArray(serialization, opts);
         ASSERT_EQ(serialization.size(), 1UL);

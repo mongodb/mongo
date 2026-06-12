@@ -75,7 +75,8 @@ InternalSearchIdLookUpStage::InternalSearchIdLookUpStage(
       _catalogResourceHandle(catalogResourceHandle),
       _searchIdLookupMetrics(searchIdLookupMetrics) {}
 
-Document InternalSearchIdLookUpStage::getExplainOutput(const SerializationOptions& opts) const {
+Document InternalSearchIdLookUpStage::getExplainOutput(
+    const query_shape::SerializationOptions& opts) const {
     const PlanSummaryStats& stats = _stats.planSummaryStats;
     MutableDocument output(Stage::getExplainOutput(opts));
     // Create sub-document with the stage name. The QO side of the explain output has a similar

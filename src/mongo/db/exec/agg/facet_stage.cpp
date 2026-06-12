@@ -59,7 +59,8 @@ namespace {
 class StatsProviderImpl : public DSFacetExecStatsWrapper::StatsProvider {
 public:
     StatsProviderImpl(const std::vector<FacetStage::FacetPipeline>& facets) : _facets(facets) {}
-    std::vector<Value> getStats(size_t facetId, const SerializationOptions& opts) override {
+    std::vector<Value> getStats(size_t facetId,
+                                const query_shape::SerializationOptions& opts) override {
         return _facets[facetId].execPipeline->writeExplainOps(opts);
     }
 

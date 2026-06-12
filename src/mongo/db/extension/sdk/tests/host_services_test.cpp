@@ -242,7 +242,8 @@ TEST_F(HostServicesTest, NestedFilterParseNodeBasicPredicate) {
         std::make_unique<NestedFilterParseNode>(filterSpec));
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
@@ -261,7 +262,8 @@ TEST_F(HostServicesTest, NestedFilterParseNodeComplexPredicate) {
         std::make_unique<NestedFilterParseNode>(filterSpec));
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
@@ -282,7 +284,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate1) {
         std::make_unique<NestedFilterParseNode>(filterSpec));
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
 
     ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);
@@ -296,7 +298,7 @@ TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate2) {
         std::make_unique<NestedFilterParseNode>(filterSpec));
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
 
     ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);

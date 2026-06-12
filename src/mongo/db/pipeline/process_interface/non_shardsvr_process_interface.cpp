@@ -390,7 +390,7 @@ BSONObj NonShardServerProcessInterface::finalizePipelineAndExplain(
     std::function<void(Pipeline* pipeline)> optimizePipeline) {
     std::vector<Value> pipelineVec;
     auto firstStage = pipeline->peekFront();
-    auto opts = SerializationOptions{.verbosity = verbosity};
+    auto opts = query_shape::SerializationOptions{.verbosity = verbosity};
     // If the pipeline already has a cursor explain with that one, otherwise attach a new one like
     // we would for a normal execution and explain that.
     if (firstStage && typeid(*firstStage) == typeid(DocumentSourceCursor)) {

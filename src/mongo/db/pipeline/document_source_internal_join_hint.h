@@ -103,7 +103,8 @@ public:
     }
 
 private:
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     join_ordering::EnumerationStrategy _joinStrategy;
 };

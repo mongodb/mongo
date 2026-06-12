@@ -125,7 +125,8 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {};
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
@@ -154,7 +155,8 @@ public:
                                                  DocumentSourceContainer* container);
 
     void serializeToArray(std::vector<Value>& array,
-                          const SerializationOptions& opts = SerializationOptions{}) const final;
+                          const query_shape::SerializationOptions& opts =
+                              query_shape::SerializationOptions{}) const final;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalAllCollectionStatsToStageFn(

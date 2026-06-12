@@ -72,7 +72,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::
     return new DocumentSourceInternalInhibitOptimization(expCtx);
 }
 
-Value DocumentSourceInternalInhibitOptimization::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalInhibitOptimization::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), Value{Document{}}}});
 }
 

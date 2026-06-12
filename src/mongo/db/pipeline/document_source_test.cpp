@@ -93,7 +93,8 @@ public:
         return boost::none;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const override {
         return Value(Document{{getSourceName(), Value(Document{})}});
     }
 

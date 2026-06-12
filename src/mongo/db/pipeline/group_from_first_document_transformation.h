@@ -99,7 +99,8 @@ public:
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) final;
 
-    Document serializeTransformation(const SerializationOptions& options = {}) const final;
+    Document serializeTransformation(
+        const query_shape::SerializationOptions& options = {}) const final;
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final;
 

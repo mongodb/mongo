@@ -269,7 +269,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
         tassert(7406001, "expCtx passed to clone must not be null", expCtx);
         std::vector<Value> serializedDoc;
-        serializeToArray(serializedDoc, SerializationOptions{.serializeForCloning = true});
+        serializeToArray(serializedDoc,
+                         query_shape::SerializationOptions{.serializeForCloning = true});
         tassert(5757900,
                 str::stream() << "DocumentSource " << getSourceName()
                               << " should have serialized to exactly one document. This stage may "
@@ -336,8 +337,9 @@ public:
      * A subclass may choose to overwrite this, rather than serialize, if it should output multiple
      * stages (eg, $sort sometimes also outputs a $limit).
      */
-    virtual void serializeToArray(std::vector<Value>& array,
-                                  const SerializationOptions& opts = SerializationOptions{}) const;
+    virtual void serializeToArray(
+        std::vector<Value>& array,
+        const query_shape::SerializationOptions& opts = query_shape::SerializationOptions{}) const;
 
     /**
      * Create a Value that represents the document source.
@@ -346,7 +348,8 @@ public:
      * to a pipeline being serialized. Returning a missing() Value results in no entry
      * being added to the array for this stage (DocumentSource).
      */
-    virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
+    virtual Value serialize(const query_shape::SerializationOptions& opts =
+                                query_shape::SerializationOptions{}) const = 0;
 
     /**
      * Shortcut method to get a BSONObj for debugging. Often useful in log messages, but is not

@@ -98,7 +98,7 @@ public:
             *aggRequest,
             stdx::unordered_set<NamespaceString>{kDefaultTestNss},
             parsedPipeline->serializeToBson(
-                SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+                query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
             LetShapeComponent(aggRequest->getLet(), _expCtx));
     }
 
@@ -150,7 +150,7 @@ TEST_F(AggCmdShapeTest, BasicPipelineShape) {
             ]
         })",
         shape->toBson(_operationContext.get(),
-                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
 }
 
@@ -182,7 +182,7 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
             ]
         })",
         shape->toBson(_operationContext.get(),
-                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -214,7 +214,7 @@ TEST_F(AggCmdShapeTest, IncludesLet) {
             ]
         })",
         shape->toBson(_operationContext.get(),
-                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
 }
 

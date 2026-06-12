@@ -47,7 +47,8 @@ namespace mongo {
 namespace {
 
 TEST(ExpressionFunction, SerializeAndRedactArgs) {
-    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     auto expCtx = ExpressionContextForTest();
     auto expr = BSON("$function" << BSON("body" << "function(age) {return age >= 21;}"

@@ -424,7 +424,7 @@ public:
     /**
      * Serialize the MatchExpression to BSON, appending to 'out'.
      *
-     * See 'SerializationOptions' for some options.
+     * See 'query_shape::SerializationOptions' for some options.
      *
      * Generally, the output of this method is expected to be a valid query object that, when
      * parsed, produces a logically equivalent MatchExpression. However, if special options are set,
@@ -448,14 +448,15 @@ public:
      * {$eq: 2} instead of its usual {a: {$eq: 2}}.
      */
     virtual void serialize(BSONObjBuilder* out,
-                           const SerializationOptions& options = {},
+                           const query_shape::SerializationOptions& options = {},
                            bool includePath = true) const = 0;
 
     /**
      * Convenience method which serializes this MatchExpression to a BSONObj. See the override with
      * a BSONObjBuilder* argument for details.
      */
-    BSONObj serialize(const SerializationOptions& options = {}, bool includePath = true) const {
+    BSONObj serialize(const query_shape::SerializationOptions& options = {},
+                      bool includePath = true) const {
         BSONObjBuilder bob;
         serialize(&bob, options, includePath);
         return bob.obj();

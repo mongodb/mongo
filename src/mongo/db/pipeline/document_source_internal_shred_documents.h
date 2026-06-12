@@ -77,7 +77,8 @@ public:
         return constraints;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) override {

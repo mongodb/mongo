@@ -52,21 +52,21 @@ namespace mongo {
  * re-parsed, and the geoparser performs validation checking to make sure input coordinates apply to
  * the correct geo type. For example, a GeoJSON Polygon must have minimum four pairs of coordinates
  * in a closed loop. The default representative parseable array value used in const
- * SerializationOptions (an empty array) is not useful here since it won't pass geo validation
- * checks. As a workaround, this custom serializer determines a parseable value for each shape or
- * point type.
+ * query_shape::SerializationOptions (an empty array) is not useful here since it won't pass geo
+ * validation checks. As a workaround, this custom serializer determines a parseable value for each
+ * shape or point type.
  */
 void geoNearExpressionCustomSerialization(BSONObjBuilder& bob,
                                           const BSONObj& obj,
-                                          const SerializationOptions& opts = {},
+                                          const query_shape::SerializationOptions& opts = {},
                                           bool includePath = true);
 
 void serializeGeoOperator(BSONObjBuilder& bob,
                           const BSONObj& obj,
-                          const SerializationOptions& opts = {});
+                          const query_shape::SerializationOptions& opts = {});
 
 void geoExpressionCustomSerialization(BSONObjBuilder& bob,
                                       const BSONObj& obj,
-                                      const SerializationOptions& opts = {},
+                                      const query_shape::SerializationOptions& opts = {},
                                       bool includePath = true);
 }  // namespace mongo

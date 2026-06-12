@@ -719,11 +719,11 @@ TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimi
 
     auto expectedMatch = fromjson("{$match: {a:{$eq: 1}}}");
 
-    ASSERT_VALUE_EQ(
-        Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))
-                  ->serialize(SerializationOptions{.verbosity = boost::make_optional(
-                                                       ExplainOptions::Verbosity::kQueryPlanner)})),
-        Value(expectedMatch));
+    ASSERT_VALUE_EQ(Value((static_cast<DocumentSourceMatch*>(optimizedMatch.get()))
+                              ->serialize(query_shape::SerializationOptions{
+                                  .verbosity = boost::make_optional(
+                                      ExplainOptions::Verbosity::kQueryPlanner)})),
+                    Value(expectedMatch));
 }
 
 TEST_F(DocumentSourceMatchTest, RedactionWithAnd) {

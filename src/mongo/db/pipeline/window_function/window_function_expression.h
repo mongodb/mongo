@@ -238,7 +238,7 @@ public:
         }
     }
 
-    virtual Value serialize(const SerializationOptions& opts) const {
+    virtual Value serialize(const query_shape::SerializationOptions& opts) const {
         MutableDocument args;
 
         args[_accumulatorName] = _input->serialize(opts);
@@ -373,7 +373,7 @@ public:
                                 << " is not supported as a removable window function");
     }
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(_input->serialize(opts)));
         return args.freezeToValue();
@@ -535,7 +535,7 @@ public:
                                 << " is not supported with a removable window");
     }
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(Document()));
         return args.freezeToValue();
@@ -589,7 +589,7 @@ public:
                                 << " is not supported with a removable window");
     }
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MutableDocument subObj;
         tassert(5433604, "ExpMovingAvg neither N nor alpha was set", _N || _alpha);
         if (_N) {
@@ -646,7 +646,7 @@ public:
         return milliseconds;
     }
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MutableDocument result;
         result[_accumulatorName][kArgInput] = _input->serialize(opts);
         if (_unit) {
@@ -912,7 +912,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(5490705);
     }
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(_input->serialize(opts)));
         return args.freezeToValue();
@@ -1018,7 +1018,7 @@ public:
         return WindowFunctionMinMaxScaler::create(_expCtx, _sMinAndsMax);
     }
 
-    Value serialize(const SerializationOptions& opts) const final {
+    Value serialize(const query_shape::SerializationOptions& opts) const final {
         MutableDocument result;
         // $minMaxScaler args
         result[_accumulatorName][kInputArg] = _input->serialize(opts);
@@ -1068,7 +1068,7 @@ public:
           nExpr(std::move(nExpr)),
           sortPattern(std::move(sortPattern)) {}
 
-    Value serialize(const SerializationOptions& opts) const final;
+    Value serialize(const query_shape::SerializationOptions& opts) const final;
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 
@@ -1127,7 +1127,7 @@ public:
         expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
     }
 
-    Value serialize(const SerializationOptions& opts) const final;
+    Value serialize(const query_shape::SerializationOptions& opts) const final;
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 

@@ -48,9 +48,10 @@ public:
         return _components;
     }
 
-    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
-                                          OperationContext*,
-                                          const SerializationOptions& opts) const override {}
+    void appendCmdSpecificShapeComponents(
+        BSONObjBuilder&,
+        OperationContext*,
+        const query_shape::SerializationOptions& opts) const override {}
 
 private:
     MockCmdSpecificShapeComponents _components;

@@ -78,7 +78,7 @@ DocumentSourceContainer::iterator DocumentSourceLimit::optimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceLimit::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceLimit::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), opts.serializeLiteral(_limit)}});
 }
 

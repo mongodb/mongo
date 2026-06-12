@@ -61,7 +61,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(skip, DocumentSourceSkip::id)
 
 constexpr StringData DocumentSourceSkip::kStageName;
 
-Value DocumentSourceSkip::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceSkip::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));
 }
 

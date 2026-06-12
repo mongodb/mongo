@@ -113,7 +113,8 @@ private:
     documentSourceInternalApplyOplogUpdateGroupToStageFn(
         const boost::intrusive_ptr<DocumentSource>&);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     BSONObj _oplogUpdate;
 };

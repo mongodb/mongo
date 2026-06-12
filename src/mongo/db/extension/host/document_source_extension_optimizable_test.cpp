@@ -135,8 +135,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
     ASSERT_TRUE(stagePtr != nullptr);
     ASSERT_EQUALS(std::string(stagePtr->getSourceName()),
                   sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
-    auto serializedPipeline =
-        parsedPipeline->serializeToBson(SerializationOptions::kDebugQueryShapeSerializeOptions);
+    auto serializedPipeline = parsedPipeline->serializeToBson(
+        query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions);
     ASSERT_EQUALS(serializedPipeline.size(), 1u);
     // The extension is in the form of DocumentSourceExtensionForQueryShape at this point, which
     // serializes to its query shape. The transform extension's query shape is just its stage
@@ -2018,8 +2018,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageCanSerializeForQueryExecutio
 
     // Test that an extension can provide its own implementation of serialize, that might change
     // the raw spec provided.
-    ASSERT_BSONOBJ_EQ(optimizable->serialize(SerializationOptions()).getDocument().toBson(),
-                      BSON(TransformAggStageDescriptor::kStageName << arguments));
+    ASSERT_BSONOBJ_EQ(
+        optimizable->serialize(query_shape::SerializationOptions()).getDocument().toBson(),
+        BSON(TransformAggStageDescriptor::kStageName << arguments));
 }
 
 DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
@@ -3187,7 +3188,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExplainPropagatesDeadlineToLogica
     const auto beforeMs = Date_t::now().toMillisSinceEpoch();
     getOpCtx()->setDeadlineAfterNowBy(maxTimeMs, ErrorCodes::MaxTimeMSExpired);
 
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
     opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
     const auto result = optimizable->serialize(opts);
     const auto afterMs = Date_t::now().toMillisSinceEpoch();
@@ -3208,7 +3209,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExplainPropagatesDeadlineToLogica
 TEST_F(DocumentSourceExtensionOptimizableTest, ExplainWithNoDeadlineReportsMaxDeadline) {
     auto optimizable = makeExplainContextOptimizable(getExpCtx());
 
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
     opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
     const auto result = optimizable->serialize(opts);
 
@@ -3227,7 +3228,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExplainDetectsInterrupt) {
 
     getOpCtx()->markKilled(ErrorCodes::Interrupted);
 
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
     opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
     ASSERT_THROWS_CODE(optimizable->serialize(opts), DBException, ErrorCodes::Interrupted);
 }

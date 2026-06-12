@@ -833,7 +833,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     }
 
     CollectionOrViewAcquisitionMap allAcquisitions;
-    SerializationOptions opts{.isSerializingForRemoteDispatch = true};
+    query_shape::SerializationOptions opts{.isSerializingForRemoteDispatch = true};
     auto serializedPipeline = pipeline->serializeToBson(opts);
     bool isAnySecondaryCollectionNotLocal =
         acquireCollectionsForPipeline(expCtx, serializedPipeline, allAcquisitions);
@@ -894,7 +894,7 @@ std::unique_ptr<Pipeline> CommonMongodProcessInterface::attachCursorSourceToPipe
     }
 
     CollectionOrViewAcquisitionMap allAcquisitions;
-    SerializationOptions wireOptsForAcquire{.isSerializingForRemoteDispatch = true};
+    query_shape::SerializationOptions wireOptsForAcquire{.isSerializingForRemoteDispatch = true};
     bool isAnySecondaryCollectionNotLocal = acquireCollectionsForPipeline(
         expCtx, pipeline->serializeToBson(wireOptsForAcquire), allAcquisitions);
 

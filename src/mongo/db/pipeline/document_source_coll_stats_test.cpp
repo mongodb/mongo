@@ -42,8 +42,8 @@ namespace {
 using DocumentSourceCollStatsTest = AggregationContextFixture;
 
 auto representativeShape(const DocumentSourceCollStats& collStatsStage) {
-    SerializationOptions opts{.literalPolicy =
-                                  LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    query_shape::SerializationOptions opts{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     return collStatsStage.serialize(opts).getDocument().toBson();
 }
 

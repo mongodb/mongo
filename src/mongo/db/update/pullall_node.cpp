@@ -70,7 +70,7 @@ public:
     }
 
 private:
-    BSONObj value(const SerializationOptions& opts) const final {
+    BSONObj value(const query_shape::SerializationOptions& opts) const final {
         BSONArrayBuilder subarrayBuilder;
         for (const auto& element : _elementsToMatch)
             subarrayBuilder << element;

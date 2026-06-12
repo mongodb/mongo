@@ -78,9 +78,9 @@ public:
      * format of the update command's update parameter.
      */
     Value serialize() const final {
-        return serialize(SerializationOptions());
+        return serialize(query_shape::SerializationOptions());
     }
-    Value serialize(const SerializationOptions& opts) const {
+    Value serialize(const query_shape::SerializationOptions& opts) const {
         return Value(_updateTree->serialize(opts));
     }
 

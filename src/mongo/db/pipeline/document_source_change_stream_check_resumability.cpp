@@ -88,7 +88,7 @@ StringData DocumentSourceChangeStreamCheckResumability::getSourceName() const {
 }
 
 Value DocumentSourceChangeStreamCheckResumability::doSerialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));

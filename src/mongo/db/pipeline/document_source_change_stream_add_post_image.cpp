@@ -63,7 +63,8 @@ DocumentSourceChangeStreamAddPostImage::createFromBson(
     return new DocumentSourceChangeStreamAddPostImage(expCtx, parsedSpec.getFullDocument());
 }
 
-Value DocumentSourceChangeStreamAddPostImage::doSerialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamAddPostImage::doSerialize(
+    const query_shape::SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
         ? Value(Document{{DocumentSourceChangeStream::kStageName,
                           Document{{"stage"_sd, kStageName},

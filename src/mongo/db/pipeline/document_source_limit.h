@@ -115,7 +115,8 @@ public:
      */
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         return DepsTracker::State::SEE_NEXT;  // This doesn't affect needed fields

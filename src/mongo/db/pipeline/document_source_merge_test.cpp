@@ -814,8 +814,9 @@ TEST_F(DocumentSourceMergeTest, SerializeTargetCollectionVersion) {
     // Ensure that 'targetCollectionVersion' attribute is not present in case of non-default literal
     // policy.
     {
-        SerializationOptions opts;
-        opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+        query_shape::SerializationOptions opts;
+        opts.literalPolicy =
+            query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
         auto serialized = mergeStage->serialize(opts).getDocument();
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
             R"({

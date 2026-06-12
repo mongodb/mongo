@@ -65,7 +65,7 @@ void SetMetadataTransformation::optimize() {
 }
 
 Document SetMetadataTransformation::serializeTransformation(
-    const SerializationOptions& options) const {
+    const query_shape::SerializationOptions& options) const {
     return Document{{DocumentMetadataFields::serializeMetaType(_metaType),
                      _metadataExpression->serialize(options)}};
 }

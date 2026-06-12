@@ -66,7 +66,7 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
 }
 
 void InternalSchemaFmodMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     bob->append("$_internalSchemaFmod"_sd,
                 BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }

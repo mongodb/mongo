@@ -33,7 +33,7 @@ namespace mongo::query_shape {
 
 namespace {
 BSONObj extractLetShape(BSONObj letSpec,
-                        const SerializationOptions& opts,
+                        const query_shape::SerializationOptions& opts,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (letSpec.isEmpty()) {
         // Fast path for the common case.
@@ -58,7 +58,9 @@ BSONObj extractLetShape(BSONObj letSpec,
 auto representativeLetShape(boost::optional<BSONObj> let,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return let ? extractLetShape(
-                     *let, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx)
+                     *let,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     expCtx)
                : BSONObj();
 }
 }  // namespace
@@ -76,14 +78,14 @@ size_t LetShapeComponent::size() const {
 }
 
 void LetShapeComponent::appendTo(BSONObjBuilder& bob,
-                                 const SerializationOptions& opts,
+                                 const query_shape::SerializationOptions& opts,
                                  const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     if (!hasLet) {
         return;
     }
 
     auto shapeToAppend = shapifiedLet;
-    if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+    if (opts != query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // We have the representative query cached/stored here, but the caller is asking for a
         // different format, so we must re-compute.
         shapeToAppend = extractLetShape(shapifiedLet, opts, expCtx);

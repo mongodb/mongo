@@ -51,7 +51,7 @@ struct InsertCmdShapeComponents : public CmdSpecificShapeComponents {
         return sizeof(InsertCmdShapeComponents);
     }
 
-    void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
+    void appendTo(BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const;
 };
 
 /**
@@ -68,9 +68,10 @@ public:
     }
 
 protected:
-    void appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                          OperationContext* opCtx,
-                                          const SerializationOptions& opts) const final;
+    void appendCmdSpecificShapeComponents(
+        BSONObjBuilder& bob,
+        OperationContext* opCtx,
+        const query_shape::SerializationOptions& opts) const final;
 
 private:
     InsertCmdShapeComponents _components;

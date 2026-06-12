@@ -574,7 +574,7 @@ const NamespaceString kResolvedNss =
  */
 class InternalSearchIdLookupBuildDocumentSourceTest : public AggregationContextFixture {};
 
-const auto kExplain = SerializationOptions{
+const auto kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,

@@ -75,7 +75,7 @@ DEATH_TEST_F(DocumentSourceExtensionForQueryShapeTestDeathTest,
     auto expandable = host::DocumentSourceExtensionForQueryShape::create(
         getExpCtx(), rawStage, AggStageDescriptorHandle(&_transformStageDescriptor));
 
-    [[maybe_unused]] auto serialized = expandable->serialize(SerializationOptions{});
+    [[maybe_unused]] auto serialized = expandable->serialize(query_shape::SerializationOptions{});
 }
 
 }  // namespace mongo::extension

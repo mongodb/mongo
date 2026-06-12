@@ -279,14 +279,15 @@ private:
     friend exec::agg::StagePtr documentSourceUnionWithToStageFn(
         const boost::intrusive_ptr<const DocumentSource>& documentSource);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     // Builds the complete {$unionWith: {coll: ..., db: ..., pipeline: ...}} Value from
     // pre-computed components. Handles collectionless and cross-db variations.
     Value buildUnionWithResult(Value pipelineValue, Value db, Value coll) const;
 
     // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
-    Value legacyUnionWithSerialize(const SerializationOptions& opts) const;
+    Value legacyUnionWithSerialize(const query_shape::SerializationOptions& opts) const;
 
     std::shared_ptr<UnionWithSharedState> _sharedState;
 

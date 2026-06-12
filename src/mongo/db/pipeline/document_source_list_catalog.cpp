@@ -112,7 +112,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     return new DocumentSourceListCatalog(pExpCtx);
 }
 
-Value DocumentSourceListCatalog::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceListCatalog::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
 }
 }  // namespace mongo

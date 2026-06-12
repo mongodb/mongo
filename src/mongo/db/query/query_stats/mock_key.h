@@ -42,8 +42,8 @@ public:
         return _components;
     }
 
-    void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const override {}
+    void appendCommandSpecificComponents(
+        BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const override {}
 
 private:
     EmptyCmdComponents _components;

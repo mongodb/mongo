@@ -2496,7 +2496,8 @@ TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaBinDataEncrypt
 
 TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaBinDataFLE2EncryptedType) {
     InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"_sd, BSONType::string);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     matcher.getSerializedRightHandSide(opts);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StringMap<std::string> renames{{"a", "d"}};
@@ -2510,7 +2511,8 @@ TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaBinDataFLE2Enc
 TEST(ApplyRenamesToExpression,
      ShouldApplyRenamesForInternalSchemaBinDataFLE2EncryptedTypeDottedPaths) {
     InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"_sd, BSONType::string);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     matcher.getSerializedRightHandSide(opts);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StringMap<std::string> renames{{"a", "x.y"}};

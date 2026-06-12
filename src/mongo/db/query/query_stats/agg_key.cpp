@@ -80,7 +80,8 @@ void AggCmdComponents::HashValue(absl::HashState state) const {
     // analysis/querying.
 }
 
-void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+void AggCmdComponents::appendTo(BSONObjBuilder& bob,
+                                const query_shape::SerializationOptions& opts) const {
 
     // otherNss
     if (!involvedNamespaces.empty()) {
@@ -147,7 +148,7 @@ size_t AggCmdComponents::size() const {
 }
 
 void AggKey::appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                             const SerializationOptions& opts) const {
+                                             const query_shape::SerializationOptions& opts) const {
     return _components.appendTo(bob, opts);
 }
 

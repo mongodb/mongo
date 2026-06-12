@@ -39,7 +39,7 @@ StringData DocumentSourceExchange::getSourceName() const {
     return kStageName;
 }
 
-Value DocumentSourceExchange::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceExchange::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << _exchange->getSpec().toBSON(opts)));
 }
 

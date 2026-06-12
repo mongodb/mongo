@@ -219,7 +219,8 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
 }
 
 TEST(FieldPath, SerializeWithRedaction) {
-    SerializationOptions options = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression =
@@ -265,7 +266,7 @@ TEST(FieldPath, SerializeWithRedaction) {
         expression->serialize(options).getDocument());
 
     // Test that a variable followed by user fields is properly hashed.
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    options.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
 
     expression = expr(R"({$gt: ["$$ROOT.a.b", 5]})");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT

@@ -42,9 +42,8 @@ void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debu
     _debugStringAttachTagInfo(&debug);
 }
 
-void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out,
-                                                           const SerializationOptions& opts,
-                                                           bool includePath) const {
+void InternalSchemaNumPropertiesMatchExpression::serialize(
+    BSONObjBuilder* out, const query_shape::SerializationOptions& opts, bool includePath) const {
     opts.appendLiteral(out, _name, _numProperties);
 }
 

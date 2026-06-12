@@ -56,7 +56,7 @@ bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression*
 }
 
 void InternalSchemaUniqueItemsMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     bob->append(kName, true);
 }
 

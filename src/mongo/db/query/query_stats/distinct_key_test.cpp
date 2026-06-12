@@ -76,8 +76,8 @@ public:
 
 TEST_F(DistinctKeyTest, ExtractKeyFromDistinctRequiredFields) {
     boost::intrusive_ptr<ExpressionContext> expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    query_shape::SerializationOptions opts = query_shape::SerializationOptions(
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     auto expectedKey = fromjson(
         R"({
@@ -104,8 +104,8 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctRequiredFields) {
 
 TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQuery) {
     boost::intrusive_ptr<ExpressionContext> expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    query_shape::SerializationOptions opts = query_shape::SerializationOptions(
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     auto expectedKey = fromjson(
         R"({
@@ -134,8 +134,8 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQuery) {
 
 TEST_F(DistinctKeyTest, ExtractKeyFromDistinctComplex) {
     boost::intrusive_ptr<ExpressionContext> expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    query_shape::SerializationOptions opts = query_shape::SerializationOptions(
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     auto expectedKey = fromjson(
         R"({
@@ -174,9 +174,9 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctComplex) {
 
 TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQueryDebugString) {
     boost::intrusive_ptr<ExpressionContext> expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    query_shape::SerializationOptions opts = query_shape::SerializationOptions(
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
 
     auto expectedKey = fromjson(
         R"({
@@ -205,8 +205,8 @@ TEST_F(DistinctKeyTest, ExtractKeyFromDistinctQueryDebugString) {
 
 TEST_F(DistinctKeyTest, OriginalQueryShapeHashAppearsInKey) {
     boost::intrusive_ptr<ExpressionContext> expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    query_shape::SerializationOptions opts = query_shape::SerializationOptions(
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     const auto hash = query_shape::QueryShapeHash::fromHexString(
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 

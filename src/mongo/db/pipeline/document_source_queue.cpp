@@ -85,7 +85,7 @@ StringData DocumentSourceQueue::getSourceName() const {
     return _stageNameOverride.value_or(kStageName);
 }
 
-Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceQueue::serialize(const query_shape::SerializationOptions& opts) const {
     // Early exit with the pre-defined serialization override if it exists.
     if (_serializeOverride.has_value()) {
         return *_serializeOverride;

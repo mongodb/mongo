@@ -587,7 +587,7 @@ TEST_F(AggStageTest, SimpleComputeQueryShapeSucceeds) {
         new extension::sdk::ExtensionAggStageParseNodeAdapter(SimpleQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
@@ -637,7 +637,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation
 
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
@@ -650,7 +650,8 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) 
     auto parseNode = new ExtensionAggStageParseNodeAdapter(IdentifierQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = IdentifierQueryShapeParseNode::applyHmacForTest;
 
@@ -734,7 +735,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation)
     auto parseNode = new ExtensionAggStageParseNodeAdapter(FieldPathQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
@@ -750,7 +751,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
     auto parseNode = new ExtensionAggStageParseNodeAdapter(FieldPathQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = FieldPathQueryShapeParseNode::applyHmacForTest;
 
@@ -836,7 +837,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
     auto parseNode = new ExtensionAggStageParseNodeAdapter(LiteralQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
@@ -858,7 +859,8 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
     auto parseNode = new ExtensionAggStageParseNodeAdapter(LiteralQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions;
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
@@ -876,7 +878,8 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
     auto parseNode = new ExtensionAggStageParseNodeAdapter(LiteralQueryShapeParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
-    SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
@@ -1529,7 +1532,7 @@ TEST_F(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesQuerySha
     auto clonedHandle = handle->clone();
 
     // Verify query shape is preserved (CloneableExtensionParseNode returns _spec as query shape).
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     ASSERT_BSONOBJ_EQ(handle->getQueryShape(adapter), clonedHandle->getQueryShape(adapter));
 }
@@ -1585,7 +1588,7 @@ TEST_F(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOthe
     auto clonedHandle = handle->clone();
 
     // Get query shape before expand.
-    SerializationOptions opts{};
+    query_shape::SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto originalQueryShape = handle->getQueryShape(adapter);
     auto clonedQueryShape = clonedHandle->getQueryShape(adapter);

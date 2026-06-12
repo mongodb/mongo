@@ -111,7 +111,8 @@ TEST_F(DeleteKeyTest, DefaultDeleteCmdComponents) {
     DeleteCmdComponents components(dcr);
 
     BSONObjBuilder bob;
-    components.appendTo(bob, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    components.appendTo(
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(fromjson(R"({ ordered: true, bypassDocumentValidation: false })"), bob.obj());
 }
 
@@ -127,7 +128,8 @@ TEST_F(DeleteKeyTest, DeleteCmdComponentsWithExplicitValues) {
     DeleteCmdComponents components(dcr);
 
     BSONObjBuilder bob;
-    components.appendTo(bob, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    components.appendTo(
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(fromjson(R"({ ordered: false, bypassDocumentValidation: true })"), bob.obj());
 }
 

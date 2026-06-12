@@ -106,7 +106,7 @@ std::unique_ptr<Pipeline> finalizePipeline(
                 "AggregateCommandRequest contains the correct serialization of the pipeline.",
                 opts.desugar);
 
-        SerializationOptions wireOptsForAggReq{.isSerializingForRemoteDispatch = true};
+        query_shape::SerializationOptions wireOptsForAggReq{.isSerializingForRemoteDispatch = true};
         aggRequest.setPipeline(pipeline->serializeToBson(wireOptsForAggReq));
 
         pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(

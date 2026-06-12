@@ -148,7 +148,7 @@ public:
 
     boost::intrusive_ptr<Expression> optimize() final;
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const query_shape::SerializationOptions& options) const final;
 
     Value evaluate(const Document& root,
                    Variables* variables,

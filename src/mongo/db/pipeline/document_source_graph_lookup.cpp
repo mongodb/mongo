@@ -226,8 +226,8 @@ DocumentSourceContainer::iterator DocumentSourceGraphLookUp::optimizeAt(
 }
 
 // TODO SERVER-125478 refactor serialization to use IDL toBSON.
-void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
-                                                 const SerializationOptions& opts) const {
+void DocumentSourceGraphLookUp::serializeToArray(
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
     // Do not include tenantId in serialized 'from' namespace.
     // Rewrite to the resolved backing whenever we're producing a wire-bound payload — that covers
     // both the router and a shard acting as sub-router. Without the latter, a shard dispatching a

@@ -103,7 +103,8 @@ public:
         return id;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         if (_constraintsOverride.has_value()) {

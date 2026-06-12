@@ -138,7 +138,8 @@ public:
                 !alreadyOptimized || pos == container.cbegin());
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     boost::intrusive_ptr<DocumentSource> optimize();
 

@@ -383,7 +383,7 @@ void UpdateObjectNode::setChild(std::string field, std::unique_ptr<UpdateNode> c
 }
 
 BSONObj UpdateObjectNode::serialize(
-    const SerializationOptions& opts = SerializationOptions{}) const {
+    const query_shape::SerializationOptions& opts = query_shape::SerializationOptions{}) const {
     // Map from operator name to list of (path, update) pairs.
     std::map<std::string, std::vector<std::pair<std::string, BSONObj>>> operatorOrientedUpdates;
 

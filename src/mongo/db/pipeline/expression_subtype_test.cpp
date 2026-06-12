@@ -116,7 +116,7 @@ TEST_F(ExpressionSubtypeTest, ParseAndSerialize) {
 
     ASSERT_VALUE_EQ_AUTO(
         "{$subtype: [{$const: BinData(0, \"6766315563786448544A3248512F4547\")}]}",
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
@@ -130,7 +130,7 @@ TEST_F(ExpressionSubtypeTest, ParseAndSerializeWithPathInput) {
 
     ASSERT_VALUE_EQ_AUTO(
         "{$subtype: [\"$path1\"]}",
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 

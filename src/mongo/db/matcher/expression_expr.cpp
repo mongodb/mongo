@@ -59,7 +59,7 @@ ExprMatchExpression::ExprMatchExpression(BSONElement elem,
                           std::move(annotation)) {}
 
 void ExprMatchExpression::serialize(BSONObjBuilder* out,
-                                    const SerializationOptions& opts,
+                                    const query_shape::SerializationOptions& opts,
                                     bool includePath) const {
     *out << "$expr" << _expression->serialize(opts);
 }

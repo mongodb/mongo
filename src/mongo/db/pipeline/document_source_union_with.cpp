@@ -496,7 +496,8 @@ Value DocumentSourceUnionWith::buildUnionWithResult(Value pipelineValue,
 }
 
 // TODO SERVER-121094: Remove when featureFlagExtensionsInsideHybridSearch is removed.
-Value DocumentSourceUnionWith::legacyUnionWithSerialize(const SerializationOptions& opts) const {
+Value DocumentSourceUnionWith::legacyUnionWithSerialize(
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForQueryStats()) {
         const auto serializedPipeline =
             pipeline_factory::makePipeline(_userPipeline,
@@ -538,7 +539,7 @@ Value DocumentSourceUnionWith::legacyUnionWithSerialize(const SerializationOptio
     }
 }
 
-Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceUnionWith::serialize(const query_shape::SerializationOptions& opts) const {
     // The db and coll values used by most serialization paths (explain, default).
     // Query stats uses _userNss instead (see below).
     Value pipelineContextColl{opts.serializeIdentifier(

@@ -498,14 +498,14 @@ std::vector<BSONObj> Pipeline::serializePipelineForLogging(const std::vector<BSO
 }
 
 std::vector<BSONObj> Pipeline::serializeForLogging(
-    const boost::optional<const SerializationOptions&>& opts) const {
+    const boost::optional<const query_shape::SerializationOptions&>& opts) const {
     std::vector<BSONObj> serialized = serializeToBson(opts);
     return serializePipelineForLogging(serialized);
 }
 
 std::vector<BSONObj> Pipeline::serializeContainerForLogging(
     const DocumentSourceContainer& container,
-    const boost::optional<const SerializationOptions&>& opts) {
+    const boost::optional<const query_shape::SerializationOptions&>& opts) {
     std::vector<Value> serialized = serializeContainer(container, opts);
     std::vector<BSONObj> redacted;
     redacted.reserve(serialized.size());
@@ -520,25 +520,26 @@ std::vector<BSONObj> Pipeline::serializeContainerForLogging(
 
 std::vector<Value> Pipeline::serializeContainer(
     const DocumentSourceContainer& container,
-    const boost::optional<const SerializationOptions&>& opts) {
+    const boost::optional<const query_shape::SerializationOptions&>& opts) {
     std::vector<Value> serializedSources;
     // This reserve may underestimate the number of elements needed for the target container, as
     // pipeline step serialization can add a variable number of results for specific
     // DocumentSources.
     serializedSources.reserve(container.size());
     for (auto&& source : container) {
-        source->serializeToArray(serializedSources, opts ? opts.get() : SerializationOptions());
+        source->serializeToArray(serializedSources,
+                                 opts ? opts.get() : query_shape::SerializationOptions());
     }
     return serializedSources;
 }
 
 std::vector<Value> Pipeline::serialize(
-    const boost::optional<const SerializationOptions&>& opts) const {
+    const boost::optional<const query_shape::SerializationOptions&>& opts) const {
     return serializeContainer(_sources, opts);
 }
 
 std::vector<BSONObj> Pipeline::serializeToBson(
-    const boost::optional<const SerializationOptions&>& opts) const {
+    const boost::optional<const query_shape::SerializationOptions&>& opts) const {
     const auto serialized = serialize(opts);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
@@ -551,7 +552,7 @@ std::vector<BSONObj> Pipeline::serializeToBson(
     return asBson;
 }
 
-std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
+std::vector<Value> Pipeline::writeExplainOps(const query_shape::SerializationOptions& opts) const {
     std::vector<Value> array;
     array.reserve(_sources.size());
     for (auto&& stage : _sources) {

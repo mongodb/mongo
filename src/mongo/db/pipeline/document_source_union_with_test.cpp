@@ -251,7 +251,7 @@ TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithForeignDBIncludesDbFi
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
 
     // Serialize with query stats options that transform identifiers.
-    auto opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray, opts);
     auto serializedBson = serializedArray[0].getDocument().toBson();
@@ -277,7 +277,7 @@ TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithSameDBOmitsDbField) {
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
 
     // Serialize with query stats options that transform identifiers.
-    auto opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    auto opts = query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray, opts);
     auto serializedBson = serializedArray[0].getDocument().toBson();

@@ -48,7 +48,7 @@ struct InsertCmdComponents : public SpecificKeyComponents {
 
     void HashValue(absl::HashState state) const final;
 
-    void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
+    void appendTo(BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const;
 
     size_t size() const final;
 
@@ -83,7 +83,7 @@ public:
 
 protected:
     void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const final;
+                                         const query_shape::SerializationOptions& opts) const final;
 
 private:
     const InsertCmdComponents _components;

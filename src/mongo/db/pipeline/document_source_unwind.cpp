@@ -163,7 +163,7 @@ DocumentSourceContainer::iterator DocumentSourceUnwind::optimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceUnwind::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceUnwind::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(
         DOC(getSourceName() << DOC(
                 "path" << opts.serializeFieldPathWithPrefix(getUnwindPath())

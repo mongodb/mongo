@@ -136,7 +136,8 @@ public:
         return id;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,

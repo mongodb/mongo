@@ -68,7 +68,8 @@ public:
     // This stage does not reference any user or system variables.
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 

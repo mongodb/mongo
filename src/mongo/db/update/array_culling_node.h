@@ -86,13 +86,13 @@ protected:
          * serialization options are provided, i.e. { $gte: 1 } for representative or { $gte:
          * "?number" } for debug query shape serialization.
          */
-        virtual BSONObj value(const SerializationOptions& opts) const = 0;
+        virtual BSONObj value(const query_shape::SerializationOptions& opts) const = 0;
     };
 
     clonable_ptr<ElementMatcher> _matcher;
 
 private:
-    BSONObj operatorValue(const SerializationOptions& opts) const final {
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final {
         return _matcher->value(opts);
     }
 };

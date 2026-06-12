@@ -121,7 +121,7 @@ GetNextResult UnionWithStage::doGetNext() {
 
     if (_sharedState->_executionState ==
         UnionWithSharedState::ExecutionProgress::kStartingSubPipeline) {
-        SerializationOptions wireOptsForSub{.isSerializingForRemoteDispatch = true};
+        query_shape::SerializationOptions wireOptsForSub{.isSerializingForRemoteDispatch = true};
         auto serializedPipeline = _sharedState->_pipeline->serializeToBson(wireOptsForSub);
 
         // Prepare the sub pipeline. This is expected to fail if the command is not supported on a

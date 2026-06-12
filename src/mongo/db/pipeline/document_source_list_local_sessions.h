@@ -141,7 +141,8 @@ public:
         return id;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final {
         return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
     }
 

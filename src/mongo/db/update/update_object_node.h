@@ -120,13 +120,13 @@ public:
      * Gather all update operators in the subtree rooted from this into a BSONObj in the format of
      * the update command's update parameter.
      */
-    BSONObj serialize(const SerializationOptions& opts) const;
+    BSONObj serialize(const query_shape::SerializationOptions& opts) const;
 
     void produceSerializationMap(
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates,
-        const SerializationOptions& opts) const final {
+        const query_shape::SerializationOptions& opts) const final {
         for (const auto& [pathSuffix, child] : _children) {
             FieldRef::FieldRefTempAppend tempAppend(*currentPath, pathSuffix);
             child->produceSerializationMap(currentPath, operatorOrientedUpdates, opts);

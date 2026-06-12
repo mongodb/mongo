@@ -76,7 +76,7 @@ DocumentSourceChangeStreamCheckTopologyChange::createFromBson(
 }
 
 Value DocumentSourceChangeStreamCheckTopologyChange::doSerialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage" << "internalCheckTopologyChange"_sd)));

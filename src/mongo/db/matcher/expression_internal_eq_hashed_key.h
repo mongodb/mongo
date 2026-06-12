@@ -83,7 +83,7 @@ public:
     }
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final {
         opts.appendLiteral(bob, name(), _rhs, Value((long long)1));
     }

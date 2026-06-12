@@ -67,7 +67,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalShardServerInfo::crea
     return new DocumentSourceInternalShardServerInfo(expCtx);
 }
 
-Value DocumentSourceInternalShardServerInfo::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalShardServerInfo::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), Value{Document{{}}}}});
 }
 

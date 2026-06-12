@@ -93,9 +93,10 @@ bool InternalSchemaAllowedPropertiesMatchExpression::equivalent(const MatchExpre
                             });
 }
 
-void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
-                                                               const SerializationOptions& opts,
-                                                               bool includePath) const {
+void InternalSchemaAllowedPropertiesMatchExpression::serialize(
+    BSONObjBuilder* builder,
+    const query_shape::SerializationOptions& opts,
+    bool includePath) const {
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 

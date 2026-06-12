@@ -54,7 +54,7 @@ StringData DocumentSourceTeeConsumer::getSourceName() const {
     return _stageName;
 }
 
-Value DocumentSourceTeeConsumer::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceTeeConsumer::serialize(const query_shape::SerializationOptions& opts) const {
     // We only serialize this stage in the context of explain.
     return opts.isSerializingForExplain() ? Value(DOC(_stageName << Document())) : Value();
 }

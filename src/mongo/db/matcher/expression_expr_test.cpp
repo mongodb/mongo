@@ -96,7 +96,7 @@ public:
         return checked_cast<ExprMatchExpression*>(_matchExpression.get());
     }
 
-    BSONObj serialize(const SerializationOptions& opts) {
+    BSONObj serialize(const query_shape::SerializationOptions& opts) {
         return _matchExpression->serialize(opts);
     }
 
@@ -342,7 +342,8 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"$b\"]}}"));
 
-    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",

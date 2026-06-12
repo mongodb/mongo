@@ -74,7 +74,7 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
 }
 
 void InternalSchemaMatchArrayIndexMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     bob->append(
         kName,
         BSON(

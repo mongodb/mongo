@@ -40,13 +40,13 @@ namespace mongo::extension::host_connector {
  */
 class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {
 public:
-    QueryShapeOptsAdapter(const SerializationOptions* opts,
+    QueryShapeOptsAdapter(const query_shape::SerializationOptions* opts,
                           boost::intrusive_ptr<ExpressionContext> expCtx)
         : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts), _expCtx(std::move(expCtx)) {
         uassert(11717605, "ExpressionContext pointer cannot be null", _expCtx != nullptr);
     }
 
-    const SerializationOptions* getOptsImpl() const {
+    const query_shape::SerializationOptions* getOptsImpl() const {
         return _opts;
     }
 
@@ -79,7 +79,7 @@ private:
         .serialize_literal = &_extSerializeLiteral,
     };
 
-    const SerializationOptions* _opts;
+    const query_shape::SerializationOptions* _opts;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 }  // namespace mongo::extension::host_connector

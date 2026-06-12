@@ -59,7 +59,8 @@ class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
     StringData getSourceName() const final;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     static const Id& id;

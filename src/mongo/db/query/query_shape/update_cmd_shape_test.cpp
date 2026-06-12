@@ -142,7 +142,7 @@ TEST_F(UpdateCmdShapeTest, BasicReplacementUpdateShape) {
             "upsert": false 
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -164,7 +164,7 @@ TEST_F(UpdateCmdShapeTest, BasicReplacementUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -191,7 +191,7 @@ TEST_F(UpdateCmdShapeTest, EmptyDocReplacementUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -213,7 +213,7 @@ TEST_F(UpdateCmdShapeTest, EmptyDocReplacementUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -267,7 +267,7 @@ TEST_F(UpdateCmdShapeTest, BasicModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -291,7 +291,7 @@ TEST_F(UpdateCmdShapeTest, BasicModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -315,7 +315,7 @@ TEST_F(UpdateCmdShapeTest, BasicModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -350,7 +350,7 @@ TEST_F(UpdateCmdShapeTest, BasicPipelineUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -381,7 +381,7 @@ TEST_F(UpdateCmdShapeTest, BasicPipelineUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -409,7 +409,7 @@ TEST_F(UpdateCmdShapeTest, NoopPipelineUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -429,7 +429,7 @@ TEST_F(UpdateCmdShapeTest, NoopPipelineUpdateShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -472,7 +472,7 @@ TEST_F(UpdateCmdShapeTest, CurrentDateModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -493,7 +493,7 @@ TEST_F(UpdateCmdShapeTest, CurrentDateModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -511,7 +511,7 @@ TEST_F(UpdateCmdShapeTest, CurrentDateModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -548,7 +548,7 @@ TEST_F(UpdateCmdShapeTest, ArithmeticModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -563,7 +563,7 @@ TEST_F(UpdateCmdShapeTest, ArithmeticModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -577,7 +577,7 @@ TEST_F(UpdateCmdShapeTest, ArithmeticModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -614,7 +614,7 @@ TEST_F(UpdateCmdShapeTest, CompareModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -629,7 +629,7 @@ TEST_F(UpdateCmdShapeTest, CompareModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -643,7 +643,7 @@ TEST_F(UpdateCmdShapeTest, CompareModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -683,7 +683,7 @@ TEST_F(UpdateCmdShapeTest, AddToSetModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -703,7 +703,7 @@ TEST_F(UpdateCmdShapeTest, AddToSetModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -720,7 +720,7 @@ TEST_F(UpdateCmdShapeTest, AddToSetModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -779,7 +779,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -800,7 +800,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ 
@@ -821,7 +821,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -863,7 +863,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierUpdateShape) {
         multi : false,
         upsert : true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -893,7 +893,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierUpdateShape) {
             multi : false,
             upsert : true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -922,7 +922,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierUpdateShape) {
             multi : false,
             upsert : true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -957,7 +957,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierWithNotExpressionShape) {
             multi : false,
             upsert : true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -974,7 +974,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierWithNotExpressionShape) {
             multi : false,
             upsert : true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -991,7 +991,7 @@ TEST_F(UpdateCmdShapeTest, PullModifierWithNotExpressionShape) {
             multi : false,
             upsert : true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1009,7 +1009,7 @@ TEST_F(UpdateCmdShapeTest, BitModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1019,7 +1019,7 @@ TEST_F(UpdateCmdShapeTest, BitModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -1029,7 +1029,7 @@ TEST_F(UpdateCmdShapeTest, BitModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1047,7 +1047,7 @@ TEST_F(UpdateCmdShapeTest, UnsetModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1057,7 +1057,7 @@ TEST_F(UpdateCmdShapeTest, UnsetModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -1067,7 +1067,7 @@ TEST_F(UpdateCmdShapeTest, UnsetModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1085,7 +1085,7 @@ TEST_F(UpdateCmdShapeTest, RenameModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1095,7 +1095,7 @@ TEST_F(UpdateCmdShapeTest, RenameModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -1105,7 +1105,7 @@ TEST_F(UpdateCmdShapeTest, RenameModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1123,7 +1123,7 @@ TEST_F(UpdateCmdShapeTest, PopModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1133,7 +1133,7 @@ TEST_F(UpdateCmdShapeTest, PopModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -1143,7 +1143,7 @@ TEST_F(UpdateCmdShapeTest, PopModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1161,7 +1161,7 @@ TEST_F(UpdateCmdShapeTest, PullAllModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1171,7 +1171,7 @@ TEST_F(UpdateCmdShapeTest, PullAllModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -1181,7 +1181,7 @@ TEST_F(UpdateCmdShapeTest, PullAllModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1220,7 +1220,7 @@ TEST_F(UpdateCmdShapeTest, ArrayFiltersModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
@@ -1239,7 +1239,7 @@ TEST_F(UpdateCmdShapeTest, ArrayFiltersModifierUpdateShape) {
             multi: false, 
             upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
@@ -1258,7 +1258,7 @@ TEST_F(UpdateCmdShapeTest, ArrayFiltersModifierUpdateShape) {
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1325,7 +1325,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithExpressionsShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1364,7 +1364,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithExpressionsShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -1409,7 +1409,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1440,7 +1440,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -1494,7 +1494,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithComplexConstantsShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -1529,7 +1529,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithComplexConstantsShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -1591,7 +1591,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithAllAllowedStagesShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1637,7 +1637,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithAllAllowedStagesShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1683,7 +1683,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithAllAllowedStagesShape) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -1747,7 +1747,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithStageAliasesShape) {
             "upsert": true
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1791,7 +1791,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithStageAliasesShape) {
             "upsert": true
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -1842,7 +1842,7 @@ TEST_F(UpdateCmdShapeTest, NoopUpdateShape) {
             multi: true,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1866,7 +1866,7 @@ TEST_F(UpdateCmdShapeTest, NoopUpdateShape) {
             multi: true,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1890,7 +1890,7 @@ TEST_F(UpdateCmdShapeTest, NoopUpdateShape) {
             multi: true,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1931,7 +1931,7 @@ TEST_F(UpdateCmdShapeTest, PartialNoopUpdateShape) {
             multi: true,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1945,7 +1945,7 @@ TEST_F(UpdateCmdShapeTest, PartialNoopUpdateShape) {
             multi: true,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1959,7 +1959,7 @@ TEST_F(UpdateCmdShapeTest, PartialNoopUpdateShape) {
             multi: true,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -1978,7 +1978,7 @@ TEST_F(UpdateCmdShapeTest, WhereUpdateShape) {
                      << BSON("$set" << BSON("item" << "?")) << "multi" << false << "upsert"
                      << false),
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1992,7 +1992,7 @@ TEST_F(UpdateCmdShapeTest, WhereUpdateShape) {
             multi: false,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2006,7 +2006,7 @@ TEST_F(UpdateCmdShapeTest, WhereUpdateShape) {
             multi: false,
             upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2037,7 +2037,7 @@ TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
             "upsert": false
         })",
         shapes[0].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2065,7 +2065,7 @@ TEST_F(UpdateCmdShapeTest, BatchReplacementUpdateShape) {
             "upsert": true
         })",
         shapes[1].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
 }
 
@@ -2096,7 +2096,7 @@ TEST_F(UpdateCmdShapeTest, BatchModifierUpdateShape) {
             "upsert": false
         })",
         shapes[0].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2124,7 +2124,7 @@ TEST_F(UpdateCmdShapeTest, BatchModifierUpdateShape) {
             "upsert": true
         })",
         shapes[1].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
 }
 
@@ -2167,7 +2167,7 @@ TEST_F(UpdateCmdShapeTest, BatchPipelineUpdateShape) {
             "upsert": false
         })",
         shapes[0].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -2195,7 +2195,7 @@ TEST_F(UpdateCmdShapeTest, BatchPipelineUpdateShape) {
             "upsert": true
         })",
         shapes[1].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
 }
 
@@ -2231,7 +2231,7 @@ TEST_F(UpdateCmdShapeTest, IncludesOptionalValues) {
             }
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -2426,7 +2426,7 @@ TEST_F(UpdateCmdShapeTest, ShapifiesUnoptimizedMatchExpression) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -2457,7 +2457,7 @@ TEST_F(UpdateCmdShapeTest, ShapifiesUnoptimizedMatchExpression) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 }
 
@@ -2496,7 +2496,7 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
                 "upsert": false
             })",
             s->toBson(_operationContext.get(),
-                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
 
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -2518,7 +2518,7 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
                 "upsert": false
             })",
             s->toBson(_operationContext.get(),
-                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
     }
 
@@ -2552,7 +2552,7 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
                 "upsert": false
             })",
             s->toBson(_operationContext.get(),
-                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
 
         ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -2574,7 +2574,7 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
                 "upsert": false
             })",
             s->toBson(_operationContext.get(),
-                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                       SerializationContext::stateDefault()));
     }
 }
@@ -2596,7 +2596,7 @@ TEST_F(UpdateCmdShapeTest, ReplacementUpdateShapeTokenization) {
         multi: false, 
         upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2644,7 +2644,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateShapeTokenization) {
         multi: false, 
         upsert: false })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2665,7 +2665,7 @@ TEST_F(UpdateCmdShapeTest, ReplacementUpdateRedaction) {
             upsert: false
         })",
         basic.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2730,7 +2730,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateRedaction) {
             upsert: false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2775,7 +2775,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsRedaction) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2823,7 +2823,7 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateWithNestedConstantsRedaction) {
             "upsert": false
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -2856,7 +2856,7 @@ TEST_F(UpdateCmdShapeTest, LetRedaction) {
             }
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 

@@ -117,7 +117,7 @@ bool GraphLookUpStage::validateOperationContext(const OperationContext* opCtx) c
         _fromExpCtx->getOperationContext() == opCtx;
 }
 
-Document GraphLookUpStage::getExplainOutput(const SerializationOptions& opts) const {
+Document GraphLookUpStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
     auto out = MutableDocument(Stage::getExplainOutput(opts));
     out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
     out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));

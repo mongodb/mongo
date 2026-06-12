@@ -254,18 +254,18 @@ public:
      * helpers, which handle redaction.
      */
     std::vector<Value> serialize(
-        const boost::optional<const SerializationOptions&>& opts = boost::none) const;
+        const boost::optional<const query_shape::SerializationOptions&>& opts = boost::none) const;
     std::vector<BSONObj> serializeToBson(
-        const boost::optional<const SerializationOptions&>& opts = boost::none) const;
+        const boost::optional<const query_shape::SerializationOptions&>& opts = boost::none) const;
     static std::vector<Value> serializeContainer(
         const DocumentSourceContainer& container,
-        const boost::optional<const SerializationOptions&>& opts = boost::none);
+        const boost::optional<const query_shape::SerializationOptions&>& opts = boost::none);
 
     std::vector<BSONObj> serializeForLogging(
-        const boost::optional<const SerializationOptions&>& opts = boost::none) const;
+        const boost::optional<const query_shape::SerializationOptions&>& opts = boost::none) const;
     static std::vector<BSONObj> serializeContainerForLogging(
         const DocumentSourceContainer& container,
-        const boost::optional<const SerializationOptions&>& opts = boost::none);
+        const boost::optional<const query_shape::SerializationOptions&>& opts = boost::none);
     static std::vector<BSONObj> serializePipelineForLogging(const std::vector<BSONObj>& pipeline);
 
     // The initial source is special since it varies between mongos and mongod.
@@ -280,7 +280,7 @@ public:
      * specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(
-        const SerializationOptions& opts = SerializationOptions{}) const;
+        const query_shape::SerializationOptions& opts = query_shape::SerializationOptions{}) const;
 
     /**
      * Returns the dependencies needed by this pipeline. 'availableMetadata' should reflect what

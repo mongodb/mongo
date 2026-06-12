@@ -115,7 +115,8 @@ public:
      */
     void parse(const BSONObj& spec);
 
-    Document serializeTransformation(const SerializationOptions& options = {}) const final {
+    Document serializeTransformation(
+        const query_shape::SerializationOptions& options = {}) const final {
         return _root->serialize(options);
     }
 

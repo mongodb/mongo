@@ -106,7 +106,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options = {}) const final;
+                       const query_shape::SerializationOptions& options = {}) const final;
 
     void reset() final;
 
@@ -169,7 +169,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const final {
+                       const query_shape::SerializationOptions& options) const final {
         // Similar to 'AccumulatorFirstLastNForBucketAuto::serialize()', this accumulator
         // serializes itself as a user-facing '$mergeObjects' instead of the internal accumulator
         // created in 'replaceAccumulationStatementForBucketAuto()'.
@@ -215,7 +215,7 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const final {
+                       const query_shape::SerializationOptions& options) const final {
         // Similar to 'AccumulatorFirstLastNForBucketAuto::serialize()', this accumulator
         // serializes itself as a user-facing '$push' or $concatArrays instead of the internal
         // accumulator created in 'replaceAccumulationStatementForBucketAuto()'.
@@ -423,7 +423,7 @@ template <FirstLastSense sense, bool single>
 Document AccumulatorFirstLastNForBucketAuto<sense, single>::serialize(
     boost::intrusive_ptr<Expression> initializer,
     boost::intrusive_ptr<Expression> argument,
-    const SerializationOptions& options) const {
+    const query_shape::SerializationOptions& options) const {
     MutableDocument args;
     if constexpr (single) {
         // Uses the same serialize() method as $first/$last uses, requiring a null initializer

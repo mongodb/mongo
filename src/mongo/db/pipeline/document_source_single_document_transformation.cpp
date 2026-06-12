@@ -109,7 +109,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     return Value(
         Document{{getSourceName(),
                   _transformationProcessor

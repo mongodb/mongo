@@ -42,11 +42,10 @@ void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
     _debugStringAttachTagInfo(&debug);
 }
 
-void InternalSchemaRootDocEqMatchExpression::serialize(BSONObjBuilder* out,
-                                                       const SerializationOptions& opts,
-                                                       bool includePath) const {
+void InternalSchemaRootDocEqMatchExpression::serialize(
+    BSONObjBuilder* out, const query_shape::SerializationOptions& opts, bool includePath) const {
     BSONObjBuilder subObj(out->subobjStart(kName));
-    SerializationOptions options = opts;
+    query_shape::SerializationOptions options = opts;
     options.addHmacedObjToBuilder(&subObj, _rhsObj);
     subObj.doneFast();
 }

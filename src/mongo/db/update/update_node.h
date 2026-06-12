@@ -126,7 +126,7 @@ public:
         FieldRef* currentPath,
         std::map<std::string, std::vector<std::pair<std::string, BSONObj>>>*
             operatorOrientedUpdates,
-        const SerializationOptions& opts = {}) const = 0;
+        const query_shape::SerializationOptions& opts = {}) const = 0;
 
     /**
      * Set the collation. This is a noop if the UpdateExecutor subclass does not require a collator.

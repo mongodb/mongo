@@ -63,7 +63,8 @@ StringData DocumentSourceSampleFromRandomCursor::getSourceName() const {
     return kStageName;
 }
 
-Value DocumentSourceSampleFromRandomCursor::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceSampleFromRandomCursor::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteral(_size))));
 }
 

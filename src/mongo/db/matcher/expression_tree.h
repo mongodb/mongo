@@ -128,7 +128,7 @@ protected:
     void _debugList(StringBuilder& debug, int indentationLevel) const;
 
     void _listToBSON(BSONArrayBuilder* out,
-                     const SerializationOptions& opts = {},
+                     const query_shape::SerializationOptions& opts = {},
                      bool includePath = true) const;
 
 private:
@@ -164,7 +164,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const override;
 
     bool isTriviallyTrue() const final;
@@ -207,7 +207,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const override;
 
     bool isTriviallyFalse() const final;
@@ -250,7 +250,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const override;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -285,7 +285,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const override;
 
     bool equivalent(const MatchExpression* other) const final;
@@ -327,7 +327,7 @@ public:
 private:
     static void serializeNotExpressionToNor(MatchExpression* exp,
                                             BSONObjBuilder* out,
-                                            const SerializationOptions& opts = {},
+                                            const query_shape::SerializationOptions& opts = {},
                                             bool includePath = true);
 
     std::unique_ptr<MatchExpression> _exp;

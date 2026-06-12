@@ -36,7 +36,7 @@ namespace mongo {
 namespace {
 
 TEST(SerializationOptionsTest, IsDefaultSerialization) {
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
 
     ASSERT_TRUE(opts.isDefaultSerialization());
     ASSERT_TRUE(opts.isKeepingLiteralsUnchanged());
@@ -47,8 +47,8 @@ TEST(SerializationOptionsTest, IsDefaultSerialization) {
 }
 
 TEST(SerializationOptionsTest, DebugTypeStringPolicy) {
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
 
     ASSERT_FALSE(opts.isKeepingLiteralsUnchanged());
     ASSERT_TRUE(opts.isSerializingLiteralsAsDebugTypes());
@@ -58,8 +58,8 @@ TEST(SerializationOptionsTest, DebugTypeStringPolicy) {
 }
 
 TEST(SerializationOptionsTest, RepresentativeParseableValuePolicy) {
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
 
     ASSERT_FALSE(opts.isKeepingLiteralsUnchanged());
     ASSERT_FALSE(opts.isSerializingLiteralsAsDebugTypes());
@@ -69,7 +69,7 @@ TEST(SerializationOptionsTest, RepresentativeParseableValuePolicy) {
 }
 
 TEST(SerializationOptionsTest, ExplainModeEnabled) {
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
     opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
 
     ASSERT_TRUE(opts.isKeepingLiteralsUnchanged());
@@ -80,7 +80,7 @@ TEST(SerializationOptionsTest, ExplainModeEnabled) {
 }
 
 TEST(SerializationOptionsTest, TransformIdentifiersEnabled) {
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
     opts.transformIdentifiers = true;
 
     ASSERT_TRUE(opts.isKeepingLiteralsUnchanged());

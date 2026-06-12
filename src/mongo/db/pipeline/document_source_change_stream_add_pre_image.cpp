@@ -76,7 +76,8 @@ DocumentSourceChangeStreamAddPreImage::createFromBson(
         expCtx, parsedSpec.getFullDocumentBeforeChange());
 }
 
-Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamAddPreImage::doSerialize(
+    const query_shape::SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
         ? Value(Document{{DocumentSourceChangeStream::kStageName,
                           Document{{"stage"_sd, "internalAddPreImage"_sd},

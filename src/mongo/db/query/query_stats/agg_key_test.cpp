@@ -129,7 +129,7 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
     // Confirm all values are set.
     BSONObjBuilder bob;
     aggComponentsAllValues->appendTo(
-        bob, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(
         fromjson(
             R"({ bypassDocumentValidation: true, cursor: { batchSize: 1 }, explain: "queryPlanner", $_passthroughToShard: { shard: "?" } })"),
@@ -260,7 +260,8 @@ TEST_F(AggKeyTest, OriginalQueryShapeHashAppearsInKey) {
 
     const auto keyBson = key->toBson(
         expCtx->getOperationContext(),
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        query_shape::SerializationOptions(
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
         {});
     ASSERT_EQ(keyBson["originalQueryShapeHash"].str(),
               "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");

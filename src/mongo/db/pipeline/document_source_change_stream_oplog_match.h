@@ -90,7 +90,7 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 
-    Value doSerialize(const SerializationOptions& opts) const final;
+    Value doSerialize(const query_shape::SerializationOptions& opts) const final;
 
     static const Id& id;
 

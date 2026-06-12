@@ -363,7 +363,7 @@ class _StructTypeInfo(StructTypeInfoBase):
         # type: () -> MethodInfo
         args = ["BSONObjBuilder* builder"]
         if self._struct.query_shape_component:
-            args.append("const SerializationOptions& options = {}")
+            args.append("const query_shape::SerializationOptions& options = {}")
         return MethodInfo(
             common.title_case(self._struct.cpp_name), "serialize", args, "void", const=True
         )
@@ -372,7 +372,7 @@ class _StructTypeInfo(StructTypeInfoBase):
         # type: () -> MethodInfo
         args = []
         if self._struct.query_shape_component:
-            args.append("const SerializationOptions& options = {}")
+            args.append("const query_shape::SerializationOptions& options = {}")
         return MethodInfo(
             common.title_case(self._struct.cpp_name), "toBSON", args, "BSONObj", const=True
         )

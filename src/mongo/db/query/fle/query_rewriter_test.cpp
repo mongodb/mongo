@@ -1133,7 +1133,7 @@ public:
                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const NamespaceString& nss,
                                 StringData expectedPipelineJsonArray) {
-        SerializationOptions opts{.serializeForFLE2 = true};
+        query_shape::SerializationOptions opts{.serializeForFLE2 = true};
         auto serializedRewrittenPipeline = rewrittenPipeline.serializeToBson(opts);
         auto serializedExpectedPipeline =
             jsonToPipeline(expCtx, nss, expectedPipelineJsonArray)->serializeToBson(opts);

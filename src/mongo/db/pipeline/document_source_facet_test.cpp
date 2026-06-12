@@ -486,7 +486,8 @@ TEST_F(DocumentSourceFacetTest,
 
     vector<Value> serialization;
     facetSource->serializeToArray(
-        serialization, SerializationOptions{.verbosity = ExplainOptions::Verbosity::kExecStats});
+        serialization,
+        query_shape::SerializationOptions{.verbosity = ExplainOptions::Verbosity::kExecStats});
 
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::object);

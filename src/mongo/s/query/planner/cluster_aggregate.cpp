@@ -961,9 +961,9 @@ Status runAggregateImpl(OperationContext* opCtx,
                     // If this is an explain write the explain output and return.
                     auto expCtx = targeter.pipeline->getContext();
                     if (expCtx->getExplain()) {
-                        auto opts =
-                            SerializationOptions{.verbosity = boost::make_optional(
-                                                     ExplainOptions::Verbosity::kQueryPlanner)};
+                        auto opts = query_shape::SerializationOptions{
+                            .verbosity =
+                                boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
                         result << "splitPipeline" << BSONNULL << "mongos"
                                << Document{{"host",
                                             prettyHostNameAndPort(expCtx->getOperationContext()

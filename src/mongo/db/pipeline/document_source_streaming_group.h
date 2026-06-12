@@ -111,9 +111,9 @@ public:
 
 protected:
     bool isSpecFieldReserved(StringData fieldName) final;
-    void serializeAdditionalFields(
-        MutableDocument& out,
-        const SerializationOptions& opts = SerializationOptions{}) const final;
+    void serializeAdditionalFields(MutableDocument& out,
+                                   const query_shape::SerializationOptions& opts =
+                                       query_shape::SerializationOptions{}) const final;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceStreamingGroupToStageFn(

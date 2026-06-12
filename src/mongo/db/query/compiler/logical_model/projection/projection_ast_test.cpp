@@ -94,7 +94,8 @@ public:
 
     BSONObj serializeToQueryShape(const projection_ast::Projection& projection) {
         return projection_ast::serialize(
-            *projection.root(), SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+            *projection.root(),
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     }
 };
 
@@ -877,7 +878,8 @@ TEST_F(ProjectionASTTest, ShouldThrowWithPositionalOnExclusion) {
 }
 
 TEST_F(ProjectionASTTest, TestASTRedaction) {
-    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     auto proj = fromjson("{'a.b': 1}");
     BSONObj output = projection_ast::serialize(*parseWithFindFeaturesEnabled(proj).root(), options);

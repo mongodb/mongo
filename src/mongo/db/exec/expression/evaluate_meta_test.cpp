@@ -315,7 +315,7 @@ TEST(ExpressionMetaTest, ExpressionMetaStreamSerialization) {
     auto result = expressionMeta->evaluate(doc, &expCtx.variables).getDocument();
     expressionMeta = ExpressionMeta::parse(
         &expCtx2,
-        expressionMeta->serialize(SerializationOptions{.serializeForCloning = true})
+        expressionMeta->serialize(query_shape::SerializationOptions{.serializeForCloning = true})
             .getDocument()
             .toBson()
             .firstElement(),

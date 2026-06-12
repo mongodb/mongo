@@ -64,7 +64,7 @@ void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
                                    BSONObjBuilder* bob,
                                    const SerializationContext& sc,
-                                   const SerializationOptions& opts);
+                                   const query_shape::SerializationOptions& opts);
 NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
                                             const BSONElement& elem,
                                             const SerializationContext& sc);
@@ -76,7 +76,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
                                   BSONObjBuilder* bob,
-                                  const SerializationOptions& opts = {});
+                                  const query_shape::SerializationOptions& opts = {});
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
 
 /**

@@ -102,7 +102,7 @@ public:
     }
 
     void serialize(BSONObjBuilder* builder,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const final;
 
     std::unique_ptr<MatchExpression> clone() const final;

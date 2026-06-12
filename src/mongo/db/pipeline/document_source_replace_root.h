@@ -99,7 +99,8 @@ public:
         return fieldPath && fieldPath->isROOT();
     }
 
-    Document serializeTransformation(const SerializationOptions& options = {}) const final {
+    Document serializeTransformation(
+        const query_shape::SerializationOptions& options = {}) const final {
         return Document{{"newRoot", _newRoot->serialize(options)}};
     }
 

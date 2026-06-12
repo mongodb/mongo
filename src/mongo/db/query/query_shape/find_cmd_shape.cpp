@@ -48,15 +48,17 @@ static_assert(
     "If the class's members have changed, this assert and the extraSize() calculation may "
     "need to be updated with a new value.");
 
-BSONObj projectionShape(const boost::optional<projection_ast::Projection>& proj,
-                        const SerializationOptions& opts =
-                            SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+BSONObj projectionShape(
+    const boost::optional<projection_ast::Projection>& proj,
+    const query_shape::SerializationOptions& opts =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
     return proj ? projection_ast::serialize(*proj->root(), opts) : BSONObj();
 }
 
-BSONObj sortShape(const boost::optional<SortPattern>& sort,
-                  const SerializationOptions& opts =
-                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+BSONObj sortShape(
+    const boost::optional<SortPattern>& sort,
+    const query_shape::SerializationOptions& opts =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
     return sort
         ? sort->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
               .toBson()
@@ -85,7 +87,7 @@ void addRemainingFindCommandFields(const FindCmdShapeComponents& components, BSO
 FindCmdShapeComponents::FindCmdShapeComponents(
     const ParsedFindCommand& request,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const SerializationOptions& opts)
+    const query_shape::SerializationOptions& opts)
     : filter(request.filter->serialize(opts)),
       projection(projectionShape(request.proj, opts)),
       sort(sortShape(request.sort, opts)),
@@ -109,7 +111,7 @@ FindCmdShapeComponents::FindCmdShapeComponents(
       serializationOpts(opts) {}
 
 void FindCmdShapeComponents::appendTo(BSONObjBuilder& bob,
-                                      const SerializationOptions& opts,
+                                      const query_shape::SerializationOptions& opts,
                                       const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     let.appendTo(bob, opts, expCtx);
 
@@ -246,11 +248,12 @@ FindCmdShape::FindCmdShape(const ParsedFindCommand& findRequest,
             findRequest.findCommandRequest->getCollation()),
       _components(findRequest, expCtx) {}
 
-void FindCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                    OperationContext* opCtx,
-                                                    const SerializationOptions& opts) const {
+void FindCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID, _components.let.shapifiedLet);
-    if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+    if (opts == query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // Fast path: we already have this.
         _components.appendTo(bob, opts, expCtx);
         return;

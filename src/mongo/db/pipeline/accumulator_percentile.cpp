@@ -322,7 +322,7 @@ void AccumulatorPercentile::reset() {
 
 Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          const SerializationOptions& options) const {
+                                          const query_shape::SerializationOptions& options) const {
     ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
     tassert(11294818, "Expecting initializer expression to be a constant", ec);
     tassert(11294817, "Expecting initializer expression to be nullish", ec->getValue().nullish());
@@ -334,7 +334,7 @@ Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initi
 }
 
 void AccumulatorPercentile::serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                            const SerializationOptions& options,
+                                            const query_shape::SerializationOptions& options,
                                             std::vector<double> percentiles,
                                             PercentileMethodEnum method,
                                             MutableDocument& md) {
@@ -439,7 +439,7 @@ Value AccumulatorMedian::getValue(bool toBeMerged) {
 
 Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializer,
                                       boost::intrusive_ptr<Expression> argument,
-                                      const SerializationOptions& options) const {
+                                      const query_shape::SerializationOptions& options) const {
     ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
     tassert(11294816, "Expecting initializer expression to be a constant", ec);
     tassert(11294815, "Expecting initializer expression to be nullish", ec->getValue().nullish());
@@ -451,7 +451,7 @@ Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializ
 }
 
 void AccumulatorMedian::serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                        const SerializationOptions& options,
+                                        const query_shape::SerializationOptions& options,
                                         std::vector<double> percentiles,
                                         PercentileMethodEnum method,
                                         MutableDocument& md) {

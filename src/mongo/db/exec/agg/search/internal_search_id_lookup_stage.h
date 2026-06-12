@@ -61,8 +61,8 @@ public:
         return &_stats;
     }
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const override;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const override;
 
 private:
     GetNextResult doGetNext() final;

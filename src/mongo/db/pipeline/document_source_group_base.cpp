@@ -63,7 +63,7 @@
 
 namespace mongo {
 
-Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceGroupBase::serialize(const query_shape::SerializationOptions& opts) const {
     MutableDocument insides;
 
     const auto& idFieldNames = _groupProcessor->getIdFieldNames();

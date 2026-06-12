@@ -608,7 +608,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     ASSERT_EQ(pipeline->size(), 2U);
 
     // To get the optimized $match from the pipeline, we have to serialize with explain.
-    auto stages = pipeline->writeExplainOps(SerializationOptions{
+    auto stages = pipeline->writeExplainOps(query_shape::SerializationOptions{
         .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(stages.size(), 2U);
 

@@ -94,8 +94,8 @@ BSONObj QueryStatsStage::computeQueryStatsKey(
         return hashed.toString();
     };
 
-    auto opts = SerializationOptions{};
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    auto opts = query_shape::SerializationOptions{};
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
     if (_algorithm == TransformAlgorithmEnum::kHmacSha256) {
         opts.transformIdentifiers = true;
         opts.transformIdentifiersCallback = [&](StringData sd) {
@@ -166,10 +166,10 @@ boost::optional<Document> QueryStatsStage::toDocument(
         // We use the representative shape to generate the key and shape hashes. This avoids
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
-        auto representativeShapeKey =
-            key->toBson(pExpCtx->getOperationContext(),
-                        SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                        SerializationContext::stateDefault());
+        auto representativeShapeKey = key->toBson(
+            pExpCtx->getOperationContext(),
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+            SerializationContext::stateDefault());
         // This SHA256 version of the hash is output to aid in data analytics use cases. In these
         // cases, we often care about comparing hashes from different hosts, potentially on
         // different versions and platforms. The thinking here is that the SHA256 algorithm is more
@@ -216,7 +216,7 @@ boost::optional<Document> QueryStatsStage::toDocument(
         const auto& hash = absl::HashOf(key);
         const auto queryShape = key->universalComponents()._queryShape->toBson(
             pExpCtx->getOperationContext(),
-            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
             SerializationContext::stateDefault());
         LOGV2_DEBUG(7349403,
                     2,

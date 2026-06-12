@@ -207,7 +207,8 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
 }
 
 TEST_F(DocumentSourceSortTest, ParseableSerialization) {
-    // Test that SerializationOptions.serializeForCloning works as expected for $sort stage.
+    // Test that query_shape::SerializationOptions.serializeForCloning works as expected for $sort
+    // stage.
     auto expCtx = getExpCtx();
     createSort(BSON("a" << 1));
 
@@ -221,7 +222,7 @@ TEST_F(DocumentSourceSortTest, ParseableSerialization) {
     ASSERT_EQUALS(*sort()->getLimit(), 2);
 
     vector<Value> arr;
-    sort()->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
+    sort()->serializeToArray(arr, query_shape::SerializationOptions{.serializeForCloning = true});
     ASSERT_EQUALS(arr.size(), 1U);
     ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
 
@@ -234,7 +235,7 @@ TEST_F(DocumentSourceSortTest, ParseableSerialization) {
     ASSERT_EQUALS(*sort2->getLimit(), 2);
 
     arr.clear();
-    sort2->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
+    sort2->serializeToArray(arr, query_shape::SerializationOptions{.serializeForCloning = true});
     ASSERT_EQUALS(arr.size(), 1U);
     ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
 }
@@ -245,7 +246,8 @@ TEST_F(DocumentSourceSortTest, QueryShapeSerializationOmitsInternalField) {
     auto sort = DocumentSourceSort::create(
         expCtx, {BSON("a" << 1), expCtx}, {.outputSortKeyMetadata = true});
     vector<Value> arr;
-    sort->serializeToArray(arr, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    sort->serializeToArray(
+        arr, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_VALUE_EQ(arr[0], Value{fromjson("{$sort: {a: 1}}")});
 }
 
@@ -613,8 +615,9 @@ TEST_F(DocumentSourceSortExecutionTest, ExtractArrayValues) {
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ParseableSerialization) {
-    // Test that the serialized spec created with SerializationOptions.serializeForCloning option
-    // can be parsed to construct a clone of the DocumentSourceSort instance.
+    // Test that the serialized spec created with
+    // query_shape::SerializationOptions.serializeForCloning option can be parsed to construct a
+    // clone of the DocumentSourceSort instance.
     auto expCtx = getExpCtx();
 
     BSONObj spec = fromjson("{$sort: {a: 1, $_internalLimit: 2}}");
@@ -628,7 +631,7 @@ TEST_F(DocumentSourceSortExecutionTest, ParseableSerialization) {
                  "[{_id:0,a:1},{_id:1,a:2}]");
 
     vector<Value> arr;
-    sort()->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
+    sort()->serializeToArray(arr, query_shape::SerializationOptions{.serializeForCloning = true});
     ASSERT_EQUALS(arr.size(), 1U);
     ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
 }

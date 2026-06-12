@@ -124,7 +124,7 @@ void DocumentSourceBucketAuto::addVariableRefs(std::set<Variables::Id>* refs) co
     }
 }
 
-Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceBucketAuto::serialize(const query_shape::SerializationOptions& opts) const {
     MutableDocument insides;
 
     insides["groupBy"] = _groupByExpression->serialize(opts);

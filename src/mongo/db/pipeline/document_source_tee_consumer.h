@@ -105,7 +105,8 @@ public:
         return id;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceTeeConsumerToStageFn(

@@ -201,9 +201,10 @@ void AccumulatorInternalJsReduce::reset() {
 }
 
 // Returns this accumulator serialized as a Value along with the reduce function.
-Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> initializer,
-                                                boost::intrusive_ptr<Expression> argument,
-                                                const SerializationOptions& options) const {
+Document AccumulatorInternalJsReduce::serialize(
+    boost::intrusive_ptr<Expression> initializer,
+    boost::intrusive_ptr<Expression> argument,
+    const query_shape::SerializationOptions& options) const {
     return DOC(kName << DOC("data" << argument->serialize(options) << "eval"
                                    << options.serializeLiteral(_funcSource)));
 }
@@ -233,7 +234,7 @@ std::string parseFunction(StringData fieldName,
 
 Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
                                   boost::intrusive_ptr<Expression> argument,
-                                  const SerializationOptions& options) const {
+                                  const query_shape::SerializationOptions& options) const {
     MutableDocument args;
 
     args.addField("init", options.serializeLiteral(_init));

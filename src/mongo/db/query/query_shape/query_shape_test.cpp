@@ -393,7 +393,8 @@ TEST(QueryPredicateShape, SizeMatchExpression) {
 TEST(QueryPredicateShape, TextMatchExpression) {
     TextMatchExpressionBase::TextParams params = {"coffee"};
     auto expr = ExtensionsCallbackNoop().createText(params);
-    auto literalAndFieldRedactOpts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto literalAndFieldRedactOpts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$text": {
@@ -408,7 +409,8 @@ TEST(QueryPredicateShape, TextMatchExpression) {
 
 TEST(QueryPredicateShape, TwoDPtInAnnulusExpression) {
     const MatchExpression& expr = TwoDPtInAnnulusExpression({}, {});
-    auto literalAndFieldRedactOpts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    auto literalAndFieldRedactOpts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$TwoDPtInAnnulusExpression":true})",
         expr.serialize(SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST));
@@ -533,7 +535,7 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
 }
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
-    SerializationOptions options;
+    query_shape::SerializationOptions options;
     options.transformIdentifiers = true;
     options.transformIdentifiersCallback = [](StringData s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
@@ -714,9 +716,10 @@ public:
         return components;
     }
 
-    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
-                                          OperationContext*,
-                                          const SerializationOptions& opts) const final {}
+    void appendCmdSpecificShapeComponents(
+        BSONObjBuilder&,
+        OperationContext*,
+        const query_shape::SerializationOptions& opts) const final {}
     DummyShapeSpecificComponents components;
 };
 
@@ -737,9 +740,10 @@ public:
     size_t extraSize() const final {
         return 125;
     }
-    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
-                                          OperationContext*,
-                                          const SerializationOptions& opts) const final {}
+    void appendCmdSpecificShapeComponents(
+        BSONObjBuilder&,
+        OperationContext*,
+        const query_shape::SerializationOptions& opts) const final {}
 
     DummyShapeSpecificComponents components;
 };

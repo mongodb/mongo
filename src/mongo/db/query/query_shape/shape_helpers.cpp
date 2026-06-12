@@ -48,7 +48,7 @@ static constexpr StringData hintSpecialField = "$hint"_sd;
 // A "Flat" object is one with only top-level fields. We won't descend recursively to shapify any
 // sub-objects.
 BSONObj shapifyFlatObj(const BSONObj& obj,
-                       const SerializationOptions& opts,
+                       const query_shape::SerializationOptions& opts,
                        bool valuesAreLiterals) {
     if (obj.isEmpty()) {
         // fast-path for the common case.
@@ -85,17 +85,17 @@ BSONObj shapifyFlatObj(const BSONObj& obj,
     return bob.obj();
 }
 
-BSONObj extractHintShape(const BSONObj& hintObj, const SerializationOptions& opts) {
+BSONObj extractHintShape(const BSONObj& hintObj, const query_shape::SerializationOptions& opts) {
     return shapifyFlatObj(hintObj, opts, /* valuesAreLiterals = */ false);
 }
 
-BSONObj extractMinOrMaxShape(const BSONObj& obj, const SerializationOptions& opts) {
+BSONObj extractMinOrMaxShape(const BSONObj& obj, const query_shape::SerializationOptions& opts) {
     return shapifyFlatObj(obj, opts, /* valuesAreLiterals = */ true);
 }
 
 void appendNamespaceShape(BSONObjBuilder& bob,
                           const NamespaceString& nss,
-                          const SerializationOptions& opts) {
+                          const query_shape::SerializationOptions& opts) {
     // We do not want to include the tenantId as prefix of 'db' because the tenant id is not
     // included into query shape.
     bob.append("db", opts.serializeIdentifier(nss.dbName().serializeWithoutTenantPrefix_UNSAFE()));

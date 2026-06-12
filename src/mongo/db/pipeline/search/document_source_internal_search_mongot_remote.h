@@ -198,14 +198,15 @@ protected:
     /**
      * Helper serialize method that avoids making mongot call during explain from mongos.
      */
-    Value serializeWithoutMergePipeline(const SerializationOptions& opts) const;
+    Value serializeWithoutMergePipeline(const query_shape::SerializationOptions& opts) const;
 
     /**
      * Helper function to add the "mergingPipeline" field to the serialization if it's needed.
      */
-    Value addMergePipelineIfNeeded(Value innerSpecVal, const SerializationOptions& opts) const;
+    Value addMergePipelineIfNeeded(Value innerSpecVal,
+                                   const query_shape::SerializationOptions& opts) const;
 
-    Value serialize(const SerializationOptions& opts) const override;
+    Value serialize(const query_shape::SerializationOptions& opts) const override;
 
     /**
      * This stage may need to merge the metadata it generates on the merging half of the pipeline.

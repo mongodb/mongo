@@ -145,7 +145,8 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value doSerialize(const query_shape::SerializationOptions& opts =
+                          query_shape::SerializationOptions{}) const final;
 
     StringData getSourceName() const final {
         return kStageName;

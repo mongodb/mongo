@@ -39,7 +39,8 @@ void DeleteCmdComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(std::move(state), _ordered, _bypassDocumentValidation);
 }
 
-void DeleteCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+void DeleteCmdComponents::appendTo(BSONObjBuilder& bob,
+                                   const query_shape::SerializationOptions& opts) const {
     bob.append(write_ops::DeleteCommandRequest::kOrderedFieldName, _ordered);
     bob.append(write_ops::DeleteCommandRequest::kBypassDocumentValidationFieldName,
                _bypassDocumentValidation);
@@ -49,8 +50,8 @@ size_t DeleteCmdComponents::size() const {
     return sizeof(DeleteCmdComponents);
 }
 
-void DeleteKey::appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                                const SerializationOptions& opts) const {
+void DeleteKey::appendCommandSpecificComponents(
+    BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const {
     _components.appendTo(bob, opts);
 }
 

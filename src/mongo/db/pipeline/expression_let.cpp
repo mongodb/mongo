@@ -199,7 +199,7 @@ boost::intrusive_ptr<Expression> ExpressionLet::optimize() {
     return _variables.empty() ? _children[_kSubExpression] : this;
 }
 
-Value ExpressionLet::serialize(const SerializationOptions& options) const {
+Value ExpressionLet::serialize(const query_shape::SerializationOptions& options) const {
     MutableDocument vars;
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {

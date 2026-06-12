@@ -116,7 +116,7 @@ public:
      * Note this may involve re-parsing command BSON and so is not necessarily cheap.
      */
     BSONObj toBson(OperationContext*,
-                   const SerializationOptions&,
+                   const query_shape::SerializationOptions&,
                    const SerializationContext& serializationContext) const;
 
     /**
@@ -162,14 +162,17 @@ protected:
      * object. Depending on 'opts', this may be eligible to be used for output in $queryStats or as
      * the object to compute the QueryShapeHash.
      */
-    virtual void appendCmdSpecificShapeComponents(BSONObjBuilder&,
-                                                  OperationContext*,
-                                                  const SerializationOptions& opts) const = 0;
+    virtual void appendCmdSpecificShapeComponents(
+        BSONObjBuilder&,
+        OperationContext*,
+        const query_shape::SerializationOptions& opts) const = 0;
 
 private:
     void appendCmdNsOrUUID(BSONObjBuilder&,
-                           const SerializationOptions&,
+                           const query_shape::SerializationOptions&,
                            const SerializationContext& serializationContext) const;
-    void appendCmdNs(BSONObjBuilder&, const NamespaceString&, const SerializationOptions&) const;
+    void appendCmdNs(BSONObjBuilder&,
+                     const NamespaceString&,
+                     const query_shape::SerializationOptions&) const;
 };
 }  // namespace mongo::query_shape

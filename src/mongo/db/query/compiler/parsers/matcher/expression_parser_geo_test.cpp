@@ -518,9 +518,9 @@ TEST(ExpressionGeoTest, SerializeGeoNearUnchanged) {
 
 
 TEST(ExpressionGeoTest, SerializeGeoExpressions) {
-    SerializationOptions opts = {};
+    query_shape::SerializationOptions opts = {};
     opts.transformIdentifiers = true;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
     {
         BSONObj query = fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}");
         std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
@@ -706,7 +706,8 @@ TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
         "properties: { name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326' }"
         "}}}}");
     std::unique_ptr<GeoMatchExpression> ge1(makeGeoMatchExpression(query1));
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     auto serialized = ge1->getSerializedRightHandSide(opts);
     ASSERT_BSONOBJ_EQ_AUTO(
         R"({
@@ -785,7 +786,8 @@ template <typename CreateFn>
 void assertRepresentativeShapeIsStable(BSONObj inputExpr,
                                        BSONObj expectedRepresentativeExpr,
                                        CreateFn createFn) {
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     auto ge(createFn(inputExpr));
 
     auto serializedExpr = ge->getSerializedRightHandSide(opts);
@@ -992,7 +994,8 @@ TEST(ExpressionGeoTest, RoundTripSerializeGeoExpressions) {
 
 void assertRepresentativeInternalBucketGeoWithinShapeIsStable(BSONObj inputExpr,
                                                               BSONObj expectedRepresentativeExpr) {
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     auto result = MatchExpressionParser::parse(inputExpr, expCtx);
@@ -1185,7 +1188,8 @@ TEST(ExpressionGeoTest, ParseInternalBucketGeoWithin2dsphereIndexVersionTypeMism
 }
 
 TEST(ExpressionGeoTest, RoundTripSerializeInternalBucketGeoWithinWith2dsphereIndexVersion) {
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     // Use BSON() because JSON does not allow field names starting with a digit

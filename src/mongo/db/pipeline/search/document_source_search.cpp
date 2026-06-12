@@ -114,7 +114,7 @@ StringData DocumentSourceSearch::getSourceName() const {
     return kStageName;
 }
 
-Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceSearch::serialize(const query_shape::SerializationOptions& opts) const {
     // If we aren't serializing for query stats or explain, serialize the full spec.
     // If we are in a router, serialize the full spec.
     // Otherwise, just serialize the mongotQuery.

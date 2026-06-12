@@ -59,7 +59,7 @@ DocumentSourceContainer::iterator GroupFromFirstDocumentTransformation::doOptimi
 }
 
 Document GroupFromFirstDocumentTransformation::serializeTransformation(
-    const SerializationOptions& options) const {
+    const query_shape::SerializationOptions& options) const {
     MutableDocument newRoot(_accumulatorExprs.size());
 
     for (auto&& expr : _accumulatorExprs) {

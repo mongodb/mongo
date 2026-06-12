@@ -48,8 +48,8 @@ class CountKeyTest : public ServiceContextTest {
 public:
     const boost::intrusive_ptr<ExpressionContext> expCtx =
         make_intrusive<ExpressionContextForTest>();
-    const SerializationOptions opts =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    const query_shape::SerializationOptions opts = query_shape::SerializationOptions(
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     std::unique_ptr<query_shape::CountCmdShape> makeCountShapeFromRequest(CountCommandRequest req) {
         const std::unique_ptr<ParsedFindCommand> parsedRequest = uassertStatusOK(

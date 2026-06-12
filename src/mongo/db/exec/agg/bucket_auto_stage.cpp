@@ -434,7 +434,7 @@ void BucketAutoStage::doForceSpill() {
     }
 }
 
-Document BucketAutoStage::getExplainOutput(const SerializationOptions& opts) const {
+Document BucketAutoStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
     MutableDocument out(Stage::getExplainOutput(opts));
     out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
     out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));

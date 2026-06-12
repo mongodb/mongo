@@ -66,9 +66,10 @@ public:
 
     const CmdSpecificShapeComponents& specificComponents() const final;
 
-    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
-                                          OperationContext*,
-                                          const SerializationOptions& opts) const final;
+    void appendCmdSpecificShapeComponents(
+        BSONObjBuilder&,
+        OperationContext*,
+        const query_shape::SerializationOptions& opts) const final;
 
     QueryShapeHash sha256Hash(OperationContext*,
                               const SerializationContext& serializationContext) const override;

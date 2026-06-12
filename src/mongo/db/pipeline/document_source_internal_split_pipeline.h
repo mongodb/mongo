@@ -121,7 +121,8 @@ private:
                                         boost::optional<ShardId> mergeShardId)
         : DocumentSource(kStageName, expCtx), _mergeType(mergeType), _mergeShardId(mergeShardId) {}
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 
     // Populated with a valid ShardId if this stage was constructed with

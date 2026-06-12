@@ -57,7 +57,7 @@ using DocumentSourcePlanCacheStatsTest = AggregationContextFixture;
 static const BSONObj kEmptySpecObj = fromjson("{$planCacheStats: {}}");
 static const BSONObj kAllHostsFalseSpecObj = fromjson("{$planCacheStats: {allHosts: false}}");
 static const BSONObj kAllHostsTrueSpecObj = fromjson("{$planCacheStats: {allHosts: true}}");
-static const SerializationOptions kExplain = SerializationOptions{
+static const query_shape::SerializationOptions kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 /**
  * A MongoProcessInterface used for testing which returns artificial plan cache stats.
@@ -141,9 +141,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainSuccessful
     auto stage =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
-    stage->serializeToArray(serialized,
-                            SerializationOptions{.verbosity = boost::make_optional(
-                                                     ExplainOptions::Verbosity::kQueryPlanner)});
+    stage->serializeToArray(
+        serialized,
+        query_shape::SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(kAllHostsFalseSpecObj, serialized[0].getDocument().toBson());
 }
@@ -163,9 +164,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainAllHostsSu
     auto stage = DocumentSourcePlanCacheStats::createFromBson(kAllHostsTrueSpecObj.firstElement(),
                                                               getExpCtx());
     std::vector<Value> serialized;
-    stage->serializeToArray(serialized,
-                            SerializationOptions{.verbosity = boost::make_optional(
-                                                     ExplainOptions::Verbosity::kQueryPlanner)});
+    stage->serializeToArray(
+        serialized,
+        query_shape::SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(kAllHostsTrueSpecObj, serialized[0].getDocument().toBson());
 }

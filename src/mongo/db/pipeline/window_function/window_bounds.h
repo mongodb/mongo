@@ -124,7 +124,7 @@ struct WindowBounds {
                               const boost::optional<SortPattern>& sortBy,
                               ExpressionContext* expCtx);
 
-    void serialize(MutableDocument& args, const SerializationOptions& opts) const;
+    void serialize(MutableDocument& args, const query_shape::SerializationOptions& opts) const;
 };
 
 }  // namespace mongo

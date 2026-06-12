@@ -68,7 +68,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalProjection::optimizeAt(
     return itr;
 }
 
-Value DocumentSourceInternalProjection::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalProjection::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _stageSpec.toBSON()}});
 }
 }  // namespace mongo

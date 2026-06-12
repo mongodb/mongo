@@ -86,7 +86,7 @@ WindowBounds::Bound<T> parseBound(ExpressionContext* expCtx,
 
 template <class T>
 Value serializeBound(const WindowBounds::Bound<T>& bound,
-                     const SerializationOptions& opts,
+                     const query_shape::SerializationOptions& opts,
                      const Value& representativeValue) {
     return visit(
         OverloadedVisitor{
@@ -256,7 +256,8 @@ WindowBounds WindowBounds::parse(BSONElement args,
         return bounds;
     }
 }
-void WindowBounds::serialize(MutableDocument& args, const SerializationOptions& opts) const {
+void WindowBounds::serialize(MutableDocument& args,
+                             const query_shape::SerializationOptions& opts) const {
     visit(
         OverloadedVisitor{
             [&](const DocumentBased& docBounds) {

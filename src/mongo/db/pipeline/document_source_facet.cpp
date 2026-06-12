@@ -229,7 +229,7 @@ intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
         std::move(facetPipelines), expCtx, bufferSizeBytes, maxOutputDocBytes);
 }
 
-Value DocumentSourceFacet::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceFacet::serialize(const query_shape::SerializationOptions& opts) const {
     MutableDocument serialized;
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
         auto&& facet = _facets[facetId];

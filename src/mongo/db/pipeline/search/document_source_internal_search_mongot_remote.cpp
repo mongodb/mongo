@@ -84,7 +84,7 @@ StringData DocumentSourceInternalSearchMongotRemote::getSourceName() const {
 }
 
 Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
-    Value innerSpecVal, const SerializationOptions& opts) const {
+    Value innerSpecVal, const query_shape::SerializationOptions& opts) const {
     if (!innerSpecVal.isObject()) {
         // We've redacted the interesting parts of the stage, return early.
         return innerSpecVal;
@@ -100,7 +100,7 @@ Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(
 }
 
 Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     // Though router can generate explain output, it should never make a remote call to the mongot.
     if (!opts.isSerializingForExplain() || getExpCtx()->getInRouter()) {
         if (_spec.getMetadataMergeProtocolVersion().has_value()) {
@@ -194,7 +194,8 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     return mDoc.freezeToValue();
 }
 
-Value DocumentSourceInternalSearchMongotRemote::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalSearchMongotRemote::serialize(
+    const query_shape::SerializationOptions& opts) const {
     auto innerSpecVal = serializeWithoutMergePipeline(opts);
     return Value(
         Document{{getSourceName(), addMergePipelineIfNeeded(std::move(innerSpecVal), opts)}});

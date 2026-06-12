@@ -41,7 +41,7 @@ namespace {
 const auto testNss = mongo::NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 
 BSONObj distinctJsonToShapeBSON(const char* json,
-                                const SerializationOptions& opts,
+                                const query_shape::SerializationOptions& opts,
                                 boost::intrusive_ptr<ExpressionContext> expCtx) {
 
     auto distinct = fromjson(json);
@@ -79,12 +79,12 @@ QueryShapeHash distinctQueryShapeHash(const char* json,
 class ExtractQueryShapeDistinctTest : public unittest::Test {
 protected:
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
 
     void setUp() override {
         expCtx = make_intrusive<ExpressionContextForTest>();
-        opts =
-            SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+        opts = query_shape::SerializationOptions(
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     }
 };
 

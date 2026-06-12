@@ -64,7 +64,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
     return make_intrusive<DocumentSourceListSampledQueries>(pExpCtx, std::move(spec));
 }
 
-Value DocumentSourceListSampledQueries::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceListSampledQueries::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
 }
 

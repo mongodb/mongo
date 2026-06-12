@@ -47,7 +47,8 @@
 namespace mongo::query_shape {
 namespace {
 
-BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate, const SerializationOptions& opts) {
+BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate,
+                     const query_shape::SerializationOptions& opts) {
     // Use the already-parsed query ('q' field) if we have it to avoid re-parsing. We won't have the
     // parsed query in the case where the 'q' field is a simple match on _id (e.g. {_id: 1}) - in
     // this case, we'll parse the query on-the-fly so we can shapify it.
@@ -105,9 +106,10 @@ static BSONObj makeNoopModifierUpdateOpShape(const BSONObj& updateModifier) {
     return bob.obj();
 }
 
-Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
-                      const SerializationOptions& opts =
-                          SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+Value shapifyUpdateOp(
+    const ParsedUpdate& parsedUpdate,
+    const query_shape::SerializationOptions& opts =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
     const auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
     const auto* executor = parsedUpdate.getDriver()->getUpdateExecutor();
     switch (modType) {
@@ -117,7 +119,7 @@ Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
         case write_ops::UpdateModification::Type::kPipeline:
             return Value(static_cast<const PipelineExecutor*>(executor)->serialize(opts));
         case write_ops::UpdateModification::Type::kModifier: {
-            SerializationOptions modifierOpts = opts;
+            query_shape::SerializationOptions modifierOpts = opts;
             if (!(parsedUpdate.arrayFilters == nullptr || parsedUpdate.arrayFilters->empty())) {
                 // If there are array filters present, field paths need to be serialized
                 // accordingly.
@@ -137,7 +139,7 @@ Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
 }
 
 boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate,
-                                                const SerializationOptions& opts) {
+                                                const query_shape::SerializationOptions& opts) {
     if (parsedUpdate.getDriver()->type() != UpdateDriver::UpdateType::kPipeline) {
         return boost::none;
     }
@@ -160,8 +162,8 @@ boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate
     return shapifiedConstants.obj();
 }
 
-boost::optional<std::vector<BSONObj>> shapifyArrayFilters(const ParsedUpdate& parsedUpdate,
-                                                          const SerializationOptions& opts) {
+boost::optional<std::vector<BSONObj>> shapifyArrayFilters(
+    const ParsedUpdate& parsedUpdate, const query_shape::SerializationOptions& opts) {
     if (parsedUpdate.getDriver()->type() != UpdateDriver::UpdateType::kOperator) {
         return boost::none;
     }
@@ -183,7 +185,7 @@ boost::optional<std::vector<BSONObj>> shapifyArrayFilters(const ParsedUpdate& pa
 
 UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpdate,
                                                    LetShapeComponent let,
-                                                   const SerializationOptions& opts)
+                                                   const query_shape::SerializationOptions& opts)
     : representativeQ(shapifyQuery(parsedUpdate, opts)),
       _representativeUObj(shapifyUpdateOp(parsedUpdate, opts).wrap(""_sd)),
       representativeC(shapifyUpdateConstants(parsedUpdate, opts)),
@@ -210,7 +212,7 @@ void UpdateCmdShapeComponents::HashValue(absl::HashState state) const {
 
 void UpdateCmdShapeComponents::appendTo(
     BSONObjBuilder& bob,
-    const SerializationOptions& opts,
+    const query_shape::SerializationOptions& opts,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     bob.append("command", "update");
 
@@ -255,16 +257,17 @@ size_t UpdateCmdShape::extraSize() const {
     return sizeof(UpdateCmdShape) - sizeof(Shape) - sizeof(UpdateCmdShapeComponents);
 }
 
-void UpdateCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                      OperationContext* opCtx,
-                                                      const SerializationOptions& opts) const {
+void UpdateCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     tassert(11034200,
             "We don't support serializing to the unmodified shape here, since we have already "
             "shapified and stored the representative query - we've lost the original literals",
             !opts.isKeepingLiteralsUnchanged());
 
     auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID, _components.let.shapifiedLet);
-    if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+    if (opts == query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // We have this copy stored already!
         _components.appendTo(bob, opts, expCtx);
         return;

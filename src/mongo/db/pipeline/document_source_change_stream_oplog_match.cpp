@@ -250,7 +250,8 @@ DocumentSourceContainer::iterator DocumentSourceChangeStreamOplogMatch::optimize
     return nextChangeStreamStageItr;
 }
 
-Value DocumentSourceChangeStreamOplogMatch::doSerialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamOplogMatch::doSerialize(
+    const query_shape::SerializationOptions& opts) const {
     BSONObjBuilder builder;
     if (opts.isSerializingForExplain()) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
@@ -261,8 +262,8 @@ Value DocumentSourceChangeStreamOplogMatch::doSerialize(const SerializationOptio
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
 
-        // 'SerializationOptions' are not required here, since serialization for explain and query
-        // stats occur before this function call.
+        // 'query_shape::SerializationOptions' are not required here, since serialization for
+        // explain and query stats occur before this function call.
         DocumentSourceChangeStreamOplogMatchSpec(getPredicate()).serialize(&sub);
         sub.done();
     }

@@ -66,7 +66,7 @@ public:
         return TAccumulator::kName.data();
     }
 
-    Value serialize(const SerializationOptions& options = {}) const final {
+    Value serialize(const query_shape::SerializationOptions& options = {}) const final {
         MutableDocument md;
         TAccumulator::serializeHelper(_input, options, _ps, _method, md);
         return Value(DOC(getOpName() << md.freeze()));

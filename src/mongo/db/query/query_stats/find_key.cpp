@@ -31,7 +31,8 @@
 
 namespace mongo::query_stats {
 
-void FindCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
+void FindCmdComponents::appendTo(BSONObjBuilder& bob,
+                                 const query_shape::SerializationOptions& opts) const {
 
     if (_hasField.allowPartialResults) {
         bob.append(FindCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);

@@ -230,7 +230,8 @@ TEST_F(DocumentSourceSetMetadataTest, SetMetadataMultipleDocuments) {
 }
 
 TEST_F(DocumentSourceSetMetadataTest, QueryShapeDebugString) {
-    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     {
         BSONObj spec = fromjson(R"({
@@ -288,7 +289,8 @@ TEST_F(DocumentSourceSetMetadataTest, QueryShapeDebugString) {
 }
 
 TEST_F(DocumentSourceSetMetadataTest, RepresentativeQueryShape) {
-    SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
 
     {
         BSONObj spec = fromjson(R"({

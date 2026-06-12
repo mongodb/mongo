@@ -45,8 +45,8 @@ namespace {
 using DocumentSourceInternalAllCollectionStatsTest = AggregationContextFixture;
 
 auto representativeShape(const DocumentSourceInternalAllCollectionStats& allCollStatsStage) {
-    SerializationOptions opts{.literalPolicy =
-                                  LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    query_shape::SerializationOptions opts{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     return allCollStatsStage.serialize(opts).getDocument().toBson();
 }
 

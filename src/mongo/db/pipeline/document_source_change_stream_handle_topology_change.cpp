@@ -91,7 +91,7 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
 }
 
 Value DocumentSourceChangeStreamHandleTopologyChange::doSerialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage" << "internalHandleTopologyChange"_sd)));

@@ -128,12 +128,14 @@ public:
     }
 
     void serializeToArray(std::vector<Value>& array,
-                          const SerializationOptions& opts = SerializationOptions{}) const final;
+                          const query_shape::SerializationOptions& opts =
+                              query_shape::SerializationOptions{}) const final;
 
     /**
      * Use 'serializeToArray' above.
      */
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final {
         MONGO_UNREACHABLE_TASSERT(7484305);
     }
 

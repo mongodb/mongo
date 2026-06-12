@@ -69,7 +69,7 @@ TEST_F(ExpressionCreateUUIDTest, Basic) {
     ASSERT_VALUE_NE(result1, result2);
 
     // Serialize, re-parse, and validate a different UUID is returned.
-    auto serialized = exp->serialize(SerializationOptions{
+    auto serialized = exp->serialize(query_shape::SerializationOptions{
         .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
     auto nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "unittests", "pipeline_test");

@@ -53,7 +53,7 @@ StringData DocumentSourceCursor::getSourceName() const {
     return kStageName;
 }
 
-Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceCursor::serialize(const query_shape::SerializationOptions& opts) const {
     // We never parse a DocumentSourceCursor, so we only serialize for explain. Since it's never
     // part of user input, there's no need to compute its query shape.
     if (!opts.isSerializingForExplain() || opts.isSerializingForQueryStats()) {

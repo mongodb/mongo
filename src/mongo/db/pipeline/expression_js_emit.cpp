@@ -79,7 +79,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(ExpressionConte
     return new ExpressionInternalJsEmit(expCtx, std::move(thisRef), std::move(funcSourceString));
 }
 
-Value ExpressionInternalJsEmit::serialize(const SerializationOptions& options) const {
+Value ExpressionInternalJsEmit::serialize(const query_shape::SerializationOptions& options) const {
     return Value(
         Document{{kExpressionName,
                   Document{{"eval", _funcSource}, {"this", _thisRef->serialize(options)}}}});

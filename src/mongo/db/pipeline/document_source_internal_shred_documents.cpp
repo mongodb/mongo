@@ -51,7 +51,8 @@ DocumentSourceInternalShredDocuments::DocumentSourceInternalShredDocuments(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageName, pExpCtx) {}
 
-Value DocumentSourceInternalShredDocuments::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalShredDocuments::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
 }
 

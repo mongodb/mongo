@@ -88,7 +88,7 @@ private:
         return context == Context::kAll ? "$set" : "$setOnInsert";
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final {
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final {
         return BSON("" << opts.serializeLiteral(val));
     }
 };

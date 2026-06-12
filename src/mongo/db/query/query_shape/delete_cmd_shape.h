@@ -46,15 +46,16 @@ namespace mongo::query_shape {
  * query shape.
  */
 struct DeleteCmdShapeComponents : public CmdSpecificShapeComponents {
-    DeleteCmdShapeComponents(const ParsedDelete& parsedDelete,
-                             LetShapeComponent let,
-                             const SerializationOptions& opts =
-                                 SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    DeleteCmdShapeComponents(
+        const ParsedDelete& parsedDelete,
+        LetShapeComponent let,
+        const query_shape::SerializationOptions& opts =
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     size_t size() const final;
 
     void appendTo(BSONObjBuilder&,
-                  const SerializationOptions&,
+                  const query_shape::SerializationOptions&,
                   const boost::intrusive_ptr<ExpressionContext>&) const;
 
     void HashValue(absl::HashState state) const final;
@@ -84,7 +85,7 @@ public:
 protected:
     void appendCmdSpecificShapeComponents(BSONObjBuilder&,
                                           OperationContext*,
-                                          const SerializationOptions&) const final;
+                                          const query_shape::SerializationOptions&) const final;
 
 private:
     DeleteCmdShapeComponents _components;

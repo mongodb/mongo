@@ -126,13 +126,15 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {};
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final {
         // Since this DocumentSource is serialized to more than one stage, the single-stage has no
         // way to return the right answer, therefore we should not use it.
         MONGO_UNREACHABLE_TASSERT(9741504);
     }
 
-    void serializeToArray(std::vector<Value>& array, const SerializationOptions& opts) const final;
+    void serializeToArray(std::vector<Value>& array,
+                          const query_shape::SerializationOptions& opts) const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,

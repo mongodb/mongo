@@ -52,7 +52,7 @@ namespace mongo::query_shape {
 namespace {
 void appendCmdNs(BSONObjBuilder& bob,
                  const NamespaceString& nss,
-                 const SerializationOptions& opts) {
+                 const query_shape::SerializationOptions& opts) {
     BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
     shape_helpers::appendNamespaceShape(nsObj, nss, opts);
     nsObj.doneFast();
@@ -68,7 +68,7 @@ Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
 
 
 BSONObj Shape::toBson(OperationContext* opCtx,
-                      const SerializationOptions& opts,
+                      const query_shape::SerializationOptions& opts,
                       const SerializationContext& serializationContext) const {
     BSONObjBuilder bob;
     appendCmdNsOrUUID(bob, opts, serializationContext);
@@ -89,15 +89,16 @@ size_t Shape::size() const {
 QueryShapeHash Shape::sha256Hash(OperationContext* opCtx,
                                  const SerializationContext& serializationContext) const {
     // The Query Shape Hash should use the representative query shape.
-    auto serialized = toBson(opCtx,
-                             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                             serializationContext);
+    auto serialized =
+        toBson(opCtx,
+               query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+               serializationContext);
     return SHA256Block::computeHash((const uint8_t*)serialized.sharedBuffer().get(),
                                     serialized.objsize());
 }
 
 void Shape::appendCmdNsOrUUID(BSONObjBuilder& bob,
-                              const SerializationOptions& opts,
+                              const query_shape::SerializationOptions& opts,
                               const SerializationContext& serializationContext) const {
     if (nssOrUUID.isNamespaceString()) {
         appendCmdNs(bob, nssOrUUID.nss(), opts);
@@ -113,7 +114,7 @@ void Shape::appendCmdNsOrUUID(BSONObjBuilder& bob,
 
 void Shape::appendCmdNs(BSONObjBuilder& bob,
                         const NamespaceString& nss,
-                        const SerializationOptions& opts) const {
+                        const query_shape::SerializationOptions& opts) const {
     BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
     shape_helpers::appendNamespaceShape(nsObj, nss, opts);
     nsObj.doneFast();

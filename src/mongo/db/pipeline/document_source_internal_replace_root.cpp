@@ -43,7 +43,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalReplaceRoot::optimizeAt(
     return itr;
 }
 
-Value DocumentSourceInternalReplaceRoot::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalReplaceRoot::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _newRoot->serialize()}});
 }
 }  // namespace mongo

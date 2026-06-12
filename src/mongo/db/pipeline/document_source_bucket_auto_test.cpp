@@ -126,7 +126,7 @@ public:
         vector<Value> explainedStages;
         bucketAutoStage->serializeToArray(
             explainedStages,
-            SerializationOptions{
+            query_shape::SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 1UL);
 
@@ -1174,7 +1174,8 @@ TEST_F(BucketAutoTests, QueryShapeReParseSerializedStage) {
             }})");
 
     auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), expCtx);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     std::vector<Value> serialized;
     docSource->serializeToArray(serialized, opts);
     auto serializedDocSource = serialized[0].getDocument().toBson();

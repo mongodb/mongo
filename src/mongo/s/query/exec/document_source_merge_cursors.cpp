@@ -134,7 +134,7 @@ std::unique_ptr<RouterStageMerge> DocumentSourceMergeCursors::convertToRouterSta
     return result;
 }
 
-Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceMergeCursors::serialize(const query_shape::SerializationOptions& opts) const {
     // This method is the only reason 'DocumentSourceMergeCursors' needs '_blockingResultsMerger'.
     // We cannot cache '_armParams->toBSON()', because remotes can change during the execution in
     // case of change streams.

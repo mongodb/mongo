@@ -119,11 +119,12 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     return constraints;
 }
 
-Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamTransform::serialize(
+    const query_shape::SerializationOptions& opts) const {
     BSONObj serializedOptions = [&]() -> BSONObj {
         BSONObj serialized = _changeStreamSpec.toBSON(opts);
 
-        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        if (opts.literalPolicy != query_shape::LiteralSerializationPolicy::kUnchanged) {
             // Explicitly remove specific fields from the '$changeStream' stage serialization for
             // query shapes that should not have any influence on the query shape hash computation.
             serialized = serialized.removeFields(kFieldsToRemoveForQueryShapeSerialization);

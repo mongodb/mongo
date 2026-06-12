@@ -80,7 +80,7 @@ public:
         return checked_cast<ExprMatchExpression*>(_matchExpression.get());
     }
 
-    BSONObj serialize(const SerializationOptions& opts) {
+    BSONObj serialize(const query_shape::SerializationOptions& opts) {
         return _matchExpression->serialize(opts);
     }
 

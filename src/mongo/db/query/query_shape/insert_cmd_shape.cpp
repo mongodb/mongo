@@ -35,7 +35,7 @@
 namespace mongo::query_shape {
 
 void InsertCmdShapeComponents::appendTo(BSONObjBuilder& bob,
-                                        const SerializationOptions& opts) const {
+                                        const query_shape::SerializationOptions& opts) const {
     bob.append("command", "insert");
 
     // 'documents' is always shapified as ?array<?object>: a placeholder array of one empty object.
@@ -48,9 +48,10 @@ void InsertCmdShapeComponents::appendTo(BSONObjBuilder& bob,
 InsertCmdShape::InsertCmdShape(const write_ops::InsertCommandRequest& request)
     : Shape(request.getNamespace(), BSONObj{} /*no collation for insert*/) {}
 
-void InsertCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                      OperationContext* opCtx,
-                                                      const SerializationOptions& opts) const {
+void InsertCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     _components.appendTo(bob, opts);
 }
 

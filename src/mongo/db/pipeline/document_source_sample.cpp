@@ -62,7 +62,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(sample, DocumentSourceSample,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(sample, DocumentSourceSample::id)
 
-Value DocumentSourceSample::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceSample::serialize(const query_shape::SerializationOptions& opts) const {
     return Value(DOC(kStageName << DOC("size" << opts.serializeLiteral(_size))));
 }
 

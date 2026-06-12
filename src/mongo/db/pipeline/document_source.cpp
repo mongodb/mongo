@@ -88,7 +88,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseFromLiteParsed(
 
 BSONObj DocumentSource::serializeToBSONForDebug() const {
     std::vector<Value> serialized;
-    auto opts = SerializationOptions{
+    auto opts = query_shape::SerializationOptions{
         .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
     serializeToArray(serialized, opts);
     if (serialized.empty()) {
@@ -105,7 +105,7 @@ BSONObj DocumentSource::serializeToBSONForDebug() const {
 }
 
 void DocumentSource::serializeToArray(std::vector<Value>& array,
-                                      const SerializationOptions& opts) const {
+                                      const query_shape::SerializationOptions& opts) const {
     Value entry = serialize(opts);
     if (!entry.missing()) {
         array.push_back(std::move(entry));

@@ -237,7 +237,8 @@ public:
                                                  DocumentSourceContainer* container);
 
 private:
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     // Holds all the planning information for the command's eventual mongot request.
     InternalSearchMongotRemoteSpec _spec;

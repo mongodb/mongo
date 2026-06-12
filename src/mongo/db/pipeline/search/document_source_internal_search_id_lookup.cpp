@@ -89,7 +89,8 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBs
                                                                 expCtx);
 }
 
-Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalSearchIdLookUp::serialize(
+    const query_shape::SerializationOptions& opts) const {
     MutableDocument outputSpec;
     if (_spec.getLimit()) {
         outputSpec["limit"] =

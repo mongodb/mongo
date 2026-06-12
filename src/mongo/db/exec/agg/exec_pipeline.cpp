@@ -128,7 +128,7 @@ void Pipeline::forceSpill() {
     _stages.back()->forceSpill();
 }
 
-std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
+std::vector<Value> Pipeline::writeExplainOps(const query_shape::SerializationOptions& opts) const {
     tassert(10908500,
             "this method should not be called with explain verbosity below 'executionStats'",
             *opts.verbosity >= ExplainOptions::Verbosity::kExecStats);

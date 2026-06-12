@@ -38,7 +38,7 @@ DistinctCmdShapeComponents::DistinctCmdShapeComponents(
     const ParsedDistinctCommand& request, const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : key(std::string{request.distinctCommandRequest->getKey()}),
       representativeQuery(request.query->serialize(
-          SerializationOptions::kRepresentativeQueryShapeSerializeOptions)) {}
+          query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions)) {}
 
 void DistinctCmdShapeComponents::HashValue(absl::HashState state) const {
     absl::HashState::combine(std::move(state), key, simpleHash(representativeQuery));
@@ -58,9 +58,10 @@ DistinctCmdShape::DistinctCmdShape(const ParsedDistinctCommand& distinct,
             distinct.distinctCommandRequest->getCollation().get_value_or(BSONObj())),
       components(distinct, expCtx) {}
 
-void DistinctCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                        OperationContext* opCtx,
-                                                        const SerializationOptions& opts) const {
+void DistinctCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     // Command name.
     bob.append("command", DistinctCommandRequest::kCommandName);
 
@@ -70,7 +71,7 @@ void DistinctCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
 
     // Query.
     if (!components.representativeQuery.isEmpty()) {
-        if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+        if (opts == query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
             // Fastpath. Already serialized using the same serialization options.
             bob.append(DistinctCommandRequest::kQueryFieldName, components.representativeQuery);
         } else {

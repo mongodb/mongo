@@ -211,13 +211,13 @@ TEST(AddFieldsProjectionExecutorSerialize, SerializesToCorrectForm) {
     // Should be the same if we're serializing for explain or for internal use.
     ASSERT_DOCUMENT_EQ(expectedSerialization, addition.serializeTransformation());
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kQueryPlanner}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecStats}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
@@ -244,13 +244,13 @@ TEST(AddFieldsProjectionExecutorSerialize, AddsIdToSerializeWhenExplicitlyInclud
     // Should be the same if we're serializing for explain or for internal use.
     ASSERT_DOCUMENT_EQ(expectedSerialization, addition.serializeTransformation());
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kQueryPlanner}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecStats}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
@@ -269,13 +269,13 @@ TEST(AddFieldsProjectionExecutorSerialize, OmitsIdFromSerializeWhenNotIncluded) 
     // Should be the same if we're serializing for explain or for internal use.
     ASSERT_DOCUMENT_EQ(expectedSerialization, addition.serializeTransformation());
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kQueryPlanner}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecStats}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
@@ -290,13 +290,13 @@ TEST(AddFieldsProjectionExecutorOptimize, OptimizesTopLevelExpressions) {
     // Should be the same if we're serializing for explain or for internal use.
     ASSERT_DOCUMENT_EQ(expectedSerialization, addition.serializeTransformation());
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kQueryPlanner}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecStats}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
@@ -311,13 +311,13 @@ TEST(AddFieldsProjectionExecutorOptimize, ShouldOptimizeNestedExpressions) {
     // Should be the same if we're serializing for explain or for internal use.
     ASSERT_DOCUMENT_EQ(expectedSerialization, addition.serializeTransformation());
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kQueryPlanner}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecStats}));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
-                       addition.serializeTransformation(SerializationOptions{
+                       addition.serializeTransformation(query_shape::SerializationOptions{
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 

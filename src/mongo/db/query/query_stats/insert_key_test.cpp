@@ -73,7 +73,8 @@ TEST_F(InsertKeyTest, DefaultInsertCmdComponents) {
     InsertCmdComponents components(icr);
 
     BSONObjBuilder bob;
-    components.appendTo(bob, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    components.appendTo(
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(fromjson(R"({ ordered: true, bypassDocumentValidation: false })"), bob.obj());
 }
 
@@ -90,7 +91,8 @@ TEST_F(InsertKeyTest, InsertCmdComponentsWithExplicitValues) {
     InsertCmdComponents components(icr);
 
     BSONObjBuilder bob;
-    components.appendTo(bob, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    components.appendTo(
+        bob, query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     ASSERT_BSONOBJ_EQ(fromjson(R"({ ordered: false, bypassDocumentValidation: true })"), bob.obj());
 }
 

@@ -224,7 +224,7 @@ private:
             return {std::numeric_limits<double>::lowest()};
         }
 
-        Document serialize(const SerializationOptions& opts) const {
+        Document serialize(const query_shape::SerializationOptions& opts) const {
             // MakeBound::serialize is only used when the sorter is serialized. NearStage won't
             // serialize the sorter, because it is always the same.
             MONGO_UNIMPLEMENTED_TASSERT(10907700);

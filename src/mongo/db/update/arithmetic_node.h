@@ -91,7 +91,7 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final {
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final {
         return BSON("" << opts.serializeLiteral(_val));
     }
 

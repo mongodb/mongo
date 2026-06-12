@@ -63,7 +63,7 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
     size_t size() const final;
 
     void appendTo(BSONObjBuilder&,
-                  const SerializationOptions&,
+                  const query_shape::SerializationOptions&,
                   const boost::intrusive_ptr<ExpressionContext>&) const;
 
     void HashValue(absl::HashState state) const final;
@@ -81,8 +81,8 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
 /**
  * A class representing the query shape of an aggregate command. The components are listed above.
  * This class knows how to utilize those components to serialize to BSON with any
- * SerializationOptions. Mostly this involves correctly setting up an ExpressionContext to re-parse
- * the request if needed.
+ * query_shape::SerializationOptions. Mostly this involves correctly setting up an ExpressionContext
+ * to re-parse the request if needed.
  */
 class AggCmdShape : public Shape {
 public:
@@ -99,7 +99,7 @@ public:
 protected:
     void appendCmdSpecificShapeComponents(BSONObjBuilder&,
                                           OperationContext*,
-                                          const SerializationOptions&) const final;
+                                          const query_shape::SerializationOptions&) const final;
 
 private:
     AggCmdShapeComponents _components;

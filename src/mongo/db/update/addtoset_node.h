@@ -86,7 +86,7 @@ private:
         return "$addToSet";
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final {
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final {
         if (!_useEachElem) {
             tassert(11034401,
                     "We should only be serializing one element max if $each is not specified.",

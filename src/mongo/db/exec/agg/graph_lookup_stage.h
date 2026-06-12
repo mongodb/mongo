@@ -91,8 +91,8 @@ public:
         spill(0);
     }
 
-    Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const final;
+    Document getExplainOutput(const query_shape::SerializationOptions& opts =
+                                  query_shape::SerializationOptions{}) const final;
 
 private:
     static constexpr StringData kFrontierValueField = "f"_sd;

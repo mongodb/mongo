@@ -140,7 +140,7 @@ TEST_F(DeleteCmdShapeTest, EmptyQueryDeleteShape) {
             q: {},
             limit: 0 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     // No literals or field names in an empty query, so all three opts produce the same output.
@@ -151,7 +151,7 @@ TEST_F(DeleteCmdShapeTest, EmptyQueryDeleteShape) {
             q: {},
             limit: 0 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -161,7 +161,7 @@ TEST_F(DeleteCmdShapeTest, EmptyQueryDeleteShape) {
             q: {},
             limit: 0 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -179,7 +179,7 @@ TEST_F(DeleteCmdShapeTest, SingleDocumentDeleteShapeWithQuery) {
             q: { x: { $eq: 1 } },
             limit: 1 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -189,7 +189,7 @@ TEST_F(DeleteCmdShapeTest, SingleDocumentDeleteShapeWithQuery) {
             q: { x: { $eq: "?number" } },
             limit: 1 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -199,7 +199,7 @@ TEST_F(DeleteCmdShapeTest, SingleDocumentDeleteShapeWithQuery) {
             q: { "HASH<x>": { $eq: "?number" } },
             limit: 1 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -217,7 +217,7 @@ TEST_F(DeleteCmdShapeTest, MultiDocumentDeleteShapeWithQuery) {
             q: { x: { $eq: 1 } },
             limit: 0 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -227,7 +227,7 @@ TEST_F(DeleteCmdShapeTest, MultiDocumentDeleteShapeWithQuery) {
             q: { x: { $eq: "?number" } },
             limit: 0})",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -237,7 +237,7 @@ TEST_F(DeleteCmdShapeTest, MultiDocumentDeleteShapeWithQuery) {
             q: { "HASH<x>": { $eq: "?number" } },
             limit: 0 })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -256,7 +256,7 @@ TEST_F(DeleteCmdShapeTest, ComplexDeleteQuery) {
             limit: 0 
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -267,7 +267,7 @@ TEST_F(DeleteCmdShapeTest, ComplexDeleteQuery) {
             limit: 0
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -278,7 +278,7 @@ TEST_F(DeleteCmdShapeTest, ComplexDeleteQuery) {
             ] }, limit: 0
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -297,7 +297,7 @@ TEST_F(DeleteCmdShapeTest, DeleteWithIdQuery) {
             limit: 1
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -308,7 +308,7 @@ TEST_F(DeleteCmdShapeTest, DeleteWithIdQuery) {
             limit: 1
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -319,7 +319,7 @@ TEST_F(DeleteCmdShapeTest, DeleteWithIdQuery) {
             limit: 1
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -344,7 +344,7 @@ TEST_F(DeleteCmdShapeTest, AllDeleteFieldsAllSerializationOptions) {
             let: { myVar: { $const: "?" } }
     })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -357,7 +357,7 @@ TEST_F(DeleteCmdShapeTest, AllDeleteFieldsAllSerializationOptions) {
             let: { myVar: "?string" }
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                      SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -370,7 +370,7 @@ TEST_F(DeleteCmdShapeTest, AllDeleteFieldsAllSerializationOptions) {
             let: { "HASH<myVar>": "?string" }
         })",
         shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 
@@ -395,7 +395,7 @@ TEST_F(DeleteCmdShapeTest, MultipleDeletesProduceSeparateShapes) {
             let: { myVar: "?number" }
         })",
         shapes[0].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -420,7 +420,7 @@ TEST_F(DeleteCmdShapeTest, MultipleDeletesProduceSeparateShapes) {
             let: { myVar: "?number" }
         })",
         shapes[1].toBson(_operationContext.get(),
-                         SerializationOptions::kDebugQueryShapeSerializeOptions,
+                         query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                          SerializationContext::stateDefault()));
 }
 

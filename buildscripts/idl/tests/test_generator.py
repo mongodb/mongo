@@ -264,7 +264,7 @@ class TestGenerator(testcase.IDLTestcase):
         """)
 
         expected = dedent("""
-        void QueryShapeSpec::serialize(BSONObjBuilder* builder, const SerializationOptions& options) const {
+        void QueryShapeSpec::serialize(BSONObjBuilder* builder, const query_shape::SerializationOptions& options) const {
             handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);
 
             {
@@ -309,7 +309,7 @@ class TestGenerator(testcase.IDLTestcase):
         """)
 
         expected = dedent("""
-        void QueryShapeSpec::serialize(BSONObjBuilder* builder, const SerializationOptions& options) const {
+        void QueryShapeSpec::serialize(BSONObjBuilder* builder, const query_shape::SerializationOptions& options) const {
             handleMissingRequiredFields(_hasMembers, fieldMetadata, fieldToRequiredFieldPositions);
 
             {

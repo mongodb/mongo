@@ -65,9 +65,10 @@ public:
         return components;
     }
 
-    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
-                                          OperationContext*,
-                                          const SerializationOptions& opts) const final {}
+    void appendCmdSpecificShapeComponents(
+        BSONObjBuilder&,
+        OperationContext*,
+        const query_shape::SerializationOptions& opts) const final {}
     DummyShapeSpecificComponents components;
 };
 
@@ -95,8 +96,8 @@ public:
     const SpecificKeyComponents& specificComponents() const override {
         return components;
     };
-    void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const override {};
+    void appendCommandSpecificComponents(
+        BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const override {};
     DummyKeyComponents components;
 };
 class UniversalKeyTest : public ServiceContextTest {};

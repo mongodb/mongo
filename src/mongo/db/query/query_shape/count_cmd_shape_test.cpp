@@ -43,9 +43,10 @@ const auto testNss = mongo::NamespaceString::createNamespaceString_forTest("test
 
 class CountCmdShapeTest : public ServiceContextTest {
 public:
-    std::unique_ptr<CountCmdShape> checkShapeBSON(const CountCommandRequest& ccr,
-                                                  const BSONObj& expectedShape,
-                                                  const SerializationOptions serializationOptions) {
+    std::unique_ptr<CountCmdShape> checkShapeBSON(
+        const CountCommandRequest& ccr,
+        const BSONObj& expectedShape,
+        const query_shape::SerializationOptions serializationOptions) {
         const auto parsedRequest = uassertStatusOK(
             parsed_find_command::parseFromCount(expCtx, ccr, extensionsCallback, testNss));
         auto shape = std::make_unique<CountCmdShape>(
@@ -79,8 +80,9 @@ public:
             *parsedRequest, false /* hasLimit */, false /* hasSkip */);
     }
 
-    const SerializationOptions representativeShapeOptions =
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    const query_shape::SerializationOptions representativeShapeOptions =
+        query_shape::SerializationOptions(
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
     const boost::intrusive_ptr<ExpressionContext> expCtx =
         make_intrusive<ExpressionContextForTest>();
     const ExtensionsCallbackNoop extensionsCallback{};
@@ -180,9 +182,10 @@ TEST_F(CountCmdShapeTest, CountShapeDebugFormat) {
             limit: "?number",
             skip: "?number"
         })");
-    checkShapeBSON(*ccr,
-                   expectedShape,
-                   SerializationOptions(SerializationOptions::kDebugQueryShapeSerializeOptions));
+    checkShapeBSON(
+        *ccr,
+        expectedShape,
+        query_shape::SerializationOptions(SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 /**

@@ -123,7 +123,8 @@ private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalGeoNearDistanceToStageFn(
         const boost::intrusive_ptr<DocumentSource>&);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     std::string _key;
     std::unique_ptr<PointWithCRS> _centroid;

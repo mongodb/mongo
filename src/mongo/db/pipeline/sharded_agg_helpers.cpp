@@ -801,7 +801,7 @@ BSONObj createPassthroughCommandForShard(
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
-        SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
+        query_shape::SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
         targetedCmd[AggregateCommandRequest::kPipelineFieldName] =
             Value(pipeline->serialize(wireOpts));
         if (auto isTranslated = pipeline->isTranslated()) {
@@ -1544,7 +1544,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         MutableDocument pipelinesDoc;
         // We specify "queryPlanner" verbosity when building the output for "shardsPart" because
         // execution stats are reported by each shard individually.
-        auto opts = SerializationOptions{
+        auto opts = query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
         pipelinesDoc.addField(
             "shardsPart",
@@ -1616,7 +1616,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
 
             // TODO SERVER-124003 Figure out a way to either avoid this serialized BSON or reuse it
             // as much as possible.
-            SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
+            query_shape::SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
             LiteParsedPipeline liteParsedPipeline(expCtx->getNamespaceString(),
                                                   pipelineToTarget->serializeToBson(wireOpts));
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
@@ -1826,26 +1826,27 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
     boost::optional<BSONObj> readConcern,
     bool useCollectionDefaultCollator) {
     auto&& aggRequestPipelinePair = [&] {
-        return visit(OverloadedVisitor{
-                         [&](std::unique_ptr<Pipeline>&& pipeline) {
-                             SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
-                             return std::make_pair(
-                                 AggregateCommandRequest(expCtx->getNamespaceString(),
-                                                         pipeline->serializeToBson(wireOpts)),
-                                 std::move(pipeline));
-                         },
-                         [&](AggregateCommandRequest&& aggRequest) {
-                             auto rawPipeline = aggRequest.getPipeline();
-                             return std::make_pair(
-                                 std::move(aggRequest),
-                                 pipeline_factory::makePipeline(
-                                     rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
-                         },
-                         [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>&&
-                                 aggRequestPipelinePair) {
-                             return std::move(aggRequestPipelinePair);
-                         }},
-                     std::move(targetRequest));
+        return visit(
+            OverloadedVisitor{[&](std::unique_ptr<Pipeline>&& pipeline) {
+                                  query_shape::SerializationOptions wireOpts{
+                                      .isSerializingForRemoteDispatch = true};
+                                  return std::make_pair(
+                                      AggregateCommandRequest(expCtx->getNamespaceString(),
+                                                              pipeline->serializeToBson(wireOpts)),
+                                      std::move(pipeline));
+                              },
+                              [&](AggregateCommandRequest&& aggRequest) {
+                                  auto rawPipeline = aggRequest.getPipeline();
+                                  return std::make_pair(
+                                      std::move(aggRequest),
+                                      pipeline_factory::makePipeline(
+                                          rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
+                              },
+                              [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>&&
+                                      aggRequestPipelinePair) {
+                                  return std::move(aggRequestPipelinePair);
+                              }},
+            std::move(targetRequest));
     }();
     const auto& aggRequest = aggRequestPipelinePair.first;
     auto&& pipeline = aggRequestPipelinePair.second;
@@ -1946,7 +1947,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
 
             // TODO SERVER-124003 Figure out a way to either avoid this serialized BSON or reuse it
             // as much as possible.
-            SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
+            query_shape::SerializationOptions wireOpts{.isSerializingForRemoteDispatch = true};
             LiteParsedPipeline liteParsedPipeline(expCtx->getNamespaceString(),
                                                   pipelineToTarget->serializeToBson(wireOpts));
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);

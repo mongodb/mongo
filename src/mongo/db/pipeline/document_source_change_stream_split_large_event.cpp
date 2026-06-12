@@ -96,7 +96,8 @@ DocumentSourceChangeStreamSplitLargeEvent::DocumentSourceChangeStreamSplitLargeE
             !_resumeAfterSplit || _resumeAfterSplit->fragmentNum);
 }
 
-Value DocumentSourceChangeStreamSplitLargeEvent::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceChangeStreamSplitLargeEvent::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{DocumentSourceChangeStreamSplitLargeEvent::kStageName, Document{}}});
 }
 

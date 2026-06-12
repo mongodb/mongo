@@ -86,7 +86,8 @@ public:
     }
 
     boost::intrusive_ptr<DocumentSource> optimize();
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
     GetModPathsReturn getModifiedPaths() const final;

@@ -101,7 +101,7 @@ public:
         return _pattern;
     }
 
-    BSONObj serializeForIDL(const SerializationOptions& options = {}) const {
+    BSONObj serializeForIDL(const query_shape::SerializationOptions& options = {}) const {
         BSONObjBuilder bob;
         for (const auto& e : _pattern) {
             bob.appendAs(e, options.serializeIdentifier(e.fieldNameStringData()));

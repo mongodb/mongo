@@ -104,7 +104,8 @@ boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
     return this;
 }
 
-Value ExpressionInternalIndexKey::serialize(const SerializationOptions& options) const {
+Value ExpressionInternalIndexKey::serialize(
+    const query_shape::SerializationOptions& options) const {
     tassert(11282949, "Missing doc field", _doc);
     tassert(11282948, "Missing spec field", _spec);
 

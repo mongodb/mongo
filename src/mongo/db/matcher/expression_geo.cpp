@@ -124,9 +124,8 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     _debugStringAttachTagInfo(&debug);
 }
 
-void GeoMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                       const SerializationOptions& opts,
-                                                       bool includePath) const {
+void GeoMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
         geoExpressionCustomSerialization(*bob, _rawObj, opts, includePath);
         return;
@@ -179,9 +178,8 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
     _debugStringAttachTagInfo(&debug);
 }
 
-void GeoNearMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                           const SerializationOptions& opts,
-                                                           bool includePath) const {
+void GeoNearMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
         geoNearExpressionCustomSerialization(*bob, _rawObj, opts, includePath);
         return;

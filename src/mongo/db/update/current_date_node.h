@@ -82,7 +82,7 @@ private:
         return "$currentDate";
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final;
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final;
 
     // If true, the current date should be expressed as a Date. If false, a Timestamp.
     bool _typeIsDate;

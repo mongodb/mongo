@@ -49,7 +49,7 @@ void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentation
 }
 
 void WhereMatchExpressionBase::serialize(BSONObjBuilder* out,
-                                         const SerializationOptions& opts,
+                                         const query_shape::SerializationOptions& opts,
                                          bool includePath) const {
     opts.appendLiteral(out, "$where", BSONCode(getCode()));
 }

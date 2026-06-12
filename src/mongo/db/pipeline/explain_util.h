@@ -46,7 +46,7 @@ namespace mongo {
  */
 std::vector<Value> mergeExplains(const Pipeline& p1,
                                  const exec::agg::Pipeline& p2,
-                                 const SerializationOptions& opts);
+                                 const query_shape::SerializationOptions& opts);
 
 /**
  * Utility to merge already generated explain outputs from two pipelines (QO and QE).

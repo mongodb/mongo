@@ -76,7 +76,7 @@ public:
     }
 
 private:
-    BSONObj value(const SerializationOptions& opts) const final {
+    BSONObj value(const query_shape::SerializationOptions& opts) const final {
         return BSON("" << _matchExpr->serialize(opts));
     }
 
@@ -113,11 +113,11 @@ public:
     }
 
 private:
-    BSONObj value(const SerializationOptions& opts) const final {
+    BSONObj value(const query_shape::SerializationOptions& opts) const final {
         // For query stats, set flag to serialize $not{$eq/$in/$exists} back to
         // $ne/$nin/{$exists:false} since top-level $not cannot be re-parsed.
         if (opts.isSerializingForQueryStats() && _matchExpr->matchType() == MatchExpression::NOT) {
-            SerializationOptions modifiedOpts = opts;
+            query_shape::SerializationOptions modifiedOpts = opts;
             modifiedOpts.serializeForUpdatePullModifier = true;
             return _matchExpr->serialize(modifiedOpts);
         }
@@ -149,7 +149,7 @@ public:
     }
 
 private:
-    BSONObj value(const SerializationOptions& opts) const final {
+    BSONObj value(const query_shape::SerializationOptions& opts) const final {
         return BSON("" << opts.serializeLiteral(_modExpr));
     }
 

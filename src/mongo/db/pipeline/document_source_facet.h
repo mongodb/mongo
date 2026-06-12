@@ -77,14 +77,15 @@ class DSFacetExecStatsWrapper {
 public:
     class StatsProvider {
     public:
-        virtual std::vector<Value> getStats(size_t facetId, const SerializationOptions& opts) = 0;
+        virtual std::vector<Value> getStats(size_t facetId,
+                                            const query_shape::SerializationOptions& opts) = 0;
         virtual ~StatsProvider() = default;
     };
 
     /**
      * Retrieves the execution statistics tracked by the pipeline given by 'facetId'.
      */
-    std::vector<Value> getExecStats(size_t facetId, const SerializationOptions& opts) {
+    std::vector<Value> getExecStats(size_t facetId, const query_shape::SerializationOptions& opts) {
         if (!_provider) {
             return {};
         }
@@ -215,7 +216,8 @@ private:
                         size_t bufferSizeBytes,
                         size_t maxOutputDocBytes);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     std::vector<FacetPipeline> _facets;
     std::shared_ptr<DSFacetExecStatsWrapper> _execStatsWrapper;

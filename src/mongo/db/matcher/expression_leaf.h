@@ -180,7 +180,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const override;
 
     bool equivalent(const MatchExpression* other) const override;
@@ -579,7 +579,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     void serializeToBSONTypeRegex(BSONObjBuilder* out) const;
@@ -659,7 +659,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;
@@ -720,7 +720,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;
@@ -751,7 +751,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;
@@ -914,7 +914,7 @@ private:
 
     // A helper to serialize to something like {$in: "?array<?number>"} or similar, depending on
     // 'opts' and whether we have a mixed-type $in or not.
-    void serializeToShape(BSONObjBuilder* bob, const SerializationOptions& opts) const;
+    void serializeToShape(BSONObjBuilder* bob, const query_shape::SerializationOptions& opts) const;
 
     // List of equalities (excluding regexes).
     std::shared_ptr<InListData> _equalities;
@@ -952,7 +952,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;

@@ -121,14 +121,14 @@ public:
      */
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const override;
+                       const query_shape::SerializationOptions& options) const override;
 
     /**
      * Helper that allows both the accumulator and expression $percentile to serialize their
      * corresponding instance variables.
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                const SerializationOptions& options,
+                                const query_shape::SerializationOptions& options,
                                 std::vector<double> percentiles,
                                 PercentileMethodEnum method,
                                 MutableDocument& md);
@@ -199,14 +199,14 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       const SerializationOptions& options) const override;
+                       const query_shape::SerializationOptions& options) const override;
 
     /**
      * Helper that allows both the accumulator and expression $median to serialize their
      * corresponding instance variables.
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                const SerializationOptions& options,
+                                const query_shape::SerializationOptions& options,
                                 std::vector<double> percentiles,
                                 PercentileMethodEnum method,
                                 MutableDocument& md);

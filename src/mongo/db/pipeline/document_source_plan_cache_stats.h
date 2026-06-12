@@ -152,7 +152,8 @@ public:
                                                  DocumentSourceContainer* container);
 
     void serializeToArray(std::vector<Value>& array,
-                          const SerializationOptions& opts = SerializationOptions{}) const final;
+                          const query_shape::SerializationOptions& opts =
+                              query_shape::SerializationOptions{}) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
@@ -163,7 +164,8 @@ private:
     DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  bool allHosts);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final {
         MONGO_UNREACHABLE_TASSERT(7484303);  // Should call serializeToArray instead.
     }
 

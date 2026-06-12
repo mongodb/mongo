@@ -92,7 +92,8 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
     boost::intrusive_ptr<DocumentSource> optimize();
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
@@ -234,8 +235,9 @@ protected:
     void initializeFromBson(BSONElement elem);
     virtual bool isSpecFieldReserved(StringData fieldName) = 0;
 
-    virtual void serializeAdditionalFields(
-        MutableDocument& out, const SerializationOptions& opts = SerializationOptions{}) const {};
+    virtual void serializeAdditionalFields(MutableDocument& out,
+                                           const query_shape::SerializationOptions& opts =
+                                               query_shape::SerializationOptions{}) const {};
 
     using RewriteGroupRequirements =
         std::tuple<AccumulatorDocumentsNeeded, std::string, boost::optional<SortPattern>>;

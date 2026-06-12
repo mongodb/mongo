@@ -267,7 +267,7 @@ public:
     }
 
     virtual Document getExplainOutput(
-        const SerializationOptions& opts = SerializationOptions{}) const;
+        const query_shape::SerializationOptions& opts = query_shape::SerializationOptions{}) const;
 
 protected:
     /**

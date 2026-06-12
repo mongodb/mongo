@@ -169,7 +169,7 @@ boost::intrusive_ptr<Expression> ExpressionMap::optimize() {
     return this;
 }
 
-Value ExpressionMap::serialize(const SerializationOptions& options) const {
+Value ExpressionMap::serialize(const query_shape::SerializationOptions& options) const {
     return Value(
         Document{{"$map",
                   Document{{"input", _children[_kInput]->serialize(options)},
@@ -327,7 +327,7 @@ boost::intrusive_ptr<Expression> ExpressionReduce::optimize() {
     return this;
 }
 
-Value ExpressionReduce::serialize(const SerializationOptions& options) const {
+Value ExpressionReduce::serialize(const query_shape::SerializationOptions& options) const {
     return Value(Document{
         {"$reduce",
          Document{
@@ -465,7 +465,7 @@ boost::intrusive_ptr<Expression> ExpressionFilter::optimize() {
     return this;
 }
 
-Value ExpressionFilter::serialize(const SerializationOptions& options) const {
+Value ExpressionFilter::serialize(const query_shape::SerializationOptions& options) const {
     return Value(
         Document{{"$filter",
                   Document{{"input", _children[_kInput]->serialize(options)},

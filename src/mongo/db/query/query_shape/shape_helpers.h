@@ -108,12 +108,12 @@ size_t containerSize(const Container& container) {
  * contains field names. It is possible that this hint doesn't actually represent an index, but we
  * can't detect that here.
  */
-BSONObj extractHintShape(const BSONObj& hintObj, const SerializationOptions& opts);
-BSONObj extractMinOrMaxShape(const BSONObj& obj, const SerializationOptions& opts);
+BSONObj extractHintShape(const BSONObj& hintObj, const query_shape::SerializationOptions& opts);
+BSONObj extractMinOrMaxShape(const BSONObj& obj, const query_shape::SerializationOptions& opts);
 
 void appendNamespaceShape(BSONObjBuilder& bob,
                           const NamespaceString& nss,
-                          const SerializationOptions& opts);
+                          const query_shape::SerializationOptions& opts);
 
 /**
  * Evaluates the 'deferredShape' and computes a QueryShapeHash if both the shape and the client

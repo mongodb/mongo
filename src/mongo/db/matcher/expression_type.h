@@ -97,7 +97,7 @@ public:
     }
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final {
         bob->appendArray(name(), _typeSet.toBSONArray());
     }
@@ -250,7 +250,7 @@ public:
     }
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final {
         if (opts.isKeepingLiteralsUnchanged()) {
             bob->append(name(), _binDataSubType);

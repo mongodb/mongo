@@ -163,7 +163,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(1).key->toBson(
-            opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+            opCtx, query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 
@@ -222,7 +222,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(0).key->toBson(
-            opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+            opCtx, query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
@@ -286,7 +286,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(0).key->toBson(
-            opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+            opCtx, query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
@@ -350,7 +350,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(0).key->toBson(
-            opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+            opCtx, query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestInsert) {
@@ -395,7 +395,8 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(kInsertOpIndex)
-            .key->toBson(opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+            .key->toBson(
+                opCtx, query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
@@ -575,7 +576,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(0).key->toBson(
-            opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+            opCtx, query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
@@ -608,7 +609,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     ASSERT_TRUE(opDebug.hasQueryStatsInfo(42));
     ASSERT_FALSE(opDebug.getQueryStatsInfo(42).key);
     ASSERT_FALSE(opDebug.getQueryStatsInfo(42).keyHash);
-}
+}  // dummy
 
 INSTANTIATE_TEST_SUITE_P(RegisterRequestSuite,
                          WriteCmdQueryStatsRegistrarRegisterRequestFixture,

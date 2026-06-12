@@ -2121,7 +2121,8 @@ Value parseAndSerializeAccumExpr(
     const BSONObj& obj,
     std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* expCtx, BSONElement, const VariablesParseState&)> func) {
-    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
     return expr->serialize(options);
@@ -2131,7 +2132,8 @@ Document parseAndSerializeAccum(
     const BSONElement elem,
     std::function<AccumulationExpression(
         ExpressionContext* const expCtx, BSONElement, VariablesParseState)> func) {
-    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -2144,7 +2146,8 @@ Document parseAndSerializeAccumRepresentative(
     const BSONElement elem,
     std::function<AccumulationExpression(
         ExpressionContext* const expCtx, BSONElement, VariablesParseState)> func) {
-    SerializationOptions options = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+    query_shape::SerializationOptions options =
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 

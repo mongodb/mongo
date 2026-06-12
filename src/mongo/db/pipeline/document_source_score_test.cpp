@@ -902,7 +902,8 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionMinMaxScalerNo
 void runQueryShapeDebugStringTest(boost::intrusive_ptr<ExpressionContextForTest> expCtx,
                                   const BSONObj& querySpec,
                                   const std::vector<std::string>& expectedDesugarOutputs) {
-    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(querySpec.firstElement(), expCtx);

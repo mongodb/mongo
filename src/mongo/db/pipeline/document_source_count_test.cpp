@@ -73,11 +73,11 @@ public:
         vector<Value> explainedStages;
         groupStage->serializeToArray(
             explainedStages,
-            SerializationOptions{
+            query_shape::SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         projectStage->serializeToArray(
             explainedStages,
-            SerializationOptions{
+            query_shape::SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)});
         ASSERT_EQUALS(explainedStages.size(), 2UL);
 

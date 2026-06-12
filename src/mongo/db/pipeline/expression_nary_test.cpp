@@ -246,7 +246,7 @@ TEST_F(ExpressionNaryTest, RedactsCorrectlyWithConstantArguments) {
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(10)));
     _notAssociativeNorCommutative->addOperand(ExpressionConstant::create(&expCtx, Value(15)));
 
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
 
     // The default shape should wrap the constants in $const.
     ASSERT_BSONOBJ_EQ(
@@ -255,7 +255,7 @@ TEST_F(ExpressionNaryTest, RedactsCorrectlyWithConstantArguments) {
         BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
 
     // The representative shape should be an array of raw constants (i.e. not wrapped in $const).
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
     ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(1 << 1 << 1))),
                       BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
 }
@@ -267,7 +267,7 @@ TEST_F(ExpressionNaryTest, RedactsCorrectlyWithMixedArguments) {
         Expression::parseExpression(&expCtx, BSON("$sum" << BSON_ARRAY(1 << 2)), vps));
     _notAssociativeNorCommutative->addOperand(ExpressionFieldPath::parse(&expCtx, "$b", vps));
 
-    SerializationOptions opts;
+    query_shape::SerializationOptions opts;
 
     // The default shape should wrap the constants in $const.
     ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(
@@ -278,7 +278,7 @@ TEST_F(ExpressionNaryTest, RedactsCorrectlyWithMixedArguments) {
                       BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));
 
     // The representative shape should not wrap the constant in $const.
-    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue;
     ASSERT_BSONOBJ_EQ(BSON("foo" << BSON("$testable" << BSON_ARRAY(
                                              1 << BSON("$sum" << BSON_ARRAY(1 << 1)) << "$b"))),
                       BSON("foo" << _notAssociativeNorCommutative->serialize(opts)));

@@ -113,9 +113,8 @@ void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int indent
     _debugStringAttachTagInfo(&debug);
 }
 
-void ComparisonMatchExpressionBase::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                                  const SerializationOptions& opts,
-                                                                  bool includePath) const {
+void ComparisonMatchExpressionBase::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     opts.appendLiteral(bob, name(), _rhs);
 }
 
@@ -212,9 +211,8 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
     _debugStringAttachTagInfo(&debug);
 }
 
-void RegexMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                         const SerializationOptions& opts,
-                                                         bool includePath) const {
+void RegexMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     // We need to be careful to generate a valid regex representative value, and the default string
     // "?" is not valid.
     opts.appendLiteral(bob, "$regex", _regex, Value("\\?"_sd));
@@ -253,9 +251,8 @@ void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     _debugStringAttachTagInfo(&debug);
 }
 
-void ModMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                       const SerializationOptions& opts,
-                                                       bool includePath) const {
+void ModMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     bob->append("$mod",
                 BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
@@ -282,9 +279,8 @@ void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLev
     _debugStringAttachTagInfo(&debug);
 }
 
-void ExistsMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                          const SerializationOptions& opts,
-                                                          bool includePath) const {
+void ExistsMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     opts.appendLiteral(bob, "$exists", true);
 }
 
@@ -347,7 +343,7 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
 }
 
 void InMatchExpression::serializeToShape(BSONObjBuilder* bob,
-                                         const SerializationOptions& opts) const {
+                                         const query_shape::SerializationOptions& opts) const {
     auto firstElementOfEachType =
         _equalities->getFirstOfEachType(opts.inMatchExprSortAndDedupElements);
 
@@ -365,7 +361,7 @@ void InMatchExpression::serializeToShape(BSONObjBuilder* bob,
 }
 
 void InMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                      const SerializationOptions& opts,
+                                                      const query_shape::SerializationOptions& opts,
                                                       bool includePath) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
         serializeToShape(bob, opts);
@@ -533,9 +529,8 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLe
     _debugStringAttachTagInfo(&debug);
 }
 
-void BitTestMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                           const SerializationOptions& opts,
-                                                           bool includePath) const {
+void BitTestMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     std::string opString = "";
 
     switch (matchType()) {

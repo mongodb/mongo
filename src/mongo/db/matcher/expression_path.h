@@ -206,7 +206,7 @@ public:
     }
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const override {
         if (includePath) {
             auto maybeDollarPath = path();
@@ -242,10 +242,10 @@ public:
      * to another expression, if that is possible syntactically.
      */
     virtual void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                               const SerializationOptions& opts = {},
+                                               const query_shape::SerializationOptions& opts = {},
                                                bool includePath = true) const = 0;
 
-    BSONObj getSerializedRightHandSide(const SerializationOptions& opts = {},
+    BSONObj getSerializedRightHandSide(const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const {
         BSONObjBuilder bob;
         appendSerializedRightHandSide(&bob, opts, includePath);

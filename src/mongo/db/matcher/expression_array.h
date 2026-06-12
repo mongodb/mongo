@@ -95,7 +95,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
@@ -161,7 +161,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
@@ -234,7 +234,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const override;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts = {},
+                                       const query_shape::SerializationOptions& opts = {},
                                        bool includePath = true) const final;
 
     bool equivalent(const MatchExpression* other) const override;

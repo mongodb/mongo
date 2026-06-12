@@ -88,7 +88,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     return new DocumentSourceListSessions(query, pExpCtx, spec.getAllUsers(), spec.getUsers());
 }
 
-Value DocumentSourceListSessions::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceListSessions::serialize(const query_shape::SerializationOptions& opts) const {
     ListSessionsSpec spec;
     spec.setAllUsers(_allUsers);
     spec.setUsers(_users);

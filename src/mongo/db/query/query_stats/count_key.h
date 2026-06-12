@@ -72,8 +72,8 @@ public:
     }
 
 private:
-    void appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                         const SerializationOptions& opts) const final {}
+    void appendCommandSpecificComponents(
+        BSONObjBuilder& bob, const query_shape::SerializationOptions& opts) const final {}
 
     const EmptyCmdComponents _components{};
 };

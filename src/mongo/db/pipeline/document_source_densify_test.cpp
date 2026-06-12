@@ -1765,13 +1765,14 @@ TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationRepresentative) {
                 }
             }
         })"),
-        SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 }
 
 TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationDebug) {
-    assertRangeTimeUnitSerialization(getExpCtx(),
-                                     fromjson(
-                                         R"({
+    assertRangeTimeUnitSerialization(
+        getExpCtx(),
+        fromjson(
+            R"({
             $densify: {
                 field: "x",
                 partitionByFields: ["foo"],
@@ -1782,8 +1783,8 @@ TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationDebug) {
                 }
             }
         })"),
-                                     fromjson(
-                                         R"({
+        fromjson(
+            R"({
             $_internalDensify: {
                 field: "x",
                 partitionByFields: ["foo"],
@@ -1794,7 +1795,7 @@ TEST_F(DensifyRedactionTest, RangeTimeUnitSerializationDebug) {
                 }
             }
         })"),
-                                     SerializationOptions::kDebugQueryShapeSerializeOptions);
+        query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
 
 TEST_F(DensifyMonthStepTest, CorrectlyDensifiesForDateExplicitRangeStartingInsideMonthStep) {

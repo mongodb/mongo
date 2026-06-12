@@ -64,7 +64,8 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(setVariableFromSubPipeline,
 ALLOCATE_DOCUMENT_SOURCE_ID(setVariableFromSubPipeline,
                             DocumentSourceSetVariableFromSubPipeline::id)
 
-Value DocumentSourceSetVariableFromSubPipeline::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceSetVariableFromSubPipeline::serialize(
+    const query_shape::SerializationOptions& opts) const {
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);
     SetVariableFromSubPipelineSpec spec;
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);

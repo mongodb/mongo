@@ -103,7 +103,8 @@ public:
         auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
         FindKey findKey(
             expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
-        SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+        query_shape::SerializationOptions opts =
+            query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
         if (!applyHmac) {
             opts.transformIdentifiers = false;
             opts.transformIdentifiersCallback = opts.defaultHmacStrategy;
@@ -115,15 +116,15 @@ public:
     BSONObj makeQueryStatsKeyAggregateRequest(AggregateCommandRequest acr,
                                               const Pipeline& pipeline,
                                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              LiteralSerializationPolicy literalPolicy,
+                                              query_shape::LiteralSerializationPolicy literalPolicy,
                                               bool applyHmac = false) {
         auto aggShape = std::make_unique<query_shape::AggCmdShape>(
             acr, acr.getNamespace(), pipeline.getInvolvedCollections(), pipeline, expCtx);
         auto aggKey = std::make_unique<AggKey>(
             expCtx, acr, std::move(aggShape), pipeline.getInvolvedCollections(), collectionType);
 
-        // SerializationOptions opts{.literalPolicy = literalPolicy};
-        SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+        query_shape::SerializationOptions opts =
+            query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
         opts.literalPolicy = literalPolicy;
         if (!applyHmac) {
             opts.transformIdentifiers = false;
@@ -940,7 +941,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
     auto shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, query_shape::LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1002,7 +1003,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setHint(BSON("z" << 1 << "c" << 1));
     acr.setCollation(BSON("locale" << "simple"));
     shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, query_shape::LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1071,7 +1072,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setLet(BSON("var1" << BSON("$literal" << "$foo") << "var2"
                            << "bar"));
     shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, query_shape::LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1148,7 +1149,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setBypassDocumentValidation(true);
     expCtx->getOperationContext()->setComment(BSON("comment" << "note to self"));
     shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, query_shape::LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1225,7 +1226,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
 
     // Test again but with the representative query shape.
     shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
+        acr,
+        *pipeline,
+        expCtx,
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue,
+        true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1317,7 +1322,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
         std::vector<BSONObj>{}, expCtx, pipeline_factory::kOptionsMinimal);
 
     auto shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, query_shape::LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1334,7 +1339,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
 
     // Test again with the representative query shape.
     shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
+        acr,
+        *pipeline,
+        expCtx,
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue,
+        true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1371,7 +1380,7 @@ TEST_F(QueryStatsStoreTest,
         pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
     auto shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, query_shape::LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1414,7 +1423,11 @@ TEST_F(QueryStatsStoreTest,
 
     // Do the same thing with the representative query shape.
     shapified = makeQueryStatsKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
+        acr,
+        *pipeline,
+        expCtx,
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue,
+        true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {

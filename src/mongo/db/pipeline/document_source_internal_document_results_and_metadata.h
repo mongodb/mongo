@@ -120,7 +120,8 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);

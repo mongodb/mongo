@@ -230,7 +230,7 @@ StageConstraints DocumentSourceInternalDocumentResultsAndMetadata::constraints(
 }
 
 Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
-    const SerializationOptions& opts) const {
+    const query_shape::SerializationOptions& opts) const {
     DocumentSourceResultsAndMetadataSpec spec;
     spec.setSource(_sourceStage->serialize(opts).getDocument().toBson());
     spec.setMetadata(_metadata);

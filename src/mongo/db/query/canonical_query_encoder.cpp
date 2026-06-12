@@ -1110,7 +1110,7 @@ private:
      */
     void encodeRhs(const PathMatchExpression* expr) {
         // Call getSerializedRightHandSide() with 'inMatchExprSortAndDedupElements' set to false.
-        SerializationOptions opts;
+        query_shape::SerializationOptions opts;
         opts.inMatchExprSortAndDedupElements = false;
 
         encodeHelper(expr->getSerializedRightHandSide(opts));

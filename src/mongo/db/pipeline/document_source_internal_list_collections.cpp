@@ -118,7 +118,7 @@ StringData DocumentSourceInternalListCollections::getSourceName() const {
 }
 
 void DocumentSourceInternalListCollections::serializeToArray(
-    std::vector<Value>& array, const SerializationOptions& opts) const {
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
     auto explain = opts.verbosity;
     if (explain) {
         BSONObjBuilder bob;

@@ -174,8 +174,10 @@ RepresentativeQueryInfo createRepresentativeInfoFind(OperationContext* opCtx,
     const auto serializationContext =
         parsedFindCommand->findCommandRequest->getSerializationContext();
     FindCmdShape findCmdShape{*parsedFindCommand, expCtx};
-    auto serializedQueryShape = findCmdShape.toBson(
-        opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, serializationContext);
+    auto serializedQueryShape =
+        findCmdShape.toBson(opCtx,
+                            query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
+                            serializationContext);
 
     return RepresentativeQueryInfo{
         .serializedQueryShape = serializedQueryShape,
@@ -222,7 +224,7 @@ RepresentativeQueryInfo createRepresentativeInfoDistinct(
         parsedDistinctCommand->distinctCommandRequest->getSerializationContext();
     auto serializedQueryShape =
         distinctCmdShape.toBson(expCtx->getOperationContext(),
-                                SerializationOptions::kDebugQueryShapeSerializeOptions,
+                                query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                                 serializationContext);
 
     return RepresentativeQueryInfo{
@@ -274,7 +276,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     AggCmdShape aggCmdShape{aggregateCommandRequest, nss, involvedNamespaces, *pipeline, expCtx};
     auto serializedQueryShape =
         aggCmdShape.toBson(expCtx->getOperationContext(),
-                           SerializationOptions::kDebugQueryShapeSerializeOptions,
+                           query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
                            serializationContext);
 
     // For aggregate queries, the check for IDHACK should not be taken into account due to the

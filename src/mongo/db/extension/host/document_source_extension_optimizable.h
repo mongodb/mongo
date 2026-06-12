@@ -466,7 +466,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}
 
-    Value serialize(const SerializationOptions& opts) const override;
+    Value serialize(const query_shape::SerializationOptions& opts) const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override;
 

@@ -38,7 +38,7 @@ CountCmdShapeComponents::CountCmdShapeComponents(const ParsedFindCommand& reques
                                                  const bool hasSkip)
     : hasField({.limit = hasLimit, .skip = hasSkip}),
       representativeQuery(request.filter->serialize(
-          SerializationOptions::kRepresentativeQueryShapeSerializeOptions)) {}
+          query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions)) {}
 
 void CountCmdShapeComponents::HashValue(absl::HashState state) const {
     absl::HashState::combine(
@@ -57,9 +57,10 @@ const CmdSpecificShapeComponents& CountCmdShape::specificComponents() const {
     return components;
 }
 
-void CountCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                     OperationContext* opCtx,
-                                                     const SerializationOptions& opts) const {
+void CountCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     tassert(9065200,
             "Serialization policy not supported - original values have been discarded",
             !opts.isKeepingLiteralsUnchanged());
@@ -70,7 +71,7 @@ void CountCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     // Query.
     // Query field is optional and thus can be empty.
     if (!components.representativeQuery.isEmpty()) {
-        if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+        if (opts == query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
             // Fast path. Already serialized using the same serialization options.
             bob.append(CountCommandRequest::kQueryFieldName, components.representativeQuery);
         } else {

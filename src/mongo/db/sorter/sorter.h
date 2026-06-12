@@ -744,7 +744,7 @@ public:
     virtual std::pair<Key, Value> next() = 0;
 
     // Serialize the bound for explain output
-    virtual Document serializeBound(const SerializationOptions& opts) const = 0;
+    virtual Document serializeBound(const query_shape::SerializationOptions& opts) const = 0;
 
     virtual size_t limit() const = 0;
 
@@ -817,7 +817,7 @@ public:
     std::pair<Key, Value> next() override;
 
     // Serialize the bound for explain output
-    Document serializeBound(const SerializationOptions& opts) const override {
+    Document serializeBound(const query_shape::SerializationOptions& opts) const override {
         return {makeBound.serialize(opts)};
     };
 

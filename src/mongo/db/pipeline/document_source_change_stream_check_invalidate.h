@@ -101,7 +101,8 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value doSerialize(const query_shape::SerializationOptions& opts =
+                          query_shape::SerializationOptions{}) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

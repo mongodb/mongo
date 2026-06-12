@@ -150,7 +150,7 @@ GetNextResult ExtensionStage::doGetNext() {
     }
 }
 
-Document ExtensionStage::getExplainOutput(const SerializationOptions& opts) const {
+Document ExtensionStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
     MutableDocument output(Stage::getExplainOutput(opts));
 
     std::unique_ptr<extension::host::QueryExecutionContext> wrappedCtx =

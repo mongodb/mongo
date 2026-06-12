@@ -84,7 +84,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
@@ -125,7 +125,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithToSubDocument) {
                     format: {$const: 'uuid'}
                 }
             })")),
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 
     ASSERT_VALUE_EQ(
@@ -137,17 +137,19 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithToSubDocument) {
                     format: {$const: "?"}
                 }
             })")),
-        convertExp->serialize(SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
+        convertExp->serialize(
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
 
-    ASSERT_VALUE_EQ(Value(fromjson(  // NOLINT
-                        R"({
+    ASSERT_VALUE_EQ(
+        Value(fromjson(  // NOLINT
+            R"({
                             $convert: {
                                 input: '$path1', 
                                 to: "?object",
                                 format: "?string"
                             }
                         })")),
-                    convertExp->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions));
+        convertExp->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
@@ -165,7 +167,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
@@ -184,7 +186,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
@@ -203,7 +205,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithBase) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, base: {$const: 8}}}")),
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 
     spec = BSON("$convert" << BSON("input" << "$path1"
@@ -218,7 +220,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithBase) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, base: '$path2'}}")),
-        convertExp->serialize(SerializationOptions{
+        convertExp->serialize(query_shape::SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
@@ -260,7 +262,8 @@ TEST_F(ExpressionConvertTest, RoundTripSerialization) {
                          << "string"));
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     auto serialized = convertExp->serialize(opts);
     ASSERT_VALUE_EQ(Value(BSON("$convert" << BSON("input" << BSON("$const" << BSON("?" << "?"))
                                                           << "to" << BSON("$const" << "string")))),

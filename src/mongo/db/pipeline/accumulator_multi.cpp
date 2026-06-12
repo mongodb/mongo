@@ -172,7 +172,7 @@ const char* AccumulatorMinMaxN::getOpName() const {
 
 Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initializer,
                                        boost::intrusive_ptr<Expression> argument,
-                                       const SerializationOptions& options) const {
+                                       const query_shape::SerializationOptions& options) const {
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
@@ -214,7 +214,7 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
 
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                    const boost::intrusive_ptr<Expression>& argument,
-                                   const SerializationOptions& options,
+                                   const query_shape::SerializationOptions& options,
                                    MutableDocument& md) {
     md.addField(kFieldNameN, Value(initializer->serialize(options)));
     md.addField(kFieldNameInput, Value(argument->serialize(options)));
@@ -367,7 +367,7 @@ const char* AccumulatorFirstLastN::getOpName() const {
 
 Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          const SerializationOptions& options) const {
+                                          const query_shape::SerializationOptions& options) const {
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
@@ -517,7 +517,7 @@ template <TopBottomSense sense, bool single>
 Document AccumulatorTopBottomN<sense, single>::serialize(
     boost::intrusive_ptr<Expression> initializer,
     boost::intrusive_ptr<Expression> argument,
-    const SerializationOptions& options) const {
+    const query_shape::SerializationOptions& options) const {
     MutableDocument args;
 
     if constexpr (!single) {

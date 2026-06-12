@@ -70,7 +70,7 @@ public:
                    Variables* variables,
                    const EvaluationContext& ctx) const final;
 
-    Value serialize(const SerializationOptions& options) const final;
+    Value serialize(const query_shape::SerializationOptions& options) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);

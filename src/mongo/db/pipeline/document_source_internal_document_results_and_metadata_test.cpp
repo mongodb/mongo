@@ -141,14 +141,14 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, RejectsMissingSourc
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, SerializesFullSpec) {
     auto* stage = parse(BSON(kStageName << kFullSpec));
 
-    auto serialized = stage->serialize(SerializationOptions{});
+    auto serialized = stage->serialize(query_shape::SerializationOptions{});
     ASSERT_BSONOBJ_EQ(serialized.getDocument().toBson(), BSON(kStageName << kFullSpec));
 }
 
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, SerializesWithoutMetadata) {
     auto* stage = parse(BSON(kStageName << kSourceOnly));
 
-    auto serialized = stage->serialize(SerializationOptions{});
+    auto serialized = stage->serialize(query_shape::SerializationOptions{});
     ASSERT_BSONOBJ_EQ(serialized.getDocument().toBson(), BSON(kStageName << kSourceOnly));
 }
 
@@ -156,7 +156,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
        SerializeIncludesReturnCursorWhenFalse) {
     auto* stage = parse(BSON(kStageName << kSourceWithMeta));
 
-    auto serialized = stage->serialize(SerializationOptions{});
+    auto serialized = stage->serialize(query_shape::SerializationOptions{});
     auto bson = serialized.getDocument().toBson();
     auto inner = bson.getObjectField(kStageName);
     ASSERT_FALSE(inner["returnCursor"].Bool());
@@ -165,7 +165,8 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, SerializesWithIdentifierTransform) {
     auto* stage = parse(BSON(kStageName << kSourceWithMeta));
 
-    auto serialized = stage->serialize(SerializationOptions::kMarkIdentifiers_FOR_TEST);
+    auto serialized =
+        stage->serialize(query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST);
     auto bson = serialized.getDocument().toBson();
     auto inner = bson.getObjectField(kStageName);
 
@@ -303,7 +304,7 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     pipeline.push_back(downstreamStage);
     ds->optimizeAt(pipeline.begin(), &pipeline);
 
-    auto serialized = ds->serialize(SerializationOptions{});
+    auto serialized = ds->serialize(query_shape::SerializationOptions{});
     auto bson = serialized.getDocument().toBson();
     auto inner = bson.getObjectField(kStageName);
     ASSERT_FALSE(inner.hasField("metadata"));

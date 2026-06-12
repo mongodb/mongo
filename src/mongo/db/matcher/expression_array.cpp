@@ -77,11 +77,10 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                                   const SerializationOptions& opts,
-                                                                   bool includePath) const {
+void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
-    SerializationOptions options = opts;
+    query_shape::SerializationOptions options = opts;
     _sub->serialize(&elemMatchBob, options, true);
     elemMatchBob.doneFast();
 }
@@ -114,11 +113,10 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     }
 }
 
-void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                                  const SerializationOptions& opts,
-                                                                  bool includePath) const {
+void ElemMatchValueMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
-    SerializationOptions options = opts;
+    query_shape::SerializationOptions options = opts;
     for (auto&& child : _subs) {
         child->serialize(&emBob, options, false);
     }
@@ -139,9 +137,8 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
     _debugStringAttachTagInfo(&debug);
 }
 
-void SizeMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                        const SerializationOptions& opts,
-                                                        bool includePath) const {
+void SizeMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const query_shape::SerializationOptions& opts, bool includePath) const {
     opts.appendLiteral(bob, "$size", _size);
 }
 

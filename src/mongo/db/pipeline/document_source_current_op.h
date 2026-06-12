@@ -199,7 +199,8 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

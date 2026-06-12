@@ -55,7 +55,8 @@ TEST(ExpressionTypeTest, Equivalent) {
 
 TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
     TypeMatchExpression type(""_sd, BSONType::string);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$type":[2]})",
         type.getSerializedRightHandSide(opts));
@@ -73,7 +74,8 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
 
 TEST(ExpressionBinDataSubTypeTest, RedactsCorrectly) {
     InternalSchemaBinDataSubTypeExpression e("b"_sd, BinDataType::newUUID);
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaBinDataSubType":"?number"})",
         e.getSerializedRightHandSide(opts));

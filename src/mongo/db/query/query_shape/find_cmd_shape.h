@@ -47,16 +47,17 @@ namespace mongo::query_shape {
  */
 struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
 
-    FindCmdShapeComponents(const ParsedFindCommand& request,
-                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           const SerializationOptions& opts =
-                               SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    FindCmdShapeComponents(
+        const ParsedFindCommand& request,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const query_shape::SerializationOptions& opts =
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     /**
-     * Appends using the SerializationOptions given in the constructor.
+     * Appends using the query_shape::SerializationOptions given in the constructor.
      */
     void appendTo(BSONObjBuilder&,
-                  const SerializationOptions&,
+                  const query_shape::SerializationOptions&,
                   const boost::intrusive_ptr<ExpressionContext>&) const;
 
     size_t size() const final {
@@ -94,7 +95,7 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
     // like limit and skip - either a 1 or "?number". We could have the caller pass the options
     // again during 'appendTo()', but this introduces a risk that the options provided are different
     // than the ones we used to compute 'filter' and the other components.
-    SerializationOptions serializationOpts;
+    query_shape::SerializationOptions serializationOpts;
 
     void HashValue(absl::HashState state) const final;
 
@@ -124,7 +125,7 @@ public:
 protected:
     void appendCmdSpecificShapeComponents(BSONObjBuilder&,
                                           OperationContext*,
-                                          const SerializationOptions&) const final;
+                                          const query_shape::SerializationOptions&) const final;
 
 private:
     FindCmdShapeComponents _components;

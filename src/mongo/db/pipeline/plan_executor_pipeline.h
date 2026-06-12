@@ -196,7 +196,7 @@ public:
      * providing the level of detail specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
-        auto opts = SerializationOptions{.verbosity = verbosity};
+        auto opts = query_shape::SerializationOptions{.verbosity = verbosity};
         return (verbosity >= ExplainOptions::Verbosity::kExecStats)
             ? mergeExplains(*_pipeline, *_execPipeline, opts)
             : _pipeline->writeExplainOps(opts);

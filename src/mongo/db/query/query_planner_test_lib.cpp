@@ -1448,7 +1448,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONObjBuilder bob;
         actualGroupNode->groupByExpression
-            ->serialize(SerializationOptions{
+            ->serialize(query_shape::SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
             .addToBsonObj(&bob, "_id");
         auto actualGroupByObj = bob.done();
@@ -1464,7 +1464,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         for (auto& acc : actualGroupNode->accumulators) {
             BSONObjBuilder bob;
             acc.expr.argument
-                ->serialize(SerializationOptions{
+                ->serialize(query_shape::SerializationOptions{
                     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
                 .addToBsonObj(&bob, acc.expr.name);
             actualAccs.append(BSON(acc.fieldName << bob.done()));

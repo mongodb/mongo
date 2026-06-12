@@ -165,7 +165,8 @@ TEST_F(FindKeyTest, OriginalQueryShapeHashAppearsInKey) {
 
     const auto keyBson = key->toBson(
         expCtx->getOperationContext(),
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        query_shape::SerializationOptions(
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
         {});
     ASSERT_EQ(keyBson["originalQueryShapeHash"].str(),
               "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
@@ -175,7 +176,8 @@ TEST_F(FindKeyTest, OriginalQueryShapeHashAbsentWhenNotSet) {
     const auto key = makeFindKeyFromQuery(BSON("x" << 1));
     const auto keyBson = key->toBson(
         make_intrusive<ExpressionContextForTest>()->getOperationContext(),
-        SerializationOptions(SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
+        query_shape::SerializationOptions(
+            query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions),
         {});
     ASSERT_TRUE(keyBson["originalQueryShapeHash"].eoo());
 }

@@ -150,7 +150,7 @@ void ListOfMatchExpression::_debugList(StringBuilder& debug, int indentationLeve
 }
 
 void ListOfMatchExpression::_listToBSON(BSONArrayBuilder* out,
-                                        const SerializationOptions& opts,
+                                        const query_shape::SerializationOptions& opts,
                                         bool includePath) const {
     for (unsigned i = 0; i < _expressions.size(); i++) {
         BSONObjBuilder childBob(out->subobjStart());
@@ -185,7 +185,7 @@ void AndMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 }
 
 void AndMatchExpression::serialize(BSONObjBuilder* out,
-                                   const SerializationOptions& opts,
+                                   const query_shape::SerializationOptions& opts,
                                    bool includePath) const {
     if (!numChildren()) {
         // It is possible for an AndMatchExpression to have no children, resulting in the serialized
@@ -212,7 +212,7 @@ void OrMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
 }
 
 void OrMatchExpression::serialize(BSONObjBuilder* out,
-                                  const SerializationOptions& opts,
+                                  const query_shape::SerializationOptions& opts,
                                   bool includePath) const {
     if (!numChildren()) {
         // It is possible for an OrMatchExpression to have no children, resulting in the serialized
@@ -239,7 +239,7 @@ void NorMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 }
 
 void NorMatchExpression::serialize(BSONObjBuilder* out,
-                                   const SerializationOptions& opts,
+                                   const query_shape::SerializationOptions& opts,
                                    bool includePath) const {
     BSONArrayBuilder arrBob(out->subarrayStart("$nor"));
     _listToBSON(&arrBob, opts, includePath);
@@ -256,7 +256,7 @@ void NotMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 
 void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp,
                                                      BSONObjBuilder* out,
-                                                     const SerializationOptions& opts,
+                                                     const query_shape::SerializationOptions& opts,
                                                      bool includePath) {
     BSONObjBuilder childBob;
     exp->serialize(&childBob, opts, includePath);
@@ -268,7 +268,7 @@ void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp,
 }
 
 void NotMatchExpression::serialize(BSONObjBuilder* out,
-                                   const SerializationOptions& opts,
+                                   const query_shape::SerializationOptions& opts,
                                    bool includePath) const {
     if (_exp->matchType() == MatchType::AND && _exp->numChildren() == 0) {
         opts.appendLiteral(out, "$alwaysFalse", 1);

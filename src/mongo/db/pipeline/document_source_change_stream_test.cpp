@@ -3865,7 +3865,7 @@ TEST_F(ChangeStreamStageTest, DSCSInjectControlEventsStageSerialization) {
         auto stage = DocumentSourceChangeStreamInjectControlEvents::createFromBson(
             stageSpecAsBSON.firstElement(), getExpCtx());
         std::vector<Value> serialization;
-        SerializationOptions options;
+        query_shape::SerializationOptions options;
         options.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
         stage->serializeToArray(serialization, options);
 
@@ -6477,8 +6477,8 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPostImageEmpty
         R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6495,8 +6495,8 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamAddPreImageEmptyF
         docSource.serialize().getDocument().toBson());
 
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource.serialize(opts).missing());
 }
 
@@ -6521,8 +6521,8 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamCheckInvalidateEm
         })",
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6547,8 +6547,8 @@ TEST_F(ChangeStreamStageTestNoSetup,
         })",
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6560,8 +6560,8 @@ TEST_F(ChangeStreamStageTestNoSetup,
         R"({"$_internalChangeStreamCheckTopologyChange":{}})",
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6586,8 +6586,8 @@ TEST_F(ChangeStreamStageTestNoSetup,
         })",
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6599,8 +6599,8 @@ TEST_F(ChangeStreamStageTestNoSetup,
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
         docSource->serialize().getDocument().toBson());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6667,8 +6667,9 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) 
             }
         })",
         docSource
-            ->serialize(SerializationOptions{
-                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            ->serialize(query_shape::SerializationOptions{
+                .literalPolicy =
+                    query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue})
             .getDocument()
             .toBson());
 }
@@ -6724,8 +6725,9 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransformMo
                 }
             })",
         docSource
-            ->serialize(SerializationOptions{
-                .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue})
+            ->serialize(query_shape::SerializationOptions{
+                .literalPolicy =
+                    query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue})
             .getDocument()
             .toBson());
 }
@@ -6778,8 +6780,8 @@ TEST_F(ChangeStreamStageTestNoSetup,
        DocumentSourceChangeStreamUnwindTransactionEmptyForQueryStats) {
     auto docSource = DocumentSourceChangeStreamUnwindTransaction::create(getExpCtx());
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 
@@ -6793,8 +6795,8 @@ TEST_F(ChangeStreamStageTestNoSetup, DocumentSourceChangeStreamOplogMatchEmptyFo
 
     auto docSource = DocumentSourceChangeStreamOplogMatch::create(getExpCtx(), spec);
 
-    auto opts = SerializationOptions{
-        .literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        .literalPolicy = query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     ASSERT(docSource->serialize(opts).missing());
 }
 

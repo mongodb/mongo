@@ -111,7 +111,8 @@ DocumentSourceContainer::iterator DocumentSourceListMqlEntities::optimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceListMqlEntities::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceListMqlEntities::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(DOC(kStageName << DOC(kEntityTypeFieldName << idl::serialize(_type))));
 }
 

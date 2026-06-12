@@ -82,7 +82,7 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
 }
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
-                                           const SerializationOptions& options,
+                                           const query_shape::SerializationOptions& options,
                                            const SerializationContext& context) {
     return options.serializeIdentifier(serialize(ns, context));
 }

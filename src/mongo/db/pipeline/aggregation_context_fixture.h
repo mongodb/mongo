@@ -107,10 +107,10 @@ public:
     BSONObj redact(const DocumentSource& docSource,
                    bool performRedaction = true,
                    boost::optional<ExplainOptions::Verbosity> verbosity = boost::none) {
-        SerializationOptions options;
+        query_shape::SerializationOptions options;
         options.verbosity = verbosity;
         if (performRedaction) {
-            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            options.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
             options.transformIdentifiersCallback = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };
@@ -124,9 +124,9 @@ public:
 
     std::vector<Value> redactToArray(const DocumentSource& docSource,
                                      bool performRedaction = true) {
-        SerializationOptions options;
+        query_shape::SerializationOptions options;
         if (performRedaction) {
-            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            options.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
             options.transformIdentifiersCallback = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };

@@ -71,7 +71,7 @@ protected:
 const long long kDefaultMaxCacheSize =
     loadMemoryLimit(StageMemoryLimit::DocumentSourceLookupCacheSizeBytes);
 
-const auto kExplain = SerializationOptions{
+const auto kExplain = query_shape::SerializationOptions{
     .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 

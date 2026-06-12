@@ -94,7 +94,7 @@ private:
         return "$push";
     }
 
-    BSONObj operatorValue(const SerializationOptions& opts) const final;
+    BSONObj operatorValue(const query_shape::SerializationOptions& opts) const final;
 
     // A helper for performPush().
     static ModifyResult insertElementsWithPosition(mutablebson::Element* array,

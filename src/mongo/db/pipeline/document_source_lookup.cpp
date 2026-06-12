@@ -978,7 +978,7 @@ void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
 }
 
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
-                                            const SerializationOptions& opts) const {
+                                            const query_shape::SerializationOptions& opts) const {
     // When serializing for a remote dispatch, fully resolve the foreign namespace. `inRouter`
     // covers cases where the router is serializing to a shard, and `isSerializingForRemoteDispatch`
     // covers cases where a shard is serializing to another shard.
@@ -1432,7 +1432,7 @@ void DocumentSourceLookUp::rebuildResolvedPipeline() {
     // We must serialize the resolved introspection pipeline with the "serializeForFLE2" option to
     // ensure that any nested DocumentSourceLookUp stages serialize their
     // _sharedState->resolvedPipeline.
-    SerializationOptions opts{.serializeForFLE2 = true};
+    query_shape::SerializationOptions opts{.serializeForFLE2 = true};
     _sharedState->resolvedPipeline =
         _sharedState->resolvedIntrospectionPipeline->serializeToBson(opts);
 

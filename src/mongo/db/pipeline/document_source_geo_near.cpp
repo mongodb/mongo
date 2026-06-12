@@ -87,7 +87,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(geoNear,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(geoNear, DocumentSourceGeoNear::id)
 
-Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceGeoNear::serialize(const query_shape::SerializationOptions& opts) const {
     MutableDocument result;
 
     if (keyFieldPath) {

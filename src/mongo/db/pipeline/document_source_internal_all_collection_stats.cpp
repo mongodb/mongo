@@ -120,7 +120,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalAllCollectionStats::opti
 }
 
 void DocumentSourceInternalAllCollectionStats::serializeToArray(
-    std::vector<Value>& array, const SerializationOptions& opts) const {
+    std::vector<Value>& array, const query_shape::SerializationOptions& opts) const {
     auto explain = opts.verbosity;
     if (explain) {
         BSONObjBuilder bob;
@@ -160,7 +160,8 @@ StringData DocumentSourceInternalAllCollectionStats::getSourceName() const {
     return kStageName;
 }
 
-Value DocumentSourceInternalAllCollectionStats::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceInternalAllCollectionStats::serialize(
+    const query_shape::SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _internalAllCollectionStatsSpec.toBSON(opts)}});
 }
 }  // namespace mongo

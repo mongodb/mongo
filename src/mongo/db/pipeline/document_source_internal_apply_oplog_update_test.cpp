@@ -269,8 +269,9 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, SerializesRepresentativeValue
 
     // Serialize with representative query shape options.
     std::vector<Value> serialization;
-    docSource->serializeToArray(serialization,
-                                SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    docSource->serializeToArray(
+        serialization,
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

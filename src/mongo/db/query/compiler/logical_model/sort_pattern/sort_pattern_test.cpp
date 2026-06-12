@@ -56,7 +56,8 @@ auto getExpCtx() {
 TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
-    SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    query_shape::SerializationOptions opts =
+        query_shape::SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     // Most basic sort pattern, confirm that field name gets redacted.
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
@@ -91,7 +92,7 @@ TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
 TEST(SerializeSortPatternTest, SerializeNoRedaction) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
-    SerializationOptions opts = {};
+    query_shape::SerializationOptions opts = {};
     opts.transformIdentifiers = false;
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"val":1})",

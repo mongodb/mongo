@@ -64,7 +64,8 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(BucketAuto);
 class DocumentSourceBucketAuto final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$bucketAuto"_sd;
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

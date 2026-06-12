@@ -141,7 +141,8 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::optimiz
     return container->end();
 }
 
-Value DocumentSourceSequentialDocumentCache::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceSequentialDocumentCache::serialize(
+    const query_shape::SerializationOptions& opts) const {
     if (opts.isSerializingForExplain()) {
         return Value(Document{
             {kStageName,

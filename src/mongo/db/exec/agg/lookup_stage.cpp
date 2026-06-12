@@ -221,7 +221,7 @@ bool LookUpStage::usedDisk() const {
     return _sharedState->execPipeline && _sharedState->execPipeline->usedDisk();
 }
 
-Document LookUpStage::getExplainOutput(const SerializationOptions& opts) const {
+Document LookUpStage::getExplainOutput(const query_shape::SerializationOptions& opts) const {
     auto doc = MutableDocument(Stage::getExplainOutput(opts));
 
     const PlanSummaryStats& stats = _stats.planSummaryStats;
@@ -337,7 +337,8 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
     // first input document.
-    SerializationOptions wireOptsForResolvedStore{.isSerializingForRemoteDispatch = true};
+    query_shape::SerializationOptions wireOptsForResolvedStore{.isSerializingForRemoteDispatch =
+                                                                   true};
     _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson(wireOptsForResolvedStore);
 
     LOGV2_DEBUG(3254800,

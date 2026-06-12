@@ -58,7 +58,7 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
     expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
-Value ExpressionFunction::serialize(const SerializationOptions& options) const {
+Value ExpressionFunction::serialize(const query_shape::SerializationOptions& options) const {
     MutableDocument innerOpts(Document{{"body"_sd, options.serializeLiteral(_funcSource)},
                                        {"args"_sd, _passedArgs->serialize(options)},
                                        // "lang" is purposefully not treated as a literal since it

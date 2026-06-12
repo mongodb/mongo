@@ -82,7 +82,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final;
 
     void serialize(BSONObjBuilder* out,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {

@@ -115,7 +115,7 @@ public:
      * Serializes each subexpression sequentially in a BSONArray.
      */
     void serialize(BSONObjBuilder* builder,
-                   const SerializationOptions& opts = {},
+                   const query_shape::SerializationOptions& opts = {},
                    bool includePath = true) const final {
         BSONArrayBuilder exprArray(builder->subarrayStart(name()));
         for (const auto& expr : _expressions) {

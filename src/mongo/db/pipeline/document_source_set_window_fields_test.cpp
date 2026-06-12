@@ -738,7 +738,8 @@ void assertRepresentativeShapeIsStable(auto expCtx,
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(inputStage.firstElement(), expCtx);
     std::vector<Value> serialization;
-    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    auto opts = query_shape::SerializationOptions{
+        query_shape::LiteralSerializationPolicy::kToRepresentativeParseableValue};
     parsedStage->serializeToArray(serialization, opts);
 
     auto serializedStage = serialization[0].getDocument().toBson();

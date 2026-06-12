@@ -46,7 +46,8 @@
 namespace mongo::query_shape {
 namespace {
 
-BSONObj shapifyQuery(const ParsedDelete& parsedDelete, const SerializationOptions& opts) {
+BSONObj shapifyQuery(const ParsedDelete& parsedDelete,
+                     const query_shape::SerializationOptions& opts) {
     // Use the already-parsed query ('q' field) if we have it to avoid re-parsing. We won't have the
     // parsed query in the case where the 'q' field is a simple match on _id (e.g. {_id: 1}) - in
     // this case, we'll parse the query on-the-fly so we can shapify it.
@@ -78,7 +79,7 @@ BSONObj shapifyQuery(const ParsedDelete& parsedDelete, const SerializationOption
 
 DeleteCmdShapeComponents::DeleteCmdShapeComponents(const ParsedDelete& parsedDelete,
                                                    LetShapeComponent let,
-                                                   const SerializationOptions& opts)
+                                                   const query_shape::SerializationOptions& opts)
     : representativeQ(shapifyQuery(parsedDelete, opts)),
       multi(parsedDelete.getRequest()->getMulti()),
       let(let) {}
@@ -89,7 +90,7 @@ void DeleteCmdShapeComponents::HashValue(absl::HashState state) const {
 
 void DeleteCmdShapeComponents::appendTo(
     BSONObjBuilder& bob,
-    const SerializationOptions& opts,
+    const query_shape::SerializationOptions& opts,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     bob.append("command", "delete");
 
@@ -118,16 +119,17 @@ size_t DeleteCmdShape::extraSize() const {
     return sizeof(DeleteCmdShape) - sizeof(Shape) - sizeof(DeleteCmdShapeComponents);
 }
 
-void DeleteCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
-                                                      OperationContext* opCtx,
-                                                      const SerializationOptions& opts) const {
+void DeleteCmdShape::appendCmdSpecificShapeComponents(
+    BSONObjBuilder& bob,
+    OperationContext* opCtx,
+    const query_shape::SerializationOptions& opts) const {
     tassert(12205300,
             "We don't support serializing to the unmodified shape here, since we have already "
             "shapified and stored the representative query - we've lost the original literals",
             !opts.isKeepingLiteralsUnchanged());
 
     auto expCtx = makeBlankExpressionContext(opCtx, nssOrUUID, _components.let.shapifiedLet);
-    if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+    if (opts == query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // We have this copy stored already!
         _components.appendTo(bob, opts, expCtx);
         return;

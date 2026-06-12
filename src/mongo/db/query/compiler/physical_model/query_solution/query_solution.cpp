@@ -1877,7 +1877,7 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
         auto& acc = accumulators[idx];
         *ss << "{" << acc.fieldName << ": {" << acc.expr.name << ": "
             << acc.expr.argument
-                   ->serialize(SerializationOptions{
+                   ->serialize(query_shape::SerializationOptions{
                        .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
                    .toString()
             << "}}";
@@ -2032,7 +2032,7 @@ void WindowNode::appendToString(str::stream* ss, int indent) const {
         }
         auto& outputField = outputFields[idx];
         MutableDocument boundsDoc;
-        outputField.expr->bounds().serialize(boundsDoc, SerializationOptions{});
+        outputField.expr->bounds().serialize(boundsDoc, query_shape::SerializationOptions{});
         auto boundsBson = boundsDoc.freeze().toBson();
         *ss << "{" << outputField.fieldName << ": {" << outputField.expr->getOpName() << ": "
             << outputField.expr->input()->serialize().toString()

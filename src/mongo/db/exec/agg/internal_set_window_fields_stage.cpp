@@ -185,7 +185,8 @@ void InternalSetWindowFieldsStage::doDispose() {
     _stats.spillingStats = _iterator.getSpillingStats();
 }
 
-Document InternalSetWindowFieldsStage::getExplainOutput(const SerializationOptions& opts) const {
+Document InternalSetWindowFieldsStage::getExplainOutput(
+    const query_shape::SerializationOptions& opts) const {
     MutableDocument out(Stage::getExplainOutput(opts));
     MutableDocument md;
 

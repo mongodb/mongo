@@ -45,7 +45,7 @@ namespace mongo {
 namespace {
 void appendGeoNearLegacyArray(BSONObjBuilder& bob,
                               const BSONElement& e,
-                              const SerializationOptions& opts) {
+                              const query_shape::SerializationOptions& opts) {
     if (!opts.isReplacingLiteralsWithRepresentativeValues()) {
         opts.appendLiteral(&bob, e);
     } else {
@@ -58,7 +58,7 @@ void appendGeoNearLegacyArray(BSONObjBuilder& bob,
 
 void appendShapeOperator(BSONObjBuilder& bob,
                          const BSONElement& e,
-                         const SerializationOptions& opts) {
+                         const query_shape::SerializationOptions& opts) {
     if (!opts.isReplacingLiteralsWithRepresentativeValues()) {
         opts.appendLiteral(&bob, e);
         return;
@@ -86,7 +86,7 @@ void appendShapeOperator(BSONObjBuilder& bob,
 void appendGeoJSONCoordinatesLiteral(BSONObjBuilder& bob,
                                      const BSONElement& coordinatesElem,
                                      const BSONElement& typeElem,
-                                     const SerializationOptions& opts) {
+                                     const query_shape::SerializationOptions& opts) {
     if (!opts.isReplacingLiteralsWithRepresentativeValues()) {
         opts.appendLiteral(&bob, coordinatesElem);
         return;
@@ -162,7 +162,7 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder& bob,
 
 void appendCRSObject(BSONObjBuilder& bob,
                      const BSONElement& crsObj,
-                     const SerializationOptions& opts) {
+                     const query_shape::SerializationOptions& opts) {
     // 'crs' is always an object.
     tassert(7559700, "Expected 'crs' to be an object", crsObj.type() == BSONType::object);
     // 'crs' is required to have a 'type' field with the value 'name'.
@@ -206,7 +206,7 @@ void appendCRSObject(BSONObjBuilder& bob,
 // obj, or implicitly as the RHS of a $geoNear.
 void appendGeoJSONObj(BSONObjBuilder& bob,
                       const BSONObj& geometryObj,
-                      const SerializationOptions& opts) {
+                      const query_shape::SerializationOptions& opts) {
     auto typeElem = geometryObj[kGeometryTypeField];
     if (typeElem) {
         bob.append(typeElem);
@@ -241,7 +241,7 @@ void appendGeoJSONObj(BSONObjBuilder& bob,
  */
 void appendGeometryOperator(BSONObjBuilder& bob,
                             const BSONElement& geometryElem,
-                            const SerializationOptions& opts) {
+                            const query_shape::SerializationOptions& opts) {
     if (geometryElem.type() == BSONType::array) {
         // This would be like {$geometry: [0, 0]} which must be a point.
         auto asArray = geometryElem.Array();
@@ -281,7 +281,7 @@ void appendGeometryOperator(BSONObjBuilder& bob,
 void appendGeoNearOperator(BSONObjBuilder& bob,
                            StringData fieldName,
                            const BSONElement& geoNearElem,
-                           const SerializationOptions& opts) {
+                           const query_shape::SerializationOptions& opts) {
     if (geoNearElem.type() == BSONType::array) {
         appendGeoNearLegacyArray(bob, geoNearElem, opts);
     } else {
@@ -350,7 +350,7 @@ void appendGeoNearOperator(BSONObjBuilder& bob,
  */
 void geoNearExpressionCustomSerialization(BSONObjBuilder& bob,
                                           const BSONObj& obj,
-                                          const SerializationOptions& opts,
+                                          const query_shape::SerializationOptions& opts,
                                           bool includePath) {
     BSONObjIterator outer_it(obj);
     while (outer_it.more()) {
@@ -374,7 +374,7 @@ void geoNearExpressionCustomSerialization(BSONObjBuilder& bob,
 
 void serializeGeoOperator(BSONObjBuilder& bob,
                           const BSONObj& obj,
-                          const SerializationOptions& opts) {
+                          const query_shape::SerializationOptions& opts) {
     BSONObjIterator it(obj);
     while (it.more()) {
         auto elem = it.next();
@@ -403,7 +403,7 @@ void serializeGeoOperator(BSONObjBuilder& bob,
  */
 void geoExpressionCustomSerialization(BSONObjBuilder& bob,
                                       const BSONObj& obj,
-                                      const SerializationOptions& opts,
+                                      const query_shape::SerializationOptions& opts,
                                       bool includePath) {
     BSONObjIterator outerIt(obj);
     BSONElement geoExprElem = outerIt.next();

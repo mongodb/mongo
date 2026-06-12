@@ -90,7 +90,8 @@ public:
                        const boost::intrusive_ptr<ExpressionContext>&,
                        SortPattern sortPattern);
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final {
         // Unlike the queue, it's okay to serialize this stage for testing purposes.
         return Value(Document{{getSourceName(), Document()}});
     }

@@ -116,7 +116,7 @@ void CurrentDateNode::setValueForNewElement(mutablebson::Element* element) const
     setValue(_service, element, _typeIsDate);
 }
 
-BSONObj CurrentDateNode::operatorValue(const SerializationOptions& opts) const {
+BSONObj CurrentDateNode::operatorValue(const query_shape::SerializationOptions& opts) const {
     // We do not need to do any special serialization here, because type is simply an enum with only
     // two possible values.
     BSONObjBuilder bob;

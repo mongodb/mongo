@@ -107,7 +107,8 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingOwnershipMatch::serialize(const SerializationOptions& opts) const {
+Value DocumentSourceReshardingOwnershipMatch::serialize(
+    const query_shape::SerializationOptions& opts) const {
     auto spec = DocumentSourceReshardingOwnershipMatchSpec(_recipientShardId,
                                                            _reshardingKey->getKeyPattern());
     // TODO SERVER-92437 ensure this behavior is safe during FCV upgrade/downgrade

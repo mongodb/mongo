@@ -47,8 +47,8 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceSingleDocumentTransformatio
     // disposing this stage.
     singleDocumentTransformationDS->_cachedStageOptions =
         singleDocumentTransformationDS->getTransformer().serializeTransformation(
-            SerializationOptions{.verbosity =
-                                     singleDocumentTransformationDS->getExpCtx()->getExplain()});
+            query_shape::SerializationOptions{
+                .verbosity = singleDocumentTransformationDS->getExpCtx()->getExplain()});
 
     return make_intrusive<exec::agg::SingleDocumentTransformationStage>(
         singleDocumentTransformationDS->getSourceName(),

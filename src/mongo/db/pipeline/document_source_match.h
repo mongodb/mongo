@@ -178,7 +178,8 @@ public:
         return constraints;
     }
 
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const override;
 
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
@@ -319,9 +320,10 @@ public:
      * DocumentSourceInternalChangeStreamStage::serialize and was added because this class cannot
      * inherit from both DocumentSourceInternalChangeStreamStage and DocumentSourceMatch.
      */
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
+    Value serialize(const query_shape::SerializationOptions& opts =
+                        query_shape::SerializationOptions{}) const final;
 
-    virtual Value doSerialize(const SerializationOptions& opts) const {
+    virtual Value doSerialize(const query_shape::SerializationOptions& opts) const {
         return DocumentSourceMatch::serialize(opts);
     }
 
