@@ -1,10 +1,11 @@
 import os
 import pathlib
+import random
 import shutil
 import signal
+import string
 import sys
 import tempfile
-import uuid
 from functools import cache
 
 import psutil
@@ -144,6 +145,19 @@ class ResmokeShimContext:
         self.outputs_symlink = None
         self.resource_monitor = None
 
+    @staticmethod
+    def _make_short_symlink(target, prefix, short_root):
+        """Create a short symlink in short_root pointing to target, retrying on collision."""
+        chars = string.ascii_lowercase + string.digits
+        while True:
+            suffix = "".join(random.choices(chars, k=6))
+            link_path = os.path.join(short_root, prefix + suffix)
+            try:
+                os.symlink(target, link_path)
+                return link_path
+            except FileExistsError:
+                continue
+
     def create_short_symlinks(self):
         """Create short symlinks in /tmp to avoid long path issues."""
         if os.path.isdir("/tmp") and os.access("/tmp", os.W_OK):
@@ -151,18 +165,16 @@ class ResmokeShimContext:
         else:
             short_root = tempfile.gettempdir()
 
-        # Create a short symlink to TEST_TMPDIR
         test_tempdir = os.environ.get("TEST_TMPDIR")
         if test_tempdir:
-            self.tmpdir_symlink = os.path.join(short_root, f"resmoke_tmp_{uuid.uuid1()}")
-            os.symlink(test_tempdir, self.tmpdir_symlink)
+            self.tmpdir_symlink = self._make_short_symlink(test_tempdir, "rt", short_root)
             self.links.append(self.tmpdir_symlink)
 
-        # Create a short symlink to TEST_UNDECLARED_OUTPUTS_DIR
         undeclared_outputs_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
         if undeclared_outputs_dir:
-            self.outputs_symlink = os.path.join(short_root, f"resmoke_out_{uuid.uuid1()}")
-            os.symlink(undeclared_outputs_dir, self.outputs_symlink)
+            self.outputs_symlink = self._make_short_symlink(
+                undeclared_outputs_dir, "ro", short_root
+            )
             self.links.append(self.outputs_symlink)
 
     def __enter__(self):
