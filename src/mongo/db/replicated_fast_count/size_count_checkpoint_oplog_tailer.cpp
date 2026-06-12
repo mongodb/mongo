@@ -196,13 +196,27 @@ boost::optional<TailerState> SizeCountCheckpointOplogTailer::_bootstrap(
 
         lastBufferedRid = first->id;
     } else {
-        // There's a real last-scanned oplog entry. Ensure it hasn't fallen off the oplog so the
-        // tailer can startup safely.
+        // Resume from the last oplog entry included in the most recent size/count checkpoint.
+        //
+        // TODO SERVER-128312: Enforce that this entry is still present in the oplog before
+        // resuming. Until then, we temporarily allow startup to proceed even if it has been
+        // truncated, which can cause size and count to be inaccurate after oplog rollover.
         lastBufferedRid = makeStartRecordId(startAfter);
-        tassert(12101811,
-                str::stream() << "Expected already-processed oplog entry at timestamp "
-                              << startAfter << " to exist",
-                cursor->seekExact(lastBufferedRid));
+        const auto seekResult =
+            cursor->seek(lastBufferedRid, SeekableRecordCursor::BoundInclusion::kInclude);
+        if (!seekResult) {
+            // No new oplog entries since the previous size count checkpoint.
+            return boost::none;
+        }
+        if (seekResult->id != lastBufferedRid) {
+            LOGV2_WARNING(12880600,
+                          "Expected already-processed oplog entry at timestamp to exist, "
+                          "seeking to next available entry",
+                          "startAfter"_attr = startAfter,
+                          "expectedRid"_attr = lastBufferedRid,
+                          "foundRid"_attr = seekResult->id);
+        }
+        lastBufferedRid = seekResult->id;
     }
 
     cursor->save();

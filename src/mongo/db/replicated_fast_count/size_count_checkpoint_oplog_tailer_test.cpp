@@ -104,6 +104,12 @@ TEST_F(SizeCountCheckpointOplogTailerTest, BootstrapFromTimestampMinSeedsBufferW
     const int64_t entry1Bytes = entry1.getEntry().toBSON().objsize();
     writeToOplog(_opCtx, entry1);
 
+    // Write a second entry to confirm bootstrap seeds only the first record, not subsequent ones.
+    // This is because a bootstrapped `state` must meet the expectations of the `state` tracked
+    // during steady state where the `lastBufferedRid` is guaranteed to either be in the buffer, or
+    // durably persisted.
+    writeToOplog(_opCtx, makeOplogEntry(Timestamp{1, 2}, _collA, repl::OpTypeEnum::kInsert, 20));
+
     SizeCountCheckpointBuffer buffer;
     auto state = _tailer.bootstrap_ForTest(_opCtx, Timestamp::min(), buffer);
 
@@ -148,42 +154,85 @@ TEST_F(SizeCountCheckpointOplogTailerTest,
     assertNoBufferedWork(buffer);
 }
 
+// TODO SERVER-128312: Replace this with catching a `tassert` for illegal state.
+TEST_F(SizeCountCheckpointOplogTailerTest,
+       BootstrapFromConcreteTimestampWhenAllEntriesHaveRolledOff) {
+    const Timestamp ts1{1, 1};
+    writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
+
+    // Bootstrap with a timestamp beyond the last oplog entry - no record exists at or after ts2.
+    const Timestamp ts2{1, 2};
+    SizeCountCheckpointBuffer buffer;
+    auto state = _tailer.bootstrap_ForTest(_opCtx, ts2, buffer);
+
+    ASSERT_FALSE(state);
+    assertNoBufferedWork(buffer);
+}
+
+// TODO SERVER-128312: Replace this with catching a `tassert` for illegal state.
+TEST_F(SizeCountCheckpointOplogTailerTest,
+       BootstrapFromConcreteTimestampWhenEntryRolledOffButLaterEntriesExist) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
+    writeToOplog(_opCtx, makeOplogEntry(ts2, _collA, repl::OpTypeEnum::kInsert, 20));
+    writeToOplog(_opCtx, makeOplogEntry(ts3, _collA, repl::OpTypeEnum::kInsert, 30));
+
+    // Simulate ts1 rolling off the capped oplog while later entries remain.
+    {
+        AutoGetOplogFastPath oplogWrite(_opCtx, OplogAccessMode::kWrite);
+        WriteUnitOfWork wuow(_opCtx);
+        oplogWrite.getCollection()->getRecordStore()->deleteRecord(
+            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx), ridFor(ts1));
+        wuow.commit();
+    }
+
+    SizeCountCheckpointBuffer buffer;
+    auto state = _tailer.bootstrap_ForTest(_opCtx, ts1, buffer);
+
+    // The tailer recovers by pinning to the next available entry rather than returning none.
+    ASSERT_TRUE(state);
+    EXPECT_EQ(state->lastBufferedRid, ridFor(ts2));
+    assertNoBufferedWork(buffer);
+}
+
 TEST_F(SizeCountCheckpointOplogTailerTest, MultipleIterationsAccumulateCumulativelyInBuffer) {
     const Timestamp ts1{1, 1};
-    auto entry1 = makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10);
-    const int64_t entry1Bytes = entry1.getEntry().toBSON().objsize();
-    writeToOplog(_opCtx, entry1);
+    writeToOplog(_opCtx, makeOplogEntry(ts1, _collA, repl::OpTypeEnum::kInsert, 10));
 
     SizeCountCheckpointBuffer buffer;
     auto state = _tailer.bootstrap_ForTest(_opCtx, Timestamp::min(), buffer);
     ASSERT_TRUE(state);
 
+    // Write two entries before the first iteration to verify a single scan picks up multiple
+    // new entries at once.
     const Timestamp ts2{1, 2};
-    auto entry2 = makeOplogEntry(ts2, _collA, repl::OpTypeEnum::kInsert, 20);
-    const int64_t entry2Bytes = entry2.getEntry().toBSON().objsize();
-    writeToOplog(_opCtx, entry2);
-
-    ASSERT_TRUE(_tailer.runOneIteration_ForTest(_opCtx, state, buffer));
-    EXPECT_EQ(state->lastBufferedRid, ridFor(ts2));
-
+    writeToOplog(_opCtx, makeOplogEntry(ts2, _collA, repl::OpTypeEnum::kInsert, 20));
     const Timestamp ts3{1, 3};
-    auto entry3 = makeOplogEntry(ts3, _collB, repl::OpTypeEnum::kInsert, 7);
-    const int64_t entry3Bytes = entry3.getEntry().toBSON().objsize();
-    writeToOplog(_opCtx, entry3);
+    writeToOplog(_opCtx, makeOplogEntry(ts3, _collB, repl::OpTypeEnum::kInsert, 7));
 
     ASSERT_TRUE(_tailer.runOneIteration_ForTest(_opCtx, state, buffer));
     EXPECT_EQ(state->lastBufferedRid, ridFor(ts3));
+
+    const Timestamp ts4{1, 4};
+    writeToOplog(_opCtx, makeOplogEntry(ts4, _collA, repl::OpTypeEnum::kInsert, 5));
+
+    ASSERT_TRUE(_tailer.runOneIteration_ForTest(_opCtx, state, buffer));
+    EXPECT_EQ(state->lastBufferedRid, ridFor(ts4));
 
     EXPECT_TRUE(buffer.hasPendingWork());
     EXPECT_FALSE(buffer.hasInFlightWork());
 
     auto flushed = buffer.checkoutForFlush();
     ASSERT_TRUE(flushed);
-    EXPECT_EQ(flushed->lastTimestamp, ts3);
-    assertContains(*flushed, _collA.uuid, CollectionSizeCount{30, 2});
+    EXPECT_EQ(flushed->lastTimestamp, ts4);
+    assertContains(*flushed, _collA.uuid, CollectionSizeCount{35, 3});
     assertContains(*flushed, _collB.uuid, CollectionSizeCount{7, 1});
     assertContains(
-        *flushed, getOplogUuid(), CollectionSizeCount{entry1Bytes + entry2Bytes + entry3Bytes, 3});
+        *flushed,
+        getOplogUuid(),
+        test_helpers::scanForAccurateSizeCount(_opCtx, NamespaceString::kRsOplogNamespace));
 
     EXPECT_FALSE(buffer.hasPendingWork());
     EXPECT_TRUE(buffer.hasInFlightWork());
