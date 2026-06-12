@@ -34,12 +34,18 @@
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
+// Forward declarations needed for DynamicMetricNameMaker to declare Passkey friends
+class DiskMetrics;
+class SystemMountMetrics;
+
 // Forward declarations needed for MetricName to declare Passkey friends.
 namespace disagg {
 class MetricNameMaker;
 }
 namespace otel::metrics {
 class MetricNameMaker;
+class DynamicMetricNameMaker;
+class DynamicMetricNameTestPasskeyMaker;
 
 /** Helper to implement the passkey idiom. */
 template <typename T>
@@ -83,11 +89,24 @@ class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricNam
  * device names or mount paths discovered at startup). Requires N&O review since dynamic names
  * cannot be audited at compile time.
  */
-class MONGO_MOD_PUBLIC DynamicMetricNameMaker{
-    public : static MetricName make(StringData name){return MetricNameMaker::make(name);
-}
-}
-;
+class MONGO_MOD_PUBLIC DynamicMetricNameMaker {
+public:
+    /**
+     * Classes that need to create dynamic metric names should be added as a
+     * friend to the Passkey.
+     */
+    class Passkey {
+        friend ::mongo::DiskMetrics;
+        friend ::mongo::SystemMountMetrics;
+        // This allows us to create dynamic metric names in tests
+        friend ::mongo::otel::metrics::DynamicMetricNameTestPasskeyMaker;
+        constexpr Passkey() = default;
+    };
+
+    static MetricName make(StringData name, Passkey passkey) {
+        return MetricNameMaker::make(name);
+    }
+};
 
 /**
  * Central registry of OpenTelemetry metric names used in the server. When adding a new metric to

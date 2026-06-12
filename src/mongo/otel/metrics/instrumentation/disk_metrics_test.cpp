@@ -37,6 +37,7 @@ namespace mongo {
 namespace {
 
 using otel::metrics::DynamicMetricNameMaker;
+using otel::metrics::DynamicMetricNameTestPasskeyMaker;
 using otel::metrics::OtelMetricsCapturer;
 
 constexpr StringData kSda = "sda"_sd;
@@ -120,14 +121,20 @@ TEST_F(DiskOtelMetricsTest, SecondUpdateEmitsDeltas) {
                                  /*ioTimeMs=*/1500,
                                  /*ioQueuedMs=*/1800));
 
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads)), 15);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadSectors)), 30);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadTimeMs)), 70);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites)), 20);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteSectors)), 30);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteTimeMs)), 200);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoTimeMs)), 500);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoQueuedMs)), 600);
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads, passkey)), 15);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadSectors, passkey)),
+              30);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadTimeMs, passkey)),
+              70);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 20);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteSectors, passkey)),
+              30);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteTimeMs, passkey)),
+              200);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoTimeMs, passkey)), 500);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoQueuedMs, passkey)),
+              600);
 }
 
 TEST_F(DiskOtelMetricsTest, MultipleDeltasAccumulate) {
@@ -135,22 +142,29 @@ TEST_F(DiskOtelMetricsTest, MultipleDeltasAccumulate) {
     _metrics.update(makeDiskBson(kSda, 60, 120, 260, 105, 210, 560, 1100, 1650));
     _metrics.update(makeDiskBson(kSda, 80, 160, 380, 115, 230, 680, 1300, 1950));
 
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+
     // reads delta: (60-50) + (80-60) = 10 + 20 = 30
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads)), 30);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads, passkey)), 30);
     // read_sectors delta: (120-100) + (160-120) = 20 + 40 = 60
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadSectors)), 60);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadSectors, passkey)),
+              60);
     // read_time_ms delta: (260-200) + (380-260) = 60 + 120 = 180
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadTimeMs)), 180);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReadTimeMs, passkey)),
+              180);
     // writes delta: (105-100) + (115-105) = 5 + 10 = 15
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites)), 15);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 15);
     // write_sectors delta: (210-200) + (230-210) = 10 + 20 = 30
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteSectors)), 30);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteSectors, passkey)),
+              30);
     // write_time_ms delta: (560-500) + (680-560) = 60 + 120 = 180
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteTimeMs)), 180);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWriteTimeMs, passkey)),
+              180);
     // io_time_ms delta: (1100-1000) + (1300-1100) = 100 + 200 = 300
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoTimeMs)), 300);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoTimeMs, passkey)), 300);
     // io_queued_ms delta: (1650-1500) + (1950-1650) = 150 + 300 = 450
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoQueuedMs)), 450);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaIoQueuedMs, passkey)),
+              450);
 }
 
 TEST_F(DiskOtelMetricsTest, UndeclaredDevicesAreIgnored) {
@@ -182,12 +196,14 @@ TEST_F(DiskOtelMetricsTest, UndeclaredDevicesAreIgnored) {
     }
     _metrics.update(both.obj());
 
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites)), 20);
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 20);
 
     // sdc was never registered, so its metric name does not exist in the service.
-    ASSERT_THROWS_CODE(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdcWrites)),
-                       DBException,
-                       ErrorCodes::KeyNotFound);
+    ASSERT_THROWS_CODE(
+        _capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdcWrites, passkey)),
+        DBException,
+        ErrorCodes::KeyNotFound);
 }
 
 TEST_F(DiskOtelMetricsTest, MultipleRegisteredDevicesTrackedIndependently) {
@@ -241,9 +257,10 @@ TEST_F(DiskOtelMetricsTest, MultipleRegisteredDevicesTrackedIndependently) {
     }
     _metrics.update(next.obj());
 
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads)), 10);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites)), 10);
-    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdbWrites)), 5);
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaReads, passkey)), 10);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdaWrites, passkey)), 10);
+    ASSERT_EQ(_capturer.readInt64Counter(DynamicMetricNameMaker::make(kSdbWrites, passkey)), 5);
 }
 
 }  // namespace

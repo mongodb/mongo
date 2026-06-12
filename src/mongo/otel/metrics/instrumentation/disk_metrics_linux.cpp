@@ -93,8 +93,11 @@ public:
             const auto makeCounter =
                 [&](StringData field, std::string desc, MetricUnit unit) -> Counter<int64_t>* {
                 std::string fullName = fmt::format("systemMetrics.disks.{}.{}", disk, field);
+                auto passkey = DiskMetrics::dyn_metric_passkey();
                 return &MetricsService::instance().createInt64Counter(
-                    DynamicMetricNameMaker::make(StringData{fullName}), std::move(desc), unit);
+                    DynamicMetricNameMaker::make(StringData{fullName}, passkey),
+                    std::move(desc),
+                    unit);
             };
 
             _instruments[i].reads = makeCounter(

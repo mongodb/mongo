@@ -37,6 +37,7 @@ namespace mongo {
 namespace {
 
 using otel::metrics::DynamicMetricNameMaker;
+using otel::metrics::DynamicMetricNameTestPasskeyMaker;
 using otel::metrics::OtelMetricsCapturer;
 
 constexpr StringData kDataMount = "/data"_sd;
@@ -80,9 +81,11 @@ protected:
 TEST_F(SystemMountOtelMetricsTest, UpdateSetsGaugeValues) {
     _metrics.update(makeMountsBson(kDataMount, 1000, 400, 500));
 
-    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity)), 1000);
-    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataAvailable)), 400);
-    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataFree)), 500);
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 1000);
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataAvailable, passkey)), 400);
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataFree, passkey)), 500);
 }
 
 TEST_F(SystemMountOtelMetricsTest, UpdateIgnoresUndeclaredMountpoints) {
@@ -104,12 +107,14 @@ TEST_F(SystemMountOtelMetricsTest, UpdateIgnoresUndeclaredMountpoints) {
     }
     _metrics.update(both.obj());
 
-    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity)), 2000);
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 2000);
 
     // /tmp was never registered, so its metric name does not exist in the service.
-    ASSERT_THROWS_CODE(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kTmpCapacity)),
-                       DBException,
-                       ErrorCodes::KeyNotFound);
+    ASSERT_THROWS_CODE(
+        _capturer.readInt64Gauge(DynamicMetricNameMaker::make(kTmpCapacity, passkey)),
+        DBException,
+        ErrorCodes::KeyNotFound);
 }
 
 TEST_F(SystemMountOtelMetricsTest, UpdateIsIdempotentForSameValues) {
@@ -117,7 +122,8 @@ TEST_F(SystemMountOtelMetricsTest, UpdateIsIdempotentForSameValues) {
     _metrics.update(bson);
     _metrics.update(bson);
 
-    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity)), 8000);
+    auto passkey = DynamicMetricNameTestPasskeyMaker::make();
+    ASSERT_EQ(_capturer.readInt64Gauge(DynamicMetricNameMaker::make(kDataCapacity, passkey)), 8000);
 }
 
 }  // namespace

@@ -256,6 +256,13 @@ private:
 #endif  // MONGO_CONFIG_OTEL
 };
 
+class DynamicMetricNameTestPasskeyMaker {
+public:
+    static DynamicMetricNameMaker::Passkey make() {
+        return DynamicMetricNameMaker::Passkey{};
+    }
+};
+
 ////////////////////////////////////////////////////////////
 // Implementation details
 ////////////////////////////////////////////////////////////

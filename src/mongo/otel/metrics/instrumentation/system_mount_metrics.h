@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -60,6 +61,9 @@ public:
 
 private:
     class Impl;
+    static otel::metrics::DynamicMetricNameMaker::Passkey dyn_metric_passkey() {
+        return {};
+    }
     std::unique_ptr<Impl> _impl;
 };
 

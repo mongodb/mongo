@@ -143,8 +143,11 @@ public:
             const auto makeGauge =
                 [&](StringData field, std::string desc, MetricUnit unit) -> Gauge<int64_t>* {
                 std::string fullName = fmt::format("systemMetrics.mounts.{}.{}", sanitized, field);
+                auto passkey = SystemMountMetrics::dyn_metric_passkey();
                 return &MetricsService::instance().createInt64Gauge(
-                    DynamicMetricNameMaker::make(StringData{fullName}), std::move(desc), unit);
+                    DynamicMetricNameMaker::make(StringData{fullName}, passkey),
+                    std::move(desc),
+                    unit);
             };
 
             _instruments[i].capacity =
