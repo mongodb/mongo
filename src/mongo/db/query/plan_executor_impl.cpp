@@ -362,6 +362,7 @@ void PlanExecutorImpl::reattachToOperationContext(OperationContext* opCtx) {
     // The response deadline value needs to be (re)computed here on every invocation, because
     // the same plan executor instance can be used to service multiple getMore requests.
     _responseDeadlineValue = _calculateResponseDeadlineValue();
+    _interrupted = false;
 
     _currentState = kSaved;
 }
@@ -493,15 +494,13 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
     // capped insert notifier is necessary for the notifierVersion to advance.
     auto notifier = makeNotifier();
 
-    PlanStage::StageState code = PlanStage::ADVANCED;
-
     // This callback is used by the yielding code once all storage resources are released.
     const auto afterSnapshotAndLocksRelinquishedCb = [&]() {
         doWaitDuringYield();
 
         if (_responseDeadlineType != ResponseDeadlineType::kNone) {
-            // The called function can modify the value of 'code' to PlanStage::StageState::IS_EOF.
-            _handleResponseDeadline(code);
+            // May set '_interrupted' to true if the response deadline is reached.
+            _handleResponseDeadline();
         }
     };
 
@@ -516,14 +515,13 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
                                                            afterSnapshotAndLocksRelinquishedCb,
                                                            RestoreContext::RestoreType::kYield,
                                                            _afterSnapshotAbandonFn));
-
-            if (code == PlanStage::IS_EOF) {
+            if (_interrupted) {
                 return PlanExecutor::IS_EOF;
             }
         }
 
         WorkingSetID id = WorkingSet::INVALID_ID;
-        code = _root->work(&id);
+        PlanStage::StageState code = _root->work(&id);
 
         if (code != PlanStage::NEED_YIELD) {
             // A successful work() step (or NEED_TIME / IS_EOF) ends any WCE streak. release()
@@ -640,7 +638,7 @@ boost::optional<Date_t> PlanExecutorImpl::_calculateResponseDeadlineValue() cons
     return now + kLongOperationResponseLogInfoDeadline;
 }
 
-void PlanExecutorImpl::_handleResponseDeadline(PlanStage::StageState& code) {
+void PlanExecutorImpl::_handleResponseDeadline() {
     tassert(10290004,
             "expecting response deadline type to be set",
             _responseDeadlineType != ResponseDeadlineType::kNone);
@@ -655,9 +653,9 @@ void PlanExecutorImpl::_handleResponseDeadline(PlanStage::StageState& code) {
     }
 
     if (_responseDeadlineType == ResponseDeadlineType::kInterruptWork) {
-        // Set code to EOF so we exit the for loop directly after yielding. Also cancel any
-        // outstanding awaitData waits.
-        code = PlanStage::IS_EOF;
+        // Mark as softly interrupted so we exit the work loop directly after yielding. Also cancel
+        // any outstanding awaitData waits.
+        _interrupted = true;
         awaitDataState(_opCtx).shouldWaitForInserts = false;
 
         LOGV2_DEBUG(

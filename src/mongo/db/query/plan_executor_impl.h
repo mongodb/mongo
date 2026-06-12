@@ -368,9 +368,9 @@ private:
     boost::optional<Date_t> _calculateResponseDeadlineValue() const;
 
     // Handles the configured response deadline. Expected '_responseDeadlineType' to be set to a
-    // value other than 'ResponseDeadlineType::kNone'. The function can modify the value of 'code'
-    // to PlanStage::StageState::IS_EOF.
-    void _handleResponseDeadline(PlanStage::StageState& code);
+    // value other than 'ResponseDeadlineType::kNone'. Can set '_interrupted' to true if the
+    // deadline is reached.
+    void _handleResponseDeadline();
 
     // Helper for handling the NEED_YIELD stage state.
     void _handleNeedYield(WriteConflictRetryState& retryState);
@@ -434,6 +434,10 @@ private:
 
     // Whether the executor must return owned BSON.
     bool _mustReturnOwnedBson;
+
+    // If the current operation was "softly" interrupted. Will be set if a configured response
+    // deadline is reached. Cleared upon every 'reattachToOperationContext()' call.
+    bool _interrupted = false;
 
     // The currently used response deadline type.
     ResponseDeadlineType _responseDeadlineType = ResponseDeadlineType::kNone;
