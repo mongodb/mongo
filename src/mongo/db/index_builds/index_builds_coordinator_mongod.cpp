@@ -66,6 +66,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -523,7 +524,9 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         updateCurOpOpDescription(opCtx.get(), nss, toIndexSpecs(replState->getIndexes()), opDesc);
 
         // Forward the forwardable operation metadata from the external client to this thread's
-        // client.
+        // client. The VersionContext carried by forwardableOpMetadata already has
+        // isLongRunningOperation=true, set by the top-level createIndexes command before
+        // constructing the ForwardableOperationMetadata.
         forwardableOpMetadata.setOn(opCtx.get());
 
         while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {

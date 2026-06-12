@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
@@ -64,10 +65,15 @@ public:
      * expected format. If allowedVersions is specified, the index version (or default version if
      * not specified) must be in the allowed set.
      *
+     * 'versionContext' selects the FCV used to gate v4 indexes. Pass the opCtx's VersionContext
+     * to detect and preserve a captured Operation FCV.
+     *
      * Returns a non-OK status if 'specObj' is invalid.
      */
     static StatusWith<BSONObj> _fixSpecHelper(
-        const BSONObj& specObj, boost::optional<std::set<long long>> allowedVersions = boost::none);
+        const BSONObj& specObj,
+        const VersionContext& versionContext,
+        boost::optional<std::set<long long>> allowedVersions = boost::none);
 
     /**
      * Takes an index spec object for this index and returns a copy tweaked to conform to the
@@ -77,7 +83,8 @@ public:
      *
      * Returns a non-OK status if 'specObj' is invalid.
      */
-    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj);
+    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj,
+                                       const VersionContext& versionContext);
 
     /**
      * Public API for checking if an S2 index is version 3.

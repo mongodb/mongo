@@ -182,6 +182,27 @@ public:
         return copy;
     }
 
+    bool isLongRunningOperation() const {
+        return _isLongRunningOperation;
+    }
+
+    /**
+     * Marks the VersionContext decoration on 'opCtx' as belonging to a long-running background
+     * index build. When marked, any scan inside
+     * waitForOperationsNotMatchingVersionContextToComplete will throw
+     * BackgroundOperationInProgressForNamespace rather than blocking indefinitely if this operation
+     * holds a stale OFCV at FCV transition time.
+     *
+     * Must be called after the OFCV has been set on 'opCtx' (e.g. after
+     * FixedOperationFCVRegion is constructed).
+     *
+     * The Client lock must be held to serialize with concurrent readers such as $currentOp.
+     * This flag is not considered in comparisons or BSON serialization. For in-process thread
+     * dispatch, it propagates to child opCtxs via ForwardableOperationMetadata::setOn (which
+     * copies the VersionContext C++ object directly, preserving all fields).
+     */
+    static void markDecorationAsLongRunning(ClientLock& lk, OperationContext* opCtx);
+
 private:
     static VersionContext& _getDecoration(OperationContext* opCtx);
 
@@ -194,6 +215,7 @@ private:
             _metadataOrTag;
 
     bool _canPropagateAcrossShards = false;
+    bool _isLongRunningOperation = false;
 };
 
 /**
@@ -220,6 +242,8 @@ MONGO_MOD_NEEDS_REPLACEMENT inline const VersionContext kVersionContextIgnored_U
  * - Not associated with a version context at all
  * - Associated with a stale version context, but that have been already killed
  *
+ * If any stale-OFCV operation has VersionContext::isLongRunningOperation() set, throws
+ * BackgroundOperationInProgressForNamespace immediately rather than waiting.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void waitForOperationsNotMatchingVersionContextToComplete(
     OperationContext* opCtx, const VersionContext& vCtx, Date_t deadline = Date_t::max());

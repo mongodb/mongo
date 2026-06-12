@@ -95,6 +95,7 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -910,6 +911,21 @@ public:
         }
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
+            // Capture a stable FCV for the lifetime of this command. The captured FCV is forwarded
+            // automatically to outgoing oplog entries (via OpObserver) and to async index build
+            // threads (via ForwardableOperationMetadata), so that secondary oplog application and
+            // async build spec validation evaluate feature flags against the same FCV the primary
+            // used. Without this, a concurrent setFCV transition between primary spec validation
+            // and secondary oplog application can cause the secondary to fatal-assert on any index
+            // spec whose feature flag has enableOnTransitionalFCV=false (e.g. 2dsphere v4,
+            // SERVER-125400).
+
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+            {
+                ClientLock lk(opCtx->getClient());
+                VersionContext::markDecorationAsLongRunning(lk, opCtx);
+            }
+
             boost::optional<ReplicaSetDDLTracker::ScopedReplicaSetDDL> scopedReplicaSetDDL{
                 boost::in_place_init, opCtx, std::vector<NamespaceString>{ns()}};
 
