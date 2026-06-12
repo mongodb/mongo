@@ -201,11 +201,11 @@ public:
             return _parseNode->toBsonForLog();
         }
 
-        // TODO SERVER-116021 Remove this override when extensions can handle views through
+        // TODO SERVER-121094 Remove this override when extensions can handle views through
         // bindViewInfo().
         bool hasExtensionVectorSearchStage() const override;
 
-        // TODO SERVER-116021 Remove this override when extensions can handle views through
+        // TODO SERVER-121094 Remove this override when extensions can handle views through
         // bindViewInfo().
         bool hasExtensionSearchStage() const override;
 

@@ -556,7 +556,7 @@ public:
 
     /**
      * Returns true if this is a vector search stage ($vectorSearch) or has a nested $vectorSearch.
-     * TODO SERVER-116021 Remove this override when extensions can handle views through
+     * TODO SERVER-121094 Remove this override when extensions can handle views through
      * bindViewInfo().
      */
     virtual bool hasExtensionVectorSearchStage() const {
@@ -565,7 +565,7 @@ public:
 
     /**
      * Returns true if this is a $search or $searchMeta extension stage, or has a nested one.
-     * TODO SERVER-116021 Remove this override when extensions can handle views through
+     * TODO SERVER-121094 Remove this override when extensions can handle views through
      * bindViewInfo().
      */
     virtual bool hasExtensionSearchStage() const {

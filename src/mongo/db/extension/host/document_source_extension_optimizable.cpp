@@ -200,23 +200,23 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtension
         DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander);
 }
 
-// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionVectorSearchStage()
     const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionSearchStage() const {
     return search_helpers::isExtensionSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionVectorSearchStage() const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionSearchStage() const {
     return search_helpers::isExtensionSearchStage(getParseTimeName());
 }
