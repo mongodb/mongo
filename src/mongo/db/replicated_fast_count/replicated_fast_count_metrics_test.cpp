@@ -214,7 +214,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDurin
 //     const UUID uuid = UUID::gen();
 //     boost::container::flat_map<UUID, CollectionSizeCount> changes;
 //     changes[uuid] = {/*count=*/1, /*size=*/100};
-//     _fastCountManager->commit(changes, /*commitTime=*/boost::none);
+//     _fastCountManager->commit(changes);
 //     _fastCountManager->flushSync_ForTest(operationContext());
 //
 //     // After flushing, at least the above change should be inserted.
@@ -223,7 +223,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDurin
 //         1);
 //
 //     changes[uuid] = {/*count=*/1, /*size=*/50};
-//     _fastCountManager->commit(changes, /*commitTime=*/boost::none);
+//     _fastCountManager->commit(changes);
 //     _fastCountManager->flushSync_ForTest(operationContext());
 //
 //     // The above change should update the existing document.

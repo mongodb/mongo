@@ -626,8 +626,6 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
 
         fp->waitForTimesEntered(initialTimesEntered + 1);
 
-        // Insert more documents into the same collection, creating new dirty metadata for that
-        // collection.
         test_helpers::insertDocs(_opCtx,
                                  _fastCountManager,
                                  _nss1,

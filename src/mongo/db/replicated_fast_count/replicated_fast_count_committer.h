@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
@@ -45,10 +44,8 @@ namespace mongo {
  * it and which ensures that size and count changes to that collection are reflected in fast count
  * metadata upon commit. This should be set when starting up the server.
  */
-using FastCountCommitFn =
-    std::function<void(OperationContext*,
-                       const boost::container::flat_map<UUID, CollectionSizeCount>&,
-                       boost::optional<Timestamp>)>;
+using FastCountCommitFn = std::function<void(
+    OperationContext*, const boost::container::flat_map<UUID, CollectionSizeCount>&)>;
 
 void setFastCountCommitFn(FastCountCommitFn fn);
 FastCountCommitFn& getFastCountCommitFn();

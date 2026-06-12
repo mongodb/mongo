@@ -59,43 +59,24 @@
 namespace mongo::replicated_fast_count {
 
 /**
- * Maintains an in-memory cache of the size and count of all collections.
+ * Singleton `ServiceContext` decoration that facilitates committing and flushing replicated
+ * collection size and count changes.
  *
  * Terminology:
- * The term "fast count" is historical, but should be equivalent to "fast size"
- * and "fast sizecount" to refer to a cached, and therefore "fast", size or count
- * value for a collection.
+ * - Collection "count" refers to the number of documents in a collection.
+ * - Collection "size" refers to the sum of the number of bytes in each documentat in a collection.
+ * - The size and count are "replicated" because they are persisted in the oplog.
+ * - The term "fast count" is historical but synonymous with "fast size" and "fast size count." All
+ *   three terms refer to a cached, and therefore "fast," size or count value for a collection.
  *
+ * Committed collection size and counts are accessible through the `Collection` and `RecordStore`
+ * APIs.
  *
- * This cache is intended to be accurate, and helps the server avoid expensive
- * collection scans to compute these values. The validate command can check and repair
- * the fast count and size with various flags to the command, like --enforceFastCount.
- *
- * Backing the in-memory cache is a pair of collections used for recovery scenarios.
- *
- * This class and its backing collections are a singleton that creates its internal
- * collection(s) once, the first time a mongod creates its data files. It is assumed
- * these backing collections exist from then on.
- *
- * The backing collections are expected to exist before starting up the ReplicatedFastCountManager
- * background thread.
- *
- * This class is thread-safe, and synchronizes access to the in-memory SizeCount cache,
- * i.e. _metadata.
- *
- * The write path should generally not depend directly on this class, because it relies on
- * the collection write path to persist fast SizeCounts. Instead, operations should
- * interact with this class through UncommittedFastCountChange.
+ * In the event of unclean shutdown, the oplog and two backing stores, `fast_count_metadata_store`
+ * and `fast_count_metadata_timestamps_store`, are used to recover the correct collection size and
+ * counts.
  */
 class MONGO_MOD_PUBLIC ReplicatedFastCountManager : public FlushAllFilesObserver {
-    struct StoredSizeCount {
-        CollectionSizeCount sizeCount;
-        bool dirty{false};  // Indicates if flush is needed.
-        Timestamp validAsOf;
-    };
-
-    using FastSizeCountMap = absl::flat_hash_map<UUID, StoredSizeCount>;
-
 public:
     MONGO_MOD_PRIVATE ReplicatedFastCountManager(
         std::unique_ptr<SizeCountStore> sizeCountStore,
@@ -168,16 +149,8 @@ public:
      *
      * Any UUID in `changes` not found in the collection catalog is skipped.
      */
-    // TODO(SERVER-126141): Remove this commitTime parameter.
     void commit(OperationContext* opCtx,
-                const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
-                boost::optional<Timestamp> commitTime);
-
-    /**
-     * Given a collection UUID, returns the last committed value of size and count for that
-     * collection.
-     */
-    CollectionSizeCount find(const UUID& uuid) const;
+                const boost::container::flat_map<UUID, CollectionSizeCount>& changes);
 
     /**
      * Returns the persisted singleton timestamp from the timestamp store, or boost::none if the
@@ -249,21 +222,8 @@ public:
 private:
     /**
      * Centralized point for flushing logic.
-     * TODO SERVER-123284: Remove 'dirtyMetadata' parameter once there is only one flush mechanism.
      */
-    void _doFlush(OperationContext* opCtx, const FastSizeCountMap& dirtyMetadata);
-
-    /**
-     * Return a copy of a subset of _metadata, only including the dirty entries. Clears the dirty
-     * flags for all currently dirty entries.
-     */
-    FastSizeCountMap _getAndClearSnapshotOfDirtyMetadata(WithLock metadataLock);
-
-    /**
-     * Write out dirtyMetadata to the `config.fast_count_metadata_store`. TODO SERVER-123284: Remove
-     * these methods.
-     */
-    void _flushDirtyMetadata(OperationContext* opCtx, const FastSizeCountMap& dirtyMetadata);
+    void _doFlush(OperationContext* opCtx);
 
     /**
      * Runs background thread, performing final flush.
@@ -271,41 +231,17 @@ private:
     void _startBackgroundThread(ServiceContext* svcCtx);
 
     /**
-     * Flushes dirty metadata when signalled.
+     * Flushes updates to size and count when signalled.
      * Sleeps on a condition variable - _backgroundThreadReadyForFlush - waiting for _flushRequested
      * to be true.
      */
     void _flushPeriodicallyOnSignal();
 
-    /**
-     * Write one collection's sizeCount to disk. Note: These are specific to the legacy flush
-     * mechanism turned on and off by '_useLegacyFlush'. TODO SERVER-123284: Remove these methods.
-     */
-    void _writeOneMetadata(OperationContext* opCtx,
-                           const CollectionPtr& fastCountColl,
-                           const UUID& uuid,
-                           const CollectionSizeCount& sizeCount,
-                           const Timestamp& validAsOfTS,
-                           const RecordId& recordId);
-
-    void _updateOneMetadata(OperationContext* opCtx,
-                            const CollectionPtr& fastCountColl,
-                            const Snapshotted<BSONObj>& doc,
-                            const UUID& uuid,
-                            const CollectionSizeCount& sizeCount,
-                            const Timestamp& validAsOfTS,
-                            const RecordId& recordId);
-    void _insertOneMetadata(OperationContext* opCtx,
-                            const CollectionPtr& fastCountColl,
-                            const UUID& uuid,
-                            const CollectionSizeCount& sizeCount,
-                            const Timestamp& validAsOfTS);
-
     using SizeCountAccumulator = absl::flat_hash_map<UUID, CollectionSizeCount>;
 
     /**
-     * Populates the in-memory values of _metadata with the values persisted in the internal fast
-     * count collection. Returns the number of records that were scanned.
+     * Populates the `accumulator` with the values persisted in the internal fast count collection.
+     * Returns the number of records that were scanned.
      */
     int _hydrateMetadataFromCollection(OperationContext* opCtx,
                                        SizeCountAccumulator& accumulator,
@@ -318,18 +254,6 @@ private:
                                       SizeCountAccumulator& accumulator,
                                       const RecordStore::RecordStoreContainer& recordStore);
 
-    /**
-     * Formats and returns the document to write to the fastcount collection.
-     */
-    BSONObj _getDocForWrite(const UUID& uuid,
-                            const CollectionSizeCount& sizeCount,
-                            const Timestamp& validAsOfTS) const;
-
-    /**
-     * Generates a key (RecordId) into the fastcount collection given a user
-     * collection uuid.
-     */
-    RecordId _keyForUUID(const UUID& uuid) const;
     UUID _UUIDForKey(RecordId key) const;
 
     // Metrics for the ReplicatedFastCountManager reported via both serverStatus and OTel.
@@ -345,32 +269,17 @@ private:
     bool _isUnderTest = false;  // Used to force synchronous writes in tests.
 
     /**
-     * When true, utilizes the legacy flush mechanism which flushes the dirtied in-memory `metadata`
-     * to the `config.fast_count_metadata_store`. Notably, this does not update
-     * `config.fast_count_metadata_timestamp_store`.
-     *
-     * When false, utilizes a more robust flush mechanism which advances the logical metadata
-     * checkpoint by writing to both `config.fast_count_metadata_store` and
-     * `config.fast_count_metadata_timestamp_store`.
-     *
-     * TODO SERVER-123284: Remove this flag and the legacy mechanism.
-     */
-    bool _useLegacyFlush{false};
-
-    /**
      * Guards _checkpointer, _backgroundThread, and _isEnabled across startup(), shutdown(), and
      * flushAsync(). Holding this lock through the idempotency check + state assignment in startup()
      * and through the move-to-claim in shutdown() makes those transitions self-protecting — no
      * reliance on external FCV/replication lock ordering for memory safety.
      *
-     * Lock ordering: _lifecycleMutex is never acquired while _metadataMutex is held. They are
-     * always acquired separately, never nested.
+     * Lock ordering: _lifecycleMutex is never acquired while _flushMutex is held. They are always
+     * acquired separately, never nested.
      */
     mutable ObservableMutex<std::mutex> _lifecycleMutex;
 
     /**
-     * When non-null, the durability feature flag was enabled at startup and all flush work is
-     * delegated to the checkpointer. The legacy background thread is not started in this mode.
      * Guarded by _lifecycleMutex.
      */
     std::unique_ptr<SizeCountCheckpointCoordinator> _checkpointer;
@@ -386,11 +295,10 @@ private:
     std::unique_ptr<SizeCountTimestampStore> _timestampStore;
 
     /**
-     * In-memory cache of committed fast sizes & counts since last checkpoint.
-     * Implemented as a map of collection UUID to the last committed size and count.
+     * Synchronizes the background flush thread with `flushAsync()` and `shutdown()`. Guards
+     * `_flushRequested` and is paired with `_backgroundThreadReadyForFlush`.
      */
-    mutable ObservableMutex<std::mutex> _metadataMutex;
-    FastSizeCountMap _metadata;
+    mutable ObservableMutex<std::mutex> _flushMutex;
     bool _flushRequested = false;  // Prevents spurious wakeups.
 };
 

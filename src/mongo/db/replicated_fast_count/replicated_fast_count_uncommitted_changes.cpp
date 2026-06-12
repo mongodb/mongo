@@ -78,7 +78,7 @@ UncommittedFastCountChange& UncommittedFastCountChange::getForWrite(OperationCon
 
             invariant(fn, "FastCountCommitFn is not set");
 
-            fn(opCtx, getUncommittedFastCountChangeFromOpCtx(opCtx)->_trackedChanges, commitTime);
+            fn(opCtx, getUncommittedFastCountChangeFromOpCtx(opCtx)->_trackedChanges);
             // The 'RecoveryUnit::Snapshot' is reset on commit, so decorations like the
             // UncommittedFastCountChange don't need manual cleanup.
         });

@@ -37,14 +37,11 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 
@@ -59,7 +56,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
 MONGO_FAIL_POINT_DEFINE(failDuringFlush);
 MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
-MONGO_FAIL_POINT_DEFINE(useInMemoryReplicatedSizeCount);
 
 }  // namespace
 
@@ -72,10 +68,8 @@ ReplicatedFastCountManager& ReplicatedFastCountManager::get(ServiceContext* svcC
 
 void ReplicatedFastCountManager::initializeFastCountCommitFn() {
     setFastCountCommitFn([](OperationContext* opCtx,
-                            const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
-                            boost::optional<Timestamp> commitTime) {
-        getReplicatedFastCountManager(opCtx->getServiceContext())
-            .commit(opCtx, changes, commitTime);
+                            const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
+        getReplicatedFastCountManager(opCtx->getServiceContext()).commit(opCtx, changes);
     });
 }
 
@@ -174,12 +168,7 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     _backgroundThreadReadyForFlush.notify_one();
     backgroundThread.join();
 
-    FastSizeCountMap dirtyMetadata;
-    {
-        std::unique_lock lock(_metadataMutex);
-        dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
-    }
-    _doFlush(opCtx, dirtyMetadata);
+    _doFlush(opCtx);
 
     LOGV2(11751501, "ReplicatedFastCountManager stopped");
     _metrics.setIsRunning(false);
@@ -389,9 +378,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
 }
 
 void ReplicatedFastCountManager::commit(
-    OperationContext* opCtx,
-    const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
-    boost::optional<Timestamp> commitTime) {
+    OperationContext* opCtx, const boost::container::flat_map<UUID, CollectionSizeCount>& changes) {
     const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
     for (const auto& [uuid, delta] : changes) {
         if (delta.count == 0 && delta.size == 0) {
@@ -406,24 +393,6 @@ void ReplicatedFastCountManager::commit(
             continue;
         }
         collection->getRecordStore()->adjustAccurateSizeCount(delta.size, delta.count);
-    }
-
-    std::lock_guard lock(_metadataMutex);
-    for (const auto& [uuid, metadata] : changes) {
-        // Ignore changes that don't need to be flushed. Count and size can both be zero if two or
-        // more UncommittedFastCountChange::record() calls between checkpoints for the same UUID
-        // cancel each other out.
-        if (metadata.count == 0 && metadata.size == 0) {
-            continue;
-        }
-
-        auto& stored = _metadata[uuid];
-        stored.sizeCount.count += metadata.count;
-        stored.sizeCount.size += metadata.size;
-        stored.dirty = true;
-        if (commitTime) {
-            stored.validAsOf = commitTime.get();
-        }
         // TODO SERVER-120203: Re-enable this invariant once outstanding bugs are fixed.
         // invariant(stored.sizeCount.size >= 0 && stored.sizeCount.count >= 0,
         //           fmt::format("Expected fast count size and count to be non-negative, but saw
@@ -434,32 +403,19 @@ void ReplicatedFastCountManager::commit(
     }
 }
 
-CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
-    std::lock_guard lock(_metadataMutex);
-    auto it = _metadata.find(uuid);
-    if (it != _metadata.end()) {
-        return it->second.sizeCount;
-    }
-    return {};
-}
-
-boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(
-    OperationContext* opCtx) const {
-    return _timestampStore->read(opCtx);
-}
-
 boost::optional<std::pair<CollectionSizeCount, Timestamp>>
 ReplicatedFastCountManager::findPersisted(OperationContext* opCtx, UUID uuid) const {
-    if (MONGO_unlikely(useInMemoryReplicatedSizeCount.shouldFail())) {
-        return std::pair{find(uuid), Timestamp{}};
-    }
-
     const auto entry = _sizeCountStore->read(opCtx, uuid);
     if (!entry) {
         return boost::none;
     }
     return std::pair{CollectionSizeCount{.size = entry->size, .count = entry->count},
                      entry->timestamp};
+}
+
+boost::optional<Timestamp> ReplicatedFastCountManager::findPersistedTimestampStoreTs(
+    OperationContext* opCtx) const {
+    return _timestampStore->read(opCtx);
 }
 
 void ReplicatedFastCountManager::flushAsync() {
@@ -472,7 +428,7 @@ void ReplicatedFastCountManager::flushAsync() {
             return;
         }
     }
-    std::lock_guard lock(_metadataMutex);
+    std::lock_guard lock(_flushMutex);
     _flushRequested = true;
     _backgroundThreadReadyForFlush.notify_one();
 }
@@ -496,17 +452,11 @@ void ReplicatedFastCountManager::flushSync_ForTest(OperationContext* opCtx) {
         }
     }
 
-    FastSizeCountMap dirtyMetadata;
-    {
-        std::unique_lock lock(_metadataMutex);
-        dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
-    }
-
     if (MONGO_unlikely(hangAfterReplicatedFastCountSnapshot.shouldFail())) {
         hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
     }
 
-    _doFlush(opCtx, dirtyMetadata);
+    _doFlush(opCtx);
 }
 
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
@@ -529,8 +479,7 @@ ReplicatedFastCountManager::getSizeCountStores_ForTest() const {
     return {_sizeCountStore.get(), _timestampStore.get()};
 }
 
-void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
-                                          const FastSizeCountMap& dirtyMetadata) {
+void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx) {
     // Flushing the logical size and count metadata checkpoint is an internal maintenance operation
     // that should not be blocked by admission control. Metadata checkpoint persistence requires
     // traversing the oplog since the last metadata checkpoint and must not fall behind to prevent
@@ -543,25 +492,21 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
         if (MONGO_unlikely(failDuringFlush.shouldFail())) {
             uasserted(12311500, "Injected failure in _doFlush for testing");
         }
+
         hangBeforePersistingNewFastCountEntries.pauseWhileSet();
 
-        if (_useLegacyFlush) {
-            _flushDirtyMetadata(opCtx, dirtyMetadata);
-        } else {
-            const size_t entryWriteCount =
-                advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
+        const size_t entryWriteCount = advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
 
-            // Failpoint used in testing for:
-            // 1. indicating a flush has completed
-            // 2. (optionally) elongating the duration of a flush.
-            sleepAfterFlush.execute([](const BSONObj& data) {
-                if (auto elem = data["sleepMs"]; elem) {
-                    sleepmillis(elem.numberInt());
-                }
-            });
+        // Failpoint used in testing for:
+        // 1. indicating a flush has completed
+        // 2. (optionally) elongating the duration of a flush.
+        sleepAfterFlush.execute([](const BSONObj& data) {
+            if (auto elem = data["sleepMs"]; elem) {
+                sleepmillis(elem.numberInt());
+            }
+        });
 
-            recordFlush(startTime, entryWriteCount);
-        }
+        recordFlush(startTime, entryWriteCount);
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
             ex.code() == ErrorCodes::NotWritablePrimary) {
@@ -578,43 +523,6 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
                       "Failed to persist collection sizeCount metadata",
                       "error"_attr = ex.toStatus());
     }
-}
-
-ReplicatedFastCountManager::FastSizeCountMap
-ReplicatedFastCountManager::_getAndClearSnapshotOfDirtyMetadata(WithLock metadataLock) {
-    FastSizeCountMap dirtyMetadata;
-    dirtyMetadata.reserve(_metadata.size());
-    for (auto&& [metadataKey, metadataValue] : _metadata) {
-        if (metadataValue.dirty) {
-            dirtyMetadata[metadataKey] = metadataValue;
-            metadataValue.dirty = false;
-        }
-    }
-
-    return dirtyMetadata;
-}
-
-void ReplicatedFastCountManager::_flushDirtyMetadata(OperationContext* opCtx,
-                                                     const FastSizeCountMap& dirtyMetadata) {
-    auto acquisition = acquireFastCountCollectionForWrite(opCtx);
-    massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
-
-    const CollectionPtr& fastCountColl = acquisition->getCollectionPtr();
-    invariant(fastCountColl,
-              str::stream()
-                  << "Expected to acquire fastcount store as a collection, not a view. isView : "
-                  << acquisition->isView());
-
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
-    for (auto&& [metadataKey, metadataVal] : dirtyMetadata) {
-        _writeOneMetadata(opCtx,
-                          fastCountColl,
-                          metadataKey,
-                          metadataVal.sizeCount,
-                          metadataVal.validAsOf,
-                          _keyForUUID(metadataKey));
-    }
-    wuow.commit();
 }
 
 void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) {
@@ -634,9 +542,8 @@ void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) 
 
 void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
     while (_isEnabled.load()) {
-        FastSizeCountMap dirtyMetadata;
         {
-            std::unique_lock lock(_metadataMutex);
+            std::unique_lock lock(_flushMutex);
             _backgroundThreadReadyForFlush.wait(
                 lock, [this] { return _flushRequested || !_isEnabled.load(); });
             _flushRequested = false;
@@ -644,86 +551,11 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
             if (!_isEnabled.load()) {
                 break;
             }
-            // Get snapshot of metadata while still holding mutex from condition variable signal.
-            dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
         }
 
         auto opCtx = cc().makeOperationContext();
-        _doFlush(opCtx.get(), dirtyMetadata);
+        _doFlush(opCtx.get());
     }
-}
-
-void ReplicatedFastCountManager::_writeOneMetadata(OperationContext* opCtx,
-                                                   const CollectionPtr& fastCountColl,
-                                                   const UUID& uuid,
-                                                   const CollectionSizeCount& sizeCount,
-                                                   const Timestamp& validAsOfTS,
-                                                   const RecordId& recordId) {
-    Snapshotted<BSONObj> doc;
-    bool exists = fastCountColl->findDoc(opCtx, recordId, &doc);
-
-    if (exists) {
-        _metrics.incrementUpdateCount();
-        _updateOneMetadata(opCtx, fastCountColl, doc, uuid, sizeCount, validAsOfTS, recordId);
-    } else {
-        _metrics.incrementInsertCount();
-        _insertOneMetadata(opCtx, fastCountColl, uuid, sizeCount, validAsOfTS);
-    }
-}
-
-void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
-                                                    const CollectionPtr& fastCountColl,
-                                                    const Snapshotted<BSONObj>& doc,
-                                                    const UUID& uuid,
-                                                    const CollectionSizeCount& sizeCount,
-                                                    const Timestamp& validAsOfTS,
-                                                    const RecordId& recordId) {
-    CollectionUpdateArgs args(doc.value());
-    // TODO SERVER-117654: When we also store timestamp we should be able to recover/combine data
-    // from old doc to keep this accurate.
-    const BSONObj newDoc = _getDocForWrite(uuid, sizeCount, validAsOfTS);
-
-    const auto diff = doc_diff::computeOplogDiff(doc.value(), newDoc, /*padding=*/0);
-    invariant(
-        diff.has_value(),
-        fmt::format("Expected computed diff to be smaller than the post-image: pre={}, post={}",
-                    doc.value().toString(),
-                    newDoc.toString()));
-
-    massert(12256900, "Expected non-empty diff for update", !diff->isEmpty());
-
-    args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
-    args.criteria = BSON("_id" << uuid);
-    collection_internal::updateDocument(
-        opCtx, fastCountColl, recordId, doc, newDoc, &args.update, nullptr, nullptr, &args);
-}
-
-void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
-                                                    const CollectionPtr& fastCountColl,
-                                                    const UUID& uuid,
-                                                    const CollectionSizeCount& sizeCount,
-                                                    const Timestamp& validAsOfTS) {
-    // TODO SERVER-118529: Consider error handling more carefully here.
-    massertStatusOK(collection_internal::insertDocument(
-        opCtx,
-        fastCountColl,
-        InsertStatement(_getDocForWrite(uuid, sizeCount, validAsOfTS)),
-        /*opDebug=*/nullptr));
-}
-
-BSONObj ReplicatedFastCountManager::_getDocForWrite(const UUID& uuid,
-                                                    const CollectionSizeCount& sizeCount,
-                                                    const Timestamp& validAsOfTS) const {
-    return BSON("_id" << uuid << kValidAsOfKey << validAsOfTS << kMetadataKey
-                      << BSON(kCountKey << sizeCount.count << kSizeKey << sizeCount.size));
-}
-
-RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) const {
-    auto key =
-        record_id_helpers::keyForDoc(BSON("_id" << uuid),
-                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                     /*collator=*/nullptr);
-    return key.getValue();
 }
 
 UUID ReplicatedFastCountManager::_UUIDForKey(const RecordId key) const {

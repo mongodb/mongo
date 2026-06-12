@@ -105,8 +105,6 @@ TEST_F(ReplicatedFastCountManagerNoCollectionsTest, InitializeMetadataDoesNothin
 
     ReplicatedFastCountManager manager;
     manager.initializeMetadata(operationContext());
-
-    EXPECT_EQ(manager.find(UUID::gen()), CollectionSizeCount(0, 0));
 }
 
 using ReplicatedFastCountManagerInitializeMetadataTest = ReplicatedFastCountManagerTest;
@@ -288,15 +286,13 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTrack
 using ReplicatedFastCountManagerCommitTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerCommitTest, CommitNothing) {
-    manager->commit(
-        operationContext(), boost::container::flat_map<UUID, CollectionSizeCount>{}, boost::none);
+    manager->commit(operationContext(), boost::container::flat_map<UUID, CollectionSizeCount>{});
 }
 
 TEST_F(ReplicatedFastCountManagerCommitTest, CollectionNotFoundDoesNothing) {
     manager->commit(operationContext(),
                     boost::container::flat_map<UUID, CollectionSizeCount>{
-                        {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}}},
-                    boost::none);
+                        {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}}});
 }
 
 TEST_F(ReplicatedFastCountManagerCommitTest, CommitZeros) {
@@ -307,8 +303,7 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitZeros) {
 
     manager->commit(operationContext(),
                     boost::container::flat_map<UUID, CollectionSizeCount>{
-                        {collA.uuid, CollectionSizeCount{.size = 0, .count = 0}}},
-                    boost::none);
+                        {collA.uuid, CollectionSizeCount{.size = 0, .count = 0}}});
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 0, .count = 0});
 }
@@ -325,8 +320,7 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) 
     manager->commit(operationContext(),
                     boost::container::flat_map<UUID, CollectionSizeCount>{
                         {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}},
-                        {collB.uuid, CollectionSizeCount{.size = 111, .count = 17}}},
-                    boost::none);
+                        {collB.uuid, CollectionSizeCount{.size = 111, .count = 17}}});
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 42, .count = 2});
     checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 111, .count = 17});
@@ -334,8 +328,7 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) 
     manager->commit(operationContext(),
                     boost::container::flat_map<UUID, CollectionSizeCount>{
                         {collA.uuid, CollectionSizeCount{.size = -10, .count = -3}},
-                        {collB.uuid, CollectionSizeCount{.size = -11, .count = -4}}},
-                    boost::none);
+                        {collB.uuid, CollectionSizeCount{.size = -11, .count = -4}}});
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 42 - 10, .count = 2 - 3});
     checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 111 - 11, .count = 17 - 4});
