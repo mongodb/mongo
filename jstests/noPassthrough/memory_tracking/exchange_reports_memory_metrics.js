@@ -71,10 +71,22 @@ let aggCmd = {
         "bufferSize": NumberInt(128),
         "key": {},
     },
+    readConcern: {},
+    writeConcern: {},
 };
 
-// Create explicit session to avoid session mismatch issues.
-const session = db.getMongo().startSession();
+// Create explicit session on an internal client connection since exchange requires internal client.
+const internalConn = (() => {
+    const conn = new Mongo(db.getMongo().host);
+    assert.commandWorked(
+        conn.getDB("admin").runCommand({
+            hello: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
+    return conn;
+})();
+const session = internalConn.startSession();
 const sessionDb = session.getDatabase(db.getName());
 
 // Run the aggregate command and get cursor IDs.
