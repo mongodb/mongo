@@ -1136,3 +1136,31 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "config_fuzzer_core",
+    config = "//buildscripts/resmokeconfig:suites/core.yml",
+    data = CORE_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+        "--setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

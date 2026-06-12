@@ -100,11 +100,26 @@ function unzip_outputs() {
 }
 
 # Writes a user-friendly bazel invocation for re-running this test target.
+# If the test was a config fuzzer suite, pins the seed so the run reproduces:
+#   --//bazel/resmoke:config_fuzz_seed=<seed>
 function write_bazel_invocation() {
-    # Escape special characters in the label for the second sed expression.
-    local test_label_escaped=$(echo "$test_label" | sed 's/[][\/\.\*^$]/\\&/g')
+    local extra_flags=""
+
+    local seed_file
+    seed_file=$(find "${workdir}/results" -name config_fuzz_seed.txt -type f 2>/dev/null | head -n 1)
+    if [[ -n "$seed_file" ]]; then
+        local seed
+        seed=$(tr -d '[:space:]' <"$seed_file")
+        if [[ -n "$seed" ]]; then
+            extra_flags+="--//bazel/resmoke:config_fuzz_seed=${seed} "
+        fi
+    fi
+
+    local replacement="${extra_flags}${test_label}"
+    local replacement_escaped
+    replacement_escaped=$(echo "$replacement" | sed 's/[][\/\.\*^$&]/\\&/g')
     mkdir -p "${workdir}/src/"
-    sed "s/\S*\$/${test_label_escaped}/" ${workdir}/resmoke-tests-bazel-invocation.txt | tail -n 1 >"${workdir}/bazel-invocation.txt"
+    sed "s/\S*\$/${replacement_escaped}/" ${workdir}/resmoke-tests-bazel-invocation.txt | tail -n 1 >"${workdir}/bazel-invocation.txt"
 }
 
 # Resolves a file path from a list of candidate locations. Returns the first existing file path found.

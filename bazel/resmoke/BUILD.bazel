@@ -1,4 +1,4 @@
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
@@ -132,6 +132,15 @@ int_flag(
     name = "test_timeout",
     build_setting_default = 0,  # 0 results in no timeout.
     make_variable = "RESMOKE_TEST_TIMEOUT",
+    visibility = ["//visibility:public"],
+)
+
+# Seed for config fuzzer suites. Empty (default) derives the seed from
+# volatile-status at build time so each run gets a fresh configuration.
+# Set to a numeric value to pin the seed for reproduction.
+string_flag(
+    name = "config_fuzz_seed",
+    build_setting_default = "",
     visibility = ["//visibility:public"],
 )
 

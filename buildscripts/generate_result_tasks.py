@@ -358,14 +358,28 @@ def get_variant_expansion(
 
 
 def _build_tag_query(tags: list[str], target_pattern: str) -> str:
-    excluded = f"attr(tags, '\\bincompatible_with_bazel_remote_test(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
-    if len(tags) == 1:
-        return f"attr(tags, '\\b{tags[0]}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern})) - {excluded}"
-    tag_queries = [
-        f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
-        for tag in tags
+    positive_tags = [t for t in tags if not t.startswith("-")]
+    negative_tags = [t[1:] for t in tags if t.startswith("-")]
+
+    excluded_parts = [
+        f"attr(tags, '\\bincompatible_with_bazel_remote_test(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
     ]
-    return f"({' + '.join(tag_queries)}) - {excluded}"
+    for tag in negative_tags:
+        excluded_parts.append(
+            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+        )
+    excluded = " + ".join(excluded_parts)
+
+    if len(positive_tags) == 1:
+        inclusion = f"attr(tags, '\\b{positive_tags[0]}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+    else:
+        tag_queries = [
+            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+            for tag in positive_tags
+        ]
+        inclusion = f"({' + '.join(tag_queries)})"
+
+    return f"{inclusion} - ({excluded})"
 
 
 def _variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str], list[str], str]:

@@ -104,3 +104,58 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "config_fuzzer_aggregation",
+    config = "//buildscripts/resmokeconfig:suites/aggregation.yml",
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+        "--setShellParameter='{defaultFindReplicaSetHostTimeoutMS: 120000}'",
+    ],
+    shard_count = 4,
+    tags = [
+        "ci-default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_aggregation_mongos_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_mongos_passthrough.yml",
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzMongosConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

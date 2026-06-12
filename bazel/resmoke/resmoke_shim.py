@@ -85,6 +85,30 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--versionId=", "version_id")
 
 
+def inject_config_fuzz_seed(resmoke_args):
+    """Read the pre-generated config fuzz seed file and inject --configFuzzSeed into resmoke args.
+
+    Also copies the seed to TEST_UNDECLARED_OUTPUTS_DIR so fetch_remote_test_results.sh
+    can include it in the reproduction command.
+    """
+    seed_file = os.environ.get("CONFIG_FUZZ_SEED_FILE")
+    if not seed_file or not os.path.exists(seed_file):
+        return
+
+    with open(seed_file) as f:
+        seed = f.read().strip()
+
+    if not seed:
+        return
+
+    if not any(arg.startswith("--configFuzzSeed") for arg in resmoke_args):
+        resmoke_args.append(f"--configFuzzSeed={seed}")
+
+    out_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+    if out_dir:
+        shutil.copy(seed_file, os.path.join(out_dir, "config_fuzz_seed.txt"))
+
+
 def setup_pythonpath():
     """Setup PYTHONPATH and executable location for jstests that call python"""
 
@@ -231,6 +255,7 @@ if __name__ == "__main__":
 
     add_evergreen_build_info(resmoke_args)
     add_multiversion_exclude_tags(resmoke_args)
+    inject_config_fuzz_seed(resmoke_args)
 
     # Add each dep binary's directory to PATH. DEPS_PATH is set when running via Bazel
     # without a pre-installed dist-test tree (i.e. not installed_dist_test_enabled).

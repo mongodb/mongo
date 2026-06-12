@@ -668,3 +668,166 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "config_fuzzer_concurrency_replication",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_replication.yml",
+    data = ["//jstests/sharding/libs:all_subpackage_javascript_files"] + CONCURRENCY_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "resources:cpu:2",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_concurrency_sharded_replication",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication.yml",
+    data = [
+        "//jstests/concurrency/reshard_collection_util:reshard_collection_util.js",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CONCURRENCY_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzMongosConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "incompatible_with_bazel_remote_test",
+        "resources:cpu:2",
+        "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_concurrency_simultaneous_replication",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_simultaneous_replication.yml",
+    data = [
+        "//jstests/fle2/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CONCURRENCY_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 30,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/replica_sets_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/replica_sets.yml",
+        "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough_base.yml",
+    ] + CORE_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "resources:cpu:2",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_simulate_crash_concurrency_replication",
+    config = "//buildscripts/resmokeconfig:suites/simulate_crash_concurrency_replication.yml",
+    data = ["//jstests/sharding/libs:all_subpackage_javascript_files"] + CONCURRENCY_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+        "--disableEncryptionFuzzing",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)

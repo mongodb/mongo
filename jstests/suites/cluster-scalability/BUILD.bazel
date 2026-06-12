@@ -14,7 +14,7 @@
 
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 load(":common.bzl", "SHARDING_DATA")
-load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
+load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_base",
@@ -300,6 +300,111 @@ resmoke_suite_test(
         "concurrency",
         "sharded",
     ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_sharding_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/check_system_buckets_hook.yml",
+        "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzMongosConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 40,
+    tags = [
+        "ci-default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "sharded",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_concurrency_sharded_replication_with_balancer",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer.yml",
+    data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzMongosConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "incompatible_with_bazel_remote_test",
+        "resources:cpu:2",
+        "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "config_fuzzer_sharding_jscore_passthrough_with_balancer",
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_balancer.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    resmoke_args = [
+        "--fuzzMongodConfigs=normal",
+        "--fuzzMongosConfigs=normal",
+        "--fuzzRuntimeParams",
+        "--excludeWithAnyTags=does_not_support_config_fuzzer",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+        "resources:cpu:2",
+        "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",

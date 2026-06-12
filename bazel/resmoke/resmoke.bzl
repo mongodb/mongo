@@ -1,6 +1,51 @@
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("//bazel/resmoke:.resmoke_suites_derived.bzl", "SUITE_SELECTORS")
 load("@rules_python//python:defs.bzl", "py_test")
+
+def _config_fuzz_seed_file_impl(ctx):
+    seed_file = ctx.actions.declare_file(ctx.label.name + ".txt")
+    fixed_seed = ctx.attr._seed_flag[BuildSettingInfo].value
+
+    if fixed_seed:
+        ctx.actions.write(seed_file, fixed_seed + "\n")
+    else:
+        ctx.actions.run_shell(
+            inputs = [ctx.version_file],
+            outputs = [seed_file],
+            command = """python3 -c '
+import hashlib, sys
+with open(sys.argv[1]) as f:
+    content = f.read()
+fields = dict(line.split(None, 1) for line in content.splitlines() if " " in line)
+raw = fields.get("BUILD_TIMESTAMP", "") + "|" + sys.argv[2]
+seed = int(hashlib.sha256(raw.strip().encode()).hexdigest(), 16) % sys.maxsize
+print(seed)
+' "$1" "$2" > "$3"
+""",
+            arguments = [ctx.version_file.path, ctx.attr.suite_name, seed_file.path],
+            execution_requirements = {
+                "no-cache": "1",
+                "no-remote": "1",
+            },
+        )
+
+    return [DefaultInfo(files = depset([seed_file]))]
+
+_config_fuzz_seed_file = rule(
+    implementation = _config_fuzz_seed_file_impl,
+    attrs = {
+        "_seed_flag": attr.label(
+            default = "//bazel/resmoke:config_fuzz_seed",
+            providers = [BuildSettingInfo],
+        ),
+        "suite_name": attr.string(
+            mandatory = True,
+            doc = "Name of the resmoke suite, combined with BUILD_TIMESTAMP to produce a per-suite seed.",
+        ),
+    },
+    doc = "Generates a seed file for config fuzzer suites. When --//bazel/resmoke:config_fuzz_seed is empty (default), derives the seed from BUILD_TIMESTAMP and the suite name in volatile-status so all shards share the same seed. When set, writes that value verbatim.",
+)
 
 def _collect_python_imports_impl(ctx):
     """Collects Python imports from data dependencies to build PYTHONPATH."""
@@ -214,6 +259,27 @@ def resmoke_suite_test(
         tags = ["manual"],
     )
 
+    # Config fuzzer: pre-generate a shared seed so all shards use the same fuzz
+    # config, and so the seed is available for the reproduction command.
+    is_config_fuzzer = (
+        not any([arg.startswith("--configFuzzSeed") for arg in resmoke_args]) and
+        any([
+            arg.startswith("--fuzzMongodConfigs") or arg.startswith("--fuzzMongosConfigs")
+            for arg in resmoke_args
+        ])
+    )
+    seed_target_data = []
+    seed_env = {}
+    if is_config_fuzzer:
+        seed_target = name + "_config_fuzz_seed"
+        _config_fuzz_seed_file(
+            name = seed_target,
+            suite_name = name,
+            tags = ["manual"],
+        )
+        seed_target_data = [":%s" % seed_target]
+        seed_env = {"CONFIG_FUZZ_SEED_FILE": "$(location :%s)" % seed_target}
+
     resmoke_shim = Label("//bazel/resmoke:resmoke_shim.py")
     resmoke = Label("//buildscripts:resmoke")
     extra_args = select({
@@ -315,8 +381,8 @@ def resmoke_suite_test(
     ]
 
     # Data that is always safe for cquery (no C++ toolchain needed): auto-derived srcs,
-    # default resmoke infrastructure, and multiversion artifacts.
-    cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags
+    # default resmoke infrastructure, multiversion artifacts, and the config fuzz seed file.
+    cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags + seed_target_data
 
     # If this suite's only multiversion dep is last-continuous, it is a
     # dedicated last-continuous suite.  Mark it incompatible when
@@ -374,7 +440,7 @@ def resmoke_suite_test(
             "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
             "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
             "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
-        } | ({
+        } | seed_env | ({
             "MULTIVERSION_CONFIG_FILE": "$(location //bazel/resmoke:multiversion_config)",
             "MULTIVERSION_VERSIONS": ",".join([
                 dep.rsplit(":", 1)[1] if ":" in dep else dep
