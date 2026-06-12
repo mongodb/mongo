@@ -446,14 +446,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
 }
 
 bool ShardingCoordinator::_isRetriableErrorForDDLCoordinator(const Status& status) {
-    return status.isA<ErrorCategory::CursorInvalidatedError>() ||
-        status.isA<ErrorCategory::ShutdownError>() || status.isA<ErrorCategory::RetriableError>() ||
-        status.isA<ErrorCategory::Interruption>() ||
-        status.isA<ErrorCategory::CancellationError>() ||
-        status.isA<ErrorCategory::ExceededTimeLimitError>() ||
-        status.isA<ErrorCategory::WriteConcernError>() ||
-        status == ErrorCodes::FailedToSatisfyReadPreference || status == ErrorCodes::LockBusy ||
-        status == ErrorCodes::CommandNotFound;
+    return sharding_ddl_util::isRetriableErrorForDDLCoordinator(status);
 }
 
 ShardingCoordinatorExternalState* ShardingCoordinator::_getExternalState() {

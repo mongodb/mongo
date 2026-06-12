@@ -59,9 +59,8 @@ public:
      */
     MergeAllChunksOnShardResponse getResponse(OperationContext* opCtx) {
         getCompletionFuture().get(opCtx);
-        auto doc = _copyDoc();
-        tassert(12117910, "Expected response to be set", doc.getResponse());
-        return doc.getResponse().get();
+        tassert(12117910, "Expected _response to be set", _response);
+        return *_response;
     }
 
 protected:
@@ -83,8 +82,15 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
+    bool _allowedToInvalidateOSI() const noexcept override;
+
+    void _onCleanup(OperationContext* opCtx) override;
+
     const ShardsvrMergeAllChunksOnShardRequest _request;
+    boost::optional<MergeAllChunksOnShardResponse> _response;
     boost::optional<ScopedSplitMergeChunk> _scopedSplitMergeChunk;
+
+    bool _cleaningUp = false;
 
     // Reason document used to acquire and release the recoverable critical section.
     const BSONObj _critSecReason;

@@ -18,6 +18,9 @@ describe("mergeAllChunksOnShard scoped per-shard", function () {
 
         // Let mergeAllChunksOnShard merge chunks no matter how recently they were created.
         configureFailPointForRS(this.st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs2.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
 
         assert.commandWorked(
             this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),
@@ -46,6 +49,10 @@ describe("mergeAllChunksOnShard scoped per-shard", function () {
         assert.eq(3, this.countChunksOnShard(this.st.shard0.shardName), "shard0 initial chunks");
         assert.eq(2, this.countChunksOnShard(this.st.shard1.shardName), "shard1 initial chunks");
         assert.eq(2, this.countChunksOnShard(this.st.shard2.shardName), "shard2 initial chunks");
+
+        // Do a collMod just to make the shard catalogs authoritative.
+        // TODO (SERVER-127953): remove.
+        assert.commandWorked(this.st.s.getDB(this.dbName).runCommand({collMod: this.collName, comment: "comment"}));
     });
 
     after(() => {

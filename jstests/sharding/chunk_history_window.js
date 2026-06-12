@@ -32,7 +32,7 @@ const st = new ShardingTest({
     },
 });
 
-// Override the history window on the config RS with the failpoint. This bypasses
+// Override the history window on the config RS and shards with the failpoint. This bypasses
 // getHistoryWindowInSeconds() entirely and works regardless of the storage backend.
 configureFailPointForRS(
     st.configRS.nodes,
@@ -40,6 +40,8 @@ configureFailPointForRS(
     {seconds: snapshotHistoryWindowSecs},
     "alwaysOn",
 );
+configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: snapshotHistoryWindowSecs}, "alwaysOn");
+configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: snapshotHistoryWindowSecs}, "alwaysOn");
 
 const mongosDB = st.s.getDB(jsTestName());
 const mongosColl = mongosDB.test;

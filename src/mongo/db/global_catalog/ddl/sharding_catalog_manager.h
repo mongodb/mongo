@@ -335,6 +335,21 @@ public:
                                 int maxTimeProcessingChunksMS = INT_MAX);
 
     /**
+     * Commits a precomputed list of merged chunks for `nss`/`shardId`.
+     *
+     * The caller supplies the post-merge chunk ranges (computed on the authoritative shard outside
+     * the critical section). Chunk versions in `newChunks` are ignored/recomputed under the
+     * chunk-op lock against the current collection placement version.
+     *
+     * Returns the new placement version.
+     */
+    StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
+    commitMergeAllPrecomputedChunksOnShard(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const ShardId& shardId,
+                                           std::vector<ChunkType> newChunks);
+
+    /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
      *
      * Returns a ShardAndCollectionPlacementVersions object with the newly produced chunk versions
@@ -714,6 +729,11 @@ public:
      * Returns the oldest timestamp that is supported for history preservation.
      */
     static Timestamp getOldestTimestampSupportedForSnapshotHistory(OperationContext* opCtx);
+
+    /**
+     * Returns the history window duration in seconds.
+     */
+    static std::uint32_t getHistoryWindowInSeconds();
 
     /**
      * Removes from config.placementHistory any document that is no longer needed to describe

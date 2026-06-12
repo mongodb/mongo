@@ -48,6 +48,7 @@
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_rename_collection_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/remove_tags_gen.h"
 #include "mongo/db/server_options.h"
@@ -82,6 +84,7 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/inline_executor.h"
@@ -121,6 +124,8 @@ namespace mongo {
 
 namespace sharding_ddl_util {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangMergeAllChunksUntilReachingTimeout);
 
 const auto kUnsplittableShardKey = KeyPattern(BSON("_id" << 1));
 
@@ -1355,6 +1360,215 @@ void generatePlacementChangeNotificationOnShard(
     }
 }
 
+bool isRetriableErrorForDDLCoordinator(const Status& status) {
+    return status.isA<ErrorCategory::CursorInvalidatedError>() ||
+        status.isA<ErrorCategory::ShutdownError>() || status.isA<ErrorCategory::RetriableError>() ||
+        status.isA<ErrorCategory::Interruption>() ||
+        status.isA<ErrorCategory::CancellationError>() ||
+        status.isA<ErrorCategory::ExceededTimeLimitError>() ||
+        status.isA<ErrorCategory::WriteConcernError>() ||
+        status == ErrorCodes::FailedToSatisfyReadPreference || status == ErrorCodes::LockBusy ||
+        status == ErrorCodes::CommandNotFound;
+}
+
+ComputeAllMergeableChunksOnShardResult computeAllMergeableChunksOnShard(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& shardId,
+    BSONObj firstMergeableChunkMin,
+    std::shared_ptr<Shard> configShard,
+    const NamespaceString& chunksNamespace,
+    CollectionType coll,
+    boost::optional<ChunkVersion> originalVersion,
+    int maxNumberOfChunksToMerge,
+    int maxTimeProcessingChunksMS) {
+    Timer tElapsed;
+
+    if (MONGO_unlikely(hangMergeAllChunksUntilReachingTimeout.shouldFail())) {
+        sleepFor(Milliseconds(maxTimeProcessingChunksMS + 1));
+    }
+
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Can't execute mergeChunks on unsharded collection "
+                          << nss.toStringForErrorMsg(),
+            !coll.getUnsplittable());
+
+    const auto& collUuid = coll.getUuid();
+    const auto& keyPattern = coll.getKeyPattern();
+    auto newVersion = originalVersion;
+    const ChunkVersion kNoVersion{};
+
+    // Retrieve the list of mergeable chunks belonging to the requested shard/collection.
+    // A chunk is mergeable when the following conditions are honored:
+    // - Non-jumbo
+    // - The last migration occurred before the current history window
+    DBDirectClient client{opCtx};
+
+    const auto chunksBelongingToShardCursor{client.find(std::invoke([&] {
+        FindCommandRequest chunksFindRequest{chunksNamespace};
+        chunksFindRequest.setFilter(std::invoke([&]() {
+            BSONObjBuilder filterBuilder;
+            filterBuilder << ChunkType::collectionUUID << collUuid;
+            filterBuilder << ChunkType::shard(shardId.toString());
+            if (!firstMergeableChunkMin.isEmpty()) {
+                filterBuilder << ChunkType::min.query("$gte", firstMergeableChunkMin);
+                firstMergeableChunkMin = BSONObj{};
+            }
+            filterBuilder << ChunkType::onCurrentShardSince.lt(
+                ShardingCatalogManager::getOldestTimestampSupportedForSnapshotHistory(opCtx));
+            filterBuilder << ChunkType::jumbo.ne(true);
+            return filterBuilder.obj();
+        }));
+        chunksFindRequest.setSort(BSON(ChunkType::min << 1));
+        return chunksFindRequest;
+    }))};
+
+    tassert(ErrorCodes::OperationFailed,
+            str::stream() << "Failed to establish a cursor for reading "
+                          << nss.toStringForErrorMsg() << " from local storage",
+            chunksBelongingToShardCursor);
+
+    // Prepare the data for the merge.
+
+    // Track the running total of chunks that would be merged.
+    int numTotalMergedChunks = 0;
+
+    std::vector<ChunkType> newChunks;
+    const Timestamp minValidTimestamp = Timestamp(0, 1);
+
+    BSONObj rangeMin, rangeMax;
+    Timestamp rangeOnCurrentShardSince = minValidTimestamp;
+    int nChunksInRange = 0;
+
+    // Lambda generating the new chunk to be committed if a merge can be issued on the range
+    auto processRange = [&]() {
+        if (nChunksInRange > 1) {
+            if (newVersion) {
+                newVersion->incMinor();
+            }
+            ChunkType newChunk(collUuid,
+                               {rangeMin.getOwned(), rangeMax.copy()},
+                               newVersion.get_value_or(kNoVersion),
+                               shardId);
+            newChunk.setOnCurrentShardSince(rangeOnCurrentShardSince);
+            newChunk.setHistory({ChunkHistory{rangeOnCurrentShardSince, shardId}});
+            numTotalMergedChunks += nChunksInRange;
+            newChunks.push_back(std::move(newChunk));
+            if (firstMergeableChunkMin.isEmpty()) {
+                firstMergeableChunkMin = newChunks.at(0).getMin().copy();
+            }
+        }
+        nChunksInRange = 0;
+        rangeOnCurrentShardSince = minValidTimestamp;
+    };
+
+    const auto zones = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        TagsType::ConfigNS,
+        /* query */
+        BSON(TagsType::ns(
+            NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))),
+        /*sort*/ BSON(TagsType::min << 1),
+        /*limit*/ boost::none,
+        /*hint*/ boost::none,
+        /*projection*/ BSON(TagsType::min << 1 << TagsType::max << 1)));
+
+    auto zonesIt = zones.docs.cbegin();
+
+    // Initialize bounds lower than any zone [(), Minkey) so that it can be later advanced
+    boost::optional<ChunkRange> currentZone = ChunkRange(BSONObj(), keyPattern.globalMin());
+
+    auto advanceZoneIfNeeded = [&](const BSONObj& advanceZoneUpToThisBound) {
+        // This lambda advances zones taking into account the whole shard key space,
+        // also considering the "no-zone" as a zone itself.
+        //
+        // Example:
+        // - Zones set by the user: [1, 10), [20, 30), [30, 40)
+        // - Real zones: [Minkey, 1), [1, 10), [10, 20), [20, 30), [30, 40), [40, MaxKey)
+        //
+        // Returns a bool indicating whether the zone has changed or not.
+        bool zoneChanged = false;
+        while (currentZone && advanceZoneUpToThisBound.woCompare(currentZone->getMin()) > 0 &&
+               advanceZoneUpToThisBound.woCompare(currentZone->getMax()) > 0) {
+            zoneChanged = true;
+            if (zonesIt != zones.docs.cend()) {
+                const auto& nextZone = *zonesIt;
+                const auto nextZoneMin =
+                    keyPattern.extendRangeBound(nextZone.getObjectField(TagsType::min()), false);
+                if (nextZoneMin.woCompare(currentZone->getMax()) > 0) {
+                    currentZone = ChunkRange(currentZone->getMax(), nextZoneMin);
+                } else {
+                    // Use makeUpperInclusive=true when zone max
+                    // is all-MaxKey.
+                    const auto nextZoneMaxField = nextZone.getObjectField(TagsType::max());
+                    const auto nextZoneMax = keyPattern.extendRangeBound(
+                        nextZoneMaxField, keyPattern.isGlobalMax(nextZoneMaxField));
+                    currentZone = ChunkRange(nextZoneMin, nextZoneMax);
+                    zonesIt++;  // Advance iterator
+                }
+            } else {
+                currentZone = boost::none;
+            }
+        }
+        return zoneChanged;
+    };
+
+    while (chunksBelongingToShardCursor->more()) {
+        const auto chunkDoc = chunksBelongingToShardCursor->nextSafe();
+
+        const auto& chunkMin = chunkDoc.getObjectField(ChunkType::min());
+        const auto& chunkMax = chunkDoc.getObjectField(ChunkType::max());
+        const Timestamp chunkOnCurrentShardSince = [&]() {
+            Timestamp t = minValidTimestamp;
+            bsonExtractTimestampField(chunkDoc, ChunkType::onCurrentShardSince(), &t).ignore();
+            return t;
+        }();
+
+        bool zoneChanged = advanceZoneIfNeeded(chunkMax);
+        if (rangeMax.woCompare(chunkMin) != 0 || zoneChanged) {
+            processRange();
+        }
+
+        if (nChunksInRange == 0) {
+            rangeMin = chunkMin.getOwned();
+        }
+        rangeMax = chunkMax.getOwned();
+
+        if (chunkOnCurrentShardSince > rangeOnCurrentShardSince) {
+            rangeOnCurrentShardSince = chunkOnCurrentShardSince;
+        }
+        nChunksInRange++;
+
+        // Stop looking for additional mergeable chunks if `maxNumberOfChunksToMerge` is
+        // reached.
+        if (numTotalMergedChunks + nChunksInRange >= maxNumberOfChunksToMerge) {
+            break;
+        }
+
+        // Stop looking for additional mergeable chunks if the `maxTimeProcessingChunksMS`
+        // is exceeded. The main reason of this timeout is to reduce the likelihood of
+        // failing on commit because of a concurrent migration.
+        //
+        // Note that we'll only timeout if we've already found mergeable chunks, otherwise
+        // we'll continue looking. Although it'll be more likely to fail on commit due to a
+        // concurrent migration, we'll increase the success rate for the next retry due to
+        // knowing the `firstMergeableChunkMin`.
+        if (!newChunks.empty() && tElapsed.millis() > maxTimeProcessingChunksMS) {
+            break;
+        }
+    }
+
+    processRange();
+
+    return {
+        .newChunks = std::move(newChunks),
+        .newVersion = newVersion.get_value_or(kNoVersion),
+        .firstMergeableChunkMin = firstMergeableChunkMin.getOwned(),
+        .numMergedChunks = numTotalMergedChunks,
+    };
+}
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

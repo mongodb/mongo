@@ -76,6 +76,9 @@ describe("authoritative chunk operations reject malformed inputs without side ef
         this.dbName = "ckprecond_db";
 
         configureFailPointForRS(this.st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs2.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
 
         assert.commandWorked(
             this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),

@@ -313,7 +313,8 @@ StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
     return chunk;
 }
 
-StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source) {
+StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source,
+                                                         bool acceptMissingVersion) {
     // Parse history and shard.
     StatusWith<ChunkType> chunkStatus = _parseChunkBase(source);
     if (!chunkStatus.isOK()) {
@@ -362,12 +363,17 @@ StatusWith<ChunkType> ChunkType::parseFromNetworkRequest(const BSONObj& source) 
     }
 
     // Parse version.
-    chunk._version = ChunkVersion::parse(source[ChunkType::lastmod()]);
+    {
+        const auto elem = source[ChunkType::lastmod()];
+        if (!acceptMissingVersion || !elem.eoo()) {
+            chunk._version = ChunkVersion::parse(elem);
+        }
+    }
 
     return chunk;
 }
 
-BSONObj ChunkType::toConfigBSON() const {
+BSONObj ChunkType::toConfigBSON(bool omitVersion) const {
     BSONObjBuilder builder;
     if (_id)
         builder.append(name.name(), getName());
@@ -377,7 +383,7 @@ BSONObj ChunkType::toConfigBSON() const {
         _range->serialize(&builder);
     if (_shard)
         getShard().serialize(shard.name(), &builder);
-    if (_version)
+    if (!omitVersion && _version)
         builder.appendTimestamp(lastmod.name(), _version->toLong());
     if (_estimatedSizeBytes)
         builder.appendNumber(estimatedSizeBytes.name(),

@@ -91,8 +91,32 @@ public:
         using InvocationBase::InvocationBase;
 
         ConfigsvrMergeAllPrecomputedChunksOnShardResponse typedRun(OperationContext* opCtx) {
-            // TODO (SERVER-128344): implement command.
-            uasserted(ErrorCodes::NotImplemented, "Not implemented yet");
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName
+                                  << " can only be run on the config server",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+            uassert(12834407,
+                    "Expected to be called within a retryable write",
+                    opCtx->isRetryableWrite() && TransactionParticipant::get(opCtx));
+
+            // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
+            // collections under the exclusive _kChunkOpLock happen on the same term.
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+            std::vector<ChunkType> newChunks;
+            newChunks.reserve(request().getNewChunks().size());
+            for (const auto& chunk : request().getNewChunks()) {
+                auto chunkBson = uassertStatusOK(
+                    ChunkType::parseFromNetworkRequest(chunk, true /*acceptMissingVersion*/));
+                newChunks.emplace_back(std::move(chunkBson));
+            }
+
+            auto const response = uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->commitMergeAllPrecomputedChunksOnShard(
+                    opCtx, ns(), request().getShard(), std::move(newChunks)));
+
+            return {response.collectionPlacementVersion};
         }
 
     private:

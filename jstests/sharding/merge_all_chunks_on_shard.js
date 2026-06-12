@@ -71,10 +71,14 @@ function setJumboFlag(mongoS, coll, chunkQuery) {
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
     configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
+    configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
+    configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
 }
 
 function resetHistoryWindowInSecs(st) {
     configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {}, "off");
+    configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {}, "off");
+    configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {}, "off");
 }
 
 function updateBalancerParameter(st, paramName, valueInMS) {
@@ -524,6 +528,7 @@ function testMaxTimeProcessingChunksMSParameter(st, testDB) {
 
     // Run mergeAllChunksOnShard on shard 'shard0' and forcing a timeout of the operation.
     const failpoint = configureFailPointForRS(st.configRS.nodes, "hangMergeAllChunksUntilReachingTimeout");
+    const failpointShard = configureFailPointForRS(st.rs0.nodes, "hangMergeAllChunksUntilReachingTimeout");
 
     assert.commandWorked(
         st.s.adminCommand({
@@ -549,6 +554,7 @@ function testMaxTimeProcessingChunksMSParameter(st, testDB) {
     });
 
     failpoint.off();
+    failpointShard.off();
 
     assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: coll.getFullName(), shard: shard0}));
 

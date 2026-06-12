@@ -155,7 +155,8 @@ public:
      * {min: <>, max: <>, shard: <>, uuid: <>, history: <>, jumbo: <>, lastmod: <>,
      * lastmodEpoch: <>, lastmodTimestamp: <>, onCurrentShardSince: <>}
      */
-    static StatusWith<ChunkType> parseFromNetworkRequest(const BSONObj& source);
+    static StatusWith<ChunkType> parseFromNetworkRequest(const BSONObj& source,
+                                                         bool acceptMissingVersion = false);
 
     /**
      * Constructs a new ChunkType object from BSON with the following format:
@@ -192,7 +193,7 @@ public:
      * Returns the BSON representation of the entry for the config server's config.chunks
      * collection.
      */
-    BSONObj toConfigBSON() const;
+    BSONObj toConfigBSON(bool omitVersion = false) const;
 
     /**
      * Returns the BSON representation of the entry for a shard server's config.chunks.<epoch>

@@ -29,6 +29,8 @@ describe("commit chunk operations honor allowChunkOperations under the chunk loc
         // Let mergeAllChunksOnShard merge chunks no matter how recently they were created;
         // otherwise it returns early before reaching the check this test exercises.
         configureFailPointForRS(this.st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPointForRS(this.st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
 
         assert.commandWorked(
             this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),

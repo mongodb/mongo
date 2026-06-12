@@ -32,6 +32,8 @@ describe("setAllowChunkOperations drains in-flight chunk coordinators", function
 
         // Let mergeAllChunksOnShard merge chunks no matter how recently they were created.
         configureFailPoint(this.st.configRS.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPoint(this.st.rs0.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
+        configureFailPoint(this.st.rs1.getPrimary(), "overrideHistoryWindowInSecs", {seconds: -10}, "alwaysOn");
 
         assert.commandWorked(
             this.st.s.adminCommand({enableSharding: this.dbName, primaryShard: this.st.shard0.shardName}),

@@ -45,6 +45,7 @@ enums:
         values:
             kUnset: "unset"
             kCheckPreconditions: "checkPreconditions"
+            kPrecomputeChunkList: "precomputeChunkList"
             kAcquireCriticalSection: "acquireCriticalSection"
             kGlobalCatalogCommit: "globalCatalogCommit"
             kShardCatalogCommit: "shardCatalogCommit"
@@ -62,9 +63,15 @@ structs:
             phase:
                 type: MergeAllChunksCoordinatorPhase
                 default: kUnset
-            response:
-                type: MergeAllChunksOnShardResponse
-                description: >-
-                    Result of the global-catalog commit. Persisted so it survives a failover that 
-                    occurs after the global catalog commit phase.
+            newChunks:
+                description: "A precomputed list with the new chunks to commit."
+                type: array # Not array<object_owned> to have more control over its creation.
+                optional: true
+            numMergedChunks:
+                type: int
+                description: "Number of chunks that will be merged"
+                optional: true
+            shardVersion:
+                type: ChunkVersion
+                description: "Latest data placement of the shard."
                 optional: true

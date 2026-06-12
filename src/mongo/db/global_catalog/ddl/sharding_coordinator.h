@@ -367,6 +367,9 @@ protected:
      * updated operation session information (OSI).
      */
     OperationSessionInfo getNewSession(OperationContext* opCtx) {
+        tassert(12834404,
+                "Attempted to bump the session when _allowedToInvalidateOSI is false",
+                _allowedToInvalidateOSI());
         return _sessionTracker.getNextSession(opCtx);
     }
 
@@ -375,6 +378,9 @@ protected:
      * session state. No-op if no session is currently held.
      */
     void releaseSession(OperationContext* opCtx) {
+        tassert(12834405,
+                "Attempted to release the session when _allowedToInvalidateOSI is false",
+                _allowedToInvalidateOSI());
         _sessionTracker.releaseSession(opCtx);
     }
 
@@ -383,7 +389,14 @@ protected:
      * reads on the barrier's participants will reflect all prior writes.
      */
     void performCausalityBarrier(OperationContext* opCtx, CausalityBarrier& barrier) {
+        tassert(12834406,
+                "Attempted to bump the session when _allowedToInvalidateOSI is false",
+                _allowedToInvalidateOSI());
         _sessionTracker.performCausalityBarrier(opCtx, barrier);
+    }
+
+    boost::optional<OperationSessionInfo> getCurrentSession(OperationContext* opCtx) {
+        return _sessionTracker.getCurrentSession(opCtx);
     }
 
     std::function<void()> _buildPhaseHandlerGeneric(
@@ -417,9 +430,17 @@ protected:
      */
     void triggerCleanup(OperationContext* opCtx, const Status& status);
 
-private:
+    /**
+     * If this function returns `false`, any call to `getNewSession`, `releaseSession` or
+     * `performCausalityBarrier` will tassert. Used to ensure stability of the curret OSI.
+     */
+    virtual bool _allowedToInvalidateOSI() const noexcept {
+        return true;
+    }
+
     void _onCleanup(OperationContext* opCtx) override;
 
+private:
     boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override;
 
     void writeSession(OperationContext* opCtx,

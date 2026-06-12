@@ -40,10 +40,14 @@ function setOnCurrentShardSince(mongoS, coll, extraQuery, refTimestamp, offsetIn
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
     configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
+    configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
+    configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
 }
 
 function resetHistoryWindowInSecs(st) {
     configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {}, "off");
+    configureFailPointForRS(st.rs0.nodes, "overrideHistoryWindowInSecs", {}, "off");
+    configureFailPointForRS(st.rs1.nodes, "overrideHistoryWindowInSecs", {}, "off");
 }
 
 // Forces the CSR for `ns` on `shardConn` into the kNonAuthoritative state by clearing
