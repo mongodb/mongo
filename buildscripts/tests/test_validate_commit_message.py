@@ -32,6 +32,16 @@ class ValidateCommitMessageTest(unittest.TestCase):
                 binsha=b"deadbeefdeadbeefdead",
                 message="SERVER-44338 blablablalbabla\nmultiline message\nasdfasdf",
             ),
+            Commit(
+                repo=fake_repo,
+                binsha=b"deadbeefdeadbeefdead",
+                message="Bump werkzeug from 2.3.7 to 3.1.6 (#55153)",
+            ),
+            Commit(
+                repo=fake_repo,
+                binsha=b"deadbeefdeadbeefdead",
+                message="Bump idna from 3.11 to 3.15 in /buildscripts/bazel_rules_mongo (#55151)",
+            ),
         ]
 
         self.assertTrue(all(is_valid_commit(message) for message in messages))
@@ -210,6 +220,25 @@ class ValidateCommitMessageTest(unittest.TestCase):
 
         self.assertTrue(is_valid_commit(commit, changed_files))
 
+    def test_dependabot_bump_passes_is_valid_commit(self):
+        """Bump X from Y to Z messages are valid in both github_pr and github_merge_queue."""
+        fake_repo = Repo()
+        messages = [
+            Commit(
+                repo=fake_repo,
+                binsha=b"deadbeefdeadbeefdead",
+                message="Bump werkzeug from 2.3.7 to 3.1.6 (#55153)",
+            ),
+            Commit(
+                repo=fake_repo,
+                binsha=b"deadbeefdeadbeefdead",
+                message="Bump idna from 3.11 to 3.15 in /buildscripts/bazel_rules_mongo (#55151)",
+            ),
+        ]
+        for requester in ("github_pr", "github_merge_queue"):
+            with self.subTest(requester=requester):
+                self.assertTrue(all(is_valid_commit(m, [], requester=requester) for m in messages))
+
     @patch("requests.post")
     def test_squashed_commit(self, mock_request):
         class FakeResponse:
@@ -218,7 +247,6 @@ class ValidateCommitMessageTest(unittest.TestCase):
                     "data": {
                         "repository": {
                             "pullRequest": {
-                                "author": {"login": "some-user"},
                                 "viewerMergeHeadlineText": "SERVER-1234 Add a ton of great support (#32823)",
                                 "viewerMergeBodyText": "This PR adds back support for a lot of things\nMany great things!",
                             }
@@ -237,8 +265,8 @@ class ValidateCommitMessageTest(unittest.TestCase):
         )
 
     @patch("requests.post")
-    def test_dependabot_pr_skips_validation(self, mock_request):
-        """GitHub GraphQL returns 'dependabot[bot]' for the native Dependabot app."""
+    def test_dependabot_squashed_commit_passes_validation(self, mock_request):
+        """Dependabot PRs return a commit with a Bump headline that passes is_valid_commit."""
 
         class FakeResponse:
             def json(self):
@@ -246,7 +274,6 @@ class ValidateCommitMessageTest(unittest.TestCase):
                     "data": {
                         "repository": {
                             "pullRequest": {
-                                "author": {"login": "dependabot[bot]"},
                                 "viewerMergeHeadlineText": "Bump werkzeug from 2.3.7 to 3.1.6 (#55153)",
                                 "viewerMergeBodyText": "Bumps werkzeug from 2.3.7 to 3.1.6.",
                             }
@@ -258,53 +285,8 @@ class ValidateCommitMessageTest(unittest.TestCase):
         commits = get_non_merge_queue_squashed_commits(
             github_org="fun_org", github_repo="fun_repo", pr_number=55153, github_token="fun_token"
         )
-        self.assertEqual(len(commits), 0)
-
-    @patch("requests.post")
-    def test_dependabot_pr_skips_validation_bare_login(self, mock_request):
-        """GitHub GraphQL sometimes returns 'dependabot' without the '[bot]' suffix."""
-
-        class FakeResponse:
-            def json(self):
-                return {
-                    "data": {
-                        "repository": {
-                            "pullRequest": {
-                                "author": {"login": "dependabot"},
-                                "viewerMergeHeadlineText": "Bump twisted from 24.11.0 to 26.4.0 (#16848)",
-                                "viewerMergeBodyText": "Bumps twisted from 24.11.0 to 26.4.0.",
-                            }
-                        }
-                    }
-                }
-
-        mock_request.return_value = FakeResponse()
-        commits = get_non_merge_queue_squashed_commits(
-            github_org="fun_org", github_repo="fun_repo", pr_number=16848, github_token="fun_token"
-        )
-        self.assertEqual(len(commits), 0)
-
-    @patch("requests.post")
-    def test_null_author_does_not_crash(self, mock_request):
-        class FakeResponse:
-            def json(self):
-                return {
-                    "data": {
-                        "repository": {
-                            "pullRequest": {
-                                "author": None,
-                                "viewerMergeHeadlineText": "SERVER-1234 Add a ton of great support (#32823)",
-                                "viewerMergeBodyText": "Body",
-                            }
-                        }
-                    }
-                }
-
-        mock_request.return_value = FakeResponse()
-        commits = get_non_merge_queue_squashed_commits(
-            github_org="fun_org", github_repo="fun_repo", pr_number=1024, github_token="fun_token"
-        )
         self.assertEqual(len(commits), 1)
+        self.assertTrue(is_valid_commit(commits[0], [], requester="github_pr"))
 
 
 if __name__ == "__main__":

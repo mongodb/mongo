@@ -58,7 +58,9 @@ with open(repo_root / ".github" / "pull_request_template.md", "r") as r:
 
 BANNED_STRINGS = ["https://spruce.mongodb.com", "https://evergreen.mongodb.com", pr_template]
 
-VALID_SUMMARY = re.compile(r'(?:Revert ")?(?:([A-Z]+)-([A-Z0-9]+)|Import wiredtiger)')
+VALID_SUMMARY = re.compile(
+    r'(?:Revert ")?(?:([A-Z]+)-([A-Z0-9]+)|Import wiredtiger|Bump \S+ from \S+ to \S+)'
+)
 
 # The allowed jira projects and their corresponding allowed file paths.
 # allowed file paths are in gitignore format
@@ -161,7 +163,6 @@ def get_non_merge_queue_squashed_commits(
         "query": f"""{{
             repository(owner: "{github_org}", name: "{github_repo}") {{
                 pullRequest(number: {pr_number}) {{
-                    author {{ login }}
                     viewerMergeHeadlineText(mergeType: SQUASH)
                     viewerMergeBodyText(mergeType: SQUASH)
                 }}
@@ -181,19 +182,11 @@ def get_non_merge_queue_squashed_commits(
     # Response will look like
     # {'data': {'repository': {'pullRequest':
     # {
-    #   'author': {'login': 'some-user'},
     #   'viewerMergeHeadlineText': 'SERVER-1234 Add a ton of great support (#32823)',
     #   'viewerMergeBodyText': 'This PR adds back support for a lot of things\nMany great things!'
     # }}}}
     LOGGER.info("Squashed content", content=resp)
     pr_info = resp["data"]["repository"]["pullRequest"]
-
-    author_login = (pr_info.get("author") or {}).get("login")
-    if author_login in ("dependabot[bot]", "dependabot"):
-        LOGGER.info(
-            "Skipping commit message validation for Dependabot PR", author_login=author_login
-        )
-        return []
 
     fake_repo = Repo()
     return [
