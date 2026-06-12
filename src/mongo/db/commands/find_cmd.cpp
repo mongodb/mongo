@@ -808,12 +808,14 @@ public:
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
-            if (prepareForFLERewrite(opCtx, findCommand->getEncryptionInformation())) {
+            if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
                 LOGV2_DEBUG(
                     7964101, 2, "Processing Queryable Encryption command", "cmd"_attr = cmdObj);
-
-                processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
+                if (prepareForFLERewrite(opCtx, findCommand->getEncryptionInformation())) {
+                    processFLEFindD(
+                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
+                }
             }
 
             if (findCommand->getMirrored().value_or(false)) {

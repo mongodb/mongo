@@ -249,10 +249,13 @@ public:
         auto curOp = CurOp::get(opCtx);
         curOp->beginQueryPlanningTimer();
 
-        if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+        if (shouldDoFLERewrite(request)) {
             LOGV2_DEBUG(7964102, 2, "Processing Queryable Encryption command", "cmd"_attr = cmdObj);
-            processFLECountD(opCtx, nss, &request);
+            if (prepareForFLERewrite(opCtx, request.getEncryptionInformation())) {
+                processFLECountD(opCtx, nss, &request);
+            }
         }
+
         if (request.getMirrored().value_or(false)) {
             const auto& invocation = CommandInvocation::get(opCtx);
             invocation->markMirrored();
