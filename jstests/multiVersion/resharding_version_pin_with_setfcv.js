@@ -4,7 +4,6 @@
  * participants that are both normal shards and config shards.
  *
  * @tags: [
- *   requires_fcv_90,
  *   resource_intensive,
  * ]
  */
