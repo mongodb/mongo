@@ -1593,7 +1593,7 @@ size_t arrayQueueSize(value::Array* arrayQueue) {
 }
 
 // Push an element {tag, value} into the queue
-void arrayQueuePush(value::Array* arrayQueue, value::TypeTags tag, value::Value val) {
+void arrayQueuePush(value::Array* arrayQueue, value::TagValueOwned tagVal) {
     /* The underlying array acts as a circular buffer for the queue with `startIdx` and `queueSize`
      * demarcating the filled region (with remaining region containing nulls). When pushing an
      * element to the queue, we set at the corresponding index [= (startIdx + queueSize) %
@@ -1622,7 +1622,6 @@ void arrayQueuePush(value::Array* arrayQueue, value::TypeTags tag, value::Value 
      *                    |
      *                   startIdx (queueSize = 5, arraySize = 8)
      */
-    value::TagValueOwned tagVal(tag, val);
     auto [array, startIdx, queueSize] = getArrayQueueState(arrayQueue);
     auto cap = array->size();
 
@@ -1768,11 +1767,8 @@ value::TagValueMaybeOwned ByteCode::builtinAggIntegralAdd(ArityType arity) {
         arrayQueuePop(sortByQueue);
     }
 
-    auto [inputTag, inputVal] = inputTagVal.releaseToRaw();
-    arrayQueuePush(inputQueue, inputTag, inputVal);
-
-    auto [sortByTag, sortByVal] = sortByTagVal.releaseToRaw();
-    arrayQueuePush(sortByQueue, sortByTag, sortByVal);
+    arrayQueuePush(inputQueue, std::move(inputTagVal));
+    arrayQueuePush(sortByQueue, std::move(sortByTagVal));
 
     return stateTagVal;
 }
@@ -2307,8 +2303,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovablePushAdd(ArityType arity) 
     uassert(7993100, "State should be of array type", stateTagVal.tag() == value::TypeTags::Array);
     auto state = value::getArrayView(stateTagVal.value());
 
-    auto [inputTag, inputVal] = inputTagVal.releaseToRaw();
-    arrayQueuePush(state, inputTag, inputVal);
+    arrayQueuePush(state, std::move(inputTagVal));
 
     return stateTagVal;
 }
@@ -2437,7 +2432,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableConcatArraysAdd(ArityType
                                         << elemSize << " bytes.");
             }
             // Update the state
-            arrayQueuePush(accArr, elemTag, elemVal);
+            arrayQueuePush(accArr, value::TagValueOwned{elemTag, elemVal});
             accArrSize += elemSize;
         });
     // Update the window field with the new total size.
@@ -2914,8 +2909,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstLastNAdd(ArityType arity) {
 
     auto [queue, n] = firstLastNState(state.tag(), state.value());
 
-    auto [tag, val] = field.releaseToRaw();
-    arrayQueuePush(queue, tag, val);
+    arrayQueuePush(queue, std::move(field));
 
     return std::move(state);
 }
