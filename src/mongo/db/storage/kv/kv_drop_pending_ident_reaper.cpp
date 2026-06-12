@@ -39,6 +39,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/stacktrace.h"
 
@@ -51,6 +52,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(skipCompletingReplicatedPrimaryIdentDrop);
+
 namespace {
 boost::optional<Timestamp> getTimestamp(const StorageEngine::DropTime& dropTime) {
     return visit(
@@ -506,6 +510,12 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
     auto status = std::visit(
         OverloadedVisitor{
             [&](const DropAsReplicatedPrimary&) -> Status {
+                // Return busy, not another error: the reaper leaves a busy ident drop-pending but
+                // treats any other failure as fatal.
+                if (MONGO_unlikely(skipCompletingReplicatedPrimaryIdentDrop.shouldFail())) {
+                    return Status(ErrorCodes::ObjectIsBusy,
+                                  "skipCompletingReplicatedPrimaryIdentDrop failpoint enabled");
+                }
                 try {
                     Lock::GlobalLock gl(opCtx, MODE_IX);
                     WriteUnitOfWork wuow(opCtx);
