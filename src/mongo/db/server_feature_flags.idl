@@ -348,6 +348,11 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
+    featureFlagContinuousInternodeValidationPerDocument:
+        description: "Enable continuous internode validation per document for Atlas Infinite nodes."
+        cpp_varname: gFeatureFlagContinuousInternodeValidationPerDocument
+        default: false
+        fcv_gated: true
 
 server_parameters:
     allowDirectSystemBucketsAccess:
