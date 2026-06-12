@@ -117,7 +117,7 @@ packaging = "^25.0"
 [tool.poetry.group.jira-client.dependencies]
 jira = "^3.10.5"
 requests-oauth = "<=0.4.1"
-PyJWT = "^2.9.0"
+PyJWT = "^2.12.0"
 # We are omitting pycrypto based on https://github.com/pycontribs/jira/pull/629
 
 [tool.poetry.group.lint.dependencies]
@@ -182,7 +182,7 @@ requests-oauthlib = "^2.0.0"
 packaging = "^25.0"
 docker = "^7.1.0"
 mongomock = "^4.1.2"
-pyjwt = "^2.9.0"
+pyjwt = "^2.12.0"
 selenium = "^4.23.1"
 geckodriver-autoinstaller = "^0.1.0"
 retry = "^0.9.2"
