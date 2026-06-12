@@ -1049,6 +1049,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:counters_sort",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 

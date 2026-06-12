@@ -288,6 +288,81 @@ export function waitForMetric({metricsDir, metricName, minValue, afterDate}) {
 }
 
 /**
+ * Polls the metrics directory until a snapshot newer than `afterDate` satisfies `pred`, then
+ * returns the full metrics object. Fails the test if the condition is not met within `timeoutMs`.
+ *
+ * @param {string} metricsDir - The metrics directory to poll.
+ * @param {Date} afterDate - Only consider snapshots newer than this date.
+ * @param {function} pred - Predicate that receives the metrics object and returns true when done.
+ * @param {function} descriptionCallback - Callback that receives the latest metrics object and
+ *     returns a human-readable description used in the timeout error message.
+ * @param {number} [timeoutMs=30000] - Maximum time to wait in milliseconds.
+ * @param {number} [intervalMs=500] - Polling interval in milliseconds.
+ * @returns {Object} The metrics snapshot that satisfied the predicate.
+ */
+export function awaitMetrics(metricsDir, afterDate, pred, descriptionCallback, timeoutMs = 30000, intervalMs = 500) {
+    let result;
+    let lastSeen = null;
+    assert.soon(
+        () => {
+            const metrics = getLatestMetrics(metricsDir);
+            if (metrics && metrics.time > afterDate.getTime()) {
+                lastSeen = metrics;
+                if (pred(metrics)) {
+                    result = metrics;
+                    return true;
+                }
+            }
+            return false;
+        },
+        () => `Timed out waiting for metrics: ${lastSeen ? descriptionCallback(lastSeen) : "(no snapshot yet)"}`,
+        timeoutMs,
+        intervalMs,
+    );
+    return result;
+}
+
+/**
+ * Returns the current numeric value of `metricName[field]` from the latest metrics snapshot, or 0
+ * if the metric has not yet been exported.
+ *
+ * @param {string} metricsDir - The metrics directory to read from.
+ * @param {string} metricName - The name of the metric.
+ * @param {string} [field='value'] - The field within the metric to extract ('value' for counters,
+ *     'count' for histograms).
+ * @returns {number}
+ */
+export function getMetricValue(metricsDir, metricName, field = "value") {
+    return Number(getLatestMetrics(metricsDir)?.[metricName]?.[field] ?? 0);
+}
+
+/**
+ * Captures a baseline, runs `fn`, then awaits and asserts that `metricName[field]` increased by at
+ * least `minIncrease`. Prefer the typed wrappers `assertCounterMetricIncreases` and
+ * `assertHistogramMetricIncreases` over calling this directly.
+ */
+function assertMetricIncreases({metricsDir, metricName, minIncrease, fn, field}) {
+    const testStart = new Date();
+    const baseline = getMetricValue(metricsDir, metricName, field);
+    fn();
+    const threshold = baseline + minIncrease;
+    return awaitMetrics(
+        metricsDir,
+        testStart,
+        (m) => Number(m[metricName]?.[field] ?? 0) >= threshold,
+        (m) => `${metricName}.${field} >= ${threshold} (was ${baseline}, got ${m[metricName]?.[field] ?? "null"})`,
+    );
+}
+
+/**
+ * Asserts that a counter metric (`value` field) increased by at least `minIncrease` after `fn`
+ * runs.
+ */
+export function assertCounterMetricIncreases({metricsDir, metricName, minIncrease, fn}) {
+    return assertMetricIncreases({metricsDir, metricName, minIncrease, fn, field: "value"});
+}
+
+/**
  * Asserts that the data point count for `metricName` with attribute `attrKey=attrValue` increases
  * by at least `minIncrease` after `fn` runs.
  */

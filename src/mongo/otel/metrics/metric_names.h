@@ -304,6 +304,14 @@ public:
     static constexpr MetricName kAggregateOpCount =
         MetricNameMaker::make("serverStatus.opcounters.aggregates");
 
+    // Query Performance Counters
+    static constexpr MetricName kQueryExecutorScanned =
+        MetricNameMaker::make("serverStatus.metrics.queryExecutor.scanned");
+    static constexpr MetricName kQueryExecutorScannedObjects =
+        MetricNameMaker::make("serverStatus.metrics.queryExecutor.scannedObjects");
+    static constexpr MetricName kDocumentReturned =
+        MetricNameMaker::make("serverStatus.metrics.document.returned");
+
     // Plan cache counters — classic engine
     static constexpr MetricName kPlanCacheClassicHits =
         MetricNameMaker::make("serverStatus.metrics.query.planCache.classic.hits");
