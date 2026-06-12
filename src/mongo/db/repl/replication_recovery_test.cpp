@@ -988,6 +988,22 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
 }
 
+TEST_F(ReplicationRecoveryTest, RecoveryRethrowsInterruptedAtShutdown) {
+    // Verify the catch block in recoverFromOplog re-throws shutdown errors rather than calling
+    // std::terminate() so we can continue to shutdown cleanly.
+    auto opCtx = getOperationContext();
+    _setUpOplog(opCtx, getStorageInterface(), {1});
+    dynamic_cast<ReplicationConsistencyMarkersMock*>(getConsistencyMarkers())->getAppliedThroughFn =
+        [&](OperationContext*) {
+            uasserted(ErrorCodes::InterruptedAtShutdown,
+                      "Simulated shutdown during oplog recovery");
+        };
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    ASSERT_THROWS_CODE(recovery.recoverFromOplog(opCtx, boost::none),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
+}
+
 DEATH_TEST_F(ReplicationRecoveryTestDeathTest, RecoveryFailsWithBadOp, "terminate() called") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();

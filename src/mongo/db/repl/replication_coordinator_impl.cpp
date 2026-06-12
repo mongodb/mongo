@@ -1040,49 +1040,67 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx) 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
                                          StorageEngine::LastShutdownState lastShutdownState) {
     if (!_settings.isReplSet()) {
-        // We do not need to check for magic restore since magic restore always runs in a replica
-        // set.
-        if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Cannot set parameter 'recoverToOplogTimestamp' "
-                                  << "when recovering from the oplog as a standalone",
-                    recoverToOplogTimestamp.empty());
-            _replicationProcess->getReplicationRecovery()->recoverFromOplogAsStandalone(opCtx);
+        try {
+            // We do not need to check for magic restore since magic restore always runs in a
+            // replica set.
+            if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "Cannot set parameter 'recoverToOplogTimestamp' "
+                                      << "when recovering from the oplog as a standalone",
+                        recoverToOplogTimestamp.empty());
+                _replicationProcess->getReplicationRecovery()->recoverFromOplogAsStandalone(opCtx);
+            }
+
+            if (storageGlobalParams.queryableBackupMode && !recoverToOplogTimestamp.empty()) {
+                BSONObj recoverToTimestampObj = fromjson(recoverToOplogTimestamp);
+                uassert(ErrorCodes::BadValue,
+                        str::stream()
+                            << "'recoverToOplogTimestamp' needs to have a 'timestamp' field",
+                        recoverToTimestampObj.hasField("timestamp"));
+
+                Timestamp recoverToTimestamp =
+                    recoverToTimestampObj.getField("timestamp").timestamp();
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "'recoverToOplogTimestamp' needs to be a valid timestamp",
+                        !recoverToTimestamp.isNull());
+
+                StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(opCtx);
+                uassert(ErrorCodes::InvalidReplicaSetConfig,
+                        str::stream()
+                            << "No replica set config document was found, "
+                               "'recoverToOplogTimestamp' "
+                            << "must be used with a node that was previously part of a replica set",
+                        cfg.isOK());
+
+                // Need to perform replication recovery up to and including the given timestamp.
+                _replicationProcess->getReplicationRecovery()->recoverFromOplogUpTo(
+                    opCtx, recoverToTimestamp);
+            }
+
+            // In standalone mode, inform the storage engine that startup recovery has completed.
+            // We should not be holding on to the replication coordinator mutex before calling this
+            // function to avoid deadlock.
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            invariant(storageEngine);
+            storageEngine->notifyReplStartupRecoveryComplete(
+                *shard_role_details::getRecoveryUnit(opCtx));
+
+            std::lock_guard lk(_mutex);
+            _setConfigState(lk, kConfigReplicationDisabled);
+        } catch (DBException& e) {
+            if (ErrorCodes::isShutdownError(e.code())) {
+                // Shutdown was initiated while we were performing standalone oplog recovery. Do not
+                // crash, and transition out of startup configState so we can continue past
+                // _waitForStartUpComplete to continue shutting down.
+                LOGV2_WARNING(9687400,
+                              "Interrupted standalone oplog recovery due to shutdown",
+                              "error"_attr = e.toStatus());
+                std::lock_guard lk(_mutex);
+                _setConfigState(lk, kConfigUninitialized);
+                return;
+            }
+            throw;
         }
-
-        if (storageGlobalParams.queryableBackupMode && !recoverToOplogTimestamp.empty()) {
-            BSONObj recoverToTimestampObj = fromjson(recoverToOplogTimestamp);
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "'recoverToOplogTimestamp' needs to have a 'timestamp' field",
-                    recoverToTimestampObj.hasField("timestamp"));
-
-            Timestamp recoverToTimestamp = recoverToTimestampObj.getField("timestamp").timestamp();
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "'recoverToOplogTimestamp' needs to be a valid timestamp",
-                    !recoverToTimestamp.isNull());
-
-            StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(opCtx);
-            uassert(ErrorCodes::InvalidReplicaSetConfig,
-                    str::stream()
-                        << "No replica set config document was found, 'recoverToOplogTimestamp' "
-                        << "must be used with a node that was previously part of a replica set",
-                    cfg.isOK());
-
-            // Need to perform replication recovery up to and including the given timestamp.
-            _replicationProcess->getReplicationRecovery()->recoverFromOplogUpTo(opCtx,
-                                                                                recoverToTimestamp);
-        }
-
-        // In standalone mode, inform the storage engine that startup recovery has completed. We
-        // should not be holding on to the replication coordinator mutex before calling this
-        // function to avoid deadlock.
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        invariant(storageEngine);
-        storageEngine->notifyReplStartupRecoveryComplete(
-            *shard_role_details::getRecoveryUnit(opCtx));
-
-        std::lock_guard lk(_mutex);
-        _setConfigState(lk, kConfigReplicationDisabled);
         return;
     }
 
@@ -1132,6 +1150,17 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
         }
     } catch (DBException& e) {
         auto status = e.toStatus();
+        if (ErrorCodes::isShutdownError(status.code())) {
+            // Shutdown was initiated while we were performing standalone oplog recovery. Do not
+            // crash, and transition out of startup configState so we can continue past
+            // _waitForStartUpComplete to continue shutting down.
+            LOGV2_WARNING(9687401,
+                          "Interrupted loading local replica set config due to shutdown",
+                          "error"_attr = status);
+            std::lock_guard lk(_mutex);
+            _setConfigState(lk, kConfigUninitialized);
+            return;
+        }
         LOGV2_FATAL_NOTRACE(
             6111701, "Failed to load local replica set config on startup", "status"_attr = status);
     }

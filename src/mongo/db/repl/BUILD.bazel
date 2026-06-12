@@ -1955,6 +1955,8 @@ mongo_cc_unit_test(
         ":repl_coordinator_impl",
         ":repl_coordinator_test_fixture",
         ":repl_server_parameters",
+        ":replication_process",
+        ":replmocks",
         ":topology_coordinator",
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:server_base",

@@ -32,6 +32,8 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/util/modules.h"
 
+#include <functional>
+
 namespace mongo {
 class OperationContext;
 namespace repl {
@@ -45,11 +47,19 @@ public:
 
     boost::optional<Timestamp> recoverFromOplog(
         OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) override {
+        if (recoverFromOplogFn) {
+            recoverFromOplogFn(opCtx, stableTimestamp);
+        }
         return stableTimestamp;
     }
 
+    std::function<void(OperationContext*, boost::optional<Timestamp>)> recoverFromOplogFn;
+
     void recoverFromOplogAsStandalone(OperationContext* opCtx,
-                                      bool duringInitialSync = false) override {}
+                                      bool duringInitialSync = false) override {
+        // Pass through to recoverFromOplog as we do in the cases being tested with this function.
+        recoverFromOplog(opCtx, boost::none);
+    }
 
     void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) override {}
 
