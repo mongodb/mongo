@@ -432,6 +432,7 @@ const skips = new Set([
     "$_internalSplitPipeline",
     "$_internalStreamingGroup",
     "$_internalUnpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.
+    "$_streamsVectorSearch", // Internal ASP stub; not a user-facing stage.
     "$_unpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.
     "$backupCursor",
     "$backupCursorExtend",

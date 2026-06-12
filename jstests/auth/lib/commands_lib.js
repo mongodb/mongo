@@ -9671,6 +9671,21 @@ export const authCommandsLib = {
             testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
         },
         {
+            testname: "aggregate_$_streamsVectorSearch",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$_streamsVectorSearch: {}}],
+                cursor: {},
+            },
+            // TODO SERVER-74961: Windows is not yet supported in stream processing.
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") ||
+                _isWindows() ||
+                getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
             testname: "aggregate_$fill",
             command: {
                 aggregate: "foo",
