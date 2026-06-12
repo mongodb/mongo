@@ -58,6 +58,8 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/sharding_write_router.h"
@@ -2174,6 +2176,24 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
     invariant(unlocked || gFeatureFlagIntentRegistration.isEnabled());
     if (gFeatureFlagIntentRegistration.isEnabled()) {
         rss::consensus::IntentRegistry::get(opCtx).deregisterTokensForSession(opCtx, _sessionId());
+    }
+
+    // Re-seed the in-memory fast count changes for the restored prepared transaction.
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        if (const auto& sizeMetadata = p().preparedSizeMetadata) {
+            const auto catalog = CollectionCatalog::get(opCtx);
+            auto& uncommittedChanges = UncommittedFastCountChange::getForWrite(opCtx);
+            for (const auto& metadata : *sizeMetadata) {
+                const auto nss = catalog->lookupNSSByUUID(opCtx, metadata.getUuid());
+                massert(12615200,
+                        fmt::format("Expected catalog to contain namespace string for collection "
+                                    "in config.transactions with UUID {}",
+                                    metadata.getUuid().toString()),
+                        nss.has_value());
+                uncommittedChanges.record(
+                    *nss, metadata.getUuid(), metadata.getCt(), metadata.getSz());
+            }
+        }
     }
 }
 

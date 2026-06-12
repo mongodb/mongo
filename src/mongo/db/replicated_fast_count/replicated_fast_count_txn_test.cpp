@@ -42,6 +42,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -679,24 +680,20 @@ protected:
     }
 
     /**
-     * Restores a prepared transaction from a precise checkpoint record on a fresh client and
-     * returns the participant's preparedSizeMetadata.
+     * Restores a prepared transaction from a precise checkpoint record on the given `opCtx`,
+     * leaving its session checked out so that the prepared transaction state can be verified.
      */
-    boost::optional<std::vector<MultiOpSizeMetadata>> restoreFromCheckpointAndGetSizeMetadata(
+    std::unique_ptr<MongoDSessionCatalog::Session> restoreFromCheckpointAndGetSession(
+        OperationContext* opCtx,
         LogicalSessionId sessionId,
         TxnNumber txnNumber,
         SessionTxnRecordForPrepareRecovery recoveryRecord) {
-        auto newClientOwned = getServiceContext()->getService()->makeClient("recoverClient");
-        AlternativeClientRegion acr(newClientOwned);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto opCtx = opCtxHolder.get();
-
         opCtx->setLogicalSessionId(sessionId);
         opCtx->setTxnNumber(txnNumber);
         opCtx->setInMultiDocumentTransaction();
 
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-        auto ocs = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
+        auto session = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -708,7 +705,7 @@ protected:
         }
 
         txnParticipant.restorePreparedTxnFromPreciseCheckpoint(opCtx, std::move(recoveryRecord));
-        return txnParticipant.getPreparedSizeMetadata();
+        return session;
     }
 };
 
@@ -813,13 +810,80 @@ TEST_F(PreparedSizeMetadataTest,
 
     // After restoring from the checkpoint record, the participant's sizeMetadata should be
     // identical to what was present before the restart.
-    const auto restoredSizeMetadata =
-        restoreFromCheckpointAndGetSizeMetadata(sessionId, txnNumber, std::move(recoveryRecord));
+    [[maybe_unused]] const auto session =
+        restoreFromCheckpointAndGetSession(_opCtx, sessionId, txnNumber, std::move(recoveryRecord));
+    const auto restoredSizeMetadata = TransactionParticipant::get(_opCtx).getPreparedSizeMetadata();
 
     ASSERT_TRUE(restoredSizeMetadata.has_value());
     assertSizeMetadataEqual(*restoredSizeMetadata, sizeMetadataBeforeRestart);
 }
 
+TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCountChanges) {
+    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                                 true);
+    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
+                                                        true);
+
+    const LogicalSessionId sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNumber(0);
+
+    beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx) {
+        addTransactionInsertOps(opCtx, _nss1, {docA, docB});
+        addTransactionInsertOps(opCtx, _nss2, {docC});
+    });
+    auto recoveryRecord = prepareTxnAndCaptureRecoveryRecord(sessionId, txnNumber);
+
+    // Before restoring, no uncommitted fast count changes have been seeded.
+    {
+        const auto& uncommitted = UncommittedFastCountChange::getForRead(_opCtx);
+        EXPECT_EQ(uncommitted.find(_uuid1), (CollectionSizeCount{.size = 0, .count = 0}));
+        EXPECT_EQ(uncommitted.find(_uuid2), (CollectionSizeCount{.size = 0, .count = 0}));
+    }
+
+    // Restoring from the checkpoint record re-seeds the uncommitted fast count changes from the
+    // persisted size metadata.
+    SessionCatalog::get(getServiceContext())->reset_forTest();
+    [[maybe_unused]] const auto session =
+        restoreFromCheckpointAndGetSession(_opCtx, sessionId, txnNumber, std::move(recoveryRecord));
+
+    {
+        const auto& uncommitted = UncommittedFastCountChange::getForRead(_opCtx);
+        EXPECT_EQ(uncommitted.find(_uuid1),
+                  (CollectionSizeCount{.size = docA.objsize() + docB.objsize(), .count = 2}));
+        EXPECT_EQ(uncommitted.find(_uuid2),
+                  (CollectionSizeCount{.size = docC.objsize(), .count = 1}));
+    }
+}
+
+TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointThrowsWhenCollectionMissingFromCatalog) {
+    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
+                                                                 true);
+    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
+                                                        true);
+
+    const LogicalSessionId sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNumber(0);
+
+    beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx) {
+        addTransactionInsertOps(opCtx, _nss1, {docA});
+    });
+    auto recoveryRecord = prepareTxnAndCaptureRecoveryRecord(sessionId, txnNumber);
+    ASSERT_TRUE(recoveryRecord.getSizeMetadata().has_value());
+
+    SessionCatalog::get(getServiceContext())->reset_forTest();
+
+    // Drop the collection so its UUID can no longer be resolved in the catalog, simulating a
+    // recovery record whose persisted size metadata references a now-missing collection.
+    {
+        DBDirectClient client(_opCtx);
+        ASSERT_TRUE(client.dropCollection(_nss1));
+    }
+
+    ASSERT_THROWS_CODE(
+        restoreFromCheckpointAndGetSession(_opCtx, sessionId, txnNumber, std::move(recoveryRecord)),
+        AssertionException,
+        12615200);
+}
 
 struct PreparedSizeMetadataFlagParams {
     // Whether `featureFlagReplicatedFastCount` is enabled.
