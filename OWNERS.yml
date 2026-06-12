@@ -109,3 +109,6 @@ filters:
   - ".bazelrc.target_mongo_version":
     approvers:
       - 10gen/server-release
+  - "catalog-info.yaml":
+    approvers:
+      - 10gen/devprod-release-infrastructure
