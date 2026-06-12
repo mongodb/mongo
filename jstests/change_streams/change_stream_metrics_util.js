@@ -23,6 +23,10 @@ export class ServerStatusMetrics {
     static getCsMetrics(db) {
         return this.getSsMetrics(db).changeStreams;
     }
+
+    static getCsErrorMetrics(db) {
+        return this.getCsMetrics(db).error;
+    }
 }
 
 // Temporarily overrides a nested TestData field at a dot-notation path with 'newValue',

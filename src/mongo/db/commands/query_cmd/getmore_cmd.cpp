@@ -39,6 +39,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/acquire_locks.h"
@@ -518,6 +519,11 @@ public:
             try {
                 return batchedExecute(
                     opCtx, cursor, exec, batchSize, isTailable, nextBatch, numResults);
+                // IMPORTANT: CloseChangeStream and ChangeStreamInvalidated must be caught before
+                // the generic DBException handler below, which calls
+                // incrementChangeStreamErrorCounters().
+                // Both are DBException subclasses and represent normal cursor lifecycle events, not
+                // errors.
             } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
                 // This exception indicates that we should close the cursor without reporting an
                 // error.
@@ -533,6 +539,9 @@ public:
                 nextBatch->setInvalidated();
                 return false;
             } catch (DBException& exception) {
+                if (cursor->isChangeStreamQuery()) {
+                    change_stream::incrementChangeStreamErrorCounters(exception);
+                }
                 nextBatch->abandon();
 
                 auto&& explainer = exec->getPlanExplainer();

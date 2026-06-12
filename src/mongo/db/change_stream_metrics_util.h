@@ -30,10 +30,12 @@
 #pragma once
 
 
+#include "mongo/base/error_codes.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_updown_counter.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <vector>
@@ -131,6 +133,137 @@ inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenPinned() {
         "Current number of open change stream cursors.",
         otel::metrics::MetricUnit::kCursors,
         kCursorsOpenPinnedOpts);
+}
+
+inline otel::metrics::Counter<int64_t>& errorNonRetriableHistoryLost() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.error.nonRetriable.changeStreamHistoryLost",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamErrorNonRetriableHistoryLost,
+            "Number of change stream errors: non-retriable ChangeStreamHistoryLost.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& errorNonRetriableFatalError() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.error.nonRetriable.changeStreamFatalError",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamErrorNonRetriableFatalError,
+            "Number of change stream errors: non-retriable ChangeStreamFatalError.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& errorNonRetriableBsonObjectTooLarge() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.error.nonRetriable.bsonObjectTooLarge",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamErrorNonRetriableBsonObjectTooLarge,
+            "Number of change stream errors: non-retriable BSONObjectTooLarge.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& errorNonRetriableOther() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.error.nonRetriable.other",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamErrorNonRetriableOther,
+            "Number of change stream errors: non-retriable other.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& errorRetriableInterruptedDueToReplStateChange() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.error.retriable.interruptedDueToReplStateChange",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamErrorRetriableInterruptedDueToReplStateChange,
+            "Number of change stream errors: retriable InterruptedDueToReplStateChange.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+inline otel::metrics::Counter<int64_t>& errorRetriableOther() {
+    static auto& counter = []() -> otel::metrics::Counter<int64_t>& {
+        otel::metrics::CounterOptions opts{};
+        opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "changeStreams.error.retriable.other",
+            .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+        };
+        return otel::metrics::MetricsService::instance().createInt64Counter(
+            otel::metrics::MetricNames::kChangeStreamErrorRetriableOther,
+            "Number of change stream errors: retriable other.",
+            otel::metrics::MetricUnit::kEvents,
+            opts);
+    }();
+    return counter;
+}
+
+// Increments the appropriate change-stream error counter for the given exception.
+// Must only be called when the cursor is a change stream (i.e. isChangeStreamQuery() == true).
+inline void incrementChangeStreamErrorCounters(const DBException& ex) {
+    auto code = ex.code();
+    switch (code) {
+        case ErrorCodes::ChangeStreamHistoryLost:
+            errorNonRetriableHistoryLost().add(1);
+            return;
+        case ErrorCodes::ChangeStreamFatalError:
+            errorNonRetriableFatalError().add(1);
+            return;
+        case ErrorCodes::BSONObjectTooLarge:
+            errorNonRetriableBsonObjectTooLarge().add(1);
+            return;
+        // InterruptedDueToReplStateChange is also in RetriableError; this named case must
+        // precede the isA<RetriableError>() fallback in the default branch or it would be
+        // miscounted as retriable.other.
+        case ErrorCodes::InterruptedDueToReplStateChange:
+            errorRetriableInterruptedDueToReplStateChange().add(1);
+            return;
+        default:
+            // Catches any NonResumableChangeStreamError code not explicitly named above (currently
+            // ShardRemovedError). Uses the generated category predicate so future additions to the
+            // category are handled automatically rather than silently falling through to
+            // nonRetriableOther.
+            if (ex.isA<ErrorCategory::NonResumableChangeStreamError>()) {
+                errorNonRetriableOther().add(1);
+            } else if (ex.isA<ErrorCategory::RetriableError>()) {
+                errorRetriableOther().add(1);
+            } else {
+                errorNonRetriableOther().add(1);
+            }
+    }
 }
 
 }  // namespace mongo::change_stream

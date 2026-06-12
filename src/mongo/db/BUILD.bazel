@@ -3741,3 +3741,16 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "change_stream_error_metrics_test",
+    srcs = [
+        "change_stream_error_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest",
+    ],
+)

@@ -45,6 +45,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/curop.h"
@@ -372,6 +373,10 @@ bool getFirstBatch(const AggExState& aggExState,
 
         try {
             state = exec.getNext(&nextDoc, nullptr);
+            // IMPORTANT: CloseChangeStream and ChangeStreamInvalidated must be caught before the
+            // generic DBException handler below, which calls
+            // incrementChangeStreamErrorCounters(). Both are
+            // DBException subclasses and represent normal cursor lifecycle events, not errors.
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event that
             // invalidates the cursor. We should close the cursor and return without error.
@@ -390,6 +395,9 @@ bool getFirstBatch(const AggExState& aggExState,
             doRegisterCursor = false;
             break;
         } catch (DBException& exception) {
+            if (aggExState.hasChangeStream()) {
+                change_stream::incrementChangeStreamErrorCounters(exception);
+            }
             auto&& explainer = exec.getPlanExplainer();
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);

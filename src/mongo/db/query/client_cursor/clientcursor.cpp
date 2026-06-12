@@ -77,6 +77,15 @@ auto& gCursorsOpenTotal = change_stream::createCursorsOpenTotal();
 // mongoD process.
 auto& gCursorsOpenPinned = change_stream::createCursorsOpenPinned();
 
+// Error counters — registered at startup so they appear in serverStatus before any errors occur.
+auto& gErrorNonRetriableHistoryLost = change_stream::errorNonRetriableHistoryLost();
+auto& gErrorNonRetriableFatalError = change_stream::errorNonRetriableFatalError();
+auto& gErrorNonRetriableBsonObjectTooLarge = change_stream::errorNonRetriableBsonObjectTooLarge();
+auto& gErrorNonRetriableOther = change_stream::errorNonRetriableOther();
+auto& gErrorRetriableInterruptedDueToReplStateChange =
+    change_stream::errorRetriableInterruptedDueToReplStateChange();
+auto& gErrorRetriableOther = change_stream::errorRetriableOther();
+
 }  // namespace change_stream_metrics
 }  // namespace
 

@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 #include <utility>
@@ -54,6 +55,9 @@
 
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(throwErrorBeforeGetNext);
+
 namespace {
 auto& changeStreamsLargeEventsFailedCounter =
     *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
@@ -139,6 +143,11 @@ boost::optional<Document> PlanExecutorPipeline::_getNext() {
 }
 
 boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
+    throwErrorBeforeGetNext.executeIf(
+        [](const BSONObj& data) {
+            uasserted(data.getIntField("code"), "throwErrorBeforeGetNext failpoint");
+        },
+        [this](const BSONObj&) { return _resumableScanType == ResumableScanType::kChangeStream; });
     return _execPipeline->getNext();
 } catch (const ExceptionFor<ErrorCodes::ChangeStreamStartAfterInvalidate>& ex) {
     // This exception contains an event that captures the client-provided resume token.
@@ -152,8 +161,6 @@ BSONObj PlanExecutorPipeline::_trySerializeToBson(const Document& doc) try {
     return _expCtx->getNeedsMerge() || _expCtx->getForPerShardCursor() ? doc.toBsonWithMetaData()
                                                                        : doc.toBson();
 } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-    // If in a change stream pipeline, increment change stream large event failed error
-    // count metric.
     if (ResumableScanType::kChangeStream == _resumableScanType) {
         changeStreamsLargeEventsFailedCounter.increment();
     }

@@ -149,6 +149,20 @@ public:
         MetricNameMaker::make("change_streams.cursor.open.total");
     static constexpr MetricName kChangeStreamCursorsOpenPinned =
         MetricNameMaker::make("change_streams.cursor.open.pinned");
+    static constexpr MetricName kChangeStreamErrorNonRetriableHistoryLost = MetricNameMaker::make(
+        "serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamHistoryLost");
+    static constexpr MetricName kChangeStreamErrorNonRetriableFatalError = MetricNameMaker::make(
+        "serverStatus.metrics.changeStreams.error.nonRetriable.changeStreamFatalError");
+    static constexpr MetricName kChangeStreamErrorNonRetriableBsonObjectTooLarge =
+        MetricNameMaker::make(
+            "serverStatus.metrics.changeStreams.error.nonRetriable.bsonObjectTooLarge");
+    static constexpr MetricName kChangeStreamErrorNonRetriableOther =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.error.nonRetriable.other");
+    static constexpr MetricName kChangeStreamErrorRetriableInterruptedDueToReplStateChange =
+        MetricNameMaker::make(
+            "serverStatus.metrics.changeStreams.error.retriable.interruptedDueToReplStateChange");
+    static constexpr MetricName kChangeStreamErrorRetriableOther =
+        MetricNameMaker::make("serverStatus.metrics.changeStreams.error.retriable.other");
 
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive = MetricNameMaker::make("index_builds.active");

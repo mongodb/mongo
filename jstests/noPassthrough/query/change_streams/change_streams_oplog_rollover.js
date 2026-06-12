@@ -105,7 +105,15 @@ while (!oplogIsRolledOver()) {
 // Confirm that attempting to continue reading an existing change stream throws CappedPositionLost.
 assert.throwsWithCode(() => cst.getNextBatch(startAtDawnOfTimeStream), ErrorCodes.CappedPositionLost);
 
-// Now confirm that attempting to resumeAfter or startAtOperationTime fails.
+function getHistoryLostCounter() {
+    return rst.getPrimary().getDB("admin").adminCommand({serverStatus: 1}).metrics.changeStreams.error.nonRetriable
+        .changeStreamHistoryLost;
+}
+
+// Now confirm that attempting to resumeAfter or startAtOperationTime fails, and that each failure
+// increments the nonRetriable.changeStreamHistoryLost serverStatus counter.
+const counterBefore = getHistoryLostCounter();
+
 ChangeStreamTest.assertChangeStreamThrowsCode({
     db: testDB,
     collName: testColl.getName(),
@@ -133,6 +141,12 @@ ChangeStreamTest.assertChangeStreamThrowsCode({
     expectedCode: ErrorCodes.ChangeStreamHistoryLost,
     validateExceptionDetails: validateChangeStreamHistoryLostException(Timestamp(1, 1)),
 });
+
+assert.gte(
+    getHistoryLostCounter(),
+    counterBefore + 3,
+    "expected nonRetriable.changeStreamHistoryLost to increment for each failed resume",
+);
 
 cst.cleanUp();
 rst.stopSet();
