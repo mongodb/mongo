@@ -74,6 +74,7 @@ function runInsertKeyTests(topologyName, setupFn, teardownFn, validateFn = null)
                 documents: [{v: 1, name: "Alice", score: 99.5}],
                 ordered: false,
                 bypassDocumentValidation: true,
+                writeConcern: {w: "majority", wtimeout: 5000},
                 comment: "complex insert test!!!",
                 maxTimeMS: 50 * 1000,
                 apiDeprecationErrors: false,

@@ -21,6 +21,7 @@ export const insertKeyFieldsRequired = [
 export const insertKeyFieldsComplex = [
     ...insertKeyFieldsRequired,
     "comment",
+    "writeConcern",
     "maxTimeMS",
     "apiDeprecationErrors",
     "apiVersion",
@@ -41,6 +42,7 @@ export const updateKeyFieldsComplex = [
     ...updateKeyFieldsRequired,
     "comment",
     "readConcern",
+    "writeConcern",
     "apiDeprecationErrors",
     "apiVersion",
     "apiStrict",

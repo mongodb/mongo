@@ -126,6 +126,7 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 bypassDocumentValidation: true,
                 comment: "modifier update test!!!",
                 readConcern: {level: "local"},
+                writeConcern: {w: "majority", wtimeout: 5000},
                 maxTimeMS: 50 * 1000,
                 apiDeprecationErrors: false,
                 apiVersion: "1",
