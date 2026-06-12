@@ -100,7 +100,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
-#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
@@ -690,8 +689,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ThreadClient tc("mongosMain", serviceContext);
 
     logMongosVersionInfo(nullptr);
-
-    transport::initMessageFilterPluginLoader("mongos");
 
     // Set up the periodic runner for background job execution
     {

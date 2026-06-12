@@ -51,7 +51,6 @@
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
-#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl_gen.h"
 #include "mongo/transport/service_executor.h"
@@ -302,9 +301,6 @@ void ServiceEntryPointImpl::configureServiceExecutorContext(ServiceContext::Uniq
 
 void ServiceEntryPointImpl::startSession(std::shared_ptr<transport::Session> session) {
     invariant(session);
-    invariant(session->isIngress());
-
-    transport::MessageHooks::onConnectionEstablished(*session);
 
     transport::IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 

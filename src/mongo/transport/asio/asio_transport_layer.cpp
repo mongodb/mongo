@@ -1572,13 +1572,6 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         }
 #endif
 
-        constexpr static auto logOnError = [](const DBException& e) {
-            LOGV2_WARNING(23023,
-                          "Error accepting new connection: {error}",
-                          "Error accepting new connection",
-                          "error"_attr = e);
-        };
-
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
@@ -1608,12 +1601,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                 session->parseProxyProtocolHeader(_acceptorReactor)
                     .getAsync([this, session = std::move(session), t = std::move(token)](Status s) {
                         if (s.isOK()) {
-                            invariant(!!_sep);
-                            try {
-                                _sep->startSession(std::move(session));
-                            } catch (const DBException& e) {
-                                logOnError(e);
-                            }
+                            _sep->startSession(std::move(session));
                         }
                         // We will release the token (i.e. `t`) as we leave this function.
                     });
@@ -1629,7 +1617,10 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                               "error"_attr = e.code().message());
             }
         } catch (const DBException& e) {
-            logOnError(e);
+            LOGV2_WARNING(23023,
+                          "Error accepting new connection: {error}",
+                          "Error accepting new connection",
+                          "error"_attr = e);
         }
 
         // _acceptConnection() is accessed by only one thread (i.e. the listener thread), so an

@@ -43,14 +43,13 @@ namespace transport {
 
 class MockSessionBase : public Session {
 public:
-    MockSessionBase() : Session(/*ingress=*/true) {}  // Not always true but good enough for now.
+    MockSessionBase() = default;
 
     explicit MockSessionBase(HostAndPort remote,
                              HostAndPort local,
                              SockAddr remoteAddr,
                              SockAddr localAddr)
-        : Session(/*ingress=*/true),
-          _remote(std::move(remote)),
+        : _remote(std::move(remote)),
           _local(std::move(local)),
           _remoteAddr(std::move(remoteAddr)),
           _localAddr(std::move(localAddr)) {}
@@ -83,7 +82,15 @@ public:
         return true;
     }
 
-    void setisLoadBalancerPeer(OperationContext* opCtx, bool helloHasLoadBalancedOption) override {}
+    bool isLoadBalancerPeer() const override {
+        return false;
+    };
+
+    bool isConnectedToLoadBalancerPort() const override {
+        return false;
+    };
+
+    void setisLoadBalancerPeer(OperationContext* opCtx, bool helloHasLoadBalancedOption) override{};
 
 #ifdef MONGO_CONFIG_SSL
     const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override {

@@ -37,7 +37,6 @@
 #include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
@@ -53,9 +52,6 @@ class SSLManagerInterface;
 namespace transport {
 
 class TransportLayer;
-
-extern FailPoint clientIsConnectedToLoadBalancerPort;
-extern FailPoint clientIsLoadBalancedPeer;
 class Session;
 
 /**
@@ -110,17 +106,12 @@ public:
      */
     virtual void end() = 0;
 
-    bool isIngress() const {
-        return _isIngress;
+    void setRestrictedMode(bool mode) {
+        _restrictedMode = mode;
     }
 
-    bool isPreauthIngress() const {
-        return _isPreauthIngress;
-    }
-    void setPreauthIngress(bool b) {
-        invariant(_isIngress,
-                  "this should only ever be called for ingress sessions, even to set to false");
-        _isPreauthIngress = b;
+    bool getRestrictedMode() const {
+        return _restrictedMode;
     }
 
     /**
@@ -174,17 +165,12 @@ public:
     /**
      * Returns true if this session was connected through an L4 load balancer.
      */
-    bool isLoadBalancerPeer() const {
-        return MONGO_unlikely(clientIsLoadBalancedPeer.shouldFail()) || _isLoadBalancerPeer;
-    }
+    virtual bool isLoadBalancerPeer() const = 0;
 
     /**
      * Returns true if the connection is on a load balancer port.
      */
-    bool isConnectedToLoadBalancerPort() const {
-        return MONGO_unlikely(clientIsConnectedToLoadBalancerPort.shouldFail()) ||
-            _isConnectedToLoadBalancerPort;
-    }
+    virtual bool isConnectedToLoadBalancerPort() const = 0;
 
     /**
      * Signal the session that the client declared being from a load balancer.
@@ -280,22 +266,13 @@ public:
 #endif
 
 protected:
-    explicit Session(bool isIngress);
+    Session();
 
-    /**
-     * We have a distinction here. A load balancer port can accept connections that are
-     * either attempting to connect to a load balancer or as a normal targeted connection.
-     * The bools below describe if 1/ the connection is connecting to the load balancer port,
-     * and 2/ the connection is a load balancer type connection. We only find out if the
-     * connection is a LoadBalancerConnection if the hello command parses {loadBalancer: 1}.
-     */
-    bool _isConnectedToLoadBalancerPort{false};
-    bool _isLoadBalancerPeer{false};
+    bool _restrictedMode{false};
 
 private:
     const Id _id;
-    const bool _isIngress;
-    bool _isPreauthIngress{false};  // Only ever true if _isIngress is also true.
+
     AtomicWord<TagMask> _tags;
 };
 
