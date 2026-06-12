@@ -167,6 +167,10 @@ last-continuous:
       ticket: SERVER-117353
     - test_file: jstests/replsets/election_term_over_int_max.js
       ticket: SERVER-119413
+    - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
+      ticket: SERVER-83322
+    - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+      ticket: SERVER-83322
     - test_file: jstests/core/timeseries/query/timeseries_lookup_index_use.js
       ticket: SERVER-95352
     - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
@@ -246,6 +250,10 @@ last-lts:
       ticket: SERVER-100345
     - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
       ticket: SERVER-95869
+    - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
+      ticket: SERVER-83322
+    - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+      ticket: SERVER-83322
     - test_file: jstests/core/query/query_settings/query_settings_and_index_filters.js
       ticket: SERVER-91954
     - test_file: jstests/core/query/query_settings/query_settings_cmds.js

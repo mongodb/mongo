@@ -2,7 +2,8 @@
 // plan. For instance, there are helpers for checking whether a plan is a collection
 // scan or whether the plan is covered (index only).
 
-import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {assertArrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
  * Returns query planner part of explain for every node in the explain report.
@@ -1449,4 +1450,54 @@ export function assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, indexName
 export function isSubplannerCompositePlan(explain) {
     const subplan = getPlanStage(explain, "SUBPLAN");
     return subplan != null && !hasRejectedPlans(explain);
+}
+
+/**
+ * Asserts that the query's optimised plan returns the same results as a collection scan.
+ */
+export function assertResultsSameAsCollscan(coll, query) {
+    const expected = coll.find(query).hint({$natural: 1}).toArray();
+    assertArrayEq({actual: coll.find(query).toArray(), expected});
+}
+
+/**
+ * Forces each candidate plan to completion via forcedPlanSolutionHash and asserts every plan
+ * returns the same results as a collection scan. Silently passes when not supported (subplanning).
+ */
+export function assertResultsSameAllPlans(coll, query) {
+    const db = coll.getDB();
+    if (!db.adminCommand({getParameter: 1, internalQueryAllowForcedPlanByHash: 1}).ok) {
+        return;
+    }
+    const expected = coll.find(query).hint({$natural: 1}).toArray();
+    runWithParamsAllNonConfigNodes(db, {internalQueryAllowForcedPlanByHash: true}, () => {
+        const plannerExplain = assert.commandWorked(
+            db.runCommand({explain: {find: coll.getName(), filter: query}, verbosity: "queryPlanner"}),
+        );
+        for (const plan of getAllPlans(plannerExplain)) {
+            if (!plan.hasOwnProperty("solutionHashUnstable")) {
+                continue;
+            }
+            const res = db.runCommand({
+                find: coll.getName(),
+                filter: query,
+                forcedPlanSolutionHash: plan.solutionHashUnstable,
+            });
+            if (!res.ok && [ErrorCodes.IllegalOperation, ErrorCodes.NoQueryExecutionPlans].includes(res.code)) {
+                return;
+            }
+            assert.commandWorked(res);
+            assertArrayEq({actual: new DBCommandCursor(db, res).toArray(), expected});
+        }
+    });
+}
+
+/**
+ * Asserts that a query returns the expected results, that the optimised plan matches a collscan,
+ * and that every candidate plan results are correct.
+ */
+export function assertQueryResults(coll, query, expected, opts = {}) {
+    assertArrayEq({actual: coll.find(query).toArray(), expected, ...opts});
+    assertResultsSameAsCollscan(coll, query);
+    assertResultsSameAllPlans(coll, query);
 }

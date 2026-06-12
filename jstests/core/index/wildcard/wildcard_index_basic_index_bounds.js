@@ -118,14 +118,10 @@ const operationListCompound = [
 
     {
         query: {"a": 3, "b.c": {$exists: true}, "c": {$lt: 3}},
-        bounds: {
-            "a": ["[3.0, 3.0]"],
-            "$_path": ["[MinKey, MinKey]", '["", {})'],
-            "c": ["[MinKey, MaxKey]"],
-        },
-        path: "$_path",
-        subpathBounds: false,
-        expectedKeyPattern: {"a": 1, "$_path": 1, "c": 1},
+        bounds: {"a": ["[3.0, 3.0]"], "b.c": ["[MinKey, MaxKey]"], "c": ["[-inf, 3.0)"]},
+        path: "b.c",
+        subpathBounds: true,
+        expectedKeyPattern: {"a": 1, "$_path": 1, "b.c": 1, "c": 1},
     },
 
     // Queries cannot use the compound wildcard index.
