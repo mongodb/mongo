@@ -34,8 +34,8 @@ else
 fi
 
 resmoke_test_flags=""
-if [[ -n "${test_flags}" ]]; then
-    resmoke_test_flags="--test-flags='${test_flags}'"
+if [[ -n "${test_flags}${extra_test_flags}" ]]; then
+    resmoke_test_flags="--test-flags='${test_flags} ${extra_test_flags}'"
 fi
 
 activate_venv

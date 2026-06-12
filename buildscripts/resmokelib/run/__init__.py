@@ -1337,6 +1337,18 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--messageFilterPlugin",
+            dest="message_filter_plugin",
+            action="store_true",
+            help=(
+                "Loads the MFP plugin into every mongod/mongos process started by resmoke. "
+                "Requires the plugin .so to be present in dist-test/lib/, "
+                "bazel-bin/install-dist-test/lib/, or "
+                "bazel-bin/src/mongo/db/modules/enterprise/src/mfp/plugin/."
+            ),
+        )
+
+        parser.add_argument(
             "--autoKillResmokeMongo",
             dest="auto_kill",
             choices=["on", "error", "off"],

@@ -236,6 +236,8 @@ DEFAULTS = {
     "load_all_extensions": False,
     # Avoids running hooks as part of the suite.
     "no_hooks": False,
+    # Loads the MFP plugin into every mongod/mongos process.
+    "message_filter_plugin": False,
     # Avoids performing signature verification on test extensions at load time.
     "skip_extensions_signature_verification": False,
     # Enable shell JS debugging
@@ -927,6 +929,11 @@ LOAD_ALL_EXTENSIONS = False
 
 # Avoids running hooks as part of the suite.
 NO_HOOKS = False
+
+# When set, loads the MFP plugin into every mongod/mongos process.
+MESSAGE_FILTER_PLUGIN = False
+# Path where the plugin .so is staged at configure time (set when MESSAGE_FILTER_PLUGIN is true).
+MESSAGE_FILTER_PLUGIN_PATH = None
 
 # Whether ASAN (AddressSanitizer) is enabled, determined by the presence of ASAN_OPTIONS.
 IS_ASAN = bool(os.environ.get("ASAN_OPTIONS"))

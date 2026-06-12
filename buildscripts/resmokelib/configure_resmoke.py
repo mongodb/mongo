@@ -14,6 +14,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
 import traceback
 from functools import cache
@@ -936,6 +937,21 @@ flags in common: {common_set}
         "skip_extensions_signature_verification"
     )
     _config.NO_HOOKS = config.pop("no_hooks")
+    _config.MESSAGE_FILTER_PLUGIN = config.pop("message_filter_plugin")
+    if _config.MESSAGE_FILTER_PLUGIN:
+        plugin_dir = tempfile.mkdtemp(prefix="mfp_")
+        _config.MESSAGE_FILTER_PLUGIN_PATH = os.path.join(plugin_dir, "plugin.so")
+        mfp_param = json.dumps({"messageFilterPluginPath": _config.MESSAGE_FILTER_PLUGIN_PATH})
+        _config.MONGOD_SET_PARAMETERS = _merge_set_params(
+            [_config.MONGOD_SET_PARAMETERS, mfp_param]
+        )
+        _config.MONGOS_SET_PARAMETERS = _merge_set_params(
+            [_config.MONGOS_SET_PARAMETERS, mfp_param]
+        )
+        plugin_src = _find_mfp_plugin_source()
+        shutil.copy2(plugin_src, _config.MESSAGE_FILTER_PLUGIN_PATH)
+        # The loader rejects plugins whose file has any write bits set (tamper-resistance check).
+        os.chmod(_config.MESSAGE_FILTER_PLUGIN_PATH, 0o444)
     _config.HANG_ANALYZER_HOOK_TIMEOUT = config.pop("hang_analyzer_hook_timeout")
 
     _config.JSDBG = config.pop("jsdbg")
@@ -1215,6 +1231,30 @@ def _find_mozjs_jstestfuzz_files() -> list[str]:
         if any(pattern in content for pattern in _MOZJS_PATTERNS):
             excluded.append(path)
     return excluded
+
+
+def _find_mfp_plugin_source() -> str:
+    """Return the path to the compiled MFP Rust plugin .so, or raise if not found."""
+    candidates = [
+        os.path.join(_config.RESMOKE_ROOT, "dist-test/lib/libmessage_filter_plugin.so"),
+        os.path.join(
+            _config.RESMOKE_ROOT,
+            "bazel-bin/install-dist-test/lib/libmessage_filter_plugin.so",
+        ),
+        os.path.join(
+            _config.RESMOKE_ROOT,
+            "bazel-bin/src/mongo/db/modules/enterprise/src/mfp/plugin/libmessage_filter_plugin.so",
+        ),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    raise RuntimeError(
+        "Could not find the MFP Rust plugin .so. Build it with "
+        "'bazel build //src/mongo/db/modules/enterprise/src/mfp/plugin:message_filter_plugin' "
+        "or ensure dist-test/lib/ is populated. "
+        f"Searched: {candidates}"
+    )
 
 
 def _detect_js_engine(mongod_executable: Optional[str]) -> Optional[str]:

@@ -94,9 +94,9 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     # definition or build variant's definition. The configuration of cache size is duplicated in
     # bazel/resmoke/resmoke_shim.py, please update both.
     set +o errexit
-    echo "${resmoke_args} ${test_flags}" | grep -q storageEngineCacheSizeGB
+    echo "${resmoke_args} ${test_flags} ${extra_test_flags}" | grep -q storageEngineCacheSizeGB
     if [ $? -eq 1 ]; then
-        echo "${resmoke_args} ${test_flags}" | grep -q "\-\-storageEngine=inMemory"
+        echo "${resmoke_args} ${test_flags} ${extra_test_flags}" | grep -q "\-\-storageEngine=inMemory"
         if [ $? -eq 0 ]; then
             # We use a default of 4GB for the InMemory storage engine.
             extra_args="$extra_args --storageEngineCacheSizeGB=4"
@@ -162,6 +162,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
         ${resmoke_args} \
         $extra_args \
         ${test_flags} \
+        ${extra_test_flags} \
         --suites=${suite_name} \
         --log=${resmoke_logger} \
         --staggerJobs=on \
