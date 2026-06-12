@@ -47,7 +47,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/lite_parsed_desugarer.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -57,7 +57,6 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -94,25 +93,12 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
 
     // It is possible to specify a $unionWith with *only* a collection in order to do a
     // COLLSCAN; thus, not every $unionWith stage will have a subpipeline.
-    if (params.liteParsedPipeline) {
+    if (params.subpipelineStageParams.has_value()) {
         return {make_intrusive<DocumentSourceUnionWith>(expCtx,
                                                         std::move(params.unionNss),
-                                                        std::move(*params.liteParsedPipeline),
+                                                        std::move(*params.subpipelineStageParams),
                                                         std::move(params.pipeline),
                                                         std::move(params.resolvedSubPipelineView),
-                                                        params.hasForeignDB)};
-    }
-
-    // A $unionWith with no user pipeline against a view should just forward the view's LPP
-    // directly.
-    if (auto viewInfo =
-            tryGetPreResolvedViewInfo(params.unionNss, expCtx->getResolvedNamespaces())) {
-        auto lpp = viewInfo->getViewPipeline();
-        return {make_intrusive<DocumentSourceUnionWith>(expCtx,
-                                                        std::move(params.unionNss),
-                                                        std::move(lpp),
-                                                        std::move(params.pipeline),
-                                                        std::move(viewInfo),
                                                         params.hasForeignDB)};
     }
 
@@ -297,19 +283,12 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     NamespaceString unionNss,
-    LiteParsedPipeline desugaredPipeline,
+    StageParamsPipeline subpipelineStageParams,
     std::vector<BSONObj> userPipeline,
     std::shared_ptr<ViewInfo> resolvedSubPipelineView,
     bool hasForeignDB)
     : DocumentSource(kStageName, expCtx) {
     _hasForeignDB = hasForeignDB;
-    // TODO SERVER-121094 Remove when feature flag is removed.
-    auto ifrContext = expCtx->getIfrContext();
-    auto hybridSearchFlagEnabled = ifrContext &&
-        ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
-    if (!hybridSearchFlagEnabled) {
-        LiteParsedDesugarer::desugar(&desugaredPipeline, expCtx->getIfrContext());
-    }
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
         if (resolvedSubPipelineView) {
@@ -322,24 +301,32 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             }
         }
 
-        // $facet reparses its subpipeline from raw BSON, bypassing the bindViewInfo pass so we must
-        // apply the view manually in that scenario.
-        bool viewAlreadyStitched = resolvedSubPipelineView != nullptr;
         if (resolvedUnionNs) {
-            _sharedState = std::make_shared<UnionWithSharedState>(
-                parsePipelineFromLPPWithMaybeViewDefinition(expCtx,
-                                                            *resolvedUnionNs,
-                                                            desugaredPipeline,
-                                                            userPipeline,
-                                                            unionNss,
-                                                            viewAlreadyStitched),
-                nullptr,
-                UnionWithSharedState::ExecutionProgress::kIteratingSource);
+            // TODO SERVER-117260: This fallback can be removed once $facet goes through normal LP
+            // view resolution, rather than reparsing from BSON.
+            const bool viewNotYetStitched =
+                resolvedUnionNs->involvedNamespaceIsAView && !resolvedSubPipelineView;
+            if (viewNotYetStitched) {
+                _sharedState = std::make_shared<UnionWithSharedState>(
+                    parsePipelineWithMaybeViewDefinition(
+                        expCtx, *resolvedUnionNs, userPipeline, unionNss),
+                    nullptr,
+                    UnionWithSharedState::ExecutionProgress::kIteratingSource);
+            } else {
+                _sharedState = std::make_shared<UnionWithSharedState>(
+                    parsePipelineFromStageParamsWithMaybeViewDefinition(
+                        expCtx,
+                        *resolvedUnionNs,
+                        std::move(subpipelineStageParams),
+                        userPipeline,
+                        unionNss),
+                    nullptr,
+                    UnionWithSharedState::ExecutionProgress::kIteratingSource);
+            }
         } else {
-            auto shared_pipeline = Pipeline::parseFromLiteParsed(
-                desugaredPipeline, expCtx, assertAllStagesAllowedInUnionWith);
             _sharedState = std::make_shared<UnionWithSharedState>(
-                std::move(shared_pipeline),
+                Pipeline::parseFromStageParams(
+                    std::move(subpipelineStageParams), expCtx, assertAllStagesAllowedInUnionWith),
                 nullptr,
                 UnionWithSharedState::ExecutionProgress::kIteratingSource);
         }
@@ -807,31 +794,21 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 
-// TODO SERVER-125519 Move this function into LiteParsed.
-std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineFromLPPWithMaybeViewDefinition(
+std::unique_ptr<Pipeline>
+DocumentSourceUnionWith::parsePipelineFromStageParamsWithMaybeViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ResolvedNamespace& resolvedNs,
-    LiteParsedPipeline& desugaredPipeline,
+    StageParamsPipeline stageParams,
     const std::vector<BSONObj>& rawPipeline,
-    const NamespaceString& userNss,
-    bool viewAlreadyStitchedByDrainLoop) {
+    const NamespaceString& userNss) {
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
     subExpCtx->setInUnionWith(true);
 
     auto opts = pipeline_factory::kDesugarOnly;
     opts.validator = assertAllStagesAllowedInUnionWith;
-    // $unionWith must stitch the view onto its sub-pipeline, unless the drain loop already did so.
-    // TODO SERVER-117260 Once $facet sub-pipelines go through LP view resolution,
-    // viewAlreadyStitchedByDrainLoop can be removed entirely.
-    return pipeline_factory::makePipelineFromViewDefinitionLPP(
-        subExpCtx,
-        resolvedNs,
-        desugaredPipeline,
-        rawPipeline,
-        userNss,
-        opts,
-        /*stitchViewOntoUserPipeline=*/!viewAlreadyStitchedByDrainLoop);
+    return pipeline_factory::makePipelineFromViewDefinitionStageParams(
+        subExpCtx, resolvedNs, std::move(stageParams), rawPipeline, userNss, opts);
 }
 
 }  // namespace mongo

@@ -8,7 +8,8 @@
 import {getExpectedPipelineLimit} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const kPreParseErrCode = 7749501;
+// TODO SERVER-121094 Remove the legacy code (7749501) when the legacy code path is deleted.
+const kPreParseErrCode = [7749501, 12788402];
 const kPostParseErrCode = 5054701;
 
 function testLimits(testDB, lengthLimit) {
@@ -201,7 +202,8 @@ function testLimitsWithLookupCache(testDB, lengthLimit) {
     let maxLength = lengthLimit;
     let tooLarge = lengthLimit + 1;
 
-    const kPreParseErrCode = 7749501;
+    // TODO SERVER-121094 Remove the legacy code (7749501) when the legacy code path is removed.
+    const kPreParseErrCode = [7749501, 12788402];
     const kPostParseErrCode = 5054701;
 
     // $lookup inserts a DocumentSourceSequentialDocumentCache stage in the subpipeline to perform
@@ -241,7 +243,7 @@ function testLimitsWithLookupCache(testDB, lengthLimit) {
             ],
             comment: "lookup tooLarge",
         }),
-        [kPostParseErrCode, kPreParseErrCode],
+        [kPostParseErrCode, ...kPreParseErrCode],
     );
 }
 

@@ -13,7 +13,8 @@ const dbName = "test";
 const timeFieldName = "time";
 const metaFieldName = "status";
 const pipelineLengthLimit = 50;
-const kPreParseErrCode = 7749501;
+// TODO SERVER-121094 Remove the legacy code (7749501) when the legacy path is removed.
+const kPreParseErrCode = [7749501, 12788402];
 const kPostParseErrCode = 5054701;
 const st = new ShardingTest({
     shards: 2,
@@ -84,7 +85,7 @@ function testLimits(testDB, isMongos = true) {
     pipeline.unshift({$limit: 3});
     assert.commandFailedWithCode(
         assert.throws(() => tsColl.aggregate(pipeline).toArray()),
-        [kPreParseErrCode, kPostParseErrCode],
+        [...kPreParseErrCode, kPostParseErrCode],
     );
 
     // Remove the last stage in the pipeline. The pipeline should fail after optimizing. There is an

@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -399,7 +400,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     NamespaceString fromNs,
     std::string as,
     std::vector<BSONObj> userPipeline,
-    LiteParsedPipeline desugaredPipeline,
+    StageParamsPipeline subpipelineStageParams,
     BSONObj letVariables,
     boost::optional<std::pair<std::string, std::string>> localForeignFields,
     boost::optional<BSONObj> unwindSpec,
@@ -409,17 +410,17 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     resolvedPipelineHelper(fromNs, userPipeline, localForeignFields, pExpCtx);
 
     parseAndDefineLetVariables(letVariables, pExpCtx);
-
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
     _fromExpCtx->startExpressionCounters();
     const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
     auto it = resolvedNamespaces.find(_fromNs);
     if (it != resolvedNamespaces.end() && !it->second.pipeline.empty()) {
-        _sharedState->resolvedIntrospectionPipeline = parsePipelineFromLPPWithMaybeViewDefinition(
-            _fromExpCtx, it->second, desugaredPipeline, userPipeline, _fromNs);
-    } else {
         _sharedState->resolvedIntrospectionPipeline =
-            Pipeline::parseFromLiteParsed(desugaredPipeline, _fromExpCtx, lookupPipeValidator);
+            parsePipelineFromStageParamsWithMaybeViewDefinition(
+                _fromExpCtx, it->second, std::move(subpipelineStageParams), userPipeline, _fromNs);
+    } else {
+        _sharedState->resolvedIntrospectionPipeline = Pipeline::parseFromStageParams(
+            std::move(subpipelineStageParams), _fromExpCtx, lookupPipeValidator);
     }
     _fromExpCtx->stopExpressionCounters();
 
@@ -490,34 +491,20 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
             std::pair(std::move(*params.localField), std::move(*params.foreignField));
     }
 
-    // Without a subpipeline there is no desugared LPP to forward.
-    if (!params.liteParsedPipeline) {
-        // When a $lookup has no user pipeline, bypass createFromBson and instead just use the
-        // provided view LPP directly.
-        if (auto viewInfo =
-                tryGetPreResolvedViewInfo(params.fromNss, expCtx->getResolvedNamespaces())) {
-            auto lpp = viewInfo->getViewPipeline();
-            return {make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
-                                                         std::move(params.as),
-                                                         std::vector<BSONObj>{},
-                                                         std::move(lpp),
-                                                         std::move(params.letVariables),
-                                                         std::move(localForeignFields),
-                                                         std::move(params.unwindSpec),
-                                                         expCtx)};
-        }
+    if (!params.subpipelineStageParams.has_value()) {
         return {DocumentSourceLookUp::createFromBson(params.getOriginalBson(), expCtx)};
     }
 
-    auto lookupStage = make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
-                                                            std::move(params.as),
-                                                            std::move(params.pipeline),
-                                                            std::move(*params.liteParsedPipeline),
-                                                            std::move(params.letVariables),
-                                                            std::move(localForeignFields),
-                                                            std::move(params.unwindSpec),
-                                                            expCtx,
-                                                            !params.isPlaceholderInjected);
+    auto lookupStage =
+        make_intrusive<DocumentSourceLookUp>(std::move(params.fromNss),
+                                             std::move(params.as),
+                                             std::move(params.pipeline),
+                                             std::move(params.subpipelineStageParams.value()),
+                                             std::move(params.letVariables),
+                                             std::move(localForeignFields),
+                                             std::move(params.unwindSpec),
+                                             expCtx,
+                                             !params.isPlaceholderInjected);
 
     if (const auto& idx = params.internalFieldMatchPipelineIdx)
         relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));
@@ -560,25 +547,16 @@ DocumentSourceContainer lookupStageParamsToDocumentSourceFn(
 
 ALLOCATE_AND_REGISTER_STAGE_PARAMS(lookup, LookUpStageParams)
 
-// TODO SERVER-125519 Move this function into LiteParsed.
-std::unique_ptr<Pipeline> DocumentSourceLookUp::parsePipelineFromLPPWithMaybeViewDefinition(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+std::unique_ptr<Pipeline> DocumentSourceLookUp::parsePipelineFromStageParamsWithMaybeViewDefinition(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
     const ResolvedNamespace& resolvedNs,
-    LiteParsedPipeline& desugaredPipeline,
+    StageParamsPipeline stageParams,
     const std::vector<BSONObj>& rawPipeline,
-    const NamespaceString& userNss) {
+    const NamespaceString& fromNss) {
     auto opts = pipeline_factory::kDesugarOnly;
     opts.validator = lookupPipeValidator;
-    // $lookup's desugaredPipeline already has the view applied during LiteParsed resolution, so the
-    // factory must not re-stitch the view onto it.
-    return pipeline_factory::makePipelineFromViewDefinitionLPP(
-        expCtx,
-        resolvedNs,
-        desugaredPipeline,
-        rawPipeline,
-        userNss,
-        opts,
-        /*stitchViewOntoUserPipeline=*/false);
+    return pipeline_factory::makePipelineFromViewDefinitionStageParams(
+        fromExpCtx, resolvedNs, std::move(stageParams), rawPipeline, fromNss, opts);
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,

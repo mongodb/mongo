@@ -184,14 +184,6 @@ private:
 };
 
 /**
- * Returns a desugared ViewInfo for `nss` if it resolves to a view with a pre-parsed pipeline in
- * `resolvedNamespaces`, or nullptr otherwise. Used by $unionWith and $lookup to consume the drain
- * loop's pre-stitched LPP directly instead of re-parsing from BSON.
- */
-std::shared_ptr<ViewInfo> tryGetPreResolvedViewInfo(const NamespaceString& nss,
-                                                    const ResolvedNamespaceMap& resolvedNamespaces);
-
-/**
  * Describes what the pipeline as a whole should do with a view on the main aggregate
  * collection, if this stage is at the front of the pipeline.
  */

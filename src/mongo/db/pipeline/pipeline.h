@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
@@ -116,6 +117,21 @@ public:
         PipelineValidatorCallback validator = nullptr,
         bool isFacetPipeline = false,
         bool useStubInterface = false);
+
+    /**
+     * Creates a Pipeline from pre-computed StageParams, dispatching each via the
+     * StageParams→DocumentSource registry. Peer to parseFromLiteParsed(); use this when StageParams
+     * have already been collected from a LiteParsedPipeline's stages so that the getStageParams()
+     * call is not repeated at DocumentSource build time.
+     *
+     * 'validator' is an optional callback run after pipeline construction, same as in
+     * parseFromLiteParsed(). isFacetPipeline and useStubInterface are not supported —
+     * subpipelines for $lookup/$unionWith never need them.
+     */
+    static std::unique_ptr<Pipeline> parseFromStageParams(
+        StageParamsPipeline stageParams,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        PipelineValidatorCallback validator = nullptr);
 
     /**
      * Creates a Pipeline from an existing DocumentSourceContainer.

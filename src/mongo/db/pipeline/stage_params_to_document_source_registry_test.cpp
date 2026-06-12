@@ -110,6 +110,36 @@ TEST(StageParamsToDocumentSourceRegistryTest, RegisteredStageReturnsDocumentSour
 }
 
 /**
+ * Test that the StageParams-direct overload of buildDocumentSource dispatches correctly
+ * for a registered stage, without going through LiteParsedDocumentSource.
+ */
+TEST(StageParamsToDocumentSourceRegistryTest, DirectStageParamsDispatchReturnsDocumentSource) {
+    BSONObj spec = BSON("$limit" << 10);
+    auto liteParsed = LimitLiteParsed(spec.firstElement());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto stageParams = liteParsed.getStageParams();
+
+    auto result = buildDocumentSource(stageParams, expCtx);
+
+    ASSERT_EQ(result.size(), 1);
+    auto* limitDS = dynamic_cast<DocumentSourceLimit*>(result.front().get());
+    ASSERT_TRUE(limitDS != nullptr);
+    ASSERT_EQ(limitDS->getLimit(), 10);
+}
+
+/**
+ * Test that the StageParams-direct overload tasserts for unregistered stages.
+ */
+DEATH_TEST(StageParamsToDocumentSourceRegistryDeathTest,
+           DirectStageParamsDispatchUnregisteredStage,
+           "12788401") {
+    std::unique_ptr<StageParams> stageParams =
+        std::make_unique<UnregisteredTestStageParams>(BSONElement{});
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    buildDocumentSource(stageParams, expCtx);
+}
+
+/**
  * A test-only StageParams class used specifically for testing duplicate registration.
  */
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(DuplicateRegistrationTest);

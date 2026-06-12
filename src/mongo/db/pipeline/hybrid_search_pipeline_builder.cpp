@@ -168,12 +168,10 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             if (hybridSearchFlagEnabled) {
                 auto unionNss = pExpCtx->getUserNss();
 
-                // Build a pre-stitched LiteParsedPipeline for the internal $unionWith.
-                // parsePipelineFromLPPWithMaybeViewDefinition skips applyViewToLiteParsed when
-                // featureFlagExtensionsInsideHybridSearch is on (to avoid double-prepending for
-                // the normal drain-loop path). But this $unionWith is created at execution time
-                // from $rankFusion/$scoreFusion desugaring — the drain loop never ran on it — so
-                // we must stitch the view stages in here.
+                // Build a pre-stitched StageParams vector for the internal $unionWith.
+                // This $unionWith is created at execution time from $rankFusion/$scoreFusion
+                // desugaring — the LP drain loop never ran on it — so we must stitch the view
+                // stages in here before collecting StageParams.
                 const auto& resolvedNamespaces = pExpCtx->getResolvedNamespaces();
                 auto viewIt = resolvedNamespaces.find(unionNss);
                 std::vector<BSONObj> stitchedPipeline;
@@ -187,13 +185,14 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
                 LiteParsedPipeline lpp(
                     unionNss, stitchedPipeline, false, LiteParserOptions{.ifrContext = ifrCtx});
                 lpp.makeOwned();
+                auto subParams = lpp.getStageParams();
 
                 UnionWithStageParams params(std::move(unionNss),
                                             std::move(bsonPipeline),
                                             /* hasForeignDB= */ false,
                                             /* isHybridSearch= */ true,
                                             /* ownedBsonObj= */ BSONObj{},
-                                            std::move(lpp));
+                                            std::move(subParams));
                 auto docSources = DocumentSourceUnionWith::createFromStageParams(params, pExpCtx);
                 outputStages.emplace_back(docSources.front());
             } else {

@@ -324,6 +324,10 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
                                    const NamespaceString& mainNss,
                                    const ResolvedNamespaceMap& resolvedNamespaces,
                                    stdx::unordered_set<NamespaceString>& inProgress) {
+    auto isView = [&](const NamespaceString& nss) {
+        auto it = resolvedNamespaces.find(nss);
+        return it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
+    };
     // Build the ViewInfo to hand to handleView. If 'mainNss' is a view in the map, build a real
     // ViewInfo from it and desugar its pipeline, else pass a sentinel ViewInfo.
     bool anyViewBound = false;
@@ -353,31 +357,38 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
     const auto& stages = lpp->getStages();
     const size_t viewStageCount = stages.size() - originalSize;
 
-    // Pass A: walk stages handleView/_stitchFront just prepended (indices [0, viewStageCount)).
-    // These came from the view's own definition, so a subpipeline back to mainNss is a true
-    // cycle. Our caller inserted mainNss into inProgress, so the guard below suppresses it.
-    for (size_t i = 0; i < viewStageCount; ++i) {
-        if (!stages[i]->shouldResolveSubpipelineViews()) {
-            continue;
-        }
-        auto* subs = stages[i]->getMutableSubPipelines();
-        if (!subs) {
-            continue;
-        }
-        for (auto& sub : *subs) {
-            auto subNss = sub->getOriginalParseNss();
-            // Cycle detection: if subNss is already being processed somewhere up the recursion
-            // stack, skip it. Without this guard mutually-referencing view definitions (each
-            // pointing into the other and back to a common base collection) would recurse
-            // indefinitely.
-            if (!inProgress.insert(subNss).second) {
+    // Recurse into the sub-pipeline views of every stage in the index range [begin, end).
+    // Returns true if any nested view was bound.
+    auto resolveSubpipelinesInRange = [&](size_t begin, size_t end) {
+        bool bound = false;
+        for (size_t i = begin; i < end; ++i) {
+            if (!stages[i]->shouldResolveSubpipelineViews()) {
                 continue;
             }
-            anyViewBound |= resolveInvolvedNamespacesImpl(
-                sub.operator->(), subNss, resolvedNamespaces, inProgress);
-            inProgress.erase(subNss);
+            auto* subs = stages[i]->getMutableSubPipelines();
+            if (!subs) {
+                continue;
+            }
+            for (auto& sub : *subs) {
+                auto subNss = sub->getOriginalParseNss();
+                const bool isRunningAgainstAView = isView(subNss);
+                if (isRunningAgainstAView && !inProgress.insert(subNss).second) {
+                    continue;
+                }
+                bound |= resolveInvolvedNamespacesImpl(
+                    sub.operator->(), subNss, resolvedNamespaces, inProgress);
+                if (isRunningAgainstAView) {
+                    inProgress.erase(subNss);
+                }
+            }
         }
-    }
+        return bound;
+    };
+
+    // Pass A: walk stages handleView/_stitchFront just prepended (indices [0, viewStageCount)).
+    // These came from the view's own definition, so a subpipeline back to mainNss is a true
+    // cycle.
+    anyViewBound |= resolveSubpipelinesInRange(0, viewStageCount);
 
     // Pass B: walk stages that were already in the LPP before handleView prepended the view
     // definition (indices [viewStageCount, N)). Whether a subpipeline reference back to mainNss
@@ -392,24 +403,7 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
     // See jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_lookup.js for an
     // end-to-end test of the $graphLookup mutual-view-cycle this guards against.
     const bool wasInProgress = anyViewBound && (inProgress.erase(mainNss) > 0);
-    for (size_t i = viewStageCount; i < stages.size(); ++i) {
-        if (!stages[i]->shouldResolveSubpipelineViews()) {
-            continue;
-        }
-        auto* subs = stages[i]->getMutableSubPipelines();
-        if (!subs) {
-            continue;
-        }
-        for (auto& sub : *subs) {
-            auto subNss = sub->getOriginalParseNss();
-            if (!inProgress.insert(subNss).second) {
-                continue;
-            }
-            anyViewBound |= resolveInvolvedNamespacesImpl(
-                sub.operator->(), subNss, resolvedNamespaces, inProgress);
-            inProgress.erase(subNss);
-        }
-    }
+    anyViewBound |= resolveSubpipelinesInRange(viewStageCount, stages.size());
     if (wasInProgress) {
         inProgress.insert(mainNss);
     }

@@ -277,6 +277,62 @@ TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
     ASSERT_EQ(innerSubStages[0]->getParseTimeName(), "$match"_sd);
 }
 
+TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionReferences) {
+    const NamespaceString kUserCollNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "userColl");
+    const NamespaceString kInnerViewNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "innerView");
+    const NamespaceString kInnerBackingNss =
+        NamespaceString::createNamespaceString_forTest("testdb", "innerBacking");
+
+    BSONObj viewMatchStage = BSON("$match" << BSON("v" << 1));
+    std::vector<BSONObj> viewPipeline{viewMatchStage};
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+
+    ResolvedNamespaceMap nsMap;
+    nsMap.emplace(
+        kInnerViewNss,
+        ResolvedNamespace(kInnerViewNss, kInnerBackingNss, viewPipeline, BSONObj{}, opts));
+
+    BSONObj innermost = BSON("$unionWith" << BSON("coll" << "innerView"
+                                                         << "pipeline" << BSONArray()));
+    BSONObj middle = BSON("$unionWith" << BSON("coll" << "userColl"
+                                                      << "pipeline" << BSON_ARRAY(innermost)));
+    BSONObj outer = BSON("$unionWith" << BSON("coll" << "userColl"
+                                                     << "pipeline" << BSON_ARRAY(middle)));
+    LiteParsedPipeline userLpp(
+        kUserCollNss, std::vector<BSONObj>{outer}, true, LiteParserOptions{});
+
+    bool result = PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
+        &userLpp, kUserCollNss, nsMap);
+
+    ASSERT_TRUE(result);
+
+    // Walk outer -> middle: neither targets a view, so nothing is prepended at those levels.
+    ASSERT_EQ(userLpp.getStages().size(), 1U);
+    auto* outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
+    ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
+    const auto& middleStages = (*outerSubs)[0]->getStages();
+    ASSERT_EQ(middleStages.size(), 1U);
+    ASSERT_EQ(middleStages[0]->getParseTimeName(), "$unionWith"_sd);
+
+    auto* middleSubs = middleStages[0]->getMutableSubPipelines();
+    ASSERT_TRUE(middleSubs && middleSubs->size() == 1U);
+    const auto& innermostStages = (*middleSubs)[0]->getStages();
+    ASSERT_EQ(innermostStages.size(), 1U);
+    ASSERT_EQ(innermostStages[0]->getParseTimeName(), "$unionWith"_sd);
+
+    // The innermost $unionWith targeted innerView should be fully resolved.
+    auto* innerSubs = innermostStages[0]->getMutableSubPipelines();
+    ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
+    const auto& viewStages = (*innerSubs)[0]->getStages();
+    ASSERT_EQ(viewStages.size(), 1U);
+    ASSERT_EQ(viewStages[0]->getParseTimeName(), "$match"_sd);
+}
+
 TEST(PipelineResolverTest, InsertTopLevelViewEntryStoresResolvedView) {
     // Build a ResolvedView backed by kBackingNss.
     BSONObj viewStage = BSON("$match" << BSON("v" << 1));

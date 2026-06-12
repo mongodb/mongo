@@ -43,18 +43,6 @@
 
 namespace mongo {
 
-std::shared_ptr<ViewInfo> tryGetPreResolvedViewInfo(
-    const NamespaceString& nss, const ResolvedNamespaceMap& resolvedNamespaces) {
-    auto it = resolvedNamespaces.find(nss);
-    if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView &&
-        it->second.getParsedPipeline()) {
-        auto viewInfo = std::make_shared<ViewInfo>(it->second);
-        viewInfo->desugarViewPipeline();
-        return viewInfo;
-    }
-    return nullptr;
-}
-
 using Parser = LiteParsedDocumentSource::Parser;
 using ParserMap = LiteParsedDocumentSource::ParserMap;
 

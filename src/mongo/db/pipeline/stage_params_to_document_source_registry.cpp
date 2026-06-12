@@ -77,4 +77,15 @@ DocumentSourceContainer buildDocumentSource(const LiteParsedDocumentSource& lite
                             << "' does not exist in the parser map");
 }
 
+DocumentSourceContainer buildDocumentSource(const std::unique_ptr<StageParams>& stageParams,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    tassert(12788400, "stageParams should not be null", stageParams);
+    auto it = documentSourceBuildersMap.find(stageParams->getId());
+    tassert(12788401,
+            str::stream() << "No DocumentSource mapping found for StageParams id "
+                          << stageParams->getId(),
+            it != documentSourceBuildersMap.end());
+    return (it->second)(stageParams, expCtx);
+}
+
 }  // namespace mongo

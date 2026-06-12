@@ -64,7 +64,7 @@ public:
                       bool hasForeignDB,
                       bool isHybridSearch,
                       BSONObj ownedBsonObj,
-                      boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none,
+                      boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
                       boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
                       bool internalFromIsAView = false,
                       bool isPlaceholderInjected = false)
@@ -78,7 +78,7 @@ public:
           unwindSpec(std::move(unwindSpec)),
           hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
-          liteParsedPipeline(std::move(liteParsedPipeline)),
+          subpipelineStageParams(std::move(subpipelineStageParams)),
           internalFieldMatchPipelineIdx(std::move(internalFieldMatchPipelineIdx)),
           internalFromIsAView(internalFromIsAView),
           isPlaceholderInjected(isPlaceholderInjected),
@@ -102,11 +102,10 @@ public:
     // search stage.
     bool isHybridSearch;
 
-    // TODO SERVER-127884 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
-    // bridges the subpipeline across phase boundaries properly.
-    // The desugared LiteParsedPipeline for the subpipeline. Absent when $lookup is used without a
-    // 'pipeline' field (local/foreignField-only form).
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    // The StageParams for each stage of the subpipeline. Present when $lookup includes a 'pipeline'
+    // field (may be empty vector for explicit `pipeline: []`), and absent when $lookup uses the
+    // local/foreignField-only form.
+    boost::optional<StageParamsPipeline> subpipelineStageParams;
 
     // Position for the foreignField $match placeholder, set by the router when a
     // localField/foreignField+pipeline $lookup targets a view.

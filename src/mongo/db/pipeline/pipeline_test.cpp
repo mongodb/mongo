@@ -58,6 +58,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -68,6 +69,7 @@
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -7104,6 +7106,30 @@ TEST_F(InvolvedNamespacesTest, IncludesAllCollectionsWhenResolvingViews) {
     ASSERT(involvedNssSet.find(nssIncludedInResolvedView) != involvedNssSet.end());
     ASSERT(involvedNssSet.find(normalCollectionNss) != involvedNssSet.end());
 };
+
+TEST(PipelineTest, ParseFromStageParamsBuildsCorrectPipeline) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    // spec must outlive the StageParams: DefaultStageParams holds a BSONElement view into it.
+    BSONObj spec = BSON("$match" << BSON("x" << 1));
+    auto liteParsed = LiteParsedDocumentSource::parse(nss, spec, {});
+
+    std::vector<std::unique_ptr<StageParams>> params;
+    params.push_back(liteParsed->getStageParams());
+
+    auto pipeline = Pipeline::parseFromStageParams(std::move(params), expCtx);
+
+    ASSERT_EQ(pipeline->getSources().size(), 1u);
+    ASSERT_EQ(pipeline->getSources().front()->getSourceName(), "$match"_sd);
+}
+
+TEST(PipelineTest, ParseFromStageParamsEmptyVectorBuildsEmptyPipeline) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    std::vector<std::unique_ptr<StageParams>> params;
+    auto pipeline = Pipeline::parseFromStageParams(std::move(params), expCtx);
+    ASSERT_TRUE(pipeline->getSources().empty());
+}
 
 }  // namespace
 }  // namespace mongo

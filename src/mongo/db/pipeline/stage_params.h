@@ -33,6 +33,9 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/modules.h"
 
+#include <memory>
+#include <vector>
+
 namespace mongo {
 
 /**
@@ -90,6 +93,8 @@ public:
      */
     static Id allocateId(StringData name);
 };
+
+using StageParamsPipeline = std::vector<std::unique_ptr<StageParams>>;
 
 /**
  * Default implementation of StageParams that stores the original BSON specification.

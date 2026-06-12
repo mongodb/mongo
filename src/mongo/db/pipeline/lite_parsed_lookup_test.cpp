@@ -104,7 +104,8 @@ TEST_F(LiteParsedLookUpTest, RejectsCollectionlessWithoutDocuments) {
 TEST_F(LiteParsedLookUpTest, StageParamsCarriesDesugaredPipelineWhenPresent) {
     auto* typed =
         parseAndGetParams(R"({$lookup: {from: "foreign", as: "a", pipeline: [{$match: {}}]}})");
-    ASSERT_TRUE(typed->liteParsedPipeline.has_value());
+    ASSERT_TRUE(typed->subpipelineStageParams.has_value());
+    ASSERT_EQ(typed->subpipelineStageParams->size(), 1U);
     ASSERT_EQ(typed->pipeline.size(), 1u);
     ASSERT_EQ(typed->as, "a");
     ASSERT_FALSE(typed->localField.has_value());
@@ -115,7 +116,7 @@ TEST_F(LiteParsedLookUpTest, StageParamsCarriesDesugaredPipelineWhenPresent) {
 TEST_F(LiteParsedLookUpTest, StageParamsOmitsLppForLocalForeignFieldForm) {
     auto* typed = parseAndGetParams(
         R"({$lookup: {from: "foreign", as: "a", localField: "x", foreignField: "y"}})");
-    ASSERT_FALSE(typed->liteParsedPipeline.has_value());
+    ASSERT_FALSE(typed->subpipelineStageParams.has_value());
     ASSERT_TRUE(typed->localField.has_value());
     ASSERT_EQ(*typed->localField, "x");
     ASSERT_TRUE(typed->foreignField.has_value());

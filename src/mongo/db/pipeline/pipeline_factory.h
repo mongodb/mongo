@@ -114,18 +114,20 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
 void applyViewDefaultCollation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                const ResolvedNamespace& resolvedNs);
 
+
 /**
- * LiteParsed-input sibling of makePipelineFromViewDefinition(). Builds a sub-pipeline from an
- * already-desugared LiteParsedPipeline rather than raw BSON.
+ * StageParams-input sibling of makePipelineFromViewDefinitionLPP(). Builds a sub-pipeline from
+ * pre-computed StageParams rather than a LiteParsedPipeline. Unlike the LPP overload, this
+ * function never stitches the view onto the pipeline: StageParams are produced by the LiteParsed
+ * layer, which has already applied view resolution, so stitching is structurally unnecessary.
  */
-std::unique_ptr<Pipeline> makePipelineFromViewDefinitionLPP(
+std::unique_ptr<Pipeline> makePipelineFromViewDefinitionStageParams(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     const ResolvedNamespace& resolvedNs,
-    LiteParsedPipeline& desugaredUserPipeline,
+    StageParamsPipeline stageParams,
     const std::vector<BSONObj>& rawPipeline,
     const NamespaceString& userNss,
-    const MakePipelineOptions& opts,
-    bool stitchViewOntoUserPipeline);
+    const MakePipelineOptions& opts);
 
 /**
  * Parses a facet sub-pipeline from a vector of raw BSONObjs by sending the raw pipeline through

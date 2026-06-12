@@ -49,9 +49,9 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_lookup.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -167,32 +167,32 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     // Build a $lookup from pre-parsed StageParams. Performs expCtx-dependent validation
-    // (cross-db on mongos / view definition, hybrid-search timeseries) and forwards the
-    // desugared LPP into the LPP-accepting constructor when a subpipeline is present.
+    // (cross-db on mongos / view definition, hybrid-search timeseries) and calls the
+    // StageParams-accepting constructor when a subpipeline is present.
     static DocumentSourceContainer createFromStageParams(
         LookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Constructor accepting a pre-desugared LiteParsedPipeline. Avoids the per-construction
+     * Constructor accepting pre-parsed StageParams for the subpipeline. Avoids the per-construction
      * re-parse of the subpipeline's BSON that createFromBson does. Used by createFromStageParams
-     * when LookUpStageParams::liteParsedPipeline is present.
+     * when LookUpStageParams::subpipelineStageParams is present.
      */
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,
                          std::vector<BSONObj> userPipeline,
-                         LiteParsedPipeline desugaredPipeline,
+                         StageParamsPipeline subpipelineStageParams,
                          BSONObj letVariables,
                          boost::optional<std::pair<std::string, std::string>> localForeignFields,
                          boost::optional<BSONObj> unwindSpec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          bool containsUserSpecifiedPipeline = true);
 
-    static std::unique_ptr<Pipeline> parsePipelineFromLPPWithMaybeViewDefinition(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    static std::unique_ptr<Pipeline> parsePipelineFromStageParamsWithMaybeViewDefinition(
+        const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
         const ResolvedNamespace& resolvedNs,
-        LiteParsedPipeline& desugaredPipeline,
+        StageParamsPipeline stageParams,
         const std::vector<BSONObj>& rawPipeline,
-        const NamespaceString& userNss);
+        const NamespaceString& fromNss);
 
     void resolvedPipelineHelper(
         NamespaceString fromNs,

@@ -88,4 +88,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildDocumentSource(
     const LiteParsedDocumentSource& liteParsed,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+/**
+ * Create the corresponding 'DocumentSource' object directly from a pre-computed 'StageParams',
+ * bypassing the LiteParsedDocumentSource::getStageParams() call. Used when StageParams have
+ * already been collected (e.g., from a subpipeline stored in a parent stage's params).
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> buildDocumentSource(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 }  // namespace mongo

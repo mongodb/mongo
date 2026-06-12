@@ -62,14 +62,14 @@ public:
                          bool hasForeignDB,
                          bool isHybridSearch,
                          BSONObj ownedBsonObj,
-                         boost::optional<LiteParsedPipeline> liteParsedPipeline = boost::none,
+                         boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
                          std::shared_ptr<ViewInfo> resolvedSubPipelineView = nullptr)
         : DefaultStageParams(ownedBsonObj.firstElement()),
           unionNss(std::move(unionNss)),
           pipeline(std::move(pipeline)),
           hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
-          liteParsedPipeline(std::move(liteParsedPipeline)),
+          subpipelineStageParams(std::move(subpipelineStageParams)),
           resolvedSubPipelineView(std::move(resolvedSubPipelineView)),
           _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
@@ -86,17 +86,12 @@ public:
     // search stage.
     bool isHybridSearch;
 
-    // TODO SERVER-127884 Remove the LPP from StageParams once the LP->DS->exec pipeline translation
-    // bridges the subpipeline across phase boundaries properly.
-    // The desugared LiteParsedPipeline for the subpipeline. Present when the $unionWith spec
-    // includes a pipeline in BSON object form, and absent when it includes string shorthand, i.e.
-    // {$unionWith: "collName"}.
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    // The StageParams for each stage of the subpipeline. Absent only when a $unionWith runs with no
+    // user pipeline specified against a collection (non-view).
+    boost::optional<StageParamsPipeline> subpipelineStageParams;
 
     // The resolved view that the subpipeline targets, populated by
-    // LiteParsedDocumentSourceNestedPipelines::bindViewInfo at parse time. Null when the
-    // subpipeline target is not a view. Lets DocumentSourceUnionWith construction consume the
-    // resolved view directly, without re-looking it up from expCtx->getResolvedNamespaces().
+    // LiteParsedDocumentSourceNestedPipelines::bindViewInfo at parse time.
     std::shared_ptr<ViewInfo> resolvedSubPipelineView;
 
 private:
@@ -125,6 +120,9 @@ public:
     bool requiresAuthzChecks() const override;
 
     std::unique_ptr<StageParams> getStageParams() const override;
+
+    void bindViewInfo(const ViewInfo& viewInfo,
+                      const ResolvedNamespaceMap& resolvedNamespaces) override;
 
     bool hasExtensionVectorSearchStage() const override;
 

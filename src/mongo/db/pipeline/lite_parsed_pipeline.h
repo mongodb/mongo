@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -454,6 +455,18 @@ public:
 
     const StageSpecs& getStages() const {
         return _stageSpecs;
+    }
+
+    /**
+     * Returns the StageParams for each stage in this pipeline.
+     */
+    StageParamsPipeline getStageParams() const {
+        StageParamsPipeline params;
+        params.reserve(_stageSpecs.size());
+        for (const auto& stage : _stageSpecs) {
+            params.push_back(stage->getStageParams());
+        }
+        return params;
     }
 
     /**

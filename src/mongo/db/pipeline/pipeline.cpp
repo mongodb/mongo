@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/db/query/explain_options.h"
@@ -250,6 +251,31 @@ std::unique_ptr<Pipeline> Pipeline::parseFromLiteParsed(
     constexpr bool alreadyOptimized = false;
     pipeline->validateCommon(alreadyOptimized);
 
+    return pipeline;
+}
+
+std::unique_ptr<Pipeline> Pipeline::parseFromStageParams(
+    StageParamsPipeline stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator) {
+    uassert(12788402,
+            str::stream() << "Pipeline length must be no longer than "
+                          << internalPipelineLengthLimit.load() << " stages.",
+            static_cast<int>(stageParams.size()) <= internalPipelineLengthLimit.load());
+
+    DocumentSourceContainer stages;
+    for (auto& sp : stageParams) {
+        auto sources = buildDocumentSource(sp, expCtx);
+        stages.insert(stages.end(), sources.begin(), sources.end());
+    }
+
+    std::unique_ptr<Pipeline> pipeline(new Pipeline(std::move(stages), expCtx));
+
+    validateTopLevelPipeline(*pipeline);
+    if (validator) {
+        validator(*pipeline);
+    }
+    pipeline->validateCommon(/*alreadyOptimized=*/false);
     return pipeline;
 }
 

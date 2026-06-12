@@ -41,11 +41,11 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -125,14 +125,13 @@ public:
                             std::vector<BSONObj> pipeline,
                             bool hasForeignDB = false);
 
-    // Constructor that accepts a pre-desugared LiteParsedPipeline for the subpipeline.
-    // Uses Pipeline::parseFromLiteParsed instead of re-parsing from BSON. 'resolvedSubPipelineView'
-    // is the resolved view recorded by LiteParsedDocumentSourceNestedPipelines::bindViewInfo at
-    // parse time; if non-null, it short-circuits the expCtx->getResolvedNamespaces() lookup that
-    // otherwise has to find the foreign namespace's resolved view.
+    // Constructor used by createFromStageParams(): accepts pre-parsed StageParams for the
+    // subpipeline together with the user-facing fields that the copy constructor and serialize()
+    // require. 'resolvedSubPipelineView' is the view marker recorded by bindViewInfo at parse time;
+    // if non-null, it short-circuits the expCtx->getResolvedNamespaces() lookup.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
-                            LiteParsedPipeline desugaredPipeline,
+                            StageParamsPipeline subpipelineStageParams,
                             std::vector<BSONObj> userPipeline,
                             std::shared_ptr<ViewInfo> resolvedSubPipelineView,
                             bool hasForeignDB);
@@ -254,15 +253,12 @@ public:
         std::vector<BSONObj> currentPipeline,
         const NamespaceString& userNss);
 
-    // TODO SERVER-117260 Once $facet sub-pipelines go through LP view resolution (drain loop),
-    // viewAlreadyStitchedByDrainLoop will always be true and this parameter can be removed.
-    static std::unique_ptr<Pipeline> parsePipelineFromLPPWithMaybeViewDefinition(
+    static std::unique_ptr<Pipeline> parsePipelineFromStageParamsWithMaybeViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ResolvedNamespace& resolvedNs,
-        LiteParsedPipeline& desugaredPipeline,
+        StageParamsPipeline stageParams,
         const std::vector<BSONObj>& rawPipeline,
-        const NamespaceString& userNss,
-        bool viewAlreadyStitchedByDrainLoop = false);
+        const NamespaceString& userNss);
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);

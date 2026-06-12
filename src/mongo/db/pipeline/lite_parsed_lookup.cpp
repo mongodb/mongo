@@ -225,9 +225,9 @@ bool LiteParsedLookUp::hasExtensionSearchStage() const {
 }
 
 std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
-    boost::optional<LiteParsedPipeline> lpp;
+    boost::optional<StageParamsPipeline> subParams;
     if (!_pipelines.empty()) {
-        lpp = _pipelines[0]->clone();
+        subParams = _pipelines[0]->getStageParams();
     }
     return std::make_unique<LookUpStageParams>(*_foreignNss,
                                                _as,
@@ -239,7 +239,7 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
                                                _hasForeignDB,
                                                _isHybridSearch,
                                                getOriginalBson().wrap(),
-                                               std::move(lpp),
+                                               std::move(subParams),
                                                _internalFieldMatchPipelineIdx,
                                                _internalFromIsAView,
                                                _isPlaceholderInjected);

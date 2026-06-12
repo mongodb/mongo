@@ -148,21 +148,35 @@ PrivilegeVector LiteParsedUnionWith::requiredPrivileges(bool isMongos,
 }
 
 std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
-    boost::optional<LiteParsedPipeline> lpp;
+    boost::optional<StageParamsPipeline> subParams;
     if (!_pipelines.empty()) {
-        lpp = _pipelines[0]->clone();
+        subParams = _pipelines[0]->getStageParams();
     }
-    // Forward the resolved-view marker that bindViewInfo populated. The
-    // const_pointer_cast is safe: the marker is owned by this LiteParsed and StageParams
-    // is consumed once at DocumentSource construction time.
     auto resolvedView = std::const_pointer_cast<ViewInfo>(getResolvedSubPipelineView());
     return std::make_unique<UnionWithStageParams>(*_foreignNss,
                                                   _rawPipeline,
                                                   _hasForeignDB,
                                                   _isHybridSearch,
                                                   getOriginalBson().wrap(),
-                                                  std::move(lpp),
+                                                  std::move(subParams),
                                                   std::move(resolvedView));
+}
+
+void LiteParsedUnionWith::bindViewInfo(const ViewInfo& viewInfo,
+                                       const ResolvedNamespaceMap& resolvedNamespaces) {
+    LiteParsedDocumentSourceNestedPipelines::bindViewInfo(viewInfo, resolvedNamespaces);
+    // Handle a $unionWith against a view with no user-provided pipeline.
+    if (!_pipelines.empty() || !_foreignNss) {
+        return;
+    }
+    auto it = resolvedNamespaces.find(*_foreignNss);
+    if (it == resolvedNamespaces.end() || !it->second.involvedNamespaceIsAView) {
+        return;
+    }
+    ResolvedNamespace viewEntry = it->second;
+    viewEntry.liteParseViewPipeline();
+    viewEntry.desugarViewPipeline();
+    _pipelines.push_back(std::move(*viewEntry.getMutableParsedPipeline()));
 }
 
 bool LiteParsedUnionWith::hasExtensionVectorSearchStage() const {
