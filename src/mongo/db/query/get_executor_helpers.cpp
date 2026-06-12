@@ -175,6 +175,9 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
     // subsequent calls.
     boost::optional<QueryPlannerParams::ReplanningData> replanningData = boost::none;
 
+    // In the following loop if the call to makePlanner raises an exception, the handling of the
+    // exception shouldn't directly call makePlanner, but instead it should reset plannerParams.
+    // In this way the next iteration's call to makePlanner can properly catch further exceptions.
     static constexpr size_t kMaxIterations = 5;
     for (size_t iter = 0; iter < kMaxIterations; ++iter) {
         try {
@@ -196,8 +199,7 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
                 // the deferred get_executor, the stages are finalized during lowering.
                 finalizePipelineStages(pipeline, canonicalQuery);
             }
-            return makePlanner(
-                makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData));
+            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData);
         } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
             // The planner failed to generate a viable plan. Remove the query settings and
             // retry if any are present. Otherwise just propagate the exception.

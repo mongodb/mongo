@@ -39,6 +39,8 @@ last-continuous:
       ticket: SERVER-83322
     - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
       ticket: SERVER-83322
+    - test_file: jstests/core/query/distinct/distinct_replanning.js
+      ticket: SERVER-125858
     - test_file: jstests/core/query/group_sbe_accumulator_limit.js
       ticket: SERVER-118700
     - test_file: jstests/core/query/sparse_index_supports_ne_null.js
@@ -278,6 +280,8 @@ last-lts:
       ticket: SERVER-115810
     - test_file: jstests/core/query/collation/collation_mismatch_merge.js
       ticket: SERVER-115810
+    - test_file: jstests/core/query/distinct/distinct_replanning.js
+      ticket: SERVER-125858
     - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
       ticket: SERVER-97254
     - test_file: jstests/core/query/explain/explain1.js
