@@ -1148,6 +1148,7 @@ def download_bazel_task_artifacts(
                 all_downloaded = False
                 break
 
+    sysroot = None
     if all_downloaded and sys.platform.startswith("linux"):
         sysroot = os.path.join(download_dir, "rbe_sysroot")
         create_rbe_sysroot(sysroot)

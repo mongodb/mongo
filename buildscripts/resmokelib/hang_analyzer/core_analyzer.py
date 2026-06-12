@@ -67,8 +67,6 @@ class CoreAnalyzer(Subcommand):
                         self.root_logger,
                         self.task_id,
                         base_dir,
-                        multiversion_dir,
-                        self.execution,
                     )
                     if not all_downloaded:
                         self.root_logger.error("Artifacts were not found.")
