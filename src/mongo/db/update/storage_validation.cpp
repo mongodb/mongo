@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
@@ -55,7 +56,8 @@ void scanDocumentChildren(mutablebson::ConstElement elem,
                           const bool allowTopLevelDollarPrefixes,
                           const bool shouldValidate,
                           const bool isEmbeddedInIdField,
-                          bool* containsDotsAndDollarsField) {
+                          bool* containsDotsAndDollarsField,
+                          const bool fromOplogApplication) {
     if (!elem.hasChildren()) {
         return;
     }
@@ -68,7 +70,8 @@ void scanDocumentChildren(mutablebson::ConstElement elem,
                      allowTopLevelDollarPrefixes,
                      shouldValidate,
                      isEmbeddedInIdField,
-                     containsDotsAndDollarsField);
+                     containsDotsAndDollarsField,
+                     fromOplogApplication);
         curr = curr.rightSibling();
     }
 }
@@ -132,7 +135,8 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
 void scanDocument(const mutablebson::Document& doc,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
-                  bool* containsDotsAndDollarsField) {
+                  bool* containsDotsAndDollarsField,
+                  const bool fromOplogApplication) {
     bool hasId = false;
     auto currElem = doc.root().leftChild();
     while (currElem.ok()) {
@@ -146,7 +150,8 @@ void scanDocument(const mutablebson::Document& doc,
                              false /* Top-level _id fields cannot be $-prefixed. */,
                              shouldValidate,
                              true /* Indicates the element is embedded inside an _id field. */,
-                             containsDotsAndDollarsField);
+                             containsDotsAndDollarsField,
+                             fromOplogApplication);
             } else {
                 uassertStatusOK(validIdField(currElem.getValue()));
             }
@@ -162,7 +167,8 @@ void scanDocument(const mutablebson::Document& doc,
                          allowTopLevelDollarPrefixes,
                          shouldValidate,
                          false /* Not embedded inside an _id field. */,
-                         containsDotsAndDollarsField);
+                         containsDotsAndDollarsField,
+                         fromOplogApplication);
         }
 
         currElem = currElem.rightSibling();
@@ -175,7 +181,8 @@ void scanDocument(mutablebson::ConstElement elem,
                   const bool allowTopLevelDollarPrefixes,
                   const bool shouldValidate,
                   const bool isEmbeddedInIdField,
-                  bool* containsDotsAndDollarsField) {
+                  bool* containsDotsAndDollarsField,
+                  const bool fromOplogApplication) {
     if (shouldValidate) {
         uassert(ErrorCodes::BadValue, "Invalid elements cannot be stored.", elem.ok());
 
@@ -210,6 +217,20 @@ void scanDocument(mutablebson::ConstElement elem,
         }
     }
 
+    if (shouldValidate && fromOplogApplication && elem.getType() == BSONType::binData) {
+        BSONElement bsonElem = elem.getValue();
+        if (bsonElem.binDataType() == BinDataType::Column) {
+            int len = 0;
+            const char* buf = bsonElem.binData(len /*out*/);
+            auto status = validateBSONColumn(buf, len);
+            if (!status.isOK()) {
+                uasserted(ErrorCodes::InvalidBSONColumn,
+                          str::stream()
+                              << "Invalid BSONColumn at field '" << elem.getFieldName() << "'");
+            }
+        }
+    }
+
     if (deep) {
 
         // Check children if there are any.
@@ -219,7 +240,8 @@ void scanDocument(mutablebson::ConstElement elem,
                              allowTopLevelDollarPrefixes,
                              shouldValidate,
                              isEmbeddedInIdField,
-                             containsDotsAndDollarsField);
+                             containsDotsAndDollarsField,
+                             fromOplogApplication);
     }
 }
 

@@ -67,7 +67,8 @@ void ArrayCullingNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                       std::uint32_t recursionLevel,
                                       ModifyResult modifyResult,
                                       const bool validateForStorage,
-                                      bool* containsDotsAndDollarsField) const {
+                                      bool* containsDotsAndDollarsField,
+                                      const bool fromOplogApplication) const {
     invariant(modifyResult.type == ModifyResult::kNormalUpdate);
 
     // Removing elements from an array cannot increase BSON depth or modify a DBRef, so we can
@@ -80,7 +81,8 @@ void ArrayCullingNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      false, /* should validate for storage */
                                      false, /* isEmbeddedInIdField */
-                                     containsDotsAndDollarsField);
+                                     containsDotsAndDollarsField,
+                                     fromOplogApplication);
 }
 
 }  // namespace mongo

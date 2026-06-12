@@ -86,7 +86,7 @@ GetNextResult InternalApplyOplogUpdateStage::doGetNext() {
     uassertStatusOK(_updateDriver.update(pExpCtx->getOperationContext(),
                                          StringData(),
                                          &doc,
-                                         false /* validateForStorage */,
+                                         true /* validateForStorage */,
                                          FieldRefSet(),
                                          false /* isInsert */));
 

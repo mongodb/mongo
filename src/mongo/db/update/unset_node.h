@@ -77,7 +77,8 @@ public:
                         std::uint32_t recursionLevel,
                         ModifyResult modifyResult,
                         bool validateForStorage,
-                        bool* containsDotsAndDollarsField) const final;
+                        bool* containsDotsAndDollarsField,
+                        bool fromOplogApplication) const final;
 
     void logUpdate(LogBuilderInterface* logBuilder,
                    const RuntimeUpdatePath& pathTaken,
