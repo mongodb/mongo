@@ -365,6 +365,9 @@ public:
                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
                 FLEUtil::checkEFCForECC(cmd.getEncryptedFields().get());
+
+                EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(
+                    cmd.getEncryptedFields().get());
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

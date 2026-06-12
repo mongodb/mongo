@@ -4127,6 +4127,24 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     return efc;
 }
 
+void EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(int64_t contention) {
+    uassert(ErrorCodes::BadValue,
+            fmt::format("contention factor ({}) must be >= 0", contention),
+            contention >= 0);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("contention factor ({}) exceeds the maximum allowed value ({})",
+                        contention,
+                        kFLEMaxContentionFactor),
+            contention <= kFLEMaxContentionFactor);
+}
+
+void EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(
+    const EncryptedFieldConfig& ef) {
+    visitQueryTypeConfigs(ef, [](const EncryptedField&, const QueryTypeConfig& qtc) {
+        EncryptionInformationHelpers::checkMaxContentionFactorNotExceeded(qtc.getContention());
+        return false;
+    });
+}
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(ConstDataRange cdr) {
     ConstDataRangeCursor cdrc(cdr);
