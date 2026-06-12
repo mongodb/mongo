@@ -1224,4 +1224,22 @@ TEST(ExpressionGeoTest, RoundTripSerializeInternalBucketGeoWithinWith2dsphereInd
     ASSERT_EQUALS(static_cast<int>(*ibgw->getIndexVersion()), 4);
 }
 
+TEST(ExpressionGeoTest, StrictWindingPolygonInQueryGeometryCollectionRejected) {
+    // A GeometryCollection containing a strict-winding polygon is not a valid query geometry.
+    // supportsProject(SPHERE) must return false for such a collection so that
+    // parseGeoExpressionFromBSON returns BadValue instead of crashing in projectInto().
+    auto assertRejected = [](const char* predicate) {
+        std::string query = std::string("{") + predicate +
+            ": {$geometry: {type: 'GeometryCollection', geometries: ["
+            "{type: 'Polygon', coordinates: [[[0,0],[5,0],[5,5],[0,5],[0,0]]],"
+            " crs: {type: 'name', properties: {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}}}"
+            "]}}}";
+        std::unique_ptr<GeoExpression> gq(new GeoExpression);
+        ASSERT_EQUALS(ErrorCodes::BadValue,
+                      parsers::matcher::parseGeoExpressionFromBSON(fromjson(query), *gq));
+    };
+    assertRejected("$within");
+    assertRejected("$geoIntersects");
+}
+
 }  // namespace mongo

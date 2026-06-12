@@ -408,5 +408,48 @@ TEST(MatchExpressionParserGeo, WithinBox) {
     ASSERT(exec::matcher::matchesBSON(result.getValue().get(), fromjson("{a: {x: 5, y:5.1}}")));
 }
 
+// $geoIntersects and $geoWithin against a stored GeometryCollection containing a strict-winding
+// polygon must return false (not crash) on the non-index (collection-scan) path. getNativeCRS()
+// returns STRICT_SPHERE for such a collection, which triggers the "Never match big polygon" guard
+// in geoContains before any null s2Polygon is dereferenced.
+TEST(MatchExpressionParserGeo, StrictWindingPolygonInGeometryCollectionGeoIntersects) {
+    BSONObj query = fromjson(
+        "{geo: {$geoIntersects: {$geometry:"
+        "  {type: 'Polygon', coordinates: [[[0,0],[10,0],[10,10],[0,10],[0,0]]]}}}}");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_TRUE(result.isOK());
+
+    BSONObj doc = fromjson(
+        "{geo: {type: 'GeometryCollection', geometries: ["
+        "  {type: 'Polygon', coordinates: [[[0,0],[5,0],[5,5],[0,5],[0,0]]],"
+        "   crs: {type: 'name', properties:"
+        "         {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}}}"
+        "]}}");
+
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), doc));
+}
+
+TEST(MatchExpressionParserGeo, StrictWindingPolygonInGeometryCollectionGeoWithin) {
+    BSONObj query = fromjson(
+        "{geo: {$geoWithin: {$geometry:"
+        "  {type: 'Polygon', coordinates: [[[-10,-10],[10,-10],[10,10],[-10,10],[-10,-10]]]}}}}");
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_TRUE(result.isOK());
+
+    BSONObj doc = fromjson(
+        "{geo: {type: 'GeometryCollection', geometries: ["
+        "  {type: 'Polygon', coordinates: [[[0,0],[5,0],[5,5],[0,5],[0,0]]],"
+        "   crs: {type: 'name', properties:"
+        "         {name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326'}}}"
+        "]}}");
+
+    ASSERT_FALSE(exec::matcher::matchesBSON(result.getValue().get(), doc));
+}
 
 }  // namespace mongo::evaluate_matcher_geo_test
