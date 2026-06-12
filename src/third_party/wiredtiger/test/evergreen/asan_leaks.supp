@@ -1,6 +1,7 @@
 # TCMalloc intentionally leaks newed objects. More information can be found in
 # https://github.com/gperftools/gperftools/issues/758.
 leak:InitModule
+
 # ARM64 python leaks memory from an unclear source. This suppresses that one leak.
 leak:PyObject_Malloc
 
@@ -10,10 +11,8 @@ leak:__tiered_open
 # FIXME-WT-16331: test_tiered04
 leak:__tiered_name_str
 
-# FIXME-WT-16083: Resolve the warnings and remove the suppressions.
+# Originates in the Python interpreter and cannot be addressed in WiredTiger code.
 leak:_PyBytes_FromSize
-leak:_wrap__wiredtiger_calc_modify
-leak:__cursor_prepared_discover_setup
 
 # FIXME-WT-16668: This leak seems to have occurred as a result of checkpoint size but that project
 # does not directly allocate memory.

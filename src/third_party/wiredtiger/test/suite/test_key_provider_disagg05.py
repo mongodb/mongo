@@ -103,6 +103,8 @@ class test_key_provider_disagg05(wttest.WiredTigerTestCase):
         ds.populate()
 
         # The first checkpoint creates the page table; record the baseline page count.
+        stable = 1
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(stable))
         self.session.checkpoint()
         baseline = len(self.key_provider_pages())
         self.assertGreaterEqual(baseline, 1)
@@ -111,6 +113,8 @@ class test_key_provider_disagg05(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri)
         for i in range(4):
             cursor[ds.key(100 + i)] = ds.value(100 + i)
+            stable += 1
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(stable))
             self.session.checkpoint()
         cursor.close()
 

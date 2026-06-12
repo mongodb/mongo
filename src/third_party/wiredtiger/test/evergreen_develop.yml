@@ -110,8 +110,6 @@ buildvariants:
       batchtime: 1440 # 1 day
     - name: compatibility-test-upgrade-to-latest-daily
       batchtime: 1440 # 1 day
-    - name: compatibility-test-for-older-releases-weekly
-      batchtime: 10080 # 7 days
     - name: compatibility-test-for-wt-standalone-releases-weekly
       batchtime: 10080 # 7 days
     - name: compatibility-test-for-newer-releases

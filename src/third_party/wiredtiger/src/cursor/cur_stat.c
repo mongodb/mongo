@@ -308,7 +308,7 @@ __curstat_search(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, ret, search, NULL);
 
     WT_ERR(__cursor_needkey(cursor));
-    F_CLR(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_SET);
+    F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     /* Initialize on demand. */
     if (cst->notinitialized) {

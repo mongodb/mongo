@@ -3875,13 +3875,6 @@ tasks:
         vars:
           compat_test_args: -n
 
-  - name: compatibility-test-for-older-releases-weekly
-    commands:
-      - func: "get project"
-      - func: "compatibility test"
-        vars:
-          compat_test_args: -o
-
   - name: compatibility-test-upgrade-to-latest-daily
     commands:
       - func: "get project"

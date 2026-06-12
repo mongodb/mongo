@@ -9,6 +9,8 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <utility>
+#include <vector>
 
 #include <catch2/catch.hpp>
 
@@ -138,7 +140,49 @@ struct kp_fixture {
 
         return (crypt);
     }
+
+    int
+    push_key(WT_KEY_PROVIDER *provider, const std::string &key_bytes, uint64_t timestamp)
+    {
+        WT_CRYPT_KEYS crypt = {};
+        crypt.keys.data = key_bytes.data();
+        crypt.keys.size = key_bytes.size();
+        crypt.timestamp = timestamp;
+        return (provider->set_key(provider, session, &crypt));
+    }
 };
+
+/*
+ * validate_chosen_key --
+ *     Assert the entry a checkpoint selected carries the expected timestamp and key bytes.
+ */
+static void
+validate_chosen_key(
+  WT_DISAGG_PENDING_CRYPT_KEY *entry, uint64_t timestamp, const std::string &key_bytes)
+{
+    REQUIRE(entry != nullptr);
+    REQUIRE(entry->timestamp == timestamp);
+    REQUIRE(entry->keys.size == key_bytes.size());
+    REQUIRE(memcmp(entry->keys.data, key_bytes.data(), key_bytes.size()) == 0);
+}
+
+/*
+ * validate_pending_queue --
+ *     Assert the pending queue holds exactly the expected (timestamp, key bytes) entries in order.
+ *     Used to confirm a checkpoint pruned the queue correctly.
+ */
+static void
+validate_pending_queue(
+  WT_CONNECTION_IMPL *conn_impl, const std::vector<std::pair<uint64_t, std::string>> &expected)
+{
+    WT_DISAGG_PENDING_CRYPT_KEY *entry =
+      TAILQ_FIRST(&conn_impl->disaggregated_storage.pending_crypt_key_qh);
+    for (const auto &expect : expected) {
+        validate_chosen_key(entry, expect.first, expect.second);
+        entry = TAILQ_NEXT(entry, q);
+    }
+    REQUIRE(entry == nullptr); /* No unexpected trailing entries. */
+}
 
 TEST_CASE_METHOD(kp_fixture, "Config", "[key_provider]")
 {
@@ -348,21 +392,6 @@ TEST_CASE_METHOD(kp_fixture, "set_key_provider version selects push mode", "[key
     F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
 }
 
-/*
- * push_key --
- *     Build a WT_CRYPT_KEYS and invoke the provider's set_key, returning its error code so the
- *     caller can assert both success and failure paths.
- */
-static int
-push_key(WT_KEY_PROVIDER *kp, WT_SESSION *session, const std::string &key_bytes, uint64_t timestamp)
-{
-    WT_CRYPT_KEYS crypt = {};
-    crypt.keys.data = key_bytes.data();
-    crypt.keys.size = key_bytes.size();
-    crypt.timestamp = timestamp;
-    return kp->set_key(kp, session, &crypt);
-}
-
 TEST_CASE_METHOD(kp_fixture, "set_key stores the pushed key as the active key", "[key_provider]")
 {
     WT_CONNECTION *wt_conn = conn.get_wt_connection();
@@ -373,15 +402,8 @@ TEST_CASE_METHOD(kp_fixture, "set_key stores the pushed key as the active key", 
     REQUIRE(TAILQ_EMPTY(&conn_impl->disaggregated_storage.pending_crypt_key_qh));
 
     const std::string key_bytes = "push-mode-test-key-0123456789";
-    REQUIRE(push_key(&stub, session, key_bytes, 1) == 0);
-
-    WT_DISAGG_PENDING_CRYPT_KEY *entry =
-      TAILQ_FIRST(&conn_impl->disaggregated_storage.pending_crypt_key_qh);
-    REQUIRE(entry != nullptr);
-    REQUIRE(entry->timestamp == 1);
-    REQUIRE(entry->keys.size == key_bytes.size());
-    REQUIRE(memcmp(entry->keys.data, key_bytes.data(), key_bytes.size()) == 0);
-    REQUIRE(TAILQ_NEXT(entry, q) == nullptr);
+    REQUIRE(push_key(&stub, key_bytes, 1) == 0);
+    validate_pending_queue(conn_impl, {{1, key_bytes}});
 
     conn_impl->key_provider = nullptr;
     F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
@@ -397,17 +419,9 @@ TEST_CASE_METHOD(kp_fixture, "set_key accumulates monotonic entries", "[key_prov
     const std::string keys[3] = {"key-one-0123456789", "key-two-9876543210", "key-three-55555"};
     const uint64_t timestamps[3] = {10, 20, 30};
     for (int i = 0; i < 3; i++)
-        REQUIRE(push_key(&stub, session, keys[i], timestamps[i]) == 0);
+        REQUIRE(push_key(&stub, keys[i], timestamps[i]) == 0);
 
-    int n = 0;
-    WT_DISAGG_PENDING_CRYPT_KEY *entry;
-    TAILQ_FOREACH (entry, &conn_impl->disaggregated_storage.pending_crypt_key_qh, q) {
-        REQUIRE(entry->timestamp == timestamps[n]);
-        REQUIRE(entry->keys.size == keys[n].size());
-        REQUIRE(memcmp(entry->keys.data, keys[n].data(), keys[n].size()) == 0);
-        n++;
-    }
-    REQUIRE(n == 3);
+    validate_pending_queue(conn_impl, {{10, keys[0]}, {20, keys[1]}, {30, keys[2]}});
 
     conn_impl->key_provider = nullptr;
     F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
@@ -421,10 +435,10 @@ TEST_CASE_METHOD(kp_fixture, "set_key rejects non-monotonic timestamp", "[key_pr
     REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
 
     const std::string key_bytes = "push-mode-key-monotonic";
-    REQUIRE(push_key(&stub, session, key_bytes, 10) == 0);
-    REQUIRE(push_key(&stub, session, key_bytes, 10) == EINVAL); /* Equal rejected. */
-    REQUIRE(push_key(&stub, session, key_bytes, 5) == EINVAL);  /* Smaller rejected. */
-    REQUIRE(push_key(&stub, session, key_bytes, 11) == 0);      /* Larger accepted. */
+    REQUIRE(push_key(&stub, key_bytes, 10) == 0);
+    REQUIRE(push_key(&stub, key_bytes, 10) == EINVAL); /* Equal rejected. */
+    REQUIRE(push_key(&stub, key_bytes, 5) == EINVAL);  /* Smaller rejected. */
+    REQUIRE(push_key(&stub, key_bytes, 11) == 0);      /* Larger accepted. */
 
     /* Only the two successful pushes are queued. */
     int n = 0;
@@ -447,9 +461,9 @@ TEST_CASE_METHOD(kp_fixture, "set_key rejects timestamp <= stable", "[key_provid
     REQUIRE(wt_conn->set_timestamp(wt_conn, "stable_timestamp=14") == 0); /* 0x14 == 20. */
 
     const std::string key_bytes = "push-mode-stable-check";
-    REQUIRE(push_key(&stub, session, key_bytes, 20) == EINVAL); /* Equal to stable. */
-    REQUIRE(push_key(&stub, session, key_bytes, 10) == EINVAL); /* Below stable. */
-    REQUIRE(push_key(&stub, session, key_bytes, 30) == 0);      /* Strictly above stable. */
+    REQUIRE(push_key(&stub, key_bytes, 20) == EINVAL); /* Equal to stable. */
+    REQUIRE(push_key(&stub, key_bytes, 10) == EINVAL); /* Below stable. */
+    REQUIRE(push_key(&stub, key_bytes, 30) == 0);      /* Strictly above stable. */
 
     conn_impl->key_provider = nullptr;
     F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
@@ -467,6 +481,137 @@ TEST_CASE_METHOD(kp_fixture, "set_key rejects empty input", "[key_provider]")
     crypt.keys.size = 0;
     crypt.timestamp = 1;
     REQUIRE(stub.set_key(&stub, session, &crypt) == EINVAL);
+
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(
+  kp_fixture, "checkpoint selection picks highest timestamp at or below ckpt ts", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    /* Each pushed key has distinct bytes so the chosen entry's key can be validated. */
+    const std::string keys[4] = {
+      "selection-key-ten", "selection-key-twenty", "selection-key-thirty", "selection-key-forty"};
+    const uint64_t timestamps[4] = {10, 20, 30, 40};
+    for (int i = 0; i < 4; i++)
+        REQUIRE(push_key(&stub, keys[i], timestamps[i]) == 0);
+
+    SECTION("a timestamp that straddles the queue picks the highest entry not exceeding it")
+    {
+        validate_chosen_key(__ut_disagg_select_pending_crypt_key(session_impl, 25), 20, keys[1]);
+    }
+
+    SECTION("an exact match on a queued timestamp is selected")
+    {
+        validate_chosen_key(__ut_disagg_select_pending_crypt_key(session_impl, 30), 30, keys[2]);
+    }
+
+    SECTION("a timestamp beyond the queue selects the newest entry")
+    {
+        validate_chosen_key(__ut_disagg_select_pending_crypt_key(session_impl, 100), 40, keys[3]);
+    }
+
+    SECTION("a timestamp before the whole queue selects nothing")
+    {
+        REQUIRE(__ut_disagg_select_pending_crypt_key(session_impl, 5) == nullptr);
+    }
+
+    __wti_disagg_pending_crypt_key_clear(session_impl);
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(kp_fixture, "checkpoint prune scenarios", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    /* Pruning an empty queue is a no-op. */
+    __ut_disagg_prune_pending_crypt_keys(session_impl, 100);
+    validate_pending_queue(conn_impl, {});
+
+    const std::string keys[3] = {"prune-key-ten", "prune-key-twenty", "prune-key-thirty"};
+    const uint64_t timestamps[3] = {10, 20, 30};
+    for (int i = 0; i < 3; i++)
+        REQUIRE(push_key(&stub, keys[i], timestamps[i]) == 0);
+
+    SECTION("a bound below every entry frees nothing")
+    {
+        __ut_disagg_prune_pending_crypt_keys(session_impl, 5);
+        validate_pending_queue(conn_impl, {{10, keys[0]}, {20, keys[1]}, {30, keys[2]}});
+    }
+
+    SECTION("a bound exactly at an entry frees that entry and everything older")
+    {
+        __ut_disagg_prune_pending_crypt_keys(session_impl, 20);
+        validate_pending_queue(conn_impl, {{30, keys[2]}});
+    }
+
+    SECTION("a bound between entries frees the covered keys and retains the newer one")
+    {
+        __ut_disagg_prune_pending_crypt_keys(session_impl, 25);
+        validate_pending_queue(conn_impl, {{30, keys[2]}});
+    }
+
+    SECTION("a bound at or above every entry drains the whole queue")
+    {
+        __ut_disagg_prune_pending_crypt_keys(session_impl, 1000);
+        validate_pending_queue(conn_impl, {});
+    }
+
+    __wti_disagg_pending_crypt_key_clear(session_impl);
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(kp_fixture, "checkpoint selection edge cases", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    /* An empty queue selects nothing. */
+    REQUIRE(__ut_disagg_select_pending_crypt_key(session_impl, 100) == nullptr);
+
+    /* A single entry is selected only once the checkpoint timestamp reaches it. */
+    const std::string edge_key = "edge-test-key";
+    REQUIRE(push_key(&stub, edge_key, 50) == 0);
+    REQUIRE(__ut_disagg_select_pending_crypt_key(session_impl, 49) == nullptr);
+    validate_chosen_key(__ut_disagg_select_pending_crypt_key(session_impl, 50), 50, edge_key);
+
+    __wti_disagg_pending_crypt_key_clear(session_impl);
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(kp_fixture, "pending key clear drains the whole queue", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    const std::string keys[3] = {"clear-key-ten", "clear-key-twenty", "clear-key-thirty"};
+    const uint64_t timestamps[3] = {10, 20, 30};
+    for (int i = 0; i < 3; i++)
+        REQUIRE(push_key(&stub, keys[i], timestamps[i]) == 0);
+    validate_pending_queue(conn_impl, {{10, keys[0]}, {20, keys[1]}, {30, keys[2]}});
+
+    /* Clearing drains every queued key regardless of timestamp. */
+    __wti_disagg_pending_crypt_key_clear(session_impl);
+    validate_pending_queue(conn_impl, {});
 
     conn_impl->key_provider = nullptr;
     F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);

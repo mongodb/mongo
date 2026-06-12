@@ -2654,6 +2654,8 @@ static inline bool __wt_get_page_modify_ta(WT_SESSION_IMPL *session, WT_PAGE *pa
   WT_TIME_AGGREGATE **ta) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 
 #ifdef HAVE_UNITTEST
+extern WT_DISAGG_PENDING_CRYPT_KEY *__ut_disagg_select_pending_crypt_key(WT_SESSION_IMPL *session,
+  wt_timestamp_t checkpoint_timestamp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern WT_EXT *__ut_block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern bool __ut_block_bitflip_detect(void *data, size_t check_size, uint32_t expected_checksum,
@@ -2710,6 +2712,7 @@ extern void __ut_block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, bo
 extern void __ut_block_off_srch_pair(
   WT_EXTLIST *el, wt_off_t off, WT_EXT **beforep, WT_EXT **afterp);
 extern void __ut_block_size_srch(WT_SIZE **head, wt_off_t size, WT_SIZE ***stack);
+extern void __ut_disagg_prune_pending_crypt_keys(WT_SESSION_IMPL *session, wt_timestamp_t bound);
 extern void __ut_disagg_set_crypt_header(WT_SESSION_IMPL *session, WT_CRYPT_KEYS *crypt);
 extern void __ut_layered_table_truncate_gc(
   WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table, const wt_timestamp_t prune_timestamp);

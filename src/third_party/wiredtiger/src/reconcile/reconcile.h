@@ -52,6 +52,10 @@ extern int __ut_ovfl_discard_verbose(WT_SESSION_IMPL *session, WT_PAGE *page, WT
   const char *tag) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __ut_ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __ut_ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __ut_ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __ut_ovfl_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 

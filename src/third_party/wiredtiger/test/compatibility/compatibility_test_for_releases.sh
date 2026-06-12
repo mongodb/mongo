@@ -16,8 +16,6 @@ bcopy()
     test "$1" = "mongodb-8.0" && echo "1"
     test "$1" = "mongodb-7.0" && echo "1"
     test "$1" = "mongodb-6.0" && echo "1"
-    test "$1" = "mongodb-5.0" && echo "1"
-    test "$1" = "mongodb-4.4" && echo "1"
     # Anything newer than mongodb-8.0 returns false.
     return 0
 }
@@ -81,8 +79,6 @@ bflag()
     test "$1" = "mongodb-8.0" && echo "-B"
     test "$1" = "mongodb-7.0" && echo "-B "
     test "$1" = "mongodb-6.0" && echo "-B "
-    test "$1" = "mongodb-5.0" && echo "-B "
-    test "$1" = "mongodb-4.4" && echo "-B "
     return 0
 }
 
@@ -113,9 +109,7 @@ pick_a_version()
     # Avoid picking below types of versions:
     #   - release candidates (rc)
     #   - alpha releases (alpha)
-    #   - mongodb-4.4.0 through mongodb-4.4.6 (4.4.[0-6]$) as they are not compatible with Doxygen
-    #     version 1.8.17 (installed on the build hosts). WT-7437 was introduced since 4.4.7.
-    mapfile -t versions < <( git tag | grep $branch | grep -Ev "rc|alpha|4.4.[0-6]$" )
+    mapfile -t versions < <( git tag | grep $branch | grep -Ev "rc|alpha" )
 
     len_versions=${#versions[@]}
     if [ $len_versions != 0 ]; then
@@ -204,7 +198,7 @@ get_config_file_name()
     local file_name=""
     branch_name=$1
     format_dir="$branch_name/build/test/format"
-    if [ "${wt_standalone}" = true ] || [ $older = true ] ; then
+    if [ "${wt_standalone}" = true ]; then
         file_name="${format_dir}/CONFIG_default"
         echo $file_name
         return
@@ -258,31 +252,13 @@ create_configs()
     echo "stress.checkpoint=0" >> $file_name          # Faster runs
     echo "timer=4" >> $file_name
     echo "verify=1" >> $file_name
-    if [ "$branch_name" == "mongodb-4.2" ] ; then
-        # WT-8601 has not been backported to 4.2 and transactions are expected to be timestamped.
-        echo "transaction.timestamps=1" >> $file_name # WT-7545 - Older releases can't do non-timestamp transactions
-        echo "huffman_key=0" >> $file_name            # WT-6893 - Not supported by newer releases
-    else
-        echo "transaction.timestamps=0" >> $file_name # WT-8601 - Timestamps do not work with logged tables
-    fi
-
-    # Append older release configs for newer compatibility release test
-    if [ $newer = true ]; then
-        for i in "${compatible_upgrade_downgrade_release_branches[@]}"
-        do
-            if [ "$i" == "$branch_name" ] ; then
-                echo "transaction.isolation=snapshot" >> $file_name # WT-7545 - Older releases can't do lower isolation levels
-                break
-            fi
-        done
-    fi
+    echo "transaction.timestamps=0" >> $file_name     # WT-8601 - Timestamps do not work with logged tables
     echo "##################################################" >> $file_name
 }
 
 #############################################################
 # create_default_configs:
-# This function will create the default configs for older and standalone
-# release branches.
+# This function will create the default configs for standalone release branches.
 #############################################################
 create_default_configs()
 {
@@ -335,11 +311,8 @@ run_format()
 
     config_file=""
 
-    # Compatibility test for newer releases will have CONFIG file for each release
-    # branches for the upgrade/downgrade testing.
-    #
-    # Compatibility test for older and standalone releases will have the default config.
-    if [ "${wt_standalone}" = true ] || [ $older = true ]; then
+    # Newer releases have a per-branch CONFIG file; standalone uses CONFIG_default.
+    if [ "${wt_standalone}" = true ]; then
         config_file="-c CONFIG_default"
     else
         config_file="-c CONFIG_${branch_name}"
@@ -357,40 +330,6 @@ run_format()
             echo w) | ed -s $dir/WiredTiger.basecfg > /dev/null
     done
     cd -
-}
-
-#############################################################
-# is_test_checkpoint_recovery_supported:
-#       arg1: branch name
-#############################################################
-is_test_checkpoint_recovery_supported()
-{
-    branch_name=$1
-
-    #
-    # The test_checkpoint recovery change WT-7958 are included in mongo
-    # 4.4.9 and 5.0.3 (and newer) versions.
-    #
-    # There's no much value to run test_checkpoint for earlier versions.
-    #
-    # Exclude mongodb-4.4.10+ and mongodb-5.0.10+ versions.
-    #
-    # Exclude mongodb-4.4 and mongodb-5.0 and they represent latest code
-    # of the corresponding release branches, which have WT-7958 included.
-    #
-    if ( ([[ $branch_name == mongodb-* ]] &&
-          [[ $branch_name < "mongodb-4.4.9" ]]) ||
-         ([[ $branch_name == mongodb-5.0.[0-9] ]] &&
-          [[ $branch_name < "mongodb-5.0.3" ]]) ) &&
-       [[ $branch_name != mongodb-4.4.[1-9][0-9] ]] &&
-       [[ $branch_name != mongodb-5.0.[1-9][0-9] ]] &&
-       [[ $branch_name != "mongodb-4.4" ]] &&
-       [[ $branch_name != "mongodb-5.0" ]]
-    then
-        echo "no"
-    else
-        echo "yes"
-    fi
 }
 
 #############################################################
@@ -553,14 +492,6 @@ upgrade_downgrade()
     for am in $3; do
         config=$top/$format_dir_branch2/RUNDIR.$am/CONFIG
         for _ in {1..2}; do
-            # In order to be able to test against 4.2, we need to have timestamped transactions. Those
-            # are incompatible with implicit transactions. Adjust the config temporarily.
-            if [ "$1" == "mongodb-4.2" ] ; then
-                echo "Temporarily forcing transaction.timestamps=1 for $config"
-                cp $config $config.orig
-                echo "transaction.timestamps=1" >> $config
-                echo "transaction.implicit=0" >> $config
-            fi
 	    # Older releases (8.0 and older) expect to find a BACKUP.copy
 	    # directory if BACKUP exists. After 8.0 the directory structure
 	    # changed. So copy it for older releases if testing against a
@@ -581,11 +512,6 @@ upgrade_downgrade()
             cd "$top/$format_dir_branch1"
             flags="-1Rq $(bflag $1)"
             ./t $flags -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
-            # Revert to the original config.
-            if [ "$1" == "mongodb-4.2" ] ; then
-                echo "Reverting $config to its original state"
-                mv $config.orig $config
-            fi
 
             echo "$2 format running on $2 access method $am..."
             cd "$top/$format_dir_branch2"
@@ -593,49 +519,6 @@ upgrade_downgrade()
             ./t $flags -h "RUNDIR.$am" timer=2
         done
     done
-}
-
-# test/format manually specifies paths to loadable extensions. It also relies on WiredTiger.basecfg
-# existing, so the result is a bunch of paths to .so files in WiredTiger.basecfg. This is fine, but
-# the change from autoconf to cmake resulted in these files living in different directories. It's a
-# bit awful, but this method fixes up the paths in WiredTiger.basecfg when upgrading between
-# versions built with different build systems. This whole thing can go away once we stop caring
-# about 5.0.
-fixup_format_extension_paths()
-{
-    local src_branch="$1"
-    local dst_branch="$2"
-    local working_dir="$3"
-
-    local src_build_system=$(get_build_system "$src_branch")
-    local dst_build_system=$(get_build_system "$dst_branch")
-
-    if [ "$src_build_system" != "$dst_build_system" ]; then
-        if [ "$src_build_system" = "autoconf" ]; then
-            sed --in-place -e 's/\/\.libs//g' "$working_dir"/WiredTiger.basecfg
-        fi
-
-        # We don't need to make the inverse translation when going from cmake to autoconf, since
-        # autoconf puts the libraries in both the .libs/ directory, and the root of the extension's
-        # build directory. Thus, when a newer version saves a path without .libs/ it'll still find
-        # the right shared library.
-    fi
-}
-
-# Check if going from $from to $to is acceptable.
-check_dirty_restart_compatibility()
-{
-    local from="$1"
-    local to="$2"
-
-    # 6.0 introduced a new fast-truncate flag that 5.0 and earlier can't deal with.
-    if [[ "$from" > "mongodb-5.0" ]]; then
-        if [[ "$to" < "mongodb-6.0" ]]; then
-            return -1
-        fi
-    fi
-
-    return 0
 }
 
 # Run test/format from $src_branch, and crash. Recover using test/format from $dst_branch.
@@ -665,7 +548,6 @@ test_dirty_restart()
     # against those.
     pushd "${dst_branch}/build/test/format"
     local dir="../../../../${src_branch}/build/test/format/RUNDIR.${src_branch}"
-    fixup_format_extension_paths "$src_branch" "$dst_branch" "$dir"
     ./t ${flags} -R -h "$dir" format.abort=0
 
     # Remove the database so future runs don't try to use it.
@@ -848,7 +730,6 @@ import_compatibility_test()
 # Only one of below flags will be set by the 1st argument of the script.
 dirty_restart=false
 import=false
-older=false
 newer=false
 wt_standalone=false
 patch_version=false
@@ -864,9 +745,6 @@ gittags['mongodb-8.3']="mongodb-8.3"
 gittags['mongodb-8.0']="mongodb-8.0"
 gittags['mongodb-7.0']="mongodb-7.0"
 gittags['mongodb-6.0']="mongodb-6.0"
-gittags['mongodb-5.0']="mongodb-5.0"
-gittags['mongodb-4.4']="mongodb-4.4"
-gittags['mongodb-4.2']="mongodb-4.2"
 # Then, optionally, replace one or more tags with a particular branch or commit hash where required for testing
 # For example, this set of commit hashes will reproduce the bug in WT-9795
 #gittags['develop']="d031f0af518c9b5f15dc586de4ae55d6867f423b"
@@ -888,8 +766,6 @@ source "$VERSIONS_FILE"
 
 import_release_branches=($IMPORT_RELEASE_BRANCHES)
 newer_release_branches=($NEWER_RELEASE_BRANCHES)
-older_release_branches=($OLDER_RELEASE_BRANCHES)
-compatible_upgrade_downgrade_release_branches=($COMPATIBLE_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
 patch_version_upgrade_downgrade_release_branches=($PATCH_VERSION_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
 test_checkpoint_release_branches=($TEST_CHECKPOINT_RELEASE_BRANCHES)
 upgrade_to_latest_upgrade_downgrade_release_branches=($UPGRADE_TO_LATEST_UPGRADE_DOWNGRADE_RELEASE_BRANCHES)
@@ -898,7 +774,6 @@ declare -A scopes
 scopes[dirty_restart]="start from an unclean shutdown of a different version"
 scopes[import]="import files from previous versions"
 scopes[newer]="newer stable release branches"
-scopes[older]="older stable release branches"
 scopes[patch_version]="patch versions of the same release branch"
 scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of the codebase"
 scopes[wt_standalone]="WiredTiger standalone releases"
@@ -1157,11 +1032,10 @@ run_pair_tests()
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-d|-i|-n|-o|-p|-u|-w|-v|-T]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-d|-i|-n|-p|-u|-w|-v|-T]"
     echo -e "\t-d\trun compatibility tests for ${scopes[dirty_restart]}"
     echo -e "\t-i\trun compatibility tests for ${scopes[import]}"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
-    echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
     echo -e "\t-p\trun compatibility tests for ${scopes[patch_version]}"
     echo -e "\t-u\trun compatibility tests for ${scopes[upgrade_to_latest]}"
     echo -e "\t-w\trun compatibility tests for ${scopes[wt_standalone]}"
@@ -1192,12 +1066,6 @@ case $1 in
     newer=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo "Performing compatibility tests for ${scopes[newer]}"
-    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-;;
-"-o")
-    older=true
-    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    echo "Performing compatibility tests for ${scopes[older]}"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 ;;
 "-p")
@@ -1286,10 +1154,6 @@ if [ "$dirty_restart" = true ]; then
     for b1 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
         for b2 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
             if [[ "$b1" != "$b2" ]]; then
-                if ! check_dirty_restart_compatibility "$b1" "$b2"; then
-                    continue
-                fi
-
                 test_dirty_restart "$b1" "$b2"
             fi
         done
@@ -1297,19 +1161,6 @@ if [ "$dirty_restart" = true ]; then
 fi
 
 if [ "$two_versions" = true ]; then
-    # Check if the 2 given versions support test checkpoint with recovery
-    rtn=$(is_test_checkpoint_recovery_supported $v1)
-    if [ $rtn == "no" ]; then
-        echo -e "\n\"$v1\" does not support test checkpoint with recovery, exiting ...\n"
-        exit 1
-    fi
-
-    rtn=$(is_test_checkpoint_recovery_supported $v2)
-    if [ $rtn == "no" ]; then
-        echo -e "\n\"$v2\" does not support test checkpoint with recovery, exiting ...\n"
-        exit 1
-    fi
-
     # Build the branches
     (build_branch $v1)
     (build_branch $v2)
@@ -1339,15 +1190,11 @@ if [ "$patch_version" = true ]; then
         # test checkpoint in that case.
         if [ -n "$pv" ]; then
             (build_branch $pv)
-            rtn=$(is_test_checkpoint_recovery_supported $pv)
             patch_fix_included=$(git log --format=%h -1 --grep=WT-8708 -b "$pv" --)
 
-            # Only run verify if the picked version supports test checkpoint recovery
-            if [ $rtn == "no" ]; then
-                echo -e "\n\"$pv\" does not support test checkpoint with recovery, skipping ...\n"
             # Apply patch fix from WT-8708 to already released compatible versions to avoid
             # test/checkpoint setting commit timestamp less than stable timestamp
-            elif [ $rtn == "yes" ] && [ -z $patch_fix_included ]; then
+            if [ -z $patch_fix_included ]; then
                 cd $pv;
 
                 git format-patch -1 d4b0ad6cacb874fdc20bcc76311d789dd5a01441;
@@ -1370,12 +1217,6 @@ fi
 # Build the branches.
 if [ "$newer" = true ]; then
     for b in ${newer_release_branches[@]}; do
-        (build_branch $b)
-    done
-fi
-
-if [ "$older" = true ]; then
-    for b in ${older_release_branches[@]}; do
         (build_branch $b)
     done
 fi
@@ -1407,12 +1248,6 @@ if [ "$newer" = true ]; then
     done
 fi
 
-if [ "$older" = true ]; then
-    for b in ${older_release_branches[@]}; do
-        (run_format $b "row var")
-    done
-fi
-
 if [ "${wt_standalone}" = true ]; then
     (run_tests "$wt1" "row")
     (run_format "$wt2" "row")
@@ -1440,13 +1275,6 @@ if [ "$newer" = true ]; then
         [[ $((i+1)) < ${#test_checkpoint_release_branches[@]} ]] && \
         (verify_test_checkpoint ${test_checkpoint_release_branches[$i]} \
                                  ${test_checkpoint_release_branches[$((i+1))]} "row")
-    done
-fi
-
-if [ "$older" = true ]; then
-    for i in ${!older_release_branches[@]}; do
-        [[ $((i+1)) < ${#older_release_branches[@]} ]] && \
-        (verify_test_format ${older_release_branches[$i]} ${older_release_branches[$((i+1))]} "row var" true)
     done
 fi
 

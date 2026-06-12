@@ -749,7 +749,7 @@ public:
             a[SQLITE_READONLY] = std::errc::read_only_file_system;
             a[SQLITE_INTERRUPT] = std::errc::interrupted;
             a[SQLITE_IOERR] = std::errc::io_error;
-            a[SQLITE_CORRUPT] = std::errc::illegal_byte_sequence;
+            a[SQLITE_CORRUPT] = std::errc::bad_message;
             a[SQLITE_NOTFOUND] = std::errc::no_such_file_or_directory;
             a[SQLITE_FULL] = std::errc::no_space_on_device;
             a[SQLITE_CANTOPEN] = std::errc::io_error;
@@ -818,10 +818,10 @@ class Connection {
       "PRAGMA journal_mode = WAL;",
 
       /*
-       * Turn Synchronous mode OFF for better performance. We don't care about database corruption
-       * in case of OS crash or power failure.
+       * Sync at the most critical moments, but less often than in FULL mode. WAL mode is safe from
+       * corruption with synchronous=NORMAL.
        */
-      "PRAGMA synchronous = OFF;",
+      "PRAGMA synchronous = NORMAL;",
 
       /* For temporary store use memory instead of disk. */
       "PRAGMA temp_store = MEMORY;"};

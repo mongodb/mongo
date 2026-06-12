@@ -182,6 +182,10 @@ from packing import pack, unpack
 	}
 }
 
+%typemap(freearg) (WT_MODIFY *entries, int *nentriesp) {
+	__wt_free(NULL, $1);
+}
+
 %typemap(argout) (WT_MODIFY *entries_string, int *nentriesp) {
 	int i;
 
@@ -196,7 +200,11 @@ from packing import pack, unpack
 		    PyInt_FromLong($1[i].size));
 		PyList_SetItem($result, i, o);
 	}
- }
+}
+
+%typemap(freearg) (WT_MODIFY *entries_string, int *nentriesp) {
+	__wt_free(NULL, $1);
+}
 
 %typemap(in) const WT_ITEM * (WT_ITEM val) {
 	if (unpackBytesOrString($input, &val.data, &val.size) != 0)

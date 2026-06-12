@@ -93,6 +93,9 @@ class test_key_provider_disagg03(wttest.WiredTigerTestCase):
 
         ds = SimpleDataSet(self, self.uri, 10)
         ds.populate()
+        # A pushed key is only persisted once the stable timestamp reaches it. Advance stable so the
+        # checkpoint selects the earliest pushed key.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 
         self.assertGreaterEqual(self.key_provider_page_count(), 1)
