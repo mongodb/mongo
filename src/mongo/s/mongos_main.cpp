@@ -103,6 +103,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/traces/trace_initialization.h"
 #include "mongo/platform/atomic_word.h"
@@ -889,6 +890,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                                        &startupTimeElapsedBuilder);
         startMongoSFTDC(serviceContext);
     }
+
+    installMongosOtelMetrics(serviceContext);
 
     if (mongosGlobalParams.scriptingEnabled) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),

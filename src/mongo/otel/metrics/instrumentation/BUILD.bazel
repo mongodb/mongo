@@ -120,6 +120,44 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "system_health_metrics",
+    hdrs = ["system_health_metrics.h"],
+    srcs_select = [{
+        "@platforms//os:linux": ["system_health_metrics_linux.cpp"],
+        "//conditions:default": ["system_health_metrics_noop.cpp"],
+    }],
+    deps = [
+        "//src/mongo/db:service_context",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metrics_service",
+            "//src/mongo/util:fail_point",
+            "//src/mongo/util:periodic_runner",
+            "//src/mongo/util:procparser",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "system_health_metrics_test",
+    srcs = ["system_health_metrics_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":system_health_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/util:fail_point",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
     name = "connections_metrics",
     srcs = ["connections_metrics.cpp"],
     hdrs = ["connections_metrics.h"],
@@ -152,6 +190,7 @@ mongo_cc_library(
         ":disk_metrics",
         ":global_lock_metrics",
         ":index_build_metrics",
+        ":system_health_metrics",
         ":system_mount_metrics",
     ],
 )

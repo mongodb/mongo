@@ -31,25 +31,55 @@
 
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+#include <memory>
+
 namespace mongo {
 
 class ServiceContext;
 
 /**
- * Installs OpenTelemetry metrics common to all server roles.
+ * Snapshot of system-level health values sampled from /proc/stat and /proc/sys/fs/file-nr.
+ *
+ * CPU times are cumulative milliseconds since boot. Thread and fd counts are instantaneous.
  */
-MONGO_MOD_PUBLIC void installCommonOtelMetrics(ServiceContext* svcCtx);
+struct SystemHealthSnapshot {
+    int64_t cpuUserMs{0};
+    int64_t cpuSystemMs{0};
+    int64_t cpuIowaitMs{0};
+    int64_t procsRunning{0};
+    int64_t procsBlocked{0};
+    int64_t fdOpen{0};
+};
 
 /**
- * Installs all OpenTelemetry instrumentation metrics for mongod. Intended to be called once at
- * startup from mongod_main.
+ * Owns the OpenTelemetry instruments for system health metrics:
+ *   - mongodb.cpu.user / mongodb.cpu.system: counters reporting the absolute cumulative CPU
+ *     time (ms) read directly from /proc/stat on each sample
+ *   - mongodb.cpu.iowait: counter reporting the absolute cumulative iowait time (ms) since boot
+ *   - mongodb.thread.{active,queued}: gauges for OS-level runnable/blocked process counts
+ *   - mongodb.fd.open: gauge for the system-wide open file handle count
+ *
+ * Thread and fd instruments are set to the latest snapshot value on each call to update().
  */
-MONGO_MOD_PUBLIC void installMongodOtelMetrics(ServiceContext* svcCtx);
+class SystemHealthMetrics {
+public:
+    SystemHealthMetrics();
+    ~SystemHealthMetrics();
+
+    void update(const SystemHealthSnapshot& snap);
+    void recordCollectError();
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> _impl;
+};
 
 /**
- * Installs OpenTelemetry instrumentation metrics for mongos. Intended to be called once at startup
- * from mongos_main.
+ * Registers OpenTelemetry system health instruments and starts a periodic job (1 Hz) that
+ * reads /proc/stat and /proc/sys/fs/file-nr to push the latest values.
+ * No-op on unsupported platforms.
  */
-MONGO_MOD_PUBLIC void installMongosOtelMetrics(ServiceContext* svcCtx);
+MONGO_MOD_PUBLIC void installSystemHealthOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

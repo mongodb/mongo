@@ -27,32 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
-
-#include "mongo/otel/metrics/instrumentation/connections_metrics.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
 #include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
 
 namespace mongo {
 
-void installCommonOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installSystemHealthOtelMetrics(svcCtx);
-}
+class SystemHealthMetrics::Impl {};
 
-void installMongodOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-    installConnectionsOtelMetrics(svcCtx);
-}
+SystemHealthMetrics::SystemHealthMetrics() : _impl(std::make_unique<Impl>()) {}
 
-void installMongosOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-}
+SystemHealthMetrics::~SystemHealthMetrics() = default;
+
+void SystemHealthMetrics::update(const SystemHealthSnapshot&) {}
+
+void SystemHealthMetrics::recordCollectError() {}
+
+void installSystemHealthOtelMetrics(ServiceContext*) {}
 
 }  // namespace mongo
