@@ -7,7 +7,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: 2,
-    nodeOptions: {binVersion: "latest", setParameter: {featureFlagConstraintValidationLevel: true}},
+    nodeOptions: {binVersion: "latest"},
 });
 rst.startSet();
 rst.initiate();

@@ -124,7 +124,8 @@ feature_flags:
     featureFlagConstraintValidationLevel:
         description: "Enables the use of the constraint schema validation level."
         cpp_varname: gFeatureFlagConstraintValidationLevel
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
     featureFlagDistinguishMetadataInconsistencyFromConflictingOperation:
         description: "Feature flag to distinguish ChunkMetadataInconsistency from ConflictingOperationInProgress error"

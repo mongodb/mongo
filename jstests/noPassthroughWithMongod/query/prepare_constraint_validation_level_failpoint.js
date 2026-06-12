@@ -5,7 +5,6 @@
  *
  * @tags: [
  *   requires_fcv_90,
- *   featureFlagConstraintValidationLevel,
  *   uses_parallel_shell,
  *   # configureFailPoint requires direct mongod access.
  *   assumes_against_mongod_not_mongos,
