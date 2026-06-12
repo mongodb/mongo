@@ -523,6 +523,14 @@ public:
             bson = bson.removeField(
                 ShardingCoordinatorMetadata::kAuthoritativeMetadataAccessLevelFieldName);
         }
+        // TODO (SERVER-126212): Remove once v9.0 becomes last-LTS.
+        // In v8.x, some coordinators parse the document with strict:true, so do not serialize the
+        // default "shardId" value of shardIdentificationType.
+        // This is also correct for newer binaries, which interpret the missing field as "shardId".
+        if (_doc.getShardingCoordinatorMetadata().getShardIdentificationType() ==
+            ShardIdentificationTypeEnum::kShardId) {
+            bson = bson.removeField(ShardingCoordinatorMetadata::kShardIdentificationTypeFieldName);
+        }
         return bson;
     }
 

@@ -130,10 +130,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 _doc.setChosenName(shardName);
 
                 // Assign a UUID for the new shard when the feature flag is enabled.
-                if (!_doc.getShardUuid().has_value() &&
-                    feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                const bool useUUID =
+                    _doc.getShardIdentificationType() != ShardIdentificationTypeEnum::kShardId;
+
+                if (!_doc.getShardUuid().has_value() && useUUID) {
                     if (_doc.getIsConfigShard()) {
                         // For config-shard transitions, reuse the UUID already stored in the
                         // config server's shard identity document.

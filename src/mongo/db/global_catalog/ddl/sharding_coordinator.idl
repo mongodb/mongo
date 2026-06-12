@@ -93,6 +93,24 @@ enums:
             kWritesAllowed: "writesAllowed"
             kWritesAndReadsAllowed: "writesAndReadsAllowed"
 
+    # TODO (SERVER-126212): Remove this enum once v9.0 becomes last-lts.
+    ShardIdentificationType:
+        description: >-
+            Indicates whether a DDL should continue referring to a shard by its legacy ShardId type or
+            the new UUID type, based on the FCV state at the time of DDL document creation. This field
+            ensures that ongoing DDLs which started on server versions predating OFCV support maintain
+            a consistent FCV-driven behaviour throughout their lifetime.
+            The possible values are:
+                - `kShardId`: refer to a shard by its ShardId, and persist the ShardId.
+                - `kUuidOrShardId`: refer to a shard by its UUID (preferred) or ShardId (fallback), and
+                    persist the UUID.
+                - `kUuid`: refer strictly by UUID and persist the UUID.
+        type: string
+        values:
+            kShardId: "shardId"
+            kUuidOrShardId: "uuidOrShardId"
+            kUuid: "uuid"
+
 types:
     ForwardableOperationMetadata:
         description: "Forwardable operation metadata assiociated with this coordinator."
@@ -149,3 +167,7 @@ structs:
                 type: AuthoritativeMetadataAccessLevel
                 description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
                 default: kNone
+            shardIdentificationType:
+                type: ShardIdentificationType
+                description: "The shard identification type assigned by the FCV state at the creation of this document."
+                default: kShardId

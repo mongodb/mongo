@@ -437,9 +437,12 @@ ShardingCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     coorMetadata.setDatabaseVersion(
         OperationShardingState::get(opCtx).getDbVersion(coorMetadata.getId().getNss().dbName()));
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
+    const auto fcvRegionSnap = fcvRegion->acquireFCVSnapshot();
     coorMetadata.setAuthoritativeMetadataAccessLevel(
         sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-            VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot()));
+            VersionContext::getDecoration(opCtx), fcvRegionSnap));
+    coorMetadata.setShardIdentificationType(sharding_ddl_util::getGrantedShardIdentificationType(
+        VersionContext::getDecoration(opCtx), fcvRegionSnap));
     const auto patchedCoorDoc = coorDoc.addFields(coorMetadata.toBSON());
 
     auto [coordinator, created] = [&] {

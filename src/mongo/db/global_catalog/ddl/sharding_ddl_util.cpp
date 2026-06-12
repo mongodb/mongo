@@ -1182,6 +1182,29 @@ AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     return AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed;
 }
 
+ShardIdentificationTypeEnum getGrantedShardIdentificationType(
+    const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot) {
+    const bool uniqueShardIdentifiersEnabled =
+        feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(vCtx, snapshot);
+    const bool uniqueShardIdentifiersDDLEnabled =
+        feature_flags::gFeatureFlagUniqueShardIdentifiersDDL.isEnabled(vCtx, snapshot);
+
+    tassert(12846100,
+            "UniqueShardIdentifiers should not be enabled if "
+            "UniqueShardIdentifiersDDL is disabled",
+            uniqueShardIdentifiersDDLEnabled || !uniqueShardIdentifiersEnabled);
+
+    if (!uniqueShardIdentifiersDDLEnabled) {
+        return ShardIdentificationTypeEnum::kShardId;
+    }
+
+    if (!uniqueShardIdentifiersEnabled) {
+        return ShardIdentificationTypeEnum::kUuidOrShardId;
+    }
+
+    return ShardIdentificationTypeEnum::kUuid;
+}
+
 boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx,
                                                          const UUID& collUuid) {
     const Timestamp dummyTimestamp;
