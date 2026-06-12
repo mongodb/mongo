@@ -15,6 +15,9 @@ filters:
   - "doc_validation_options_logging.js":
     approvers:
       - 10gen/query-execution
+  - "prepare_constraint_blocks_invalid_wcos_updates.js":
+    approvers:
+      - 10gen/query-execution
   - "query_settings*":
     approvers:
       - 10gen/query-execution-query-settings
