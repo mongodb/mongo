@@ -30,14 +30,6 @@ global:
     mod_visibility: private
     cpp_namespace: "mongo"
 
-feature_flags:
-    # TODO (SERVER-76345): Remove this feature flag once parallel validation is the permanent default.
-    featureFlagParallelCollectionValidation:
-        description: "When enabled, collection validation will use a parallel execution model to validate records."
-        cpp_varname: gFeatureFlagParallelCollectionValidation
-        default: false
-        fcv_gated: false
-
 server_parameters:
     maxValidateMBperSec:
         description:
