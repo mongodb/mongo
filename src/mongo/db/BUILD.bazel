@@ -1076,6 +1076,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role",
         "//src/mongo/db/stats:timer_stats",
         "//src/mongo/db/storage:storage_control",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -3420,6 +3421,7 @@ mongo_cc_unit_test(
     srcs = [
         "read_concern_test.cpp",
         "read_write_concern_provenance_test.cpp",
+        "write_concern_metrics_test.cpp",
         "write_concern_options_test.cpp",
         "write_concern_test.cpp",
     ],
@@ -3431,6 +3433,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:repl_coordinator_test_fixture",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/repl:replmocks",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 

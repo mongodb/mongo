@@ -265,6 +265,16 @@ public:
 
     // Replication Team Metrics
     static constexpr MetricName kOplogApplyBytes = MetricNameMaker::make("oplog.apply.bytes");
+    static constexpr MetricName kGetLastErrorWtimeNum =
+        MetricNameMaker::make("serverStatus.metrics.getLastError.wtime.num");
+    static constexpr MetricName kGetLastErrorWtimeTotalMillis =
+        MetricNameMaker::make("serverStatus.metrics.getLastError.wtime.totalMillis");
+    static constexpr MetricName kGetLastErrorWtimeouts =
+        MetricNameMaker::make("serverStatus.metrics.getLastError.wtimeouts");
+    static constexpr MetricName kGetLastErrorDefaultWtimeouts =
+        MetricNameMaker::make("serverStatus.metrics.getLastError.default.wtimeouts");
+    static constexpr MetricName kGetLastErrorDefaultUnsatisfiable =
+        MetricNameMaker::make("serverStatus.metrics.getLastError.default.unsatisfiable");
 
     // Query Integration Team Metrics
 

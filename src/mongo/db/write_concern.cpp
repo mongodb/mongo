@@ -50,6 +50,9 @@
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -79,11 +82,51 @@ using repl::OpTime;
 using std::string;
 
 namespace {
-auto& gleWtimeStats = *MetricBuilder<TimerStats>{"getLastError.wtime"};
-auto& gleWtimeouts = *MetricBuilder<Counter64>{"getLastError.wtimeouts"};
-auto& gleDefaultWtimeouts = *MetricBuilder<Counter64>{"getLastError.default.wtimeouts"};
-auto& gleDefaultUnsatisfiable = *MetricBuilder<Counter64>{"getLastError.default.unsatisfiable"};
+
+using otel::metrics::MetricNames;
+using otel::metrics::MetricsService;
+using otel::metrics::MetricUnit;
+using otel::metrics::ServerStatusOptions;
+
+auto& gleWtimeNumMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kGetLastErrorWtimeNum,
+    "The total number of operations with a specified write concern (i.e. `w`) that wait for one or "
+    "more members of a replica set to acknowledge the write operation (i.e. `w > 1`).",
+    MetricUnit::kOperations,
+    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "getLastError.wtime.num"})});
+
+auto& gleWTimeTotalMillisMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kGetLastErrorWtimeTotalMillis,
+    "The total amount of time in milliseconds that the mongod has spent performing operations with "
+    "a write concern (i.e. `w`) that waits for one or more members of a replica set to acknowledge "
+    "the write operation (i.e. a `w` value greater than `1`.).",
+    MetricUnit::kMilliseconds,
+    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "getLastError.wtime.totalMillis"})});
+
+auto& gleWtimeoutsMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kGetLastErrorWtimeouts,
+    "The number of times that write concern operations have timed out as a result of the "
+    "`wtimeout` threshold. This number increments for both default and non-default write concern "
+    "specifications.",
+    MetricUnit::kOperations,
+    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "getLastError.wtimeouts"})});
+
+auto& gleDefaultWtimeoutsMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kGetLastErrorDefaultWtimeouts,
+    "The number of times a non-`clientSupplied` write concern timed out.",
+    MetricUnit::kOperations,
+    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "getLastError.default.wtimeouts"})});
+
+auto& gleDefaultUnsatisfiableMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kGetLastErrorDefaultUnsatisfiable,
+    "The number of times that a non-`clientSupplied` write concern returned the "
+    "`UnsatisfiableWriteConcern` error code.",
+    MetricUnit::kOperations,
+    {.serverStatusOptions =
+         ServerStatusOptions({.dottedPath = "getLastError.default.unsatisfiable"})});
+
 }  // namespace
+
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 MONGO_FAIL_POINT_DEFINE(failWaitForWriteConcernIfTimeoutSet);
@@ -420,20 +463,21 @@ Status waitForWriteConcern(OperationContext* opCtx,
     }
 
     if (replStatus.status == ErrorCodes::WriteConcernTimeout) {
-        gleWtimeouts.increment();
+        gleWtimeoutsMetric.add(1);
         if (!writeConcern.getProvenance().isClientSupplied()) {
-            gleDefaultWtimeouts.increment();
+            gleDefaultWtimeoutsMetric.add(1);
         }
         result->err = "timeout";
         result->wTimedOut = true;
     }
     if (replStatus.status == ErrorCodes::UnsatisfiableWriteConcern) {
         if (!writeConcern.getProvenance().isClientSupplied()) {
-            gleDefaultUnsatisfiable.increment();
+            gleDefaultUnsatisfiableMetric.add(1);
         }
     }
 
-    gleWtimeStats.recordMillis(durationCount<Milliseconds>(replStatus.duration));
+    gleWtimeNumMetric.add(1);
+    gleWTimeTotalMillisMetric.add(durationCount<Milliseconds>(replStatus.duration));
     result->wTime = durationCount<Milliseconds>(replStatus.duration);
 
     result->wcUsed = writeConcern;
