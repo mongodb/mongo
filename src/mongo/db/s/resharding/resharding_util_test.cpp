@@ -342,8 +342,7 @@ TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
 
     validateIndexes(sourceSpecs, recipientSpecs, ErrorCodes::OK);
 
-    // 6. Extra recipient index (e.g. synthesized shard key) passes the content check since all
-    // source specs are still present in the recipient.
+    // 6. num(recipientSpecs) > num(recipientSpecs) works.
     std::vector<BSONObj> sourceSpecs2{BSON("key" << BSON("field2" << 1) << "name"
                                                  << "indexName_2"
                                                  << "v" << 3)};

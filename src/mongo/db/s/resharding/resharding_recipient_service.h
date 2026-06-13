@@ -343,9 +343,6 @@ private:
     void _cleanupReshardingCollections(
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _verifyIndexesBuilt(OperationContext* opCtx, bool shardKeyIndexAdded);
-    void _verifyCollectionOptions(OperationContext* opCtx);
-
     // Transitions the on-disk and in-memory state to 'newState'.
     void _transitionState(RecipientStateEnum newState,
                           std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);

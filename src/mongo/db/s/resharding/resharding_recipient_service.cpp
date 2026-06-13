@@ -82,7 +82,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
-#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/list_indexes.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -941,7 +940,41 @@ void ReshardingRecipientService::RecipientStateMachine::
             _metadata.getTempReshardingNss(), _metadata.getReshardingUUID(), createCollRequest);
         notifyChangeStreamsOnShardCollection(opCtx.get(), notification);
 
-        _verifyCollectionOptions(opCtx.get());
+        if (resharding::gReshardingCollectionOptionsVerification.load()) {
+            auto [sourceCollOptions, _] = _externalState->getCollectionOptions(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                _metadata.getSourceUUID(),
+                *_cloneTimestamp,
+                "loading collection options of source collection to verify collection options equality"_sd);
+
+            CollectionOptions sourceCollectionOptions = uassertStatusOK(
+                CollectionOptions::parse(sourceCollOptions, CollectionOptions::parseForStorage));
+
+            auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
+
+            auto [tempReshardingCollOptions, __] = _externalState->getCollectionOptions(
+                opCtx.get(),
+                _metadata.getTempReshardingNss(),
+                _metadata.getReshardingUUID(),
+                boost::none,
+                "loading collection options of the temporary resharding collection to verify collection options equality"_sd,
+                myShardId);
+
+            CollectionOptions tempReshardingCollectionOptions =
+                uassertStatusOK(CollectionOptions::parse(tempReshardingCollOptions,
+                                                         CollectionOptions::parseForStorage));
+
+            uassert(9799200,
+                    str::stream() << "Resharded collection created non-matching collection "
+                                     "options. Source collection options: "
+                                  << sourceCollectionOptions.toBSON()
+                                  << " Resharded collection options: "
+                                  << tempReshardingCollectionOptions.toBSON(),
+                    tempReshardingCollectionOptions.matchesStorageOptions(
+                        sourceCollectionOptions,
+                        CollatorFactoryInterface::get(opCtx->getServiceContext())));
+        }
     }
 
     _transitionState(RecipientStateEnum::kCloning, factory);
@@ -1256,16 +1289,13 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 _metadata.getSourceUUID(),
                 *_cloneTimestamp,
                 "loading indexes to create indexes on temporary resharding collection"_sd);
-            bool shardKeyIndexAdded = false;
             auto shardKeyIndexSpec = behaviors.getShardKeyIndexSpec();
             if (shardKeyIndexSpec) {
                 indexSpecs.push_back(*shardKeyIndexSpec);
-                shardKeyIndexAdded = true;
             }
-            return std::make_pair(std::move(indexSpecs), shardKeyIndexAdded);
+            return indexSpecs;
         })
-        .then([this, executor, factory](std::pair<std::vector<BSONObj>, bool> specs) {
-            auto& [indexSpecs, shardKeyIndexAdded] = specs;
+        .then([this, executor, factory](const std::vector<BSONObj>& indexSpecs) {
             auto opCtx = _makeOperationContext(factory);
             auto& rss = rss::ReplicatedStorageService::get(opCtx.get()->getServiceContext());
             auto mustUsePrimaryDrivenIndexBuilds =
@@ -1291,13 +1321,12 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                getMaxReplicationLagSecondsBeforeBuildingIndexes),
                            _cancelState.getAbortOrStepdownToken())
                     .thenRunOn(**executor)
-                    .then([specs] { return specs; });
+                    .then([indexSpecs] { return indexSpecs; });
             }
 
-            return ExecutorFuture(**executor, specs);
+            return ExecutorFuture(**executor, indexSpecs);
         })
-        .then([this, executor, factory](std::pair<std::vector<BSONObj>, bool> specs) {
-            auto& [indexSpecs, shardKeyIndexAdded] = specs;
+        .then([this, executor, factory](const std::vector<BSONObj>& indexSpecs) {
             return future_util::withCancellation(
                        [this, factory, &indexSpecs] {
                            // Build all the indexes.
@@ -1361,11 +1390,38 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                        }(),
                        _cancelState.getAbortOrStepdownToken())
                 .thenRunOn(**executor)
-                .then([this, factory, shardKeyIndexAdded](
-                          const ReplIndexBuildState::IndexCatalogStats&) {
-                    {
-                        auto opCtx = _makeOperationContext(factory);
-                        _verifyIndexesBuilt(opCtx.get(), shardKeyIndexAdded);
+                .then([this, factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
+                    if (auto opCtx = _makeOperationContext(factory);
+                        resharding::gReshardingIndexVerification.load()) {
+                        auto [normalizedSourceIdxSpecs, _] = _externalState->getCollectionIndexes(
+                            opCtx.get(),
+                            _metadata.getSourceNss(),
+                            _metadata.getSourceUUID(),
+                            *_cloneTimestamp,
+                            "loading indexes to validate indexes on temporary resharding collection"_sd,
+                            /*expandSimpleCollation*/ false);
+
+                        const auto& tempCollIdxSpecs =
+                            listIndexesEmptyListIfMissing(opCtx.get(),
+                                                          _metadata.getTempReshardingNss(),
+                                                          ListIndexesInclude::kNothing,
+                                                          /*isRawDataRequest=*/true);
+
+                        // The listIndexes command always includes a 'collation' field in each index
+                        // spec as of SERVER-89953, even if it represents the simple collation. In
+                        // contrast, getCollectionIndexes() returns normalized specs where the
+                        // 'collation' field is omitted when it is a simple collation. Therefore, we
+                        // normalize the listIndexes output here to enable direct comparison between
+                        // both formats.
+                        // TODO (SERVER-119573): Remove this normalization once listIndexes output
+                        // matches storage format.
+                        const auto& normalizedTempCollIdxSpecs =
+                            IndexCatalog::normalizeIndexSpecsFromListIndexes(tempCollIdxSpecs);
+
+                        resharding::verifyIndexSpecsMatch(normalizedSourceIdxSpecs.cbegin(),
+                                                          normalizedSourceIdxSpecs.cend(),
+                                                          normalizedTempCollIdxSpecs.cbegin(),
+                                                          normalizedTempCollIdxSpecs.cend());
                     }
                     _transitionToApplying(factory);
                 });
@@ -1566,96 +1622,6 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
     }
 
     resharding::data_copy::deleteRecipientResumeData(opCtx.get(), _metadata.getReshardingUUID());
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_verifyCollectionOptions(
-    OperationContext* opCtx) {
-    if (!resharding::gReshardingCollectionOptionsVerification.load()) {
-        return;
-    }
-    auto [sourceCollOptions, _] = _externalState->getCollectionOptions(
-        opCtx,
-        _metadata.getSourceNss(),
-        _metadata.getSourceUUID(),
-        *_cloneTimestamp,
-        "loading collection options of source collection to verify collection options equality"_sd);
-
-    CollectionOptions sourceCollectionOptions = uassertStatusOK(
-        CollectionOptions::parse(sourceCollOptions, CollectionOptions::parseForStorage));
-
-    auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
-
-    auto [tempReshardingCollOptions, __] = _externalState->getCollectionOptions(
-        opCtx,
-        _metadata.getTempReshardingNss(),
-        _metadata.getReshardingUUID(),
-        boost::none,
-        "loading collection options of the temporary resharding collection to verify collection options equality"_sd,
-        myShardId);
-
-    CollectionOptions tempReshardingCollectionOptions = uassertStatusOK(
-        CollectionOptions::parse(tempReshardingCollOptions, CollectionOptions::parseForStorage));
-
-    uassert(
-        9799200,
-        str::stream() << "Resharded collection created non-matching collection options. "
-                      << "Source collection options: " << sourceCollectionOptions.toBSON()
-                      << " Resharded collection options: "
-                      << tempReshardingCollectionOptions.toBSON(),
-        tempReshardingCollectionOptions.matchesStorageOptions(
-            sourceCollectionOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_verifyIndexesBuilt(
-    OperationContext* opCtx, bool shardKeyIndexAdded) {
-    if (!resharding::gReshardingIndexVerification.load()) {
-        return;
-    }
-
-    // Any index build failure would have aborted resharding before reaching this point. These
-    // checks guard against unexpected divergence in the resulting index specs.
-    auto [normalizedSourceIdxSpecs, _] = _externalState->getCollectionIndexes(
-        opCtx,
-        _metadata.getSourceNss(),
-        _metadata.getSourceUUID(),
-        *_cloneTimestamp,
-        "loading indexes to validate indexes on temporary resharding collection"_sd,
-        /*expandSimpleCollation*/ false);
-
-    const auto& tempCollIdxSpecs = listIndexesEmptyListIfMissing(opCtx,
-                                                                 _metadata.getTempReshardingNss(),
-                                                                 ListIndexesInclude::kNothing,
-                                                                 /*isRawDataRequest=*/true);
-
-    // The listIndexes command always includes a 'collation' field in each index spec as of
-    // SERVER-89953, even if it represents the simple collation. In contrast,
-    // getCollectionIndexes() returns normalized specs where the 'collation' field is omitted
-    // when it is a simple collation. Therefore, we normalize the listIndexes output here to
-    // enable direct comparison between both formats.
-    // TODO (SERVER-119573): Remove this normalization once listIndexes output matches storage
-    // format.
-    const auto& normalizedTempCollIdxSpecs =
-        IndexCatalog::normalizeIndexSpecsFromListIndexes(tempCollIdxSpecs);
-
-    // getCollectionIndexes() skips clustered indexes on the source since they are implicitly
-    // re-created. Filter them from the temp specs as well so both sides are comparable.
-    std::vector<BSONObj> filteredTempCollIdxSpecs;
-    for (const auto& spec : normalizedTempCollIdxSpecs) {
-        if (!spec[IndexDescriptor::kClusteredFieldName]) {
-            filteredTempCollIdxSpecs.push_back(spec);
-        }
-    }
-
-    const auto expectedIndexCount = normalizedSourceIdxSpecs.size() + (shardKeyIndexAdded ? 1 : 0);
-    uassert(12792800,
-            str::stream() << "Resharded collection has unexpected number of indexes. Expected "
-                          << expectedIndexCount << " but found " << filteredTempCollIdxSpecs.size(),
-            filteredTempCollIdxSpecs.size() == expectedIndexCount);
-
-    resharding::verifyIndexSpecsMatch(normalizedSourceIdxSpecs.cbegin(),
-                                      normalizedSourceIdxSpecs.cend(),
-                                      filteredTempCollIdxSpecs.cbegin(),
-                                      filteredTempCollIdxSpecs.cend());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
