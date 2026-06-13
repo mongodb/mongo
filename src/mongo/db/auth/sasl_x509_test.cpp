@@ -51,10 +51,10 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -213,7 +213,7 @@ protected:
 //   b. gEnforceUserSeparation off
 // 5. Cert that's both a cluster member and explicit user in db
 TEST_F(SASLX509Test, testBasic) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
@@ -227,7 +227,7 @@ TEST_F(SASLX509Test, testBasic) {
 }
 
 TEST_F(SASLX509Test, testBasicFailure) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
@@ -244,7 +244,7 @@ TEST_F(SASLX509Test, testBasicFailure) {
 }
 
 TEST_F(SASLX509Test, testBasicNoUsername) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
@@ -260,7 +260,7 @@ TEST_F(SASLX509Test, testBasicNoUsername) {
 }
 
 TEST_F(SASLX509Test, testBasicEmptyUsername) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
@@ -276,7 +276,7 @@ TEST_F(SASLX509Test, testBasicEmptyUsername) {
 }
 
 TEST_F(SASLX509Test, testIncorrectDatabase) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("test");
 
@@ -299,7 +299,7 @@ TEST_F(SASLX509Test, testIncorrectDatabase) {
 // ClusterAuthX509Config on any other platform.
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 TEST_F(SASLX509Test, testBasicCluster) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
 
@@ -319,7 +319,7 @@ TEST_F(SASLX509Test, testBasicCluster) {
 }
 
 TEST_F(SASLX509Test, testSystemLocalWithClusterAuthFails) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("local");
 
@@ -344,10 +344,9 @@ TEST_F(SASLX509Test, testSystemLocalWithClusterAuthFails) {
 
 
 TEST_F(SASLX509Test, testEnforceUserClusterSeparationFalse) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
-    RAIIServerParameterControllerForTest enforceClusterSeparation("enforceUserClusterSeparation",
-                                                                  false);
+    unittest::ServerParameterGuard enforceClusterSeparation("enforceUserClusterSeparation", false);
 
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
 
@@ -370,10 +369,9 @@ TEST_F(SASLX509Test, testEnforceUserClusterSeparationFalse) {
 }
 
 TEST_F(SASLX509Test, testEnforceUserClusterSeparationTrue) {
-    RAIIServerParameterControllerForTest userAcquisitionRefactorFeatureFlag(
+    unittest::ServerParameterGuard userAcquisitionRefactorFeatureFlag(
         "featureFlagRearchitectUserAcquisition", true);
-    RAIIServerParameterControllerForTest enforceClusterSeparation("enforceUserClusterSeparation",
-                                                                  true);
+    unittest::ServerParameterGuard enforceClusterSeparation("enforceUserClusterSeparation", true);
 
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
 

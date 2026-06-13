@@ -65,10 +65,10 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -203,7 +203,7 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     assertStartSuccess(BSON("_id" << "mySet"
                                   << "version" << 1 << "members"
                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -289,7 +289,7 @@ TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     assertStartSuccess(generateConfigObj(1, 1, boost::none), HostAndPort("node1", 12345));
 
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(10, 1), 0),
@@ -2494,7 +2494,7 @@ protected:
 
 // The first round of heartbeats indicates we are the most up-to-date.
 TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
     OpTime time1(Timestamp(100, 1), 0);
     ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
@@ -2541,7 +2541,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
 
 // Heartbeats set a future target OpTime and we reached that successfully.
 TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2592,7 +2592,7 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
 }
 
 TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2629,7 +2629,7 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
 }
 
 TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2673,7 +2673,7 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
 }
 
 TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2810,7 +2810,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -2891,7 +2891,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
 }
 
 TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(200, 1), 0);
     OpTime time3(Timestamp(300, 1), 0);
@@ -2976,7 +2976,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
 }
 
 TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);
@@ -3041,7 +3041,7 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
 }
 
 TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     unittest::LogCaptureGuard logs;
 
     OpTime time1(Timestamp(100, 1), 0);

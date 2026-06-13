@@ -46,9 +46,9 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -1155,8 +1155,7 @@ public:
 
 protected:
     void setUp() final {
-        RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport",
-                                                                           true);
+        unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
         CollectionClonerTestResumable::setUp();
     }
 
@@ -1179,7 +1178,7 @@ protected:
 };
 
 TEST_F(CollectionClonerMultitenancyTest, CollectionClonerMultitenancy) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto cloner = makeCollectionCloner();
     cloner->setBatchSize_forTest(1);

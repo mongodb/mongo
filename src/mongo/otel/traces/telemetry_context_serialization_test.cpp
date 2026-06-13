@@ -29,13 +29,14 @@
 
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -54,9 +55,9 @@ using opentelemetry::trace::propagation::HttpTraceContext;
 
 class TelemetryContextSerializationTest : public traces::OtelTestFixture {
 protected:
-    RAIIServerParameterControllerForTest _featureFlagTracingController{"featureFlagTracing", true};
-    RAIIServerParameterControllerForTest _featureFlagSamplingController{
-        "featureFlagOtelTraceSampling", true};
+    unittest::ServerParameterGuard _featureFlagTracingController{"featureFlagTracing", true};
+    unittest::ServerParameterGuard _featureFlagSamplingController{"featureFlagOtelTraceSampling",
+                                                                  true};
 };
 
 BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {

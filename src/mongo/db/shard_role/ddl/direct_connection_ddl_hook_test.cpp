@@ -183,8 +183,7 @@ TEST_F(DirectConnectionDDLHookTest, RegisterOpSessionsCollection) {
 TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecksWithNss) {
     makeUnauthorizedForDirectOps(operationContext()->getClient());
 
-    RAIIServerParameterControllerForTest multitenancyController("enableDirectShardDDLOperations",
-                                                                true);
+    unittest::ServerParameterGuard multitenancyController("enableDirectShardDDLOperations", true);
 
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{kNss});
@@ -195,8 +194,7 @@ TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecksWithNss) 
 TEST_F(DirectConnectionDDLHookTest, RegisterOpUnauthorizedDisableChecksNoNss) {
     makeUnauthorizedForDirectOps(operationContext()->getClient());
 
-    RAIIServerParameterControllerForTest multitenancyController("enableDirectShardDDLOperations",
-                                                                true);
+    unittest::ServerParameterGuard multitenancyController("enableDirectShardDDLOperations", true);
 
     DirectConnectionDDLHook hook;
     hook.onBeginDDL(operationContext(), std::vector<NamespaceString>{});

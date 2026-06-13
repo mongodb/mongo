@@ -48,7 +48,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"

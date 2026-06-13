@@ -36,7 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/testing_options_gen.h"
@@ -115,9 +115,9 @@ TEST_F(FLEStatsTest, BinaryEmuStatsAreEmptyWithoutTesting) {
 }
 
 TEST_F(FLEStatsTest, BinaryEmuStatsArePopulatedWithTesting) {
-    RAIIServerParameterControllerForTest controller1(
-        "unsupportedDangerousTestingFLEDiagnosticsEnabled", true);
-    RAIIServerParameterControllerForTest controller2("testingDiagnosticsEnabled", true);
+    unittest::ServerParameterGuard controller1("unsupportedDangerousTestingFLEDiagnosticsEnabled",
+                                               true);
+    unittest::ServerParameterGuard controller2("testingDiagnosticsEnabled", true);
 
     {
         auto tracker = instance->makeEmuBinaryTracker();

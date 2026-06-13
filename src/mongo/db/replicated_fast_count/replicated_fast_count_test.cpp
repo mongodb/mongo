@@ -79,9 +79,9 @@ protected:
         _opCtx = operationContext();
 
         if (getMode() == FastCountStoreMode::kContainer) {
-            _ffDurability = std::make_unique<RAIIServerParameterControllerForTest>(
+            _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
                 "featureFlagReplicatedFastCountDurability", true);
-            _ffContainerWrites = std::make_unique<RAIIServerParameterControllerForTest>(
+            _ffContainerWrites = std::make_unique<unittest::ServerParameterGuard>(
                 "featureFlagContainerWrites", true);
         }
 
@@ -151,8 +151,8 @@ protected:
     BSONObj sampleDocForInsert = BSON("_id" << 0 << "x" << 0);
     BSONObj sampleDocForUpdate = BSON("_id" << 0 << "x" << 0 << "y" << 0);
 
-    std::unique_ptr<RAIIServerParameterControllerForTest> _ffDurability;
-    std::unique_ptr<RAIIServerParameterControllerForTest> _ffContainerWrites;
+    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
+    std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
 
 /**
@@ -195,7 +195,7 @@ const std::function<BSONObj(int)> docGeneratorForUpdate = [](int i) {
 };
 
 TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnCommit) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const int numDocs = 5;
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -208,7 +208,7 @@ TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnCommit) {
 }
 
 TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnRollback) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const int numDocs = 5;
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -222,7 +222,7 @@ TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnRollback) {
 }
 
 TEST_P(ReplicatedFastCountTest, UpdatesAreCorrectlyAccountedFor) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
     test_helpers::insertDocs(_opCtx,
@@ -247,7 +247,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesAreCorrectlyAccountedFor) {
 }
 
 TEST_P(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
     test_helpers::insertDocs(_opCtx,
@@ -270,7 +270,7 @@ TEST_P(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
 }
 
 TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 5;
     const int numDocsColl2 = 10;
@@ -329,7 +329,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
 }
 
 TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 5;
     const int numDocsColl2 = 10;
@@ -373,7 +373,7 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
 }
 
 TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 10;
     const int numDocsColl2 = 20;
@@ -450,7 +450,7 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
 }
 
 TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 25;
     const int numDocsColl2 = 40;
@@ -512,7 +512,7 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
 }
 
 TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 5;
 
@@ -539,7 +539,7 @@ TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
 }
 
 TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 5;
 
@@ -576,7 +576,7 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
 }
 
 TEST_F(ReplicatedFastCountCollectionOnlyTest, StartupFailsIfFastCountCollectionNotPresent) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx);
@@ -590,7 +590,7 @@ TEST_F(ReplicatedFastCountCollectionOnlyTest, StartupFailsIfFastCountCollectionN
 }
 
 TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int64_t numInitialDocs = 5;
     const int64_t initialSize = numInitialDocs * sampleDocForInsert.objsize();
@@ -677,7 +677,7 @@ BSONObj makeApplyOpsDeleteOp(const NamespaceString& nss, const UUID& uuid, int i
 }
 
 TEST_P(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 3;
     const int numDocsColl2 = 4;
@@ -711,7 +711,7 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
 }
 
 TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 5;
 
@@ -750,7 +750,7 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
 }
 
 TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
 
@@ -809,7 +809,7 @@ protected:
 };
 
 TEST_P(ReplicatedFastCountCappedCollectionTest, CorrectSizeCountAfterCapReached) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const int maxDocs = 5;
     const NamespaceString nssCapped = NamespaceString::createNamespaceString_forTest(
         "replicated_fast_count_test", "cappedWithMaxCount");
@@ -976,7 +976,7 @@ protected:
 };
 
 TEST_F(SizeMetadataLoggingTest, BasicInsertOplogEntry) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss, AcquisitionPrerequisites::kWrite),
@@ -1000,7 +1000,7 @@ TEST_F(SizeMetadataLoggingTest, BasicInsertOplogEntry) {
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntry) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss, AcquisitionPrerequisites::kWrite),
@@ -1031,7 +1031,7 @@ TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntry) {
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntryWithNegativeDelta) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss, AcquisitionPrerequisites::kWrite),
@@ -1062,7 +1062,7 @@ TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntryWithNegativeDelta) {
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicDeleteOplogEntry) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss, AcquisitionPrerequisites::kWrite),
@@ -1090,7 +1090,7 @@ TEST_F(SizeMetadataLoggingTest, BasicDeleteOplogEntry) {
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicGroupCommit) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
         CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss, AcquisitionPrerequisites::kWrite),

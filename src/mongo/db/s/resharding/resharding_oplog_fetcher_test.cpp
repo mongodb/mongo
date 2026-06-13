@@ -86,10 +86,10 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -722,7 +722,7 @@ protected:
                                                     const NamespaceString& outputCollectionNss,
                                                     bool storeProgress) {
         auto batchLimitOperations = 5;
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "reshardingOplogFetcherInsertBatchLimitOperations", batchLimitOperations);
         auto numInsertOplogEntries = 8;
         auto initialAggregateBatchSize = boost::none;
@@ -748,7 +748,7 @@ protected:
         const NamespaceString& outputCollectionNss,
         bool storeProgress) {
         auto batchLimitBytes = 1 * 1024;
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "reshardingOplogFetcherInsertBatchLimitBytes", batchLimitBytes);
         auto numInsertOplogEntries = 2;
         auto approxInsertOplogEntrySizeBytes = 3 * 1024;
@@ -809,9 +809,9 @@ protected:
 
 private:
     // Set the sleep to 0 to speed up the tests.
-    RAIIServerParameterControllerForTest _sleepMillisBeforeCriticalSection{
+    unittest::ServerParameterGuard _sleepMillisBeforeCriticalSection{
         "reshardingOplogFetcherSleepMillisBeforeCriticalSection", 0};
-    RAIIServerParameterControllerForTest _sleepMillisDuringCriticalSection{
+    unittest::ServerParameterGuard _sleepMillisDuringCriticalSection{
         "reshardingOplogFetcherSleepMillisDuringCriticalSection", 0};
 
     static HostAndPort makeHostAndPort(const ShardId& shardId) {
@@ -836,8 +836,8 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicSingleApplyOps) {
 // Tests that recordIds replicated for the donor's data collection aren't leaked in the output
 // collection for the resharding fetcher.
 TEST_F(ReshardingOplogFetcherTest, TestBasicSingleApplyOpsStripsRids) {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 true};
     for (bool storeProgress : {false, true}) {
         LOGV2(8919200, "Running case", "storeProgress"_attr = storeProgress);
 
@@ -872,8 +872,8 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_BatchLimitOperation
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOpsStripsRids) {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 true};
     for (bool storeProgress : {false, true}) {
         LOGV2(8919201, "Running case", "storeProgress"_attr = storeProgress);
 
@@ -904,7 +904,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_BatchLimitBytes) {
             "dbtests.runFetchIteration" + std::to_string(storeProgress));
 
         auto batchLimitBytes = 10 * 1024;
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "reshardingOplogFetcherInsertBatchLimitBytes", batchLimitBytes);
         auto numInsertOplogEntries = 8;
         auto approxInsertOplogEntrySizeBytes = 3 * 1024;
@@ -950,8 +950,8 @@ TEST_F(ReshardingOplogFetcherTest,
 
 TEST_F(ReshardingOplogFetcherTest,
        TestBasicMultipleApplyOpsStripsRids_SingleOplogEntrySizeExceedsBatchLimitBytes) {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 true};
 
     for (bool storeProgress : {false, true}) {
         LOGV2(8919202, "Running case", "storeProgress"_attr = storeProgress);
@@ -983,7 +983,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_FinalOplogEntry) {
             "dbtests.runFetchIteration" + std::to_string(storeProgress));
 
         auto batchLimitOperations = 5;
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "reshardingOplogFetcherInsertBatchLimitOperations", batchLimitOperations);
         auto numInsertOplogEntriesBeforeFinal = 8;
         auto approxInsertOplogEntrySizeBytes = 1;
@@ -1642,7 +1642,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
 }
 
 TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotTargetPrimary) {
-    RAIIServerParameterControllerForTest targetPrimaryDuringCriticalSection{
+    unittest::ServerParameterGuard targetPrimaryDuringCriticalSection{
         "reshardingOplogFetcherTargetPrimaryDuringCriticalSection", false};
 
     const NamespaceString outputCollectionNss =
@@ -1843,7 +1843,7 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
     for (bool targetPrimary : {false, true}) {
         LOGV2(10355403, "Running case", "targetPrimary"_attr = targetPrimary);
 
-        RAIIServerParameterControllerForTest targetPrimaryDuringCriticalSection{
+        unittest::ServerParameterGuard targetPrimaryDuringCriticalSection{
             "reshardingOplogFetcherTargetPrimaryDuringCriticalSection", targetPrimary};
 
         const NamespaceString outputCollectionNss = NamespaceString::createNamespaceString_forTest(
@@ -1927,7 +1927,7 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
 TEST_F(ReshardingOplogFetcherTest,
        UpdateAverageTimeToFetchCursorAdvancedBasic_WithPostBatchResumeToken) {
     auto smoothingFactor = 0.5;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     const NamespaceString outputCollectionNss =
@@ -2034,7 +2034,7 @@ TEST_F(ReshardingOplogFetcherTest,
 TEST_F(ReshardingOplogFetcherTest,
        UpdateAverageTimeToFetchCursorAdvancedBasic_WithoutPostBatchResumeToken) {
     auto smoothingFactor = 0.5;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     const NamespaceString outputCollectionNss =
@@ -2382,7 +2382,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayNegative
 
 TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
     auto smoothingFactor = 0.6;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     const NamespaceString outputCollectionNss =
@@ -2502,7 +2502,7 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
 
 TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
     auto smoothingFactor = 0.7;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     const NamespaceString outputCollectionNss =
@@ -2777,8 +2777,8 @@ protected:
         NamespaceString outputCollectionNss;
         NamespaceString dataCollectionNss;
         UUID dataCollectionUUID;
-        RAIIServerParameterControllerForTest movingAvgFeatureFlag;
-        RAIIServerParameterControllerForTest movingAvgServerParameter;
+        unittest::ServerParameterGuard movingAvgFeatureFlag;
+        unittest::ServerParameterGuard movingAvgServerParameter;
     };
 
     std::vector<TestOptions> makeAllTestOptions() {
@@ -3343,7 +3343,7 @@ TEST_F(
 TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
        DuringOplogApplication_BatchEmptyAndTimestampEqualToLastSeen) {
     auto movingAvgInterval = Milliseconds(50);
-    RAIIServerParameterControllerForTest intervalMillisServerParameter{
+    unittest::ServerParameterGuard intervalMillisServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis",
         movingAvgInterval.count()};
 

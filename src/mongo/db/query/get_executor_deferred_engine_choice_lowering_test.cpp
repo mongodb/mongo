@@ -197,8 +197,8 @@ protected:
     }
 
 private:
-    RAIIServerParameterControllerForTest sbeFullController{
-        "featureFlagGetExecutorDeferredEngineChoice", true};
+    unittest::ServerParameterGuard sbeFullController{"featureFlagGetExecutorDeferredEngineChoice",
+                                                     true};
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::optional<MultipleCollectionAccessor> _collections;
@@ -331,7 +331,7 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         testExpectedEngine(numDocs, false /*hasGroupPipeline*/, false /*shouldUseSbe*/);
     }
 
-    RAIIServerParameterControllerForTest sbeFullController{"featureFlagSbeFull", true};
+    unittest::ServerParameterGuard sbeFullController{"featureFlagSbeFull", true};
     for (int numDocs : numDocsCases) {
         bool hitEof = numDocs < 100;
         // With SBE full enabled, we can use SBE even when there is no pipeline. We should use the

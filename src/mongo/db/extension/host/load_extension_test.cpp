@@ -43,8 +43,8 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/server_options.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -107,9 +107,8 @@ protected:
         NamespaceString::createNamespaceString_forTest(boost::none, "load_extension_test");
 
 private:
-    RAIIServerParameterControllerForTest _featureFlagExtensionsAPI{"featureFlagExtensionsAPI",
-                                                                   true};
-    RAIIServerParameterControllerForTest _featureFlagExtensionsApiSignatureValidation{
+    unittest::ServerParameterGuard _featureFlagExtensionsAPI{"featureFlagExtensionsAPI", true};
+    unittest::ServerParameterGuard _featureFlagExtensionsApiSignatureValidation{
         "featureFlagExtensionsApiSignatureValidation", true};
     std::string _previousExtensionsSignaturePublicKeyPath{""};
 };

@@ -33,7 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -283,8 +283,8 @@ TEST_F(QueryPlannerTest, TextInsideOrOfAnd) {
 
 // SERVER-13039
 TEST_F(QueryPlannerTest, TextInsideAndOrAnd) {
-    RAIIServerParameterControllerForTest controller(
-        "internalQueryEnableBooleanExpressionsSimplifier", true);
+    unittest::ServerParameterGuard controller("internalQueryEnableBooleanExpressionsSimplifier",
+                                              true);
 
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
@@ -306,8 +306,8 @@ TEST_F(QueryPlannerTest, TextInsideAndOrAnd) {
 
 // SERVER-13039
 TEST_F(QueryPlannerTest, TextInsideAndOrAnd_DisabledSimplifier) {
-    RAIIServerParameterControllerForTest controller(
-        "internalQueryEnableBooleanExpressionsSimplifier", false);
+    unittest::ServerParameterGuard controller("internalQueryEnableBooleanExpressionsSimplifier",
+                                              false);
 
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));

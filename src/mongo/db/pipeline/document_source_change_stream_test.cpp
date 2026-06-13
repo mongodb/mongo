@@ -78,9 +78,9 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -460,7 +460,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesWholeCluster) {
 TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
     getExpCtx()->setInRouter(true);
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -545,7 +545,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
 TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenNotOnRouter) {
     getExpCtx()->setInRouter(false);
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
@@ -560,7 +560,7 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenNotOnRouter)
 TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1WhenFeatureFlagIsDisabled) {
     getExpCtx()->setInRouter(true);
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", false);
 
     const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
@@ -580,7 +580,7 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForAllDatabasesC
     getExpCtx()->setNamespaceString(
         NamespaceString::createNamespaceString_forTest("admin.$cmd.aggregate"));
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -602,7 +602,7 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForDatabaseLevel
     getExpCtx()->setNamespaceString(
         NamespaceString::createNamespaceString_forTest("testDB.$cmd.aggregate"));
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
@@ -622,7 +622,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    "Tripwire assertion.*10743904") {
     getExpCtx()->setInRouter(true);
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
 
@@ -644,7 +644,7 @@ DEATH_TEST_REGEX_F(
     "Tripwire assertion.*10743906") {
     getExpCtx()->setInRouter(true);
 
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     // Intentionally set the global 'DataToShardsAllocationQueryService' instance to a nullptr.
@@ -663,7 +663,7 @@ DEATH_TEST_REGEX_F(
 // Test that 'supportedEvents' are registered in the change stream transform stage for v2 change
 // stream readers.
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -710,7 +710,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
 // Test that the match expression for the supportedEvents is registered in the change stream oplog
 // match stage for v2 change stream readers.
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterForSupportedEvents) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -759,7 +759,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterFor
 // Test that the control events filter for data shards is correctly registered in the change stream
 // unwind transaction stage for v2 change stream readers.
 TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForDataShard) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -829,7 +829,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
 // Test that the control events filter for a data shard in v2 change stream readers is as expected.
 TEST_F(ChangeStreamStageTest,
        BuildControlEventsFilterForDataShardReturnsCorrectFilterForV2ChangeStream) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -1324,7 +1324,7 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrations) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", true);
 
     constexpr bool fromMigrate = true;
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
@@ -1351,7 +1351,7 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrations) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertFromMigrateShowMigrationsDontEmitFromMigrate) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", false);
 
     constexpr bool fromMigrate = true;
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
@@ -1717,7 +1717,7 @@ TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrations) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", true);
 
     constexpr bool fromMigrate = true;
     BSONObj o = BSON("_id" << 1);
@@ -1744,7 +1744,7 @@ TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrations) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrateShowMigrationsDontEmitFromMigrate) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", false);
 
     constexpr bool fromMigrate = true;
     BSONObj o = BSON("_id" << 1);
@@ -2031,7 +2031,7 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", true);
 
     auto uuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
@@ -2063,7 +2063,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardBeginDontEmitFromMigrate) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", false);
 
     auto uuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
@@ -2126,7 +2126,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBlockingWrites) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", true);
 
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
@@ -2166,7 +2166,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUp) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformReshardDoneCatchUpDontEmitFromMigrate) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", false);
 
     auto existingUuid = UUID::gen();
     auto reshardingUuid = UUID::gen();
@@ -2358,7 +2358,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyDoesNotEmitEndOf
     // kApplyOpsAppliedAtomically applyOps is a retryable write, so even with the feature flag and
     // expanded events enabled (the conditions under which a transaction would emit one) it must not
     // produce an endOfTransaction event.
-    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+    unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
     Document applyOpsDoc{
         {"applyOps",
          Value{std::vector<Document>{
@@ -3212,7 +3212,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOps) {
 
 TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     // Enable the endOfTransaction feature flag so this test produces an EOT change event.
-    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+    unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
     // Doesn't use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
     Document idIndexDef = Document{{"v", 2}, {"key", D{{"_id", 1}}}};
@@ -4136,7 +4136,7 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) 
 
 // Test the control events mapping for a v2 change stream reader.
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -4171,7 +4171,7 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
 
 // Test the control events for a v2 change stream reader.
 TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShardShowSystemEvents) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -4869,7 +4869,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrate) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrations) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", true);
 
     bool fromMigrate = true;
     BSONObj o = BSON("_id" << 1 << "x" << 2);
@@ -4897,7 +4897,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrations) {
 }
 
 TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrationsDontEmitFromMigrate) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", false);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", false);
 
     bool fromMigrate = true;
     BSONObj o = BSON("_id" << 1 << "x" << 2);
@@ -4925,7 +4925,7 @@ TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrateShowMigrationsDontEmit
 
 
 TEST_F(ChangeStreamStageDBTest, TransformEventWithFromMigrateSetToFalseInOplog) {
-    RAIIServerParameterControllerForTest emitFromMigrate("changeStreamsEmitFromMigrate", true);
+    unittest::ServerParameterGuard emitFromMigrate("changeStreamsEmitFromMigrate", true);
 
     bool fromMigrate = false;
     BSONObj o = BSON("_id" << 1 << "x" << 2);
@@ -5381,7 +5381,7 @@ TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamStagesOrder) {
 // steps.
 //
 TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5411,7 +5411,7 @@ TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
 // steps.
 //
 TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5440,7 +5440,7 @@ TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
 // Tests the stages in a basic all-cluster v2 change stream without any additional pipeline steps.
 //
 TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamV2StagesOrder) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5494,7 +5494,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
 // '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleMatch) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5549,7 +5549,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
 // '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5610,7 +5610,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
 // '$_internalChangeStreamHandleTopologyChange' in a v2 change stream when resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5670,7 +5670,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
 // '$_internalChangeStreamHandleTopologyChange' in a v2 change stream.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleProject) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
@@ -5725,7 +5725,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
 // '$_internalChangeStreamHandleTopologyChangeV2'.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleProject) {
-    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
     ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;

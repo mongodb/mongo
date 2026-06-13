@@ -50,8 +50,8 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -541,7 +541,7 @@ TEST_F(TransactionCoordinatorServiceTest,
     {
         // Set this server parameter so coordinateCommit returns the decision future instead of the
         // completion future.
-        RAIIServerParameterControllerForTest controller{
+        unittest::ServerParameterGuard controller{
             "coordinateCommitReturnImmediatelyAfterPersistingDecision", true};
         auto decisionFuture = *coordinatorService->coordinateCommit(
             operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
@@ -643,7 +643,7 @@ TEST_F(TransactionCoordinatorServiceTest,
 
         // Set this server parameter so coordinateCommit returns the decision future instead of the
         // completion future.
-        RAIIServerParameterControllerForTest controller{
+        unittest::ServerParameterGuard controller{
             "coordinateCommitReturnImmediatelyAfterPersistingDecision", true};
 
         auto oldTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(

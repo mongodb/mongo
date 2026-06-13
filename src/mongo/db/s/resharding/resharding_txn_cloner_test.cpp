@@ -100,9 +100,9 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -630,7 +630,7 @@ private:
         return HostAndPort(str::stream() << shardId << ":123");
     }
 
-    RAIIServerParameterControllerForTest controller{"reshardingTxnClonerProgressBatchSize", 1};
+    unittest::ServerParameterGuard controller{"reshardingTxnClonerProgressBatchSize", 1};
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<ThreadPool> _threadPool;

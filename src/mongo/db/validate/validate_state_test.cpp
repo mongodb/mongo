@@ -36,8 +36,8 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::collection_validation {
@@ -104,7 +104,7 @@ TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsLegacySizeStorer) {
 };
 
 TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsLegacySizeStorerNoOplog) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     // Reset the oplog collection, to simulate this node never having been part of a replica set.
     LocalOplogInfo::get(operationContext())->resetRecordStore();
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
@@ -113,7 +113,7 @@ TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsLegacySizeStorerNoOplog
 };
 
 TEST_F(ValidateStateTest, GetExpectedFastCountTypeReturnsBoth) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getExpectedFastCountType(operationContext()), FastCountType::both);
 };
@@ -176,10 +176,10 @@ public:
 TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {
     const auto& p = GetParam();
 
-    std::unique_ptr<RAIIServerParameterControllerForTest> flag;
+    std::unique_ptr<unittest::ServerParameterGuard> flag;
     if (p.featureFlagOn) {
-        flag = std::make_unique<RAIIServerParameterControllerForTest>(
-            "featureFlagReplicatedFastCount", true);
+        flag = std::make_unique<unittest::ServerParameterGuard>("featureFlagReplicatedFastCount",
+                                                                true);
     }
 
     if (p.createRfcCollection) {

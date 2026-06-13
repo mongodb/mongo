@@ -34,7 +34,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/platform/atomic_word.h"
@@ -49,6 +48,7 @@
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
@@ -661,7 +661,7 @@ TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
 TEST(AsioTransportLayer, UnauthenticatedConnectionRejectsOversizedMessage) {
     // Set pre-auth max message size to a small value for testing (1024 bytes).
     // We also disable the post-header timeout to isolate message size validation.
-    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
+    unittest::ServerParameterGuard maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
 
     TestFixture tf;
     Notification<StatusWith<Message>> received;
@@ -709,8 +709,8 @@ TEST(AsioTransportLayer, UnauthenticatedConnectionRejectsOversizedMessage) {
 TEST(AsioTransportLayer, AuthenticatedConnectionAllowsLargerMessages) {
     // Set pre-auth max message size to a small value for testing (1024 bytes).
     const auto preAuthMaxMsgSize = 1024;
-    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes",
-                                                           preAuthMaxMsgSize};
+    unittest::ServerParameterGuard maxSizeController{"preAuthMaximumMessageSizeBytes",
+                                                     preAuthMaxMsgSize};
 
     TestFixture tf;
     Notification<test::SessionThread*> mockSessionCreated;
@@ -761,7 +761,7 @@ TEST(AsioTransportLayer, AuthenticatedConnectionAllowsLargerMessages) {
  */
 TEST(AsioTransportLayer, UnauthenticatedConnectionAcceptsValidSizedMessage) {
     // Set pre-auth max message size large enough to accept our test message.
-    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 16384};
+    unittest::ServerParameterGuard maxSizeController{"preAuthMaximumMessageSizeBytes", 16384};
 
     TestFixture tf;
     Notification<StatusWith<Message>> received;

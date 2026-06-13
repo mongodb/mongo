@@ -43,10 +43,10 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -473,8 +473,7 @@ TEST_F(BalancerSettingsTestFixture, TimeFormatEdgeCases) {
 
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWSingleDay) {
     BalancerConfiguration config;
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", true);
     BalancerSettings settings = assertGet(
         config.getSettingsFromBSON(opCtx(),
                                    BSON("activeWindowDOW" << BSON_ARRAY(BSON("day" << "Monday"
@@ -516,8 +515,7 @@ TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWSingleDay) {
 }
 
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWMultipleDays) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", true);
 
     BalancerConfiguration config;
     BalancerSettings settings = assertGet(config.getSettingsFromBSON(
@@ -556,8 +554,7 @@ TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWMultipleDays) {
 }
 
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWTimeValidation) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", true);
     BalancerConfiguration config;
 
     auto status1 = config
@@ -582,8 +579,7 @@ TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWTimeValidation) {
 }
 
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWOvernightWindow) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", true);
     BalancerConfiguration config;
     BalancerSettings settings = assertGet(config.getSettingsFromBSON(
         opCtx(),
@@ -633,8 +629,7 @@ TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWOvernightWindow) {
 }
 
 TEST_F(BalancerSettingsTestFixture, MultipleTimeWindowsForSameDay) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", true);
     BalancerConfiguration config;
     BalancerSettings settings = assertGet(config.getSettingsFromBSON(
         opCtx(),
@@ -696,8 +691,7 @@ TEST_F(BalancerSettingsTestFixture, MultipleTimeWindowsForSameDay) {
 }
 
 TEST_F(BalancerSettingsTestFixture, ActiveWindowAndActiveWindowDOWPrecedence) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", true);
     BalancerConfiguration config;
     BalancerSettings settings = assertGet(
         config.getSettingsFromBSON(opCtx(),
@@ -742,8 +736,7 @@ TEST_F(BalancerSettingsTestFixture, ActiveWindowAndActiveWindowDOWPrecedence) {
 
 // ===== Feature Flag Disabled Tests =====
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWDisabled_IgnoresActiveWindowDOW) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", false);
     BalancerConfiguration config;
     unittest::LogCaptureGuard logs;
     BalancerSettings settings = assertGet(
@@ -761,8 +754,7 @@ TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWDisabled_IgnoresActiveWind
 
 
 TEST_F(BalancerSettingsTestFixture, BalancingWindowDOWDisabled_FallsBackToActiveWindow) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBalancerWindowDOW",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBalancerWindowDOW", false);
     BalancerConfiguration config;
     unittest::LogCaptureGuard logs;
 

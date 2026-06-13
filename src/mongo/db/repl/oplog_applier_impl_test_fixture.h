@@ -60,8 +60,8 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -273,7 +273,7 @@ protected:
 
     template <typename T>
     inline void setServerParameter(const std::string& name, T value) {
-        _serverParamControllers.push_back(ServerParameterControllerForTest(name, value));
+        _serverParamControllers.push_back(unittest::ServerParameterGuard(name, value));
     }
 
     OpTime nextOpTime() {
@@ -302,7 +302,7 @@ protected:
 
     UUID kUuid{UUID::gen()};
 
-    std::vector<ServerParameterControllerForTest> _serverParamControllers;
+    std::vector<unittest::ServerParameterGuard> _serverParamControllers;
 };
 
 class OplogApplierImplWithFastAutoAdvancingClockTest : public OplogApplierImplTest {

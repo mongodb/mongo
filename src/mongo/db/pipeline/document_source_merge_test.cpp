@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -871,8 +871,8 @@ TEST_F(DocumentSourceMergeTest, SerializeTargetCollectionVersion) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariableMentionNew) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowMergeOnNullishValues", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
+                                                         true);
     auto pipeline = BSON_ARRAY(fromjson("{$project: {_id: true, x: '$$new'}}"));
     auto spec = BSON("$merge" << BSON("into" << "target_collection"
                                              << "let" << BSONObj() << "whenMatched" << pipeline
@@ -945,11 +945,11 @@ using DocumentSourceMergeServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceMergeServerlessTest,
        LiteParsedDocumentSourceLookupStringContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         auto tenantId = TenantId(OID::gen());
         NamespaceString nss =
@@ -969,11 +969,11 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
 TEST_F(DocumentSourceMergeServerlessTest,
        LiteParsedDocumentSourceLookupObjContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         auto tenantId = TenantId(OID::gen());
         NamespaceString nss =
@@ -994,9 +994,9 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
 TEST_F(DocumentSourceMergeServerlessTest,
        LiteParsedDocumentSourceLookupObjContainsExpectedNamespacesInServerlessPrefixed) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
     auto tenantId = TenantId(OID::gen());
     NamespaceString nss =
@@ -1017,14 +1017,14 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
 TEST_F(DocumentSourceMergeServerlessTest,
        CreateFromBSONStringContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     ASSERT(expCtx->getNamespaceString().tenantId());
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         // Pass collection name as a string.
         auto spec = BSON("$merge" << _targetColl);
@@ -1047,14 +1047,14 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
 TEST_F(DocumentSourceMergeServerlessTest,
        CreateFromBSONCollObjContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     ASSERT(expCtx->getNamespaceString().tenantId());
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         // Pass collection name as a coll object.
         auto spec = BSON("$merge" << BSON("into" << BSON("coll" << _targetColl)));
@@ -1076,14 +1076,14 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
 TEST_F(DocumentSourceMergeServerlessTest,
        CreateFromBSONDbObjContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     ASSERT(expCtx->getNamespaceString().tenantId());
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         // Pass collection name as a db + coll object.
         auto spec =
@@ -1106,12 +1106,12 @@ TEST_F(DocumentSourceMergeServerlessTest,
 
 TEST_F(DocumentSourceMergeServerlessTest,
        CreateFromBSONDbObjContainsExpectedNamespacesInServerlessPrefix) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     ASSERT(expCtx->getNamespaceString().tenantId());
 
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
     // We're expecting a prefix given gFeatureFlagRequireTenantId is false.
     std::string dbField = str::stream()
@@ -1132,8 +1132,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
 }
 
 TEST_F(DocumentSourceMergeTest, QueryShape) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowMergeOnNullishValues", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
+                                                         true);
     auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x" << "1")));
     auto let = BSON("new" << "$$ROOT"
                           << "year"

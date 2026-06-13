@@ -52,7 +52,7 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tailable_mode_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -512,7 +512,7 @@ TEST(ExpressionOptimizeTest, PartialOrToInRewriteDoesNotGenerateDirectlyNestedOr
     // itself does not unnecessarily generate intermediate nested $or nodes as described in
     // SERVER-83602.
     for (auto booleanSimplificationEnabled : {false, true}) {
-        RAIIServerParameterControllerForTest simplifierParamController(
+        unittest::ServerParameterGuard simplifierParamController(
             "internalQueryEnableBooleanExpressionsSimplifier", booleanSimplificationEnabled);
         BSONObj obj = fromjson("{$or: [{x: {$eq: 3}}, {x: {$eq: 4}}, {y: 5}, {z: 6}]}");
         // We call normalizeMatchExpression() here to ensure the stability of the predicate order

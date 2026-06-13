@@ -39,8 +39,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -545,8 +545,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
 
     // The Tenant ID contained in the generated applyOps oplog entry should match that
     // of the first operation.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
     auto tenant = TenantId(OID::gen());
 
     // Add a small operation. This should be packed into a single applyOps entry.
@@ -613,8 +613,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
 
     // The Tenant ID contained in the generated applyOps oplog entry should match that
     // of the first operation.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
     auto tenant = TenantId(OID::gen());
 
     // Add three operations. This helps us check fields for the first, middle, and last entries
@@ -740,8 +740,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
 
     // The Tenant ID contained in the generated applyOps oplog entry should match that
     // of the first operation.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
     auto tenant = TenantId(OID::gen());
 
     // Add three operations. This helps us check fields for the first, middle, and last entries
@@ -868,8 +868,8 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsRetryableWrite)
 
     // The Tenant ID contained in the generated applyOps oplog entry should match that
     // of the first operation.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
     auto tenant = TenantId(OID::gen());
 
     // Add three operations. This helps us check fields for the first, middle, and last entries

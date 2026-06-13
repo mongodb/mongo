@@ -48,7 +48,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -554,8 +554,8 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
 
 TEST_F(IndexBuildsCoordinatorTest, CommitRemovesBuildFromPrimaryDrivenRegistry) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto opCtx = operationContext();
 
@@ -595,8 +595,8 @@ TEST_F(IndexBuildsCoordinatorTest, CommitRemovesBuildFromPrimaryDrivenRegistry) 
 
 TEST_F(IndexBuildsCoordinatorTest, AbortRemovesBuildFromPrimaryDrivenRegistry) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto opCtx = operationContext();
 
@@ -676,11 +676,11 @@ void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
                                         std::tuple<IndexBuildPhaseEnum, bool> param) {
     auto [phase, hasPersistedResumeState] = param;
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     // TODO(SERVER-124910): Remove.
-    RAIIServerParameterControllerForTest ffPDIBResume(
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffPDIBResume("featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                true);
 
     auto opObserver = OpObserverMock::install(opCtx);
     auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
@@ -767,11 +767,11 @@ void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
 
 // TODO (SERVER-126257): Remove this test once index build side writes cannot be torn.
 TEST_F(IndexBuildsCoordinatorTest, ResumeFailsWhenTearableSideWriteAbortSentinelPresent) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
     // TODO(SERVER-124910): Remove.
-    RAIIServerParameterControllerForTest ffPDIBResume{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffPDIBResume{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                true};
 
     auto opCtx = operationContext();
     OpObserverMock::install(opCtx);

@@ -30,9 +30,9 @@
 #include "mongo/db/mirroring_sampler.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -78,8 +78,7 @@ TEST(MirroringSamplerTest, ValidateHostIsPrimaryForGeneral) {
 }
 
 TEST(MirroringSamplerTest, ValidateHostOKIfNotPrimaryForTargeted) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagTargetedMirrorReads",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagTargetedMirrorReads", true);
 
     auto hello = std::make_shared<mongo::repl::HelloResponse>();
     hello->setIsWritablePrimary(false);

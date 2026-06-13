@@ -36,9 +36,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/none.hpp>
@@ -596,7 +596,7 @@ TEST(CursorResponseTest,
     TenantId tid(OID::gen());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, defaultNssStr);
 
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     rpc::OpMsgReplyBuilder builder;
     BSONObj okStatus = BSON("ok" << 1);
@@ -739,11 +739,11 @@ TEST(CursorResponseTest, addToBSONInitialResponseWithTenantId) {
     TenantId tid(OID::gen());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "testdb.testcoll");
 
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
         CursorResponse response(nss, CursorId(123), batch);

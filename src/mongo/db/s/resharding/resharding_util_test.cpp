@@ -55,10 +55,10 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -360,8 +360,8 @@ TEST_F(ReshardingUtilTest, ValidateIndexSpecsMatch) {
 }
 
 TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectionRequest) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReshardingNumSamplesPerChunk", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReshardingNumSamplesPerChunk",
+                                                         true);
 
     int numInitialChunks = 1;
     int numSamplesPerChunk = 10;
@@ -398,34 +398,34 @@ TEST_F(ReshardingUtilTest, ValidatePerformVerification) {
 
     // false is always a no-op.
     {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagReshardingVerification", false);
-        RAIIServerParameterControllerForTest serverParamController("reshardingDocumentVerification",
-                                                                   false);
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             false);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             false);
         ASSERT_DOES_NOT_THROW(validatePerformVerification(vCtx, false));
     }
 
     // true is valid only when both gates are on.
     {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagReshardingVerification", true);
-        RAIIServerParameterControllerForTest serverParamController("reshardingDocumentVerification",
-                                                                   true);
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             true);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             true);
         ASSERT_DOES_NOT_THROW(validatePerformVerification(vCtx, true));
     }
     {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagReshardingVerification", false);
-        RAIIServerParameterControllerForTest serverParamController("reshardingDocumentVerification",
-                                                                   true);
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             false);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             true);
         ASSERT_THROWS_CODE(
             validatePerformVerification(vCtx, true), DBException, ErrorCodes::InvalidOptions);
     }
     {
-        RAIIServerParameterControllerForTest featureFlagController(
-            "featureFlagReshardingVerification", true);
-        RAIIServerParameterControllerForTest serverParamController("reshardingDocumentVerification",
-                                                                   false);
+        unittest::ServerParameterGuard featureFlagController("featureFlagReshardingVerification",
+                                                             true);
+        unittest::ServerParameterGuard serverParamController("reshardingDocumentVerification",
+                                                             false);
         ASSERT_THROWS_CODE(
             validatePerformVerification(vCtx, true), DBException, ErrorCodes::InvalidOptions);
     }
@@ -441,9 +441,9 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocPerformVerification) {
                       "performVerification"_attr = performVerification,
                       "featureFlagEnabled"_attr = featureFlagEnabled,
                       "serverParamEnabled"_attr = serverParamEnabled);
-                RAIIServerParameterControllerForTest featureFlagController(
+                unittest::ServerParameterGuard featureFlagController(
                     "featureFlagReshardingVerification", featureFlagEnabled);
-                RAIIServerParameterControllerForTest serverParamController(
+                unittest::ServerParameterGuard serverParamController(
                     "reshardingDocumentVerification", serverParamEnabled);
 
                 const CollectionType collEntry(

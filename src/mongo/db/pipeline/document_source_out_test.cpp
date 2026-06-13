@@ -41,7 +41,7 @@
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -181,7 +181,7 @@ using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceOutServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto tenantId = TenantId(OID::gen());
     NamespaceString nss =
@@ -212,7 +212,7 @@ TEST_F(DocumentSourceOutServerlessTest,
 }
 
 TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     ASSERT(expCtx->getNamespaceString().tenantId());

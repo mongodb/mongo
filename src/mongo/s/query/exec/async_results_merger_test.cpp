@@ -50,7 +50,6 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
@@ -58,6 +57,7 @@
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -3403,8 +3403,8 @@ TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
 }
 
 TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipants) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowAdditionalParticipants", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowAdditionalParticipants",
+                                                         true);
 
     auto lsid = makeLogicalSessionIdForTest();
     operationContext()->setLogicalSessionId(lsid);
@@ -3456,8 +3456,8 @@ TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipants) {
 }
 
 TEST_F(AsyncResultsMergerTest, ProcessAdditionalParticipantsEvenIfKilled) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowAdditionalParticipants", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowAdditionalParticipants",
+                                                         true);
 
     auto lsid = makeLogicalSessionIdForTest();
     operationContext()->setLogicalSessionId(lsid);
@@ -4628,8 +4628,8 @@ TEST_F(AsyncResultsMergerTest,
        RetryRequestIfErrorLabelsIncludesRetryableErrorUntilMaxAttemptsAreReached) {
 
     const int maxAttempts = 3;
-    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
-                                                                maxAttempts);
+    unittest::ServerParameterGuard multitenancyController("defaultClientMaxRetryAttempts",
+                                                          maxAttempts);
 
     const BSONObj response = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kRetryableError});
@@ -4750,8 +4750,8 @@ TEST_F(AsyncResultsMergerTest,
        RetryRequestIfErrorLabelsIncludesRetryableErrorAndCompleteSuccessfully) {
 
     const int maxAttempts = 3;
-    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
-                                                                maxAttempts);
+    unittest::ServerParameterGuard multitenancyController("defaultClientMaxRetryAttempts",
+                                                          maxAttempts);
 
     const BSONObj responseToRetry = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kRetryableError});
@@ -4886,8 +4886,8 @@ TEST_F(AsyncResultsMergerTest,
     FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
 
     const int maxAttempts = 3;
-    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
-                                                                maxAttempts);
+    unittest::ServerParameterGuard multitenancyController("defaultClientMaxRetryAttempts",
+                                                          maxAttempts);
 
     {
         auto shardState = getShardState(kTestShardIds[0]);
@@ -5066,7 +5066,7 @@ TEST_F(AsyncResultsMergerTest, RetryWithDeadSubBatonDoesNotDeadlock) {
 // When the baton retry for remote 0 fires it sees '!_status.isOK()'. It then must not call
 // '_cleanUpKilledBatch()'.
 TEST_F(AsyncResultsMergerTest, DoesNotCallCleanUpKilledBatchWhenKillHasNotStarted) {
-    RAIIServerParameterControllerForTest maxAttemptsController("defaultClientMaxRetryAttempts", 3);
+    unittest::ServerParameterGuard maxAttemptsController("defaultClientMaxRetryAttempts", 3);
 
     const BSONObj retryableError = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable, "retryable error", {ErrorLabel::kRetryableError});
@@ -5138,8 +5138,8 @@ TEST_F(AsyncResultsMergerTest, CallsCleanUpKilledBatchWhenResponsesAreProcessedA
 // held on the same thread. The fix detects the detached state ('!_opCtx') and leaves the remote in
 // a retryable state instead, deferring the retry to '_scheduleGetMores()' on reattach.
 TEST_F(AsyncResultsMergerTest, RetryableErrorWhileDetachedDoesNotDeadlockAndRetriesOnReattach) {
-    RAIIServerParameterControllerForTest multitenancyController("defaultClientMaxRetryAttempts",
-                                                                3 /* maxAttempts */);
+    unittest::ServerParameterGuard multitenancyController("defaultClientMaxRetryAttempts",
+                                                          3 /* maxAttempts */);
 
     const BSONObj retryableErrorResponse = makeResponseObjWithErrorLabels(
         ErrorCodes::HostUnreachable, "dummy msg", {ErrorLabel::kRetryableError});

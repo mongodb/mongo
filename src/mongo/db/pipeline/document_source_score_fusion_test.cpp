@@ -35,7 +35,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -52,10 +52,9 @@ public:
     DocumentSourceScoreFusionTest() {}
 
 private:
-    RAIIServerParameterControllerForTest scoreFusionFlag{"featureFlagSearchHybridScoringFull",
-                                                         true};
+    unittest::ServerParameterGuard scoreFusionFlag{"featureFlagSearchHybridScoringFull", true};
     // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest rankFusionFlag{"featureFlagRankFusionFull", true};
+    unittest::ServerParameterGuard rankFusionFlag{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNoInputField) {

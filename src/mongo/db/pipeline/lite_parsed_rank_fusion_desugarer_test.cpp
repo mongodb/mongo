@@ -43,7 +43,7 @@
 #include "mongo/db/pipeline/lite_parsed_rank_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -91,12 +91,12 @@ protected:
     }
 
 private:
-    RAIIServerParameterControllerForTest featureFlagController1{"featureFlagRankFusionBasic", true};
-    RAIIServerParameterControllerForTest featureFlagController2{"featureFlagRankFusionFull", true};
+    unittest::ServerParameterGuard featureFlagController1{"featureFlagRankFusionBasic", true};
+    unittest::ServerParameterGuard featureFlagController2{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(LiteParsedRankFusionDesugarerTest, SinglePipelineBasic) {
-    RAIIServerParameterControllerForTest disableFull("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard disableFull("featureFlagRankFusionFull", false);
     BSONObj spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -371,7 +371,7 @@ TEST_F(LiteParsedRankFusionDesugarerTest, SinglePipelineFull) {
 }
 
 TEST_F(LiteParsedRankFusionDesugarerTest, MultiplePipelinesMixedBasic) {
-    RAIIServerParameterControllerForTest disableFull("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard disableFull("featureFlagRankFusionFull", false);
     BSONObj spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -673,7 +673,7 @@ TEST_F(LiteParsedRankFusionDesugarerTest, MultiplePipelinesMixedBasic) {
 }
 
 TEST_F(LiteParsedRankFusionDesugarerTest, CustomWeightsBasic) {
-    RAIIServerParameterControllerForTest disableFull("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard disableFull("featureFlagRankFusionFull", false);
     BSONObj spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -1295,7 +1295,7 @@ TEST_F(LiteParsedRankFusionDesugarerTest, ScoreDetailsSearchInputGeneratesScoreD
 TEST_F(LiteParsedRankFusionDesugarerTest, MultipleSortStagesRightmostMutated) {
     // The leading $sort here should NOT receive $_internalOutputSortKeyMetadata; only the
     // rightmost $sort is mutated.
-    RAIIServerParameterControllerForTest disableFull("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard disableFull("featureFlagRankFusionFull", false);
     BSONObj spec = fromjson(R"({
         $rankFusion: {
             input: {

@@ -47,6 +47,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
@@ -191,9 +192,8 @@ protected:
             .getOwned();
     };
 
-    RAIIServerParameterControllerForTest crudFeatureFlag{"featureFlagAuthoritativeShardsCRUD",
-                                                         true};
-    RAIIServerParameterControllerForTest ddlFeatureFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFeatureFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard ddlFeatureFlag{"featureFlagAuthoritativeShardsDDL", true};
 };
 
 TEST_F(AuthoritativeRefreshFixture, UntrackedIsCorrectlyRecoveredFromDisk) {
@@ -452,7 +452,7 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitDoesNotCountAsNoProgress) {
-    RAIIServerParameterControllerForTest maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
+    unittest::ServerParameterGuard maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -496,7 +496,7 @@ using AuthoritativeRefreshFixtureDeathTest = AuthoritativeRefreshFixture;
 DEATH_TEST_REGEX_F(AuthoritativeRefreshFixtureDeathTest,
                    PostDrainRetryCountsAgainstNoProgressBudget,
                    "Tripwire assertion.*Exhausted maximum number") {
-    RAIIServerParameterControllerForTest maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
+    unittest::ServerParameterGuard maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -1238,8 +1238,7 @@ TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
     auto* opCtx = operationContext();
 
     // Force the flag on so the bg thread picks the auth path on the first attempt.
-    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                            true);
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
     // Cached version matches received, so both the initial auth path (before we cancel it) and the
     // non-auth retry can complete from the local cache.
@@ -1261,8 +1260,8 @@ TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
     fp->waitForTimesEntered(initialTimesEntered + 1);
 
     // Flip the flag before cancelling so the outer retry dispatches to the non-auth path.
-    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                               false);
+    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
 
     FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
 
@@ -1279,8 +1278,8 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     auto* opCtx = operationContext();
 
     // Force the flag off so the bg thread picks the non-auth path on the first attempt.
-    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                               false);
+    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
 
     // Set a dbVersion lower than receivedDbVersion, to actually run the non-authoritative refresh.
     setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
@@ -1304,8 +1303,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(2, 0));
 
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
-    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                            true);
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
     FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
 
@@ -1322,8 +1320,7 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     auto* opCtx = operationContext();
 
     // Force the flag on so the bg thread picks the auth path on the first attempt.
-    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                            true);
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
     // Auth CSR with no metadata: forces the authoritative path to recover from disk.
     {
@@ -1358,8 +1355,8 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     }
 
     // Flip the flag before cancelling so the outer retry dispatches to the non-auth path.
-    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                               false);
+    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
 
     FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
 
@@ -1376,8 +1373,8 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
     auto* opCtx = operationContext();
 
     // Force the flag off so the bg thread picks the non-auth path on the first attempt.
-    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                               false);
+    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
 
     auto sharedMetadata =
         makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
@@ -1407,8 +1404,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
     }
 
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
-    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                            true);
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
     FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
 
@@ -1425,8 +1421,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
 TEST_F(RefreshCancellationFixture, MaxTimeMsOnOperationContextInterruptsRefresh) {
     auto* opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
-                                                            true);
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
     // Force the authoritative path to recover from disk and block.
     {

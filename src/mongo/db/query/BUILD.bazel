@@ -548,8 +548,8 @@ mongo_cc_library(
         ":query_planner_test_lib",
         "//src/mongo:base",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
@@ -670,7 +670,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
@@ -835,6 +835,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

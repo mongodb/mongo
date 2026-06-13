@@ -41,7 +41,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_ranker_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <utility>
@@ -94,11 +94,11 @@ TEST(PlanRankerTest, NoFetchBonus) {
 }
 
 TEST(PlanRankerTest, DistinctBonus) {
-    RAIIServerParameterControllerForTest shardFilteringDistinct(
-        "featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard shardFilteringDistinct("featureFlagShardFilteringDistinctScan",
+                                                          true);
 
     for (bool deferredExecEnabled : {false, true}) {
-        RAIIServerParameterControllerForTest deferredEngineChoice(
+        unittest::ServerParameterGuard deferredEngineChoice(
             "featureFlagGetExecutorDeferredEngineChoice", deferredExecEnabled);
         // Two plans: both fetch, one is a DISTINCT_SCAN, other is an IXSCAN.
         // DISTINCT_SCAN does 2 advances / 10 works.

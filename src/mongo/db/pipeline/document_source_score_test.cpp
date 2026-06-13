@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -54,10 +54,9 @@ namespace {
 class DocumentSourceScoreTest : service_context_test::WithSetupTransportLayer,
                                 public AggregationContextFixture {
 private:
-    RAIIServerParameterControllerForTest scoreFusionFlag{"featureFlagSearchHybridScoringFull",
-                                                         true};
+    unittest::ServerParameterGuard scoreFusionFlag{"featureFlagSearchHybridScoringFull", true};
     // Feature flag needed to use 'score' meta field
-    RAIIServerParameterControllerForTest rankFusionFlag{"featureFlagRankFusionFull", true};
+    unittest::ServerParameterGuard rankFusionFlag{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {

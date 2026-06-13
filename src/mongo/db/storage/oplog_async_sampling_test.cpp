@@ -48,6 +48,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -129,7 +130,7 @@ private:
         auto replCoord = std::make_unique<ReplicationCoordinatorMock>(service);
         ReplicationCoordinator::set(service, std::move(replCoord));
         // Turn on async mode
-        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        unittest::ServerParameterGuard oplogSamplingAsyncEnabledController(
             "oplogSamplingAsyncEnabled", true);
         repl::createOplog(_opCtx.get());
     }
@@ -140,8 +141,8 @@ private:
     }
 
     // Use 0ms yield interval (i.e. yield every next()) in tests.
-    RAIIServerParameterControllerForTest _zeroMsYield =
-        RAIIServerParameterControllerForTest("oplogSamplingAsyncYieldIntervalMs", 0);
+    unittest::ServerParameterGuard _zeroMsYield =
+        unittest::ServerParameterGuard("oplogSamplingAsyncYieldIntervalMs", 0);
     ServiceContext::UniqueOperationContext _opCtx;
     StorageInterfaceImpl _storage;
 };
@@ -150,8 +151,8 @@ private:
 // creates the initial set of markers.
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeBeginMarkerCreation) {
     // Turn on async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", true);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
@@ -180,8 +181,8 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeBeginMarke
 // Sampling method once initial marker creation has finished
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeInProgressState) {
     // Turn on async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", true);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
@@ -208,8 +209,8 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeInProgress
 // In async mode, we are still able to sample when expected, and some markers can be created.
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) {
     // Turn on async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", true);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
@@ -252,8 +253,8 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) 
 // returns empty OplogTruncateMarkers object)
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplogTruncateMarkers) {
     // Turn on async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", true);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
@@ -270,8 +271,8 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplo
 // When oplogSamplingAsyncEnabled is false, AttachedPersistenceProvider turns off async marker
 // generation; createOplogTruncateMarkers must then build the initial markers synchronously.
 TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_SynchronousPathWhenAsyncDisabled) {
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
 
@@ -290,8 +291,8 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_SynchronousPathWhenAsyncDi
 // Test that oplog cap maintainer thread kills the truncation markers if it instantiated them for
 // async sampling.
 TEST_F(AsyncOplogTruncationTest, ShutdownKillsMarkersAndClearsLocalOplogInfo) {
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", true);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
 
     // Populate the oplog so initial marker generation produces a real, non-empty markers object.
     insertOplog(1, 100);
@@ -344,8 +345,8 @@ TEST_F(AsyncOplogTruncationTest, ShutdownKillsMarkersAndClearsLocalOplogInfo) {
 // iterations, etc. Each iteration installs a fresh thread, lets it produce initial markers,
 // then immediately shuts it down and checks the post-shutdown state.
 TEST_F(AsyncOplogTruncationTest, ShutdownRacesWithLiveCapMaintainerThread) {
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", true);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       true);
 
     insertOplog(1, 100);
 

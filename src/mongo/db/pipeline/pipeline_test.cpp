@@ -80,9 +80,9 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -2952,7 +2952,7 @@ TEST_F(PipelineOptimizationTest,
     // The $addFields simply maps an array of objects to one containing their inner 'elementField'
     // scalar values . The $match stage on the reshaped array should not be swapped with $project to
     // preserve the original $elemMatch semantics.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagExposeArrayIndexInMapFilterReduce", true);
     std::string pipeline = R"(
 [
@@ -3034,7 +3034,7 @@ TEST_F(PipelineOptimizationTest,
     // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
     // the 'd' for $elemMatch as a modified dependency and so $match cannot be swapped with
     // $project.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagExposeArrayIndexInMapFilterReduce", true);
     std::string inputPipe = R"(
 [
@@ -3127,7 +3127,7 @@ TEST_F(PipelineOptimizationTest, MatchEqObjectCanNotSplitAcrossRenameWithMapAndP
 TEST_F(PipelineOptimizationTest, FeatureMatchEqObjectCanNotSplitAcrossRenameWithMapAndProject) {
     // The $project simply renames 'a.b' & 'a.c' to 'd.e' & 'd.f' but the dependency tracker reports
     // the 'd' for $eq as a modified dependency and so $match cannot be swapped with $project.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagExposeArrayIndexInMapFilterReduce", true);
     std::string inputPipe = R"(
 [
@@ -4396,7 +4396,7 @@ auto enablePipelineOptimizationAdditionalTestingRules() {
 
 // 'a' is unset, therefore it cannot have type array.
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
     std::string inputPipe =
         "["
@@ -4418,7 +4418,7 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArray) {
 
 // 'a' is computed and could be array or null (if $b is null).
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenCanBeArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
     std::string inputPipe =
         "["
@@ -4439,7 +4439,7 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenCanBeArray) {
 }
 
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArrayMultiple) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
     std::string inputPipe =
         "["
@@ -4464,7 +4464,7 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArrayMultiple) {
 }
 
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenMixedArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
     std::string inputPipe =
         "["
@@ -4495,7 +4495,7 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenMixedArray) {
 // After $set{x: 1}, x is known non-array, so {a: "$x.y"} is a safe rename. $match should push past
 // $addFields (but not past $set, since $set defines x).
 TEST_F(PipelineOptimizationTest, MatchSwapsPastComplexRenameWhenNonArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$set: {x: 1}},"
@@ -4520,7 +4520,7 @@ TEST_F(PipelineOptimizationTest, MatchSwapsPastComplexRenameWhenNonArray) {
 // After $set{x: 1}, x is known non-array. The subsequent $set{x: {y: 1}} inherits x's non-array
 // metadata and establishes x.y as non-array too, so {a: "$x.y.z"} is a safe rename.
 TEST_F(PipelineOptimizationTest, MatchSwapsPastDeeperComplexRenameWhenNonArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$set: {x: 1}},"
@@ -4547,7 +4547,7 @@ TEST_F(PipelineOptimizationTest, MatchSwapsPastDeeperComplexRenameWhenNonArray) 
 
 // Without proof that 'b' is not an array, $match should NOT push past deeper complex rename.
 TEST_F(PipelineOptimizationTest, DeeperComplexRenameNotPromotedWithoutProof) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$addFields: {a: '$b.c.d'}},"
@@ -4569,7 +4569,7 @@ TEST_F(PipelineOptimizationTest, DeeperComplexRenameNotPromotedWithoutProof) {
 // After $set{a: 1}, "a" is known non-array. The rename {"a.b": "$c"} has left-side dots,
 // but since "a" is proven non-array, the match on "a.b" can be rewritten to "c" and pushed down.
 TEST_F(PipelineOptimizationTest, MatchSwapsPastLeftDottedRenameWhenNonArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$set: {a: 1}},"
@@ -4594,7 +4594,7 @@ TEST_F(PipelineOptimizationTest, MatchSwapsPastLeftDottedRenameWhenNonArray) {
 // Both sides have dots: {"a.b": "$c.d"}. With proof that both "a" and "c" are non-array,
 // the match on "a.b" is rewritten to "c.d" and pushed down.
 TEST_F(PipelineOptimizationTest, MatchSwapsPastBothSidesDottedRenameWhenNonArray) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$set: {a: 1, c: 1}},"
@@ -4618,7 +4618,7 @@ TEST_F(PipelineOptimizationTest, MatchSwapsPastBothSidesDottedRenameWhenNonArray
 
 // Without proof that "a" is non-array, $match should NOT push past left-dotted rename.
 TEST_F(PipelineOptimizationTest, LeftDottedRenameNotPromotedWithoutProof) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$addFields: {'a.b': '$c'}},"
@@ -4639,7 +4639,7 @@ TEST_F(PipelineOptimizationTest, LeftDottedRenameNotPromotedWithoutProof) {
 
 // Without proof that 'b' is not an array, $match should NOT push past complex rename.
 TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWithoutProof) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$addFields: {a: '$b.c'}},"
@@ -4662,7 +4662,7 @@ TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWithoutProof) {
 // from that array path (e.g. {c: "$arr.b"}) should NOT allow $match to push past $project,
 // because the rename source prefix is always an array and the rename is unsafe to reverse.
 TEST_F(PipelineOptimizationTest, ComplexRenameNotPromotedWhenPipelineIntroducesArrays) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
     std::string inputPipe =
         "["
         " {$group: {_id: '$x', arr: {$push: '$b'}}},"
@@ -5570,7 +5570,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfAddFieldsOverwritesShardKe
 };
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfUsingAddFieldsWithoutShardFilteringDistinct) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", false);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", false);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
@@ -5583,7 +5583,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfUsingAddFieldsWithoutShard
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupIfUsingAddFields) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]", /*inputPipeJson*/
@@ -5596,7 +5596,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupIfUsingAddFields) {
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKey) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"_id"};
     doTest(
         "[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
@@ -5608,7 +5608,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKey) {
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKey) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
     doTest("[{$sort: {a: 1}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]", /*inputPipeJson*/
            "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}, "
@@ -5619,7 +5619,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKey) {
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInArray) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
     doTest("[{$sort: {a: 1}}, {$group: {_id: ['$a', '$b', '$c']}}]", /*inputPipeJson*/
            "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b', '$c'], $willBeMerged: "
@@ -5630,7 +5630,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInArray) {
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInNestedStructure) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
     doTest("[{$sort: {a: 1}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]", /*inputPipeJson*/
            "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}, "
@@ -5641,7 +5641,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInNestedStr
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyWithIrrelevantFieldsModified) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
     doTest(
         "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b', "
@@ -5654,7 +5654,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyWithIrrelev
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRenameProject) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a"};
     doTest(
         "[{$project:{'a':true, b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
@@ -5666,7 +5666,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRena
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRenameAddFields) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a"};
     doTest(
         "[{$addFields:{b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
@@ -5678,7 +5678,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRena
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithUnrelatedExclusion) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a"};
     doTest(
         "[{$project:{'c':false}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
@@ -5700,7 +5700,7 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfComputesValue) {
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithRenames) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$project: {rename: '$shardKey'}}"
@@ -5717,7 +5717,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithRenames) {
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMultipleRenames) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$project: {rename: '$shardKey'}}"
@@ -5734,7 +5734,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMultipleRenames) 
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMatchBetweenSortAndGroup) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$sort: {shardKey: 1}}, {$match: {shardKey: 'val'}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
@@ -5748,7 +5748,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMatchBetweenSortA
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithFirstAccumulator) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$sort: {shardKey: 1}}, {$group: {_id: '$shardKey', first: {$first: '$other'}}}]" /*inputPipeJson*/
@@ -5762,7 +5762,7 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithFirstAccumulator)
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithTopAccumulator) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
         "[{$sort: {shardKey: 1}}"
@@ -5863,8 +5863,8 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowMergeOnNullishValues", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
+                                                         true);
 
     const Timestamp timestamp{1, 1};
     getCatalogCacheMock()->setCollectionReturnValue(
@@ -5886,14 +5886,14 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithShardedCollection) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowMergeOnNullishValues", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
+                                                         true);
     doMergeWithCollectionWithRoutingTableTest(false /*unsplittable*/);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUnsplittableCollection) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagAllowMergeOnNullishValues", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
+                                                         true);
     doMergeWithCollectionWithRoutingTableTest(true /*unsplittable*/);
 };
 

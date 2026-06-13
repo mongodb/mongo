@@ -1032,7 +1032,7 @@ TEST_F(QueryPlannerTest, IntersectCanBeVeryBig) {
 // Ensure that disabling AND_SORTED intersection works properly.
 TEST_F(QueryPlannerTest, IntersectDisabledAndSort) {
     // Disable sort-based intersection.
-    RAIIServerParameterControllerForTest disableSortIntersection(
+    unittest::ServerParameterGuard disableSortIntersection(
         "internalQueryPlannerEnableSortIndexIntersection", false);
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
@@ -1088,9 +1088,9 @@ TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
 // Ensure that disabling AND_SORTED and AND_HASHED intersection works properly.
 TEST_F(QueryPlannerTest, IntersectDisabledAndSortAndHash) {
     // Disable sort and hash based intersection.
-    RAIIServerParameterControllerForTest disableSortIntersection(
+    unittest::ServerParameterGuard disableSortIntersection(
         "internalQueryPlannerEnableSortIndexIntersection", false);
-    RAIIServerParameterControllerForTest disableHashedIntersection(
+    unittest::ServerParameterGuard disableHashedIntersection(
         "internalQueryPlannerEnableHashIntersection", false);
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;

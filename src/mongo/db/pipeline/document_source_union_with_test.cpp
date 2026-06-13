@@ -56,8 +56,8 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -922,7 +922,7 @@ using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixtur
 
 TEST_F(DocumentSourceUnionWithServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto tenantId = TenantId(OID::gen());
     NamespaceString nss =
@@ -951,7 +951,7 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
 
 TEST_F(DocumentSourceUnionWithServerlessTest,
        CreateFromBSONContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     ASSERT(expCtx->getNamespaceString().tenantId());

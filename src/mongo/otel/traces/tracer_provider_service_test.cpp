@@ -30,9 +30,9 @@
 #include "mongo/otel/traces/tracer_provider_service.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/trace_settings.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -93,7 +93,7 @@ TEST(HttpInitTest, ResourceHasServiceInstanceId) {
 
 TEST(HttpInitTest, UserResourceAttributesAppearInProvider) {
     std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    RAIIServerParameterControllerForTest attrsParam{
+    unittest::ServerParameterGuard attrsParam{
         "openTelemetryTracingResourceAttributes",
         BSON("deployment.environment" << "staging" << "custom.key" << "custom-val")};
 
@@ -109,7 +109,7 @@ TEST(HttpInitTest, UserResourceAttributesAppearInProvider) {
 
 TEST(HttpInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
     std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    RAIIServerParameterControllerForTest attrsParam{
+    unittest::ServerParameterGuard attrsParam{
         "openTelemetryTracingResourceAttributes",
         BSON("service.name" << "user-supplied-name" << "service.instance.id" << "user-pid"
                             << "custom.key" << "custom-val")};
@@ -146,8 +146,8 @@ TEST(FileInitTest, ResourceHasServiceInstanceId) {
 
 TEST(FileInitTest, UserResourceAttributesAppearInProvider) {
     std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    RAIIServerParameterControllerForTest attrsParam{"openTelemetryTracingResourceAttributes",
-                                                    BSON("deployment.environment" << "production")};
+    unittest::ServerParameterGuard attrsParam{"openTelemetryTracingResourceAttributes",
+                                              BSON("deployment.environment" << "production")};
 
     TempDir dir("tmp");
     ASSERT_OK(service->initializeFile(kServiceName, dir.path()));
@@ -159,7 +159,7 @@ TEST(FileInitTest, UserResourceAttributesAppearInProvider) {
 
 TEST(FileInitTest, UserAttributeOverrideServiceNameAndPidOverride) {
     std::unique_ptr<TracerProviderService> service = TracerProviderService::create();
-    RAIIServerParameterControllerForTest attrsParam{
+    unittest::ServerParameterGuard attrsParam{
         "openTelemetryTracingResourceAttributes",
         BSON("service.name" << "user-supplied-name" << "service.instance.id" << "user-pid"
                             << "custom.key" << "custom-val")};

@@ -784,7 +784,7 @@ public:
     void testExpiryAfterrefreshHighestTrackedRecord() {
 
         // Turn off async mode
-        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        unittest::ServerParameterGuard oplogSamplingAsyncEnabledController(
             "oplogSamplingAsyncEnabled", false);
 
         const auto expireAfterSeconds = getExpireAfterSeconds();
@@ -823,7 +823,7 @@ public:
 
     void testExpiryOneRecordOneWholeMarker() {
         // Turn off async mode
-        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        unittest::ServerParameterGuard oplogSamplingAsyncEnabledController(
             "oplogSamplingAsyncEnabled", false);
 
         const auto expireAfterSeconds = getExpireAfterSeconds();

@@ -48,11 +48,11 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/expression_type.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
@@ -1566,7 +1566,7 @@ TEST(BSONValidateColumn, BSONColumnWithObjectNestedCodeWScope) {
 
 TEST(BSONValidateColumn, BSONColumnMemLimitSingleElem) {
     const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
+    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", memLimit);
 
     // Use empty field name to mimic how elements are stored in a BSONColumn. The element is stored
     // twice, in the column binary and as first uncompressed element. Use a size below half of
@@ -1589,7 +1589,7 @@ TEST(BSONValidateColumn, BSONColumnMemLimitSingleElem) {
 
 TEST(BSONValidateColumn, BSONColumnMemLimitManyRepeated) {
     const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
+    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", memLimit);
 
     // Use empty field name to mimic how elements are stored in a BSONColumn.
     BSONObj obj = BSON("" << std::string(1024, 'x'));
@@ -1606,7 +1606,7 @@ TEST(BSONValidateColumn, BSONColumnMemLimitManyRepeated) {
 
 TEST(BSONValidateColumn, BSONColumnMemLimitAllSkip) {
     const long long memLimit = 1024 * 15;  // 15KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
+    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", memLimit);
 
     BSONElement elem;
     size_t elemSize = sizeof(boost::optional<BSONElement>);
@@ -1622,7 +1622,7 @@ TEST(BSONValidateColumn, BSONColumnMemLimitAllSkip) {
 
 TEST(BSONValidateColumn, BSONColumnMemLimitInterleaved) {
     const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
+    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", memLimit);
 
     // Use empty field name to mimic how elements are stored in a BSONColumn.
     BSONObj obj = BSON("" << BSON("a" << std::string(1024, 'x') << "b" << 1.0));
@@ -1639,7 +1639,7 @@ TEST(BSONValidateColumn, BSONColumnMemLimitInterleaved) {
 
 TEST(BSONValidateColumn, BSONColumnMemLimitInterleavedRestart) {
     const long long memLimit = 256 * 1024;  // 256KB
-    RAIIServerParameterControllerForTest memLimitParam("bsonMaxExpandedMemUsage", memLimit);
+    unittest::ServerParameterGuard memLimitParam("bsonMaxExpandedMemUsage", memLimit);
 
     // Use empty field name to mimic how elements are stored in a BSONColumn.
     BSONObj obj = BSON("" << BSON("a" << std::string(1024, 'x') << "b" << 1.0));

@@ -32,8 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
@@ -491,7 +491,7 @@ TEST(DocumentMetadataFieldsTest, MetadataIsMarkedModifiedOnMergeWith) {
 TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
     // Tests that for certain types of metadata fields, related to a score,
     // the 'score' metadata is also set.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     // 'searchScore'
     {
@@ -523,7 +523,7 @@ TEST(DocumentMetadataFieldsTest, ScoreMetadataSetOnOtherMetadataTest) {
 
 // TODO SERVER-85426 Remove this test when the feature flag is removed.
 TEST(DocumentMetadataFieldsTest, FFGatedFieldsNotSetWithoutFlag) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
 
     DocumentMetadataFields metadata;
     metadata.setScore(10);
@@ -545,7 +545,7 @@ TEST(DocumentMetadataFieldsTest, FFGatedFieldsNotSetWithoutFlag) {
 }
 
 TEST(DocumentMetadataFieldsTest, ScoreDetailsWithScoreMetadataTest) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScoreDetails());
@@ -568,7 +568,7 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsWithScoreMetadataTest) {
 TEST(DocumentMetadataFieldsTest, ScoreDetailsMetadataSetOnOtherMetadataTest) {
     // Tests that setting "searchScoreDetails" also sets "scoreDetails" but does not set "score" or
     // "searchScore".
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasSearchScoreDetails());
@@ -586,7 +586,7 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsMetadataSetOnOtherMetadataTest) {
 }
 
 TEST(DocumentMetadataFieldsTest, ScoreDetailsAloneMetadataTest) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     {
         DocumentMetadataFields metadata;
         metadata.setScoreDetails(Value(BSON("value" << 5 << "otherDetails" << 10)));
@@ -664,7 +664,7 @@ TEST(DocumentMetadataFieldsTest, ScoreDetailsAloneMetadataTest) {
 TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
     // Tests that setting "searchScoreDetails" also sets "scoreDetails" but does not set "score" or
     // "searchScore".
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     DocumentMetadataFields metadata;
     ASSERT_FALSE(metadata.hasScoreDetails());
@@ -682,7 +682,7 @@ TEST(DocumentMetadataFieldsTest, SettingScoreDetailsWithScoreOverridesScore) {
 DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsNonNumeric,
                  "Tripwire assertion.*9679300") {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     DocumentMetadataFields metadata;
     metadata.setScoreAndScoreDetails(Value(BSON("value" << "string")));
 }
@@ -690,7 +690,7 @@ DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
 DEATH_TEST_REGEX(DocumentMetadataFieldsTestDeathTest,
                  ScoreDetailsWithScoreMetadataFailsIfScoreValueIsMissing,
                  "Tripwire assertion.*9679300") {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     DocumentMetadataFields metadata;
     metadata.setScoreAndScoreDetails(Value(BSON("non-value" << "string")));
 }

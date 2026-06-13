@@ -58,7 +58,7 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -146,11 +146,11 @@ private:
     std::vector<std::unique_ptr<QuerySolution>> _bestCBRPlan;
 
     // Run all tests with hash-based intersection enabled.
-    RAIIServerParameterControllerForTest _enableHashIntersection{
+    unittest::ServerParameterGuard _enableHashIntersection{
         "internalQueryPlannerEnableHashIntersection", true};
 
     // Configure Sampling CE with a large sample
-    RAIIServerParameterControllerForTest _samplingMarginOfError{"samplingMarginOfError", 1.0};
+    unittest::ServerParameterGuard _samplingMarginOfError{"samplingMarginOfError", 1.0};
 
     DBDirectClient _client;
 };
@@ -239,8 +239,8 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest _internalQueryMaxBlockingSortMemoryUsageBytes;
-    RAIIServerParameterControllerForTest _internalQueryPlanEvaluationMaxResults;
+    unittest::ServerParameterGuard _internalQueryMaxBlockingSortMemoryUsageBytes;
+    unittest::ServerParameterGuard _internalQueryPlanEvaluationMaxResults;
 };
 
 /**
@@ -275,9 +275,9 @@ public:
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedPlan, cbrSoln->root()).isOK());
 
         // Turn on the "force intersect" option.
-        RAIIServerParameterControllerForTest forceIntersectionPlans{
-            "internalQueryForceIntersectionPlans", true};
-        RAIIServerParameterControllerForTest enableSortIntersection{
+        unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
+                                                              true};
+        unittest::ServerParameterGuard enableSortIntersection{
             "internalQueryPlannerEnableSortIndexIntersection", true};
 
         // And run the same query again.
@@ -328,8 +328,8 @@ public:
 
         // Turn on the "force intersect" option.
         // This will be reverted by PlanRankingTestBase's destructor when the test completes.
-        RAIIServerParameterControllerForTest forceIntersectionPlans{
-            "internalQueryForceIntersectionPlans", true};
+        unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
+                                                              true};
 
         const std::string expectedMPPlan(
             "{fetch: {node: {andHash: {nodes: ["

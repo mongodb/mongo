@@ -33,8 +33,8 @@
 #include "mongo/db/extension/host/mongot_extension_signing_key.h"
 #include "mongo/db/extension/host/rnp/rnp.h"
 #include "mongo/db/server_options.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -80,13 +80,13 @@ public:
     }
 
     void disableFeatureFlag() {
-        _featureFlagExtensionsApiSignatureValidation = RAIIServerParameterControllerForTest{
-            "featureFlagExtensionsApiSignatureValidation", false};
+        _featureFlagExtensionsApiSignatureValidation =
+            unittest::ServerParameterGuard{"featureFlagExtensionsApiSignatureValidation", false};
     }
 
 private:
     std::string _previousExtensionsSignaturePublicKeyPath{""};
-    RAIIServerParameterControllerForTest _featureFlagExtensionsApiSignatureValidation{
+    unittest::ServerParameterGuard _featureFlagExtensionsApiSignatureValidation{
         "featureFlagExtensionsApiSignatureValidation", true};
 };
 

@@ -38,7 +38,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -187,7 +187,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslationInvalidMod) {
 
 // Check that timeseries options are correctly translated to a new CollMod.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", true);
 
     auto collModTimeseries = CollModTimeseries();
@@ -229,9 +229,9 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
 // If timeseries translation and view translation are both required, both should be executed.
 // TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndView) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", true);
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     auto collModTimeseries = CollModTimeseries();

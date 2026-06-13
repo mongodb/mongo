@@ -36,7 +36,6 @@
 #include "mongo/db/exec/expression/evaluate_test_helpers.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/summation.h"
 

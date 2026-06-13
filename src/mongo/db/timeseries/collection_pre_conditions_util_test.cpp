@@ -67,7 +67,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, NonTimeseriesCollection) {
 
 // TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     CreateCommand cmd = CreateCommand(viewfulTsNss);
@@ -86,7 +86,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) {
-    RAIIServerParameterControllerForTest queryKnobController{
+    unittest::ServerParameterGuard queryKnobController{
         "featureFlagCreateViewlessTimeseriesCollections", true};
 
     CreateCommand cmd = CreateCommand(viewlessTsNss);
@@ -104,7 +104,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) 
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreConditionsCreated) {
-    RAIIServerParameterControllerForTest queryKnobController{
+    unittest::ServerParameterGuard queryKnobController{
         "featureFlagCreateViewlessTimeseriesCollections", true};
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
         _opCtx, viewlessTsNss, /*expectedUUID=*/boost::none);
@@ -129,7 +129,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreCondi
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, DetectWhenCollectionIsDroppedAndReacquired) {
-    RAIIServerParameterControllerForTest queryKnobController{
+    unittest::ServerParameterGuard queryKnobController{
         "featureFlagCreateViewlessTimeseriesCollections", true};
     CreateCommand cmd = CreateCommand(viewlessTsNss);
     uassertStatusOK(createCollection(_opCtx, cmd));

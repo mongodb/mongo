@@ -33,7 +33,7 @@
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -95,6 +95,6 @@ public:
 
 private:
     // Ensure path arrayness is enabled for all tests.
-    RAIIServerParameterControllerForTest queryKnobController{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard queryKnobController{"featureFlagPathArrayness", true};
 };
 }  // namespace mongo::join_ordering

@@ -37,8 +37,8 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -247,7 +247,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForGeoDistanceSort) {
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "searchScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldSearchScore << 10.3)));
@@ -255,7 +255,7 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForVectorSearchScoreSort) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta" << "vectorSearchScore")), nullptr);
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldVectorSearchScore << 10.3)));

@@ -55,8 +55,8 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/time_support.h"
@@ -2606,8 +2606,7 @@ void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) 
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDefaultPrependAndCallback) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(_nss,
@@ -2618,8 +2617,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDoNothingAndCallback) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(_nss,
@@ -2630,8 +2628,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        ViewPipelineValidatorAcceptsOnlyMatchAddFieldsSetStages) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
 
     // Valid: $match and $addFields (and $set) are allowed.
     runViewPipelineValidatorCallback({BSON("$match" << BSON("x" << 1))});
@@ -2645,8 +2642,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, ViewPipelineValidatorRejectsDisallowedStages) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
 
     ASSERT_THROWS(runViewPipelineValidatorCallback({BSON("$project" << BSON("x" << 1))}),
                   AssertionException);
@@ -3249,7 +3245,7 @@ const BSONObj LogicalStageWithFilter::kFilter = BSON("x" << 1);
 }  // namespace
 
 TEST_F(DocumentSourceExtensionOptimizableTest, GetQuery_SourceStageNoFilter) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsOptimizations", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsOptimizations", true};
     auto logicalStage = new sdk::ExtensionLogicalAggStageAdapter(
         std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>());
     auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
@@ -3263,7 +3259,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, GetQuery_SourceStageNoFilter) {
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, GetQuery_SourceStageWithFilter) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsOptimizations", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsOptimizations", true};
     auto logicalStage =
         new sdk::ExtensionLogicalAggStageAdapter(std::make_unique<LogicalStageWithFilter>());
     auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
@@ -3277,7 +3273,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, GetQuery_SourceStageWithFilter) {
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, GetFilter_TransformStageWithFilter) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsOptimizations", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsOptimizations", true};
     auto logicalStage =
         new sdk::ExtensionLogicalAggStageAdapter(std::make_unique<LogicalStageWithFilter>());
     auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
@@ -3333,8 +3329,8 @@ class DocumentSourceExtensionOptimizableInLookupKickbackTest
     : public DocumentSourceExtensionOptimizableTest {
 protected:
     void runKickbackCase(bool hybridFlagEnabled, std::string_view stageName, bool expectKickback) {
-        RAIIServerParameterControllerForTest hybridFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                        hybridFlagEnabled};
+        unittest::ServerParameterGuard hybridFlag{"featureFlagExtensionsInsideHybridSearch",
+                                                  hybridFlagEnabled};
         auto expCtx = getExpCtx();
         expCtx->setInLookup(true);
 

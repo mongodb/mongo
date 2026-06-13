@@ -70,10 +70,10 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1205,9 +1205,9 @@ TEST_F(WiredTigerKVEngineDirectoryTest, HandlesNestedDirectories) {
 
 TEST_F(WiredTigerKVEngineTest, CheckSessionCacheMax) {
 
-    RAIIServerParameterControllerForTest sessionCacheMax{"wiredTigerSessionCacheMaxPercentage", 20};
-    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", 150};
-    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax", 10};
+    unittest::ServerParameterGuard sessionCacheMax{"wiredTigerSessionCacheMaxPercentage", 20};
+    unittest::ServerParameterGuard sessionMax{"wiredTigerSessionMax", 150};
+    unittest::ServerParameterGuard reservedSession{"wiredTigerReservedSessionMax", 10};
     _helper->restartEngine();
 
     auto* engine = _helper->getWiredTigerKVEngine();
@@ -1585,7 +1585,7 @@ TEST_F(WiredTigerKVEngineTest, AllowUntimestampedWritesWithServerParam) {
     ON_BLOCK_EXIT([initialStorageGlobalParamsDotMagicRestore] {
         storageGlobalParams.magicRestore = initialStorageGlobalParamsDotMagicRestore;
     });
-    RAIIServerParameterControllerForTest controller("allowUnsafeUntimestampedWrites", true);
+    unittest::ServerParameterGuard controller("allowUnsafeUntimestampedWrites", true);
 
     storageGlobalParams.magicRestore = false;
     // Standalone mode without oplog recovery is the only case that permits untimestamped writes.
@@ -1626,7 +1626,7 @@ TEST_F(WiredTigerKVEngineTest, AllowUntimestampedWritesWithoutServerParam) {
     ON_BLOCK_EXIT([initialStorageGlobalParamsDotMagicRestore] {
         storageGlobalParams.magicRestore = initialStorageGlobalParamsDotMagicRestore;
     });
-    RAIIServerParameterControllerForTest controller("allowUnsafeUntimestampedWrites", false);
+    unittest::ServerParameterGuard controller("allowUnsafeUntimestampedWrites", false);
 
     storageGlobalParams.magicRestore = false;
     // Standalone mode without oplog recovery is the only case that permits untimestamped writes.

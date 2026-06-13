@@ -46,8 +46,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -369,7 +369,7 @@ protected:
     void testSbeFullOnAndOffFn(std::function<void(bool)> testFn) {
         try {
             for (auto value : {false, true}) {
-                RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", value);
+                unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", value);
                 LOGV2(9049201,
                       "Running test with 'featureFlagSbeFull' set to {value}",
                       "value"_attr = value);
@@ -547,7 +547,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachB
 
 TEST_F(ClassicRuntimePlannerForSbeTest,
        SubPlannerPicksCachedPlanForWholeQueryWhenSbePlanCacheEnabled) {
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     setUpSubPlannerTest();
 
     getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
@@ -559,7 +559,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest,
 }
 
 TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerCachesEachBranchWhenSbePlanCacheEnabled) {
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", false);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", false);
     setUpSubPlannerTest();
 
     getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
@@ -594,7 +594,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
 
     setUpCachedPlannerTest();
 
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", false);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", false);
 
     auto [cqForCacheWrite, plannerDataForCacheWrite] = createPlannerData();
     auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
@@ -653,7 +653,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
     // Ensures that cache entries are available immediately.
     bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
     ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", false);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", false);
 
     setUpCachedPlannerTest();
 

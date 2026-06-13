@@ -49,8 +49,8 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/match_processor.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -439,8 +439,8 @@ TEST_F(PipelineIsEOFTest, BoundedSortWithLimitEagerlyReportsEOF) {
 }
 
 TEST_F(PipelineIsEOFTest, SpillingSortReportsEOF) {
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 3 * 1024};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   3 * 1024};
 
     unittest::TempDir tempDir("ExecPipelineSpillingSortTest");
     auto expCtx = getExpCtx();

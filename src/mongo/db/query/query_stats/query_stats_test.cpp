@@ -40,7 +40,7 @@
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -64,7 +64,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
     query_shape::FindCmdShape findShape(*parsedFind, expCtx);
 
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStats", true);
     auto& opDebug = CurOp::get(*opCtx)->debug();
     ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, false);
 
@@ -239,17 +239,17 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     auto opCtx = makeOperationContext();
 
     {
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
         ASSERT_EQ(rateLimiter.getSamplingRate(), 42);
     }
 
     {  // Test that window-based rate limiting will be elected when sampling rate is set to 0.0
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kWindowBasedPolicy);
@@ -258,9 +258,9 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
 
     {  // Test that sampling-based rate limiting takes precedence over window-based policy when both
        // are enabled.
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
@@ -268,9 +268,9 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test idempotency when both parameters are set but being set in different order.
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
-        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 10);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.042);
+        unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 10);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
@@ -278,9 +278,9 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 
     {  // Test that query stats is disabled when both rate limit and sample rate are set to 0.
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest rateLimitCtrl("internalQueryStatsRateLimit", 0.0);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard rateLimitCtrl("internalQueryStatsRateLimit", 0.0);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsSampleRate", 0.0);
 
         auto& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
         ASSERT_EQ(rateLimiter.getPolicyType(), RateLimiter::kWindowBasedPolicy);
@@ -294,9 +294,9 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     auto serviceCtx = opCtx->getServiceContext();
 
     {
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
-                                                            0.042);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
+                                                      0.042);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
         ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
@@ -304,9 +304,8 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     }
 
     {  // Full sampling rate of 1.0 should yield a per-thousand rate of 1000.
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
-                                                            1.0);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate", 1.0);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
         ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
@@ -314,9 +313,8 @@ TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
     }
 
     {  // A rate of 0.0 should disable write command sampling.
-        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
-        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
-                                                            0.0);
+        unittest::ServerParameterGuard flagCtrl("featureFlagQueryStats", true);
+        unittest::ServerParameterGuard sampleRateCtrl("internalQueryStatsWriteCmdSampleRate", 0.0);
 
         auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
         ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);

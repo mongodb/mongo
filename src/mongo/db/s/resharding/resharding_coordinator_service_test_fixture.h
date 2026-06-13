@@ -57,9 +57,9 @@
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/executor/mock_async_rpc.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
@@ -829,7 +829,7 @@ protected:
 
     Timestamp _cloneTimestamp = Timestamp(Date_t::now());
 
-    RAIIServerParameterControllerForTest _serverParamController{
+    unittest::ServerParameterGuard _serverParamController{
         "reshardingMinimumOperationDurationMillis", 0};
 
     long long _term = 0;

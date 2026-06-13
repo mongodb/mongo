@@ -77,7 +77,7 @@ protected:
 };
 
 TEST_F(PersistedSizeCountTest, UuidExistsInSizeCountStore) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     constexpr int expectedCount = 5;
     int expectedSize = 0;

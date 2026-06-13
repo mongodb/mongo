@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/op_observer/op_observer_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -36,14 +36,12 @@ namespace mongo {
 namespace {
 
 TEST(ShouldSetIsTimeseriesFieldTest, FCVInitializedFeatureFlagOff) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagMarkTimeseriesEventsInOplog",
-                                                     false);
+    unittest::ServerParameterGuard featureFlag("featureFlagMarkTimeseriesEventsInOplog", false);
     EXPECT_FALSE(shouldSetIsTimeseriesField(VersionContext{}));
 }
 
 TEST(ShouldSetIsTimeseriesFieldTest, FCVInitializedFeatureFlagOn) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagMarkTimeseriesEventsInOplog",
-                                                     true);
+    unittest::ServerParameterGuard featureFlag("featureFlagMarkTimeseriesEventsInOplog", true);
     EXPECT_TRUE(shouldSetIsTimeseriesField(VersionContext{}));
 }
 

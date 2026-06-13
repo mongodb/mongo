@@ -114,6 +114,14 @@ mongo_cc_library(
     #AIB_COMPONENT="benchmarks",
 )
 
+mongo_cc_library(
+    name = "server_parameter_guard",
+    hdrs = ["server_parameter_guard.h"],
+    deps = [
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
 idl_generator(
     name = "integration_test_main_gen",
     src = "integration_test_main.idl",

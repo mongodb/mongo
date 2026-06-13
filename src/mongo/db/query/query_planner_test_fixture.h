@@ -358,9 +358,9 @@ protected:
     ServiceContext::UniqueOperationContext opCtx;
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
-    RAIIServerParameterControllerForTest enableHashIntersection{
+    unittest::ServerParameterGuard enableHashIntersection{
         "internalQueryPlannerEnableHashIntersection", true};
-    RAIIServerParameterControllerForTest enableSortIntersection{
+    unittest::ServerParameterGuard enableSortIntersection{
         "internalQueryPlannerEnableSortIndexIntersection", true};
 
     BSONObj queryObj;

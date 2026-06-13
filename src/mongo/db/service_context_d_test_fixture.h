@@ -36,7 +36,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -187,7 +187,7 @@ public:
         bool _enableSpillEngine = !TestingProctor::instance().isEnabled();
         bool _createShardingState = true;
         std::vector<std::unique_ptr<ServiceContext::ClientObserver>> _clientObservers;
-        std::vector<RAIIServerParameterControllerForTest> _parameters;
+        std::vector<unittest::ServerParameterGuard> _parameters;
         std::unique_ptr<rss::PersistenceProvider> _persistenceProvider;
     };
 

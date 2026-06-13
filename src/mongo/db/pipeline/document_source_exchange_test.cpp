@@ -48,10 +48,10 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/time_support.h"
@@ -250,10 +250,9 @@ TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumer) {
 }
 
 TEST_F(DocumentSourceExchangeTest, SimpleExchangeNConsumerMemoryTracking) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
-    RAIIServerParameterControllerForTest curOpWriteBytes(
-        "internalQueryMaxWriteToCurOpMemoryUsageBytes", 64);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
 
     // Create a pipeline that uses group, which will track memory.
     const size_t nInputDocs = 500;

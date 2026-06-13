@@ -37,9 +37,9 @@
 #include "mongo/db/query/query_stats/mock_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -80,11 +80,11 @@ public:
     ServiceContext::UniqueOperationContext opCtxHolder;
     OperationContext* opCtx;
     // Enable collection of query stats for updates.
-    RAIIServerParameterControllerForTest controller{"featureFlagQueryStatsUpdateCommand", true};
+    unittest::ServerParameterGuard controller{"featureFlagQueryStatsUpdateCommand", true};
     // Enable collection of query stats for inserts.
-    RAIIServerParameterControllerForTest insertController{"featureFlagQueryStatsInsert", true};
+    unittest::ServerParameterGuard insertController{"featureFlagQueryStatsInsert", true};
     // Enable collection of query stats for deletes.
-    RAIIServerParameterControllerForTest deleteFlag{"featureFlagQueryStatsDelete", true};
+    unittest::ServerParameterGuard deleteFlag{"featureFlagQueryStatsDelete", true};
 };
 
 /**
@@ -617,8 +617,7 @@ INSTANTIATE_TEST_SUITE_P(RegisterRequestSuite,
 
 TEST_F(WriteCmdQueryStatsRegistrarTest, DoesNotRegisterInsertRequestWhenFeatureFlagOff) {
     // Override the fixture's insert flag controller to disable it for this test.
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagQueryStatsInsert",
-                                                               false};
+    unittest::ServerParameterGuard featureFlagController{"featureFlagQueryStatsInsert", false};
 
     auto insert = fromjson(R"({
         insert: "testColl",
@@ -640,7 +639,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, DoesNotRegisterInsertRequestWhenFeatureF
 
 TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenFlagDisabled) {
     // Disable the delete feature flag for this test.
-    RAIIServerParameterControllerForTest disabledFlag{"featureFlagQueryStatsDelete", false};
+    unittest::ServerParameterGuard disabledFlag{"featureFlagQueryStatsDelete", false};
 
     auto deleteCmd = fromjson(R"({
         delete: "testColl",

@@ -37,8 +37,8 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/join_thread.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -155,7 +155,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireCollectionThroughBucketsNss) {
 TEST_F(TimeseriesCatalogHelperTest, acquireLegacyTimeseriesThroughMainNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     // Create legacy (viewful) timeseries collection.
@@ -179,7 +179,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireLegacyTimeseriesThroughMainNss) {
 TEST_F(TimeseriesCatalogHelperTest, acquireLegacyTimeseriesThroughBucketsNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     // Create legacy (viewful) timeseries collection.
@@ -204,7 +204,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireLegacyTimeseriesThroughBucketsNss) {
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughMainNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     // Create timeseries buckets collection only (no associated view).
@@ -229,7 +229,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughMainNss)
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughBucketsNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     // Create timeseries buckets collection only (no associated view).
@@ -253,7 +253,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughBucketsN
 TEST_F(TimeseriesCatalogHelperTest, acquireViewlessTimeseriesThroughMainNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     CreateCommand cmd(_mainNss);
@@ -276,7 +276,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireViewlessTimeseriesThroughMainNss) {
 TEST_F(TimeseriesCatalogHelperTest, acquireViewlessTimeseriesThroughBucketsNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     CreateCommand cmd(_mainNss);
@@ -367,7 +367,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireViewThroughBucketsNss) {
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughBucketsNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     {
@@ -393,7 +393,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughBuc
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughMainNss) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     {
@@ -417,7 +417,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutTsOptionsThroughMai
 TEST_F(TimeseriesCatalogHelperTest, acquireWithUpgradeDowngrade) {
     auto opCtx = operationContext();
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         // Create legacy (viewful) timeseries collection.
         CreateCommand cmd(_mainNss);
@@ -430,12 +430,12 @@ TEST_F(TimeseriesCatalogHelperTest, acquireWithUpgradeDowngrade) {
         auto newOpCtx = client->makeOperationContext();
         while (_upgradeDowngradeInBackground.load()) {
             {
-                RAIIServerParameterControllerForTest featureFlagController(
+                unittest::ServerParameterGuard featureFlagController(
                     "featureFlagCreateViewlessTimeseriesCollections", true);
                 timeseries::upgradeToViewlessTimeseries(newOpCtx.get(), _mainNss);
             }
             {
-                RAIIServerParameterControllerForTest featureFlagController(
+                unittest::ServerParameterGuard featureFlagController(
                     "featureFlagCreateViewlessTimeseriesCollections", false);
                 timeseries::downgradeFromViewlessTimeseries(newOpCtx.get(), _mainNss);
             }
@@ -487,7 +487,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnPlainViewHasSystemVie
 TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnViewfulTimeseriesHasSystemViews) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     CreateCommand cmd(_mainNss);
@@ -506,7 +506,7 @@ TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnViewfulTimeseriesHasS
 TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnViewlessTimeseriesHasNoSystemViews) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     CreateCommand cmd(_mainNss);

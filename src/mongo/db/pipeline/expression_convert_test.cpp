@@ -44,8 +44,8 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -340,8 +340,7 @@ TEST_F(ExpressionConvertTest, ConvertWithBaseOptimizesToExpressionConstant) {
 }
 
 TEST_F(ExpressionConvertTest, ConvertBinDataToIntFeatureFlagOffFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBinDataConvertNumeric", false);
 
     auto expCtx = getExpCtx();
 
@@ -353,8 +352,7 @@ TEST_F(ExpressionConvertTest, ConvertBinDataToIntFeatureFlagOffFails) {
 }
 
 TEST_F(ExpressionConvertTest, ConvertIntToBindataFeatureFlagOffFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBinDataConvertNumeric", false);
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'little'}}");
@@ -365,8 +363,7 @@ TEST_F(ExpressionConvertTest, ConvertIntToBindataFeatureFlagOffFails) {
 }
 
 TEST_F(ExpressionConvertTest, ConvertBinDataToLongFeatureFlagOffFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBinDataConvertNumeric", false);
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'long', byteOrder: 'little'}}");
@@ -377,8 +374,7 @@ TEST_F(ExpressionConvertTest, ConvertBinDataToLongFeatureFlagOffFails) {
 }
 
 TEST_F(ExpressionConvertTest, ConvertLongToBinDataFeatureFlagOffFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBinDataConvertNumeric", false);
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}");
@@ -389,8 +385,7 @@ TEST_F(ExpressionConvertTest, ConvertLongToBinDataFeatureFlagOffFails) {
 }
 
 TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleFeatureFlagOffFails) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagBinDataConvertNumeric", false);
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}");

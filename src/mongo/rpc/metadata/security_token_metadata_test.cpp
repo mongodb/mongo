@@ -40,9 +40,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -80,7 +80,7 @@ protected:
 };
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenSingletenancy) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", false);
 
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
@@ -93,8 +93,8 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenSingletenancy) {
 }
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", false);
 
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
@@ -108,8 +108,8 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
 }
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenTestTokensNotAvailable) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
 
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
@@ -123,10 +123,9 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenTestTokensNotAvailable) {
 }
 
 TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const auto kTenantId = TenantId(OID::gen());
     const auto kPingBody = BSON(kPingFieldName << 1);

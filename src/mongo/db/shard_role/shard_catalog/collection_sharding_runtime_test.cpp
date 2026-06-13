@@ -73,9 +73,9 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -669,7 +669,7 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
     // current shard version, when the ff AddTransactionRuntimeContextAsAGenericArgument is
     // enabled, meaning that the placementConflictTime is retrieved from the TransactionParticipant.
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
 
         runWithinTxn(operationContext(), LogicalTime(collectionTimestamp + 1), [&]() {
@@ -701,7 +701,7 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
     // current shard version, when the ff AddTransactionRuntimeContextAsAGenericArgument is
     // disabled, meaning that the placementConflictTime is retrieved from the ShardVersion object.
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
 
         // Valid placementConflictTime (equal or later than collection timestamp).
@@ -1263,7 +1263,7 @@ protected:
     }
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> _featureFlagScope;
+    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
 };
 
 INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,

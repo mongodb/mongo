@@ -41,10 +41,10 @@
 #include "mongo/db/query/query_stats/mock_key.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -704,8 +704,7 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
 
     ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
@@ -729,8 +728,7 @@ TEST(CurOpTest, CanReadMemoryStatsWithoutFeatureFlag) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
 
     ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
@@ -740,8 +738,7 @@ DEATH_TEST(CurOpTestDeathTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "ta
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
     curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
 }
 
@@ -750,8 +747,7 @@ DEATH_TEST(CurOpTestDeathTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "ta
  * the profiler.
  */
 TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -779,8 +775,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
 }
 
 TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
     auto curOp = CurOp::get(*opCtx);
@@ -808,10 +803,9 @@ TEST(CurOpTest, ReportStateIncludesMemoryStatsIfNonZero) {
 }
 
 TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
 
     QueryTestServiceContext serviceContext;
     auto tickSourcePtr = dynamic_cast<TickSourceMock<Nanoseconds>*>(
@@ -1171,7 +1165,7 @@ TEST(CurOpTest, ElapsedTimeReflectsTickSource) {
 }
 
 TEST(CurOpTest, CheckNSAgainstSerializationContext) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     TenantId tid = TenantId(OID::gen());
 
     QueryTestServiceContext serviceContext;
@@ -1376,10 +1370,9 @@ TEST(CurOpTest, OpDebugAllowsMultipleAdditiveMetrics) {
  * Characterize the full set of metrics collected by setEndOfOpMetricsForBatchWrites().
  */
 TEST(CurOpTest, SetEndOfOpMetricsForBatchWritesPopulatesAllMetrics) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
 
     QueryTestServiceContext serviceContext;
     auto tickSourcePtr = serviceContext.tickSource();

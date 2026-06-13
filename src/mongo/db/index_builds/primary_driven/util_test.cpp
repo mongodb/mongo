@@ -50,7 +50,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::index_builds::primary_driven {
@@ -206,7 +206,7 @@ protected:
 
 private:
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest _featureFlag{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard _featureFlag{"featureFlagPrimaryDrivenIndexBuilds", true};
 };
 
 TEST_F(UtilTest, Start) {
@@ -614,7 +614,7 @@ void insertSorterEntries(OperationContext* opCtx,
 }
 
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesOutOfRangeKeys) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
@@ -652,7 +652,7 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesOutOfRangeKeys) {
 }
 
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAllWhenRangesUnset) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
@@ -682,7 +682,7 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAllWhenRangesUnset) {
 }
 
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAllWhenRangesEmpty) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
@@ -713,7 +713,7 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAllWhenRangesEmpty) {
 }
 
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenAllWithinRange) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
@@ -747,10 +747,9 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenAllWithinRange) {
 }
 
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAcrossBatches) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
     // Set a small batch size to force multiple delete batches.
-    RAIIServerParameterControllerForTest batchSize{
-        "primaryDrivenIndexBuildSorterInsertionBatchSize", 3};
+    unittest::ServerParameterGuard batchSize{"primaryDrivenIndexBuildSorterInsertionBatchSize", 3};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
@@ -789,9 +788,8 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAcrossBatches) {
 
 // Fires a deterministic WCE while removing keys < firstStart.
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysLessThanFirstStart) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest batchSize{
-        "primaryDrivenIndexBuildSorterInsertionBatchSize", 5};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard batchSize{"primaryDrivenIndexBuildSorterInsertionBatchSize", 5};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
@@ -841,9 +839,8 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysLess
 // Fires a deterministic WCE while removing keys >= LastEnd.
 TEST_F(UtilTest,
        DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysGreaterThanOrEqualToLastEnd) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest batchSize{
-        "primaryDrivenIndexBuildSorterInsertionBatchSize", 4};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard batchSize{"primaryDrivenIndexBuildSorterInsertionBatchSize", 4};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);

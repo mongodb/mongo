@@ -59,7 +59,7 @@
 #include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -182,9 +182,9 @@ CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const Namespac
 
 // When collMod changes bucketing parameters, fixedBucketing must be automatically set to false.
 TEST_F(CollModTest, CollModDisablesFixedBucketingOnBucketingParameterChange) {
-    RAIIServerParameterControllerForTest fixedBucketingFlagController(
-        "featureFlagFixedBucketingCatalog", true);
-    RAIIServerParameterControllerForTest viewlessFlagController(
+    unittest::ServerParameterGuard fixedBucketingFlagController("featureFlagFixedBucketingCatalog",
+                                                                true);
+    unittest::ServerParameterGuard viewlessFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
@@ -230,9 +230,9 @@ TEST_F(CollModTest, CollModDisablesFixedBucketingOnBucketingParameterChange) {
 // When collMod specifies the same bucketing parameter values as the current ones, fixedBucketing
 // must remain unchanged (no spurious disable).
 TEST_F(CollModTest, CollModFixedBucketingNoOpWhenBucketingParamsUnchanged) {
-    RAIIServerParameterControllerForTest fixedBucketingFlagController(
-        "featureFlagFixedBucketingCatalog", true);
-    RAIIServerParameterControllerForTest viewlessFlagController(
+    unittest::ServerParameterGuard fixedBucketingFlagController("featureFlagFixedBucketingCatalog",
+                                                                true);
+    unittest::ServerParameterGuard viewlessFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
@@ -354,7 +354,7 @@ public:
 // Regression test for SERVER-104640. Test that the MixedSchema and BucketingParametersHaveChanged
 // timeseries flags can be read at a point-in-time from the collection catalog.
 TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
@@ -425,7 +425,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_Succeeds) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collModColl");
 
     // Enabling the Replicated RecordId flag
-    RAIIServerParameterControllerForTest featureFlagRecordIdsReplicatedController(
+    unittest::ServerParameterGuard featureFlagRecordIdsReplicatedController(
         "featureFlagRecordIdsReplicated", true);
 
     // Creating the collection, it will have replicated record Ids since the feature flag is on.
@@ -521,7 +521,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequi
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collModColl");
 
     // Enabling the Replicated RecordId flag
-    RAIIServerParameterControllerForTest featureFlagRecordIdsReplicatedController(
+    unittest::ServerParameterGuard featureFlagRecordIdsReplicatedController(
         "featureFlagRecordIdsReplicated", true);
 
     // Creating the collection, it will have replicated record Ids since the feature flag is on.

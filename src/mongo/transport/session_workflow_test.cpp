@@ -54,7 +54,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -84,6 +83,7 @@
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -691,16 +691,15 @@ private:
         return sm;
     }
 
-    RAIIServerParameterControllerForTest featureEnabled{
+    unittest::ServerParameterGuard featureEnabled{
         "ingressConnectionEstablishmentRateLimiterEnabled", true};
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
                                                           logv2::LogSeverity::Debug(4)};
 };
 
 TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisabled) {
-    RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
-                                                     1.0};
-    RAIIServerParameterControllerForTest burstCapacitySecs{
+    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
+    unittest::ServerParameterGuard burstCapacitySecs{
         "ingressConnectionEstablishmentBurstCapacitySecs", 1};
 
     // The first session gets a token successfully and calls sourceMessage.
@@ -729,12 +728,10 @@ TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisab
 }
 
 TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
-    RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
-                                                     1.0};
-    RAIIServerParameterControllerForTest burstCapacitySecs{
+    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
+    unittest::ServerParameterGuard burstCapacitySecs{
         "ingressConnectionEstablishmentBurstCapacitySecs", 1};
-    RAIIServerParameterControllerForTest maxQueueDepth{
-        "ingressConnectionEstablishmentMaxQueueDepth", 10};
+    unittest::ServerParameterGuard maxQueueDepth{"ingressConnectionEstablishmentMaxQueueDepth", 10};
     const auto initialAvailable = getConnectionStats()["available"].numberLong();
 
     // The first session gets a token successfully and calls sourceMessage.
@@ -768,12 +765,11 @@ TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
 
 TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
     std::string ip = "127.0.0.1";
-    RAIIServerParameterControllerForTest exemptionsGuard(
+    unittest::ServerParameterGuard exemptionsGuard(
         "ingressConnectionEstablishmentRateLimiterBypass",
         BSON("ranges" << BSONArray(BSON("0" << ip))));
-    RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
-                                                     1.0};
-    RAIIServerParameterControllerForTest burstCapacitySecs{
+    unittest::ServerParameterGuard refreshRate{"ingressConnectionEstablishmentRatePerSec", 1.0};
+    unittest::ServerParameterGuard burstCapacitySecs{
         "ingressConnectionEstablishmentBurstCapacitySecs", 1};
 
     // The first session gets a token successfully and calls sourceMessage.
@@ -868,9 +864,9 @@ private:
                                                            logv2::LogSeverity::Debug(4)};
 
     boost::optional<FailPointEnableBlock> _overrideFailpoint;
-    boost::optional<RAIIServerParameterControllerForTest> _requestLimiterEnabled;
-    boost::optional<RAIIServerParameterControllerForTest> _requestLimiterBurstCapacitySecs;
-    boost::optional<RAIIServerParameterControllerForTest> _requestAdmissionRatePerSec;
+    boost::optional<unittest::ServerParameterGuard> _requestLimiterEnabled;
+    boost::optional<unittest::ServerParameterGuard> _requestLimiterBurstCapacitySecs;
+    boost::optional<unittest::ServerParameterGuard> _requestAdmissionRatePerSec;
 };
 
 TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
@@ -936,7 +932,7 @@ TEST_F(IngressRequestRateLimiterTest, IterationFrameClearsDeferredAdmissionToken
     enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
 
     // Allow queueing so the post-burst request waits in the limiter rather than being rejected.
-    RAIIServerParameterControllerForTest queueDepth{"ingressRequestAdmissionMaxQueueDepth", 4};
+    unittest::ServerParameterGuard queueDepth{"ingressRequestAdmissionMaxQueueDepth", 4};
 
     startSession();
 
@@ -1012,7 +1008,7 @@ TEST_F(IngressRequestRateLimiterTest, ImmediateRejectionHasExpectedErrorLabels) 
 
 TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErrorLabels) {
     enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
-    RAIIServerParameterControllerForTest queueDepth{"ingressRequestAdmissionMaxQueueDepth", 1};
+    unittest::ServerParameterGuard queueDepth{"ingressRequestAdmissionMaxQueueDepth", 1};
 
     startSession();
 
@@ -1133,7 +1129,7 @@ TEST_F(RateLimitRejectionResponseTest, CachedFastPathMatchesSlowPath) {
  */
 TEST_F(RateLimitRejectionResponseTest, RetryAfterMsStampedIntoFastPathWhenEnabled) {
     constexpr long long kRetryAfterMs = 1500;
-    RAIIServerParameterControllerForTest retryGuard{"overloadRetryAfterMS", kRetryAfterMs};
+    unittest::ServerParameterGuard retryGuard{"overloadRetryAfterMS", kRetryAfterMs};
 
     constexpr int32_t kInputRequestId = 0x0BADCAFE;
     auto inputMsg = makeOpMsgInput(kInputRequestId);
@@ -1167,13 +1163,13 @@ TEST_F(RateLimitRejectionResponseTest, RetryAfterMsReflectsLiveParameterValue) {
     const auto rejectionStatus = ingressRateLimitStatus();
 
     {
-        RAIIServerParameterControllerForTest guard{"overloadRetryAfterMS", 100};
+        unittest::ServerParameterGuard guard{"overloadRetryAfterMS", 100};
         Message response = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
         const auto body = OpMsg::parse(response).body;
         ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), 100);
     }
     {
-        RAIIServerParameterControllerForTest guard{"overloadRetryAfterMS", 9999};
+        unittest::ServerParameterGuard guard{"overloadRetryAfterMS", 9999};
         Message response = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
         const auto body = OpMsg::parse(response).body;
         ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), 9999);
@@ -1533,7 +1529,7 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
         uassertStatusOK(registry.finalizeSupportedCompressors());
     }
 
-    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
+    unittest::ServerParameterGuard maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
 
     startSession();
 

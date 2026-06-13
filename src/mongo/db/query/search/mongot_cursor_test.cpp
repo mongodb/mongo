@@ -36,7 +36,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/task_executor_cursor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
@@ -878,20 +878,20 @@ TEST_F(NonPinningMongotCursorTestFixture,
 }
 
 TEST(PinConnectionSettingTest, AlwaysSetWithGRPC) {
-    RAIIServerParameterControllerForTest globalPinConn("pinTaskExecCursorConns", false);
-    RAIIServerParameterControllerForTest grpcForSearch("useGrpcForSearch", true);
+    unittest::ServerParameterGuard globalPinConn("pinTaskExecCursorConns", false);
+    unittest::ServerParameterGuard grpcForSearch("useGrpcForSearch", true);
     ASSERT_TRUE(mongot_cursor::shouldPinConnection());
 }
 
 TEST(PinConnectionSettingTest, SetFromPinTaskExecCursorConns) {
-    RAIIServerParameterControllerForTest globalPinConn("pinTaskExecCursorConns", true);
-    RAIIServerParameterControllerForTest grpcForSearch("useGrpcForSearch", false);
+    unittest::ServerParameterGuard globalPinConn("pinTaskExecCursorConns", true);
+    unittest::ServerParameterGuard grpcForSearch("useGrpcForSearch", false);
     ASSERT_TRUE(mongot_cursor::shouldPinConnection());
 }
 
 TEST(PinConnectionSettingTest, NeitherParamSet) {
-    RAIIServerParameterControllerForTest globalPinConn("pinTaskExecCursorConns", false);
-    RAIIServerParameterControllerForTest grpcForSearch("useGrpcForSearch", false);
+    unittest::ServerParameterGuard globalPinConn("pinTaskExecCursorConns", false);
+    unittest::ServerParameterGuard grpcForSearch("useGrpcForSearch", false);
     ASSERT_FALSE(mongot_cursor::shouldPinConnection());
 }
 

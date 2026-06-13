@@ -38,9 +38,9 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/version_context.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/version/releases.h"
 
@@ -313,7 +313,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
        CreateLegacyReshardingFieldsUpdateAddsTelemetryContext) {
     // The reshardingFields persistence path is gated off by featureFlagReshardingInitNoRefresh
     // (which defaults to true). Disable it to exercise the legacy contract this test verifies.
-    RAIIServerParameterControllerForTest initNoRefresh{"featureFlagReshardingInitNoRefresh", false};
+    unittest::ServerParameterGuard initNoRefresh{"featureFlagReshardingInitNoRefresh", false};
 
     auto opCtx = makeOperationContext();
 
@@ -349,7 +349,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
     ASSERT_TRUE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
 
     {
-        RAIIServerParameterControllerForTest flagScope{"featureFlagReshardingInitNoRefresh", false};
+        unittest::ServerParameterGuard flagScope{"featureFlagReshardingInitNoRefresh", false};
         ASSERT_FALSE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
     }
 }
@@ -358,8 +358,8 @@ TEST_F(
     ReshardingCoordinatorServiceUtilTest,
     CreateReshardedCollectionEntryUpdateAlwaysWritesIdentityFieldsRegardlessOfInitNoRefreshFlag) {
     auto runWithFlag = [&](bool initNoRefreshOn) {
-        RAIIServerParameterControllerForTest flagScope{"featureFlagReshardingInitNoRefresh",
-                                                       initNoRefreshOn};
+        unittest::ServerParameterGuard flagScope{"featureFlagReshardingInitNoRefresh",
+                                                 initNoRefreshOn};
 
         auto opCtx = makeOperationContext();
         ReshardingCoordinatorDocument coordinatorDoc;
@@ -426,7 +426,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        SkipReshardingFieldsWritesForCoordinatorHonorsGlobalFlagDisableShortCircuit) {
-    RAIIServerParameterControllerForTest flagScope{"featureFlagReshardingInitNoRefresh", false};
+    unittest::ServerParameterGuard flagScope{"featureFlagReshardingInitNoRefresh", false};
 
     ReshardingCoordinatorDocument coordinatorDoc;
     auto metadata = makeMetadata();
@@ -546,7 +546,7 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,
 TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest, TempCollectionTypeCopiesProvenance) {
     // The temp-collection reshardingFields subtree is gated off by
     // featureFlagReshardingInitNoRefresh (which defaults to true).
-    RAIIServerParameterControllerForTest initNoRefresh{"featureFlagReshardingInitNoRefresh", false};
+    unittest::ServerParameterGuard initNoRefresh{"featureFlagReshardingInitNoRefresh", false};
 
     auto opCtx = makeOperationContext();
     auto doc = makeCoordinatorDocWithProvenance(CoordinatorStateEnum::kPreparingToDonate);
@@ -562,7 +562,7 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest, TempCollectionTypeCopiesP
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        ComputeVerificationDeadlineAtCriticalSectionStartMatchesShareOfTotalBudget) {
-    RAIIServerParameterControllerForTest percentCtrl{
+    unittest::ServerParameterGuard percentCtrl{
         "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 30};
 
     const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
@@ -578,7 +578,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        ComputeVerificationDeadlineEqualsExpiresAtAt100Percent) {
     // 100% leaves no reserve: the wait may run right up to critical-section expiry.
-    RAIIServerParameterControllerForTest percentCtrl{
+    unittest::ServerParameterGuard percentCtrl{
         "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 100};
 
     const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
@@ -592,7 +592,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
 TEST_F(ReshardingCoordinatorServiceUtilTest, ComputeVerificationDeadlineEqualsReachedAtAt0Percent) {
     // 0% grants no time: the wait is skipped immediately.
-    RAIIServerParameterControllerForTest percentCtrl{
+    unittest::ServerParameterGuard percentCtrl{
         "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 0};
 
     const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);
@@ -609,7 +609,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
        ComputeVerificationDeadlineClampsToReachedAtWhenNoBudgetRemains) {
     // Strict consistency reached after the critical section already expired: remaining < 0.
     // The deadline must clamp to reachedStrictConsistencyTime (immediate skip).
-    RAIIServerParameterControllerForTest percentCtrl{
+    unittest::ServerParameterGuard percentCtrl{
         "reshardingVerificationDeltaWaitRemainingCriticalSectionPercent", 80};
 
     const auto expiresAt = Date_t::fromMillisSinceEpoch(1'000'000);

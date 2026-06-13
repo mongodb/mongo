@@ -42,8 +42,8 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -365,8 +365,8 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceed
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsWithLimitedMemoryForSortOperation) {
-    RAIIServerParameterControllerForTest sortMaxMemory{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 100};
+    unittest::ServerParameterGuard sortMaxMemory{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                 100};
 
     unittest::TempDir _tempDir{"SamplingSucceedsWithLimitedMemoryForSortOperation"};
     storageGlobalParams.dbpath = _tempDir.path();

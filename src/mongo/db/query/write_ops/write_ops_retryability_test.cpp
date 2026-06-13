@@ -705,7 +705,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage_PreImageOpTime) {
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPreImage_NeedsRetryImage_ImageCollectionAllowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagDisallowFindAndModifyImageCollection", false);
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
@@ -744,7 +744,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage_NeedsRetryImage_ImageCollec
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPreImage_NeedsRetryImage_ImageCollectionDisallowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagDisallowFindAndModifyImageCollection", true);
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
@@ -890,7 +890,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage_PostImageOpTime) {
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImage_NeedsRetryImage_ImageCollectionAllowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagDisallowFindAndModifyImageCollection", false);
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
@@ -929,7 +929,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage_NeedsRetryImage_ImageColle
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImage_NeedsRetryImage_ImageCollectionDisallowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagDisallowFindAndModifyImageCollection", true);
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
@@ -1152,7 +1152,7 @@ TEST_F(FindAndModifyRetryability, BasicRemove_PreImageOpTime) {
 }
 
 TEST_F(FindAndModifyRetryability, BasicRemove_NeedsRetryImage_ImageCollectionAllowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagDisallowFindAndModifyImageCollection", false);
     auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
     request.setRemove(true);
@@ -1190,7 +1190,7 @@ TEST_F(FindAndModifyRetryability, BasicRemove_NeedsRetryImage_ImageCollectionAll
 }
 
 TEST_F(FindAndModifyRetryability, BasicRemove_NeedsRetryImage_ImageCollectionDisallowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagDisallowFindAndModifyImageCollection", true);
     auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
     request.setRemove(true);

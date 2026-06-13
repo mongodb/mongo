@@ -42,8 +42,8 @@
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/scopeguard.h"
 
 
@@ -190,7 +190,7 @@ TEST_F(DocumentSourceVectorSearchTest, HasTheCorrectStagesWhenCreated) {
     // We want the mock to return true for isExpectedToExecuteQueries() since that will enable
     // insertion of the idLookup stage. That means we also need mongotHost to be configured to
     // avoid the uassert with SearchNotEnabled error.
-    RAIIServerParameterControllerForTest controller("mongotHost", "localhost:27017");
+    unittest::ServerParameterGuard controller("mongotHost", "localhost:27017");
     auto expCtx = getExpCtx();
     struct MockMongoInterface final : public StubMongoProcessInterface {
         bool inShardedEnvironment(OperationContext* opCtx) const override {

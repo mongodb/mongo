@@ -45,10 +45,10 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -193,8 +193,8 @@ public:
               "Creating new RoutingTable",
               "chunkBucketSize"_attr = chunkBucketSize,
               "numChunks"_attr = chunks.size());
-        RAIIServerParameterControllerForTest chunkBucketSizeParameter(
-            "routingTableCacheChunkBucketSize", chunkBucketSize);
+        unittest::ServerParameterGuard chunkBucketSizeParameter("routingTableCacheChunkBucketSize",
+                                                                chunkBucketSize);
         return RoutingTableHistory::makeNew(kNss,
                                             _collUUID,
                                             _shardKeyPattern,
@@ -935,8 +935,8 @@ public:
     RoutingTableHistory makeNewRtAllowingGaps(const std::vector<ChunkType>& chunks) const {
         const auto chunkBucketSize =
             _random.nextInt64(std::max<std::size_t>(chunks.size(), 1) * 1.2) + 1;
-        RAIIServerParameterControllerForTest chunkBucketSizeParameter(
-            "routingTableCacheChunkBucketSize", chunkBucketSize);
+        unittest::ServerParameterGuard chunkBucketSizeParameter("routingTableCacheChunkBucketSize",
+                                                                chunkBucketSize);
         return RoutingTableHistory::makeNewAllowingGaps(kNss,
                                                         collUUID(),
                                                         getShardKeyPattern(),

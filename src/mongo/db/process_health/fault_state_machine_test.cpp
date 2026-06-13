@@ -43,8 +43,8 @@
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -372,7 +372,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
 }
 
 TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSuccess) {
-    RAIIServerParameterControllerForTest serverParamController{"activeFaultDurationSecs", 30};
+    unittest::ServerParameterGuard serverParamController{"activeFaultDurationSecs", 30};
     const auto faultFacetType = FaultFacetType::kDns;
     auto config = std::make_unique<FaultManagerConfig>();
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kCritical);

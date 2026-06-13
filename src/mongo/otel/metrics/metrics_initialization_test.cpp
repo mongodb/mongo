@@ -31,10 +31,10 @@
 
 #ifdef MONGO_CONFIG_OTEL
 
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -78,7 +78,7 @@ TEST_F(OtelMetricsInitializationTest, NoMeterProvider) {
 }
 
 TEST_F(OtelMetricsInitializationTest, MultipleInitializationIsError) {
-    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsDir()};
+    unittest::ServerParameterGuard param{"openTelemetryMetricsDirectory", getMetricsDir()};
     ASSERT_OK(initialize());
     EXPECT_THAT(initialize(),
                 StatusIs(ErrorCodes::IllegalOperation,
@@ -87,7 +87,7 @@ TEST_F(OtelMetricsInitializationTest, MultipleInitializationIsError) {
 
 
 TEST_F(OtelMetricsInitializationTest, Shutdown) {
-    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsDir()};
+    unittest::ServerParameterGuard param{"openTelemetryMetricsDirectory", getMetricsDir()};
     ASSERT_OK(initialize());
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_FALSE(isNoopMeterProvider(provider.get()));
@@ -99,7 +99,7 @@ TEST_F(OtelMetricsInitializationTest, Shutdown) {
 }
 
 TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
-    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsDir()};
+    unittest::ServerParameterGuard param{"openTelemetryMetricsDirectory", getMetricsDir()};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -107,8 +107,8 @@ TEST_F(OtelMetricsInitializationTest, FileMeterProvider) {
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {
-    RAIIServerParameterControllerForTest param{"openTelemetryMetricsHttpEndpoint",
-                                               "http://localhost:4318/v1/traces"};
+    unittest::ServerParameterGuard param{"openTelemetryMetricsHttpEndpoint",
+                                         "http://localhost:4318/v1/traces"};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -116,10 +116,9 @@ TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {
 }
 
 TEST_F(OtelMetricsInitializationTest, HttpAndDirectory) {
-    RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
-                                                   "http://localhost:4318/v1/traces"};
-    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                        getMetricsDir()};
+    unittest::ServerParameterGuard httpParam{"openTelemetryMetricsHttpEndpoint",
+                                             "http://localhost:4318/v1/traces"};
+    unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory", getMetricsDir()};
     auto status = initialize();
     ASSERT_FALSE(status.isOK());
     ASSERT_EQ(status.codeString(), "InvalidOptions");
@@ -129,8 +128,8 @@ TEST_F(OtelMetricsInitializationTest, HttpAndDirectory) {
 }
 
 TEST_F(OtelMetricsInitializationTest, PrometheusExporterPath) {
-    RAIIServerParameterControllerForTest param{"openTelemetryPrometheusMetricsPath",
-                                               getPrometheusMetricsPath()};
+    unittest::ServerParameterGuard param{"openTelemetryPrometheusMetricsPath",
+                                         getPrometheusMetricsPath()};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -138,8 +137,8 @@ TEST_F(OtelMetricsInitializationTest, PrometheusExporterPath) {
 }
 
 TEST_F(OtelMetricsInitializationTest, PrometheusExporterDirectory) {
-    RAIIServerParameterControllerForTest param{"openTelemetryPrometheusMetricsDirectory",
-                                               getMetricsDir()};
+    unittest::ServerParameterGuard param{"openTelemetryPrometheusMetricsDirectory",
+                                         getMetricsDir()};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -147,10 +146,9 @@ TEST_F(OtelMetricsInitializationTest, PrometheusExporterDirectory) {
 }
 
 TEST_F(OtelMetricsInitializationTest, PrometheusPathAndOtelDirectory) {
-    RAIIServerParameterControllerForTest prometheusParam{"openTelemetryPrometheusMetricsPath",
-                                                         getPrometheusMetricsPath()};
-    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                        getMetricsDir()};
+    unittest::ServerParameterGuard prometheusParam{"openTelemetryPrometheusMetricsPath",
+                                                   getPrometheusMetricsPath()};
+    unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory", getMetricsDir()};
     auto status = initialize();
     ASSERT_FALSE(status.isOK());
     ASSERT_EQ(status.codeString(), "InvalidOptions");
@@ -160,8 +158,8 @@ TEST_F(OtelMetricsInitializationTest, PrometheusPathAndOtelDirectory) {
 }
 
 TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryExporterMeterProvider) {
-    RAIIServerParameterControllerForTest param{"openTelemetryPrometheusMetricsDirectory",
-                                               getMetricsDir()};
+    unittest::ServerParameterGuard param{"openTelemetryPrometheusMetricsDirectory",
+                                         getMetricsDir()};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -169,10 +167,9 @@ TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryExporterMeterProvider) 
 }
 
 TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryAndOtelDirectory) {
-    RAIIServerParameterControllerForTest prometheusParam{"openTelemetryPrometheusMetricsDirectory",
-                                                         getMetricsDir()};
-    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                        getMetricsDir()};
+    unittest::ServerParameterGuard prometheusParam{"openTelemetryPrometheusMetricsDirectory",
+                                                   getMetricsDir()};
+    unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory", getMetricsDir()};
     auto status = initialize();
     ASSERT_FALSE(status.isOK());
     ASSERT_EQ(status.codeString(), "InvalidOptions");
@@ -184,14 +181,14 @@ TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryAndOtelDirectory) {
 TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryDoesNotExistFails) {
 
     {
-        RAIIServerParameterControllerForTest dirParam{"openTelemetryPrometheusMetricsDirectory",
-                                                      "/nonexistent/directory"};
+        unittest::ServerParameterGuard dirParam{"openTelemetryPrometheusMetricsDirectory",
+                                                "/nonexistent/directory"};
         ASSERT_THAT(initialize(),
                     StatusIs(ErrorCodes::FileOpenFailed, HasSubstr("/nonexistent/directory")));
     }
     {
-        RAIIServerParameterControllerForTest pathParam{"openTelemetryPrometheusMetricsPath",
-                                                       "/nonexistent/directory/file.prom"};
+        unittest::ServerParameterGuard pathParam{"openTelemetryPrometheusMetricsPath",
+                                                 "/nonexistent/directory/file.prom"};
         ASSERT_THAT(initialize(),
                     StatusIs(ErrorCodes::FileOpenFailed, HasSubstr("/nonexistent/directory")));
     }
@@ -201,10 +198,10 @@ TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryDoesNotExistFails) {
 // openTelemetryPrometheusMetricsDirectory when both are set. If the directory were used instead,
 // the initialization would fail because the directory does not exist.
 TEST_F(OtelMetricsInitializationTest, PrometheusPathTakesPrecedenceOverDirectory) {
-    RAIIServerParameterControllerForTest pathParam{"openTelemetryPrometheusMetricsPath",
-                                                   getPrometheusMetricsPath()};
-    RAIIServerParameterControllerForTest dirParam{"openTelemetryPrometheusMetricsDirectory",
-                                                  "/nonexistent/directory"};
+    unittest::ServerParameterGuard pathParam{"openTelemetryPrometheusMetricsPath",
+                                             getPrometheusMetricsPath()};
+    unittest::ServerParameterGuard dirParam{"openTelemetryPrometheusMetricsDirectory",
+                                            "/nonexistent/directory"};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -212,7 +209,7 @@ TEST_F(OtelMetricsInitializationTest, PrometheusPathTakesPrecedenceOverDirectory
 }
 
 TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledNoParams) {
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
+    unittest::ServerParameterGuard featureFlagController{"featureFlagOtelMetrics", false};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -220,17 +217,17 @@ TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledNoParams) {
 }
 
 TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledDirectorySet) {
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
-    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsDir()};
+    unittest::ServerParameterGuard featureFlagController{"featureFlagOtelMetrics", false};
+    unittest::ServerParameterGuard param{"openTelemetryMetricsDirectory", getMetricsDir()};
     ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
 
 TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledHttpSet) {
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagOtelMetrics", false};
-    RAIIServerParameterControllerForTest param{"openTelemetryMetricsHttpEndpoint",
-                                               "http://localhost:4318/v1/traces"};
+    unittest::ServerParameterGuard featureFlagController{"featureFlagOtelMetrics", false};
+    unittest::ServerParameterGuard param{"openTelemetryMetricsHttpEndpoint",
+                                         "http://localhost:4318/v1/traces"};
     ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_TRUE(isNoopMeterProvider(provider.get()));
@@ -238,21 +235,20 @@ TEST_F(OtelMetricsInitializationTest, FeatureFlagDisabledHttpSet) {
 
 TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
     {
-        RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
-                                                       "http://localhost:4318/v1/traces"};
-        RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
-                                                              "foo"};
+        unittest::ServerParameterGuard httpParam{"openTelemetryMetricsHttpEndpoint",
+                                                 "http://localhost:4318/v1/traces"};
+        unittest::ServerParameterGuard compressionParam{"openTelemetryMetricsCompression", "foo"};
         ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
         auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
         ASSERT_TRUE(isNoopMeterProvider(provider.get()));
     }
 
     {
-        RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                            getMetricsDir()};
+        unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory",
+                                                      getMetricsDir()};
         for (const auto& value : {"gzip", "foo"}) {
-            RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
-                                                                  value};
+            unittest::ServerParameterGuard compressionParam{"openTelemetryMetricsCompression",
+                                                            value};
             ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
             auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
             ASSERT_TRUE(isNoopMeterProvider(provider.get()));
@@ -260,11 +256,11 @@ TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
     }
 
     {
-        RAIIServerParameterControllerForTest directoryParam{"openTelemetryPrometheusMetricsPath",
-                                                            getPrometheusMetricsPath()};
+        unittest::ServerParameterGuard directoryParam{"openTelemetryPrometheusMetricsPath",
+                                                      getPrometheusMetricsPath()};
         for (const auto& value : {"gzip", "foo"}) {
-            RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
-                                                                  value};
+            unittest::ServerParameterGuard compressionParam{"openTelemetryMetricsCompression",
+                                                            value};
             ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
             auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
             ASSERT_TRUE(isNoopMeterProvider(provider.get()));
@@ -274,11 +270,11 @@ TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
 
 TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
     {
-        RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
-                                                       "http://localhost:4318/v1/traces"};
+        unittest::ServerParameterGuard httpParam{"openTelemetryMetricsHttpEndpoint",
+                                                 "http://localhost:4318/v1/traces"};
         for (const auto& value : {"gzip", "none"}) {
-            RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
-                                                                  value};
+            unittest::ServerParameterGuard compressionParam{"openTelemetryMetricsCompression",
+                                                            value};
             ASSERT_OK(initialize());
 
             auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -289,10 +285,8 @@ TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
         }
     }
 
-    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                        getMetricsDir()};
-    RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
-                                                          "none"};
+    unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory", getMetricsDir()};
+    unittest::ServerParameterGuard compressionParam{"openTelemetryMetricsCompression", "none"};
     ASSERT_OK(initialize());
 
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
@@ -303,11 +297,10 @@ TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
 }
 
 TEST_F(OtelMetricsInitializationTest, TimeoutGreaterThanIntervalFails) {
-    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                        getMetricsDir()};
+    unittest::ServerParameterGuard directoryParam{"openTelemetryMetricsDirectory", getMetricsDir()};
     // Set timeout greater than interval (interval defaults to 1000, timeout defaults to 500)
-    RAIIServerParameterControllerForTest intervalParam{"openTelemetryExportIntervalMillis", 500};
-    RAIIServerParameterControllerForTest timeoutParam{"openTelemetryExportTimeoutMillis", 1000};
+    unittest::ServerParameterGuard intervalParam{"openTelemetryExportIntervalMillis", 500};
+    unittest::ServerParameterGuard timeoutParam{"openTelemetryExportTimeoutMillis", 1000};
 
     ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
 

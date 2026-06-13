@@ -50,6 +50,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
@@ -142,7 +143,7 @@ private:
         ReplicationCoordinator::set(service, std::move(replCoord));
         // Turn off async sampling before creating the oplog so we get the right value of
         // needsTruncateMarkers in setRecordStore.
-        RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
+        unittest::ServerParameterGuard oplogSamplingAsyncEnabledController(
             "oplogSamplingAsyncEnabled", false);
         repl::createOplog(_opCtx.get());
     }
@@ -163,8 +164,8 @@ private:
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_CreateNewMarker) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
 
@@ -219,8 +220,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CreateNewMarker) {
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_Truncate) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto& storage = getStorage();
@@ -259,8 +260,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Truncate) {
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_UpdateRecord) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto& storage = getStorage();
@@ -325,8 +326,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_UpdateRecord) {
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto& storage = getStorage();
@@ -443,8 +444,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
  */
 TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
@@ -636,8 +637,8 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTruncatedRange) {
     // This is actually an async test but we turn async off because we simulate the asynchronous
     // behaviour another way
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
@@ -709,12 +710,12 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
     // This is actually an async test but we turn async off because we simulate the asynchronous
     // behaviour another way
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
-    RAIIServerParameterControllerForTest minMarkerCountController("minOplogTruncationPoints", 30);
-    RAIIServerParameterControllerForTest maxMarkerCountController(
-        "maxOplogTruncationPointsAfterStartup", 30);
+    unittest::ServerParameterGuard minMarkerCountController("minOplogTruncationPoints", 30);
+    unittest::ServerParameterGuard maxMarkerCountController("maxOplogTruncationPointsAfterStartup",
+                                                            30);
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
@@ -767,8 +768,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
  */
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_AscendingOrder) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
 
@@ -816,8 +817,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AscendingOrder) {
 //  of the estimated size.
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
@@ -857,8 +858,8 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
 // inaccurate.
 TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
     // Turn off async mode
-    RAIIServerParameterControllerForTest oplogSamplingAsyncEnabledController(
-        "oplogSamplingAsyncEnabled", false);
+    unittest::ServerParameterGuard oplogSamplingAsyncEnabledController("oplogSamplingAsyncEnabled",
+                                                                       false);
 
     auto opCtx = getOperationContext();
     auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();

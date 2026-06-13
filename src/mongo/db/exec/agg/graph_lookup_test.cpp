@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/graph_lookup_mock_mongo_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -376,7 +377,7 @@ TEST_F(GraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
 TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillVisitedDocuments) {
     static constexpr long long kMemoryLimit = 100 * 1024;
-    RAIIServerParameterControllerForTest memoryLimitController(
+    unittest::ServerParameterGuard memoryLimitController(
         "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
 
     auto expCtx = getExpCtx();
@@ -436,7 +437,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillVisitedDocuments) {
 
 TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillSeveralStructures) {
     static constexpr long long kMemoryLimit = 200 * 1024;
-    RAIIServerParameterControllerForTest memoryLimitController(
+    unittest::ServerParameterGuard memoryLimitController(
         "internalDocumentSourceGraphLookupMaxMemoryBytes", kMemoryLimit);
 
     auto expCtx = getExpCtx();

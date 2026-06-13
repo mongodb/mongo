@@ -35,7 +35,7 @@
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/db/s/balancer/move_unsharded_policy.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -75,8 +75,8 @@ protected:
 
 TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
 
-    RAIIServerParameterControllerForTest serverParamController{
-        "reshardingMinimumOperationDurationMillis", 5000};
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5000};
 
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);
@@ -110,8 +110,8 @@ TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
 
 TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
 
-    RAIIServerParameterControllerForTest serverParamController{
-        "reshardingMinimumOperationDurationMillis", 5000};
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5000};
 
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);
@@ -166,8 +166,8 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
 }
 
 TEST_F(MoveUnshardedPolicyTest, DontMigrateAnyCollectionIfReshardingMinimumDurationIsTooLarge) {
-    RAIIServerParameterControllerForTest serverParamController{
-        "reshardingMinimumOperationDurationMillis", 5001};
+    unittest::ServerParameterGuard serverParamController{"reshardingMinimumOperationDurationMillis",
+                                                         5001};
 
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);

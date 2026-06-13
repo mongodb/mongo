@@ -64,8 +64,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/utility.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -345,7 +345,7 @@ TEST_F(CreateCollectionTest,
 TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucketsCollectionPrefix) {
     // This test validates system.buckets.* prefix handling during applyOps rename,
     // which only applies to legacy timeseries collections.
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
     auto bucketsColl =
@@ -408,7 +408,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagNotSetIfFeatureDisabled) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
 
@@ -426,7 +426,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagNotSetIfFea
 
 TEST_F(CreateCollectionTest,
        TimeseriesBucketingParametersChangedFlagNotSetIfCollectionNotTimeseries) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
 
@@ -439,7 +439,7 @@ TEST_F(CreateCollectionTest,
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
@@ -458,7 +458,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
@@ -641,8 +641,8 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsUsesIdIndexIdentIfSuppli
 
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsUsesRecordIdsReplicatedIfSuppliedWhenItIsFalse) {
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 
     auto opCtx = makeOpCtx();
     auto nss = NamespaceString::createNamespaceString_forTest("test.recordIdsReplicated");
@@ -669,8 +669,8 @@ TEST_F(CreateCollectionTest,
 
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsUsesRecordIdsReplicatedIfSuppliedWhenItIsTrue) {
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 
     auto opCtx = makeOpCtx();
     auto nss = NamespaceString::createNamespaceString_forTest("test.recordIdsReplicated");
@@ -697,8 +697,8 @@ TEST_F(CreateCollectionTest,
 
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsUsesRecordIdsReplicatedWhenNotSuppliedAndFeatureFlagIsOn) {
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 
     auto opCtx = makeOpCtx();
     auto nss = NamespaceString::createNamespaceString_forTest("test.recordIdsReplicated");
@@ -876,7 +876,7 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
 
     // CollectionOptions cannot have validator set when creating a viewless timeseries collection.
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         auto opCtx = makeOpCtx();
         CollectionOptions options;
@@ -932,9 +932,8 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
 
     // Cannot set fixedBucketing when featureFlagFixedBucketingCatalog is disabled.
     {
-        RAIIServerParameterControllerForTest flagController("featureFlagFixedBucketingCatalog",
-                                                            false);
-        RAIIServerParameterControllerForTest viewlessController(
+        unittest::ServerParameterGuard flagController("featureFlagFixedBucketingCatalog", false);
+        unittest::ServerParameterGuard viewlessController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         auto opCtx = makeOpCtx();
         CollectionOptions options;
@@ -945,9 +944,8 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
 
     // Cannot set fixedBucketing on a non-viewless (legacy) timeseries collection.
     {
-        RAIIServerParameterControllerForTest flagController("featureFlagFixedBucketingCatalog",
-                                                            true);
-        RAIIServerParameterControllerForTest viewlessController(
+        unittest::ServerParameterGuard flagController("featureFlagFixedBucketingCatalog", true);
+        unittest::ServerParameterGuard viewlessController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         auto opCtx = makeOpCtx();
         CollectionOptions options;
@@ -961,8 +959,8 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
 // catalog and read back unchanged. Covers true, false, and unset to ensure all three states
 // are distinguishable on read-back.
 TEST_F(CreateCollectionTest, FixedBucketingValuePersisted) {
-    RAIIServerParameterControllerForTest flagController("featureFlagFixedBucketingCatalog", true);
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard flagController("featureFlagFixedBucketingCatalog", true);
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     auto checkPersisted = [&](StringData collName, boost::optional<bool> fixedBucketing) {

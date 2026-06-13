@@ -52,7 +52,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"

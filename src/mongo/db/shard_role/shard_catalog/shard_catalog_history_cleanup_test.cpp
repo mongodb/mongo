@@ -179,8 +179,8 @@ public:
 };
 
 TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimestampMonitorAdvance) {
-    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
 
     auto opCtx = operationContext();
 
@@ -240,8 +240,8 @@ TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimesta
 }
 
 TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupStopsOnPause) {
-    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
 
     auto opCtx = operationContext();
 
@@ -313,8 +313,8 @@ TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupStopsOnPause) {
 }
 
 TEST_F(ShardCatalogHistoryCleanupTest, DeletesStaleCollectionEntries) {
-    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
 
     auto storageEngine = getServiceContext()->getStorageEngine();
     auto oldestTimestamp = storageEngine->getOldestTimestamp() + 20;
@@ -365,8 +365,8 @@ TEST_F(ShardCatalogHistoryCleanupTest, DeletesStaleCollectionEntries) {
 }
 
 TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenCollectionCriticalSectionActive) {
-    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
 
     auto storageEngine = getServiceContext()->getStorageEngine();
     auto oldestTimestamp = storageEngine->getOldestTimestamp() + 20;
@@ -426,8 +426,8 @@ TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenCollectionCriticalSection
 }
 
 TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenDatabaseCriticalSectionActive) {
-    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
-    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
 
     auto storageEngine = getServiceContext()->getStorageEngine();
     auto oldestTimestamp = storageEngine->getOldestTimestamp() + 20;

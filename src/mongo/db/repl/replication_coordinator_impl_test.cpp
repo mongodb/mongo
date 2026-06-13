@@ -79,6 +79,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -320,7 +321,7 @@ TEST_F(ReplCoordTest, StandaloneNodeHandlesInterruptedAtShutdownDuringStartupRec
     // Create standalone node.
     init(ReplSettings());
     // Enable standalone oplog recovery.
-    RAIIServerParameterControllerForTest standaloneModeGuard("recoverFromOplogAsStandalone", true);
+    unittest::ServerParameterGuard standaloneModeGuard("recoverFromOplogAsStandalone", true);
     // Simulate InterruptedAtShutdown thrown during oplog recovery.
     dynamic_cast<ReplicationRecoveryMock*>(
         ReplicationProcess::get(getServiceContext())->getReplicationRecovery())

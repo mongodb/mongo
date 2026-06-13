@@ -59,7 +59,6 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/generic_argument_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
@@ -68,6 +67,7 @@
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/integration_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -775,8 +775,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeout) {
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     // Disable the local buffer time addition for straightforward assertions in this test.
-    const RAIIServerParameterControllerForTest bufferServerParameterRAII{
-        "maxTimeMsLocalBufferTimeMillis", 0};
+    const unittest::ServerParameterGuard bufferServerParameterRAII{"maxTimeMsLocalBufferTimeMillis",
+                                                                   0};
 
     // Kick off operation
     auto cb = makeCallbackHandle();
@@ -833,8 +833,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
     // Disable the local buffer time addition for straightforward assertions in this test.
-    const RAIIServerParameterControllerForTest bufferServerParameterRAII{
-        "maxTimeMsLocalBufferTimeMillis", 0};
+    const unittest::ServerParameterGuard bufferServerParameterRAII{"maxTimeMsLocalBufferTimeMillis",
+                                                                   0};
 
     // Kick off operation
     auto cb = makeCallbackHandle();
@@ -897,8 +897,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 // to fire later than the nominal deadline.
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExtendsDeadline) {
     constexpr auto bufferMs = Milliseconds{500};
-    const RAIIServerParameterControllerForTest bufferServerParameterRAII{
-        "maxTimeMsLocalBufferTimeMillis", bufferMs.count()};
+    const unittest::ServerParameterGuard bufferServerParameterRAII{"maxTimeMsLocalBufferTimeMillis",
+                                                                   bufferMs.count()};
 
     // Block the remote handling of "ping" for much longer than our timeout, so the local timer
     // is the one that fires.

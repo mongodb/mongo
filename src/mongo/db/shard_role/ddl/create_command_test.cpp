@@ -41,7 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -74,8 +74,8 @@ TEST_F(CreateCommandTest, CreateFailsWithEncryptionOptions) {
 }
 
 TEST_F(CreateCommandTest, LegacyCreateSucceedsWithEncryptionOptions) {
-    RAIIServerParameterControllerForTest controller{
-        "featureFlagBanEncryptionOptionsInCollectionCreation", false};
+    unittest::ServerParameterGuard controller{"featureFlagBanEncryptionOptionsInCollectionCreation",
+                                              false};
     auto opCtx = operationContext();
     // Drop config.system.indexBuilds collection.
 

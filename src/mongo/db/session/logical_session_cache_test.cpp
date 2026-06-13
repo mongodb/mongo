@@ -47,8 +47,8 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_collection_mock.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -540,9 +540,8 @@ TEST_F(LogicalSessionCacheReapTest, ReapUsesKExemptAdmissionPriority) {
 // ---------------------------------------------------------------------------
 
 TEST(WithRefreshTimeoutTest, AddsMaxTimeMSWhenTimeoutEnabled) {
-    RAIIServerParameterControllerForTest timeoutController{"logicalSessionCacheJobTimeoutEnabled",
-                                                           true};
-    RAIIServerParameterControllerForTest intervalController{
+    unittest::ServerParameterGuard timeoutController{"logicalSessionCacheJobTimeoutEnabled", true};
+    unittest::ServerParameterGuard intervalController{
         "logicalSessionRefreshMillis",
         10000  // 10 seconds
     };
@@ -565,8 +564,7 @@ TEST(WithRefreshTimeoutTest, AddsMaxTimeMSWhenTimeoutEnabled) {
 }
 
 TEST(WithRefreshTimeoutTest, DoesNotAddMaxTimeMSWhenTimeoutDisabled) {
-    RAIIServerParameterControllerForTest timeoutController{"logicalSessionCacheJobTimeoutEnabled",
-                                                           false};
+    unittest::ServerParameterGuard timeoutController{"logicalSessionCacheJobTimeoutEnabled", false};
 
     BSONObj capturedBatch;
     auto captureFn = [&capturedBatch](BSONObj batch) -> Status {
@@ -584,9 +582,8 @@ TEST(WithRefreshTimeoutTest, DoesNotAddMaxTimeMSWhenTimeoutDisabled) {
 }
 
 TEST(WithRefreshTimeoutTest, TimeoutIsNinetyPercentOfRefreshInterval) {
-    RAIIServerParameterControllerForTest timeoutController{"logicalSessionCacheJobTimeoutEnabled",
-                                                           true};
-    RAIIServerParameterControllerForTest intervalController{
+    unittest::ServerParameterGuard timeoutController{"logicalSessionCacheJobTimeoutEnabled", true};
+    unittest::ServerParameterGuard intervalController{
         "logicalSessionRefreshMillis",
         300000  // 5 minutes (the default)
     };

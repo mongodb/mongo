@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -400,7 +400,7 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobDisabled) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
 
     // Disable query knob
-    RAIIServerParameterControllerForTest queryKnobController("internalEnablePathArrayness", false);
+    unittest::ServerParameterGuard queryKnobController("internalEnablePathArrayness", false);
 
     // Array: ["a.b"]
     FieldPath field_AB("a.b");
@@ -429,7 +429,7 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobDisabled) {
     ASSERT_EQ(pathArrayness.canPathBeArray(FieldRef(fieldPathString_A), &expCtx), true);
 
     // Enable query knob
-    queryKnobController = RAIIServerParameterControllerForTest("internalEnablePathArrayness", true);
+    queryKnobController = unittest::ServerParameterGuard("internalEnablePathArrayness", true);
 
     // The original value of the query knob is cached in the ExpressionContext, so even though
     // the query knob has now been enabled PathArrayness will still use the cached value
@@ -444,7 +444,7 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
 
     // Disable query knob
-    RAIIServerParameterControllerForTest queryKnobController("internalEnablePathArrayness", true);
+    unittest::ServerParameterGuard queryKnobController("internalEnablePathArrayness", true);
 
     // Array: ["a.b"]
     FieldPath field_AB("a.b");
@@ -473,8 +473,7 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
     ASSERT_EQ(pathArrayness.canPathBeArray(FieldRef(fieldPathString_A), &expCtx), false);
 
     // Enable query knob
-    queryKnobController =
-        RAIIServerParameterControllerForTest("internalEnablePathArrayness", false);
+    queryKnobController = unittest::ServerParameterGuard("internalEnablePathArrayness", false);
 
     // The original value of the query knob is cached in the ExpressionContext, so even though
     // the query knob has now been disabled PathArrayness will still use the cached value
@@ -878,7 +877,7 @@ TEST(NonArrayPathsForNssFrom, CopiesNonArrayPathsToNewContext) {
 }
 
 TEST(MakeCopyFromExpressionContext, CopiesNonArrayPathsForNss) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagPathArrayness", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagPathArrayness", true);
     QueryTestServiceContext testServiceCtx;
     auto opCtx = testServiceCtx.makeOperationContext();
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");

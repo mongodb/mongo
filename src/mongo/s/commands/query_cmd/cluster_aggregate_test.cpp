@@ -49,9 +49,9 @@
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -336,13 +336,12 @@ private:
 namespace {
 
 TEST_F(ClusterAggregateMemoryTrackingTest, MemoryTrackingWorksOnRouter) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
-    RAIIServerParameterControllerForTest curOpWriteBytes(
-        "internalQueryMaxWriteToCurOpMemoryUsageBytes", 64);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
     // Force the classic engine so we can use the classic $group stage.
-    RAIIServerParameterControllerForTest paramController("internalQueryFrameworkControl",
-                                                         "forceClassicEngine");
+    unittest::ServerParameterGuard paramController("internalQueryFrameworkControl",
+                                                   "forceClassicEngine");
     // Run a query that will produce three documents, with a batch size of 1, so that we will need
     // to call getMore().
     BSONObj groupCmdObj = fromjson(R"({

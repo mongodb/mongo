@@ -42,7 +42,7 @@
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -516,8 +516,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMultipleExpandablesSequentially) {
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineWithExpandableStage) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -567,8 +566,7 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) 
 }
 
 TEST_F(LiteParsedDesugarerTest, NoopOnLookupSubpipelineWithNonExpandableStages) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
     // Create [$lookup] with subpipeline [$match]. No expandable stages, desugar should return
     // false.
     auto lookupStage = makeLookupWithSubpipeline({BSON("$match" << BSON("a" << 1))});
@@ -582,8 +580,7 @@ TEST_F(LiteParsedDesugarerTest, NoopOnLookupSubpipelineWithNonExpandableStages) 
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -609,8 +606,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsSubpipelineAndTopLevelExpandableStage) {
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsAllSubpipelinesInFacetStage) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -637,8 +633,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsAllSubpipelinesInFacetStage) {
 }
 
 TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =
         std::string(extension::sdk::shared_test_stages::kExpandToHostParseName);
@@ -677,8 +672,7 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
 // the lifted content will be [$match] (desugared). If outermost-first, we'd lift
 // [$expandToHostParse].
 TEST_F(LiteParsedDesugarerTest, DesugaringOrderInnermostFirst) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsInsideHybridSearch",
-                                                     true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagExtensionsInsideHybridSearch", true};
     registerParser(std::string(kLiftSubpipelineStageName), LiftSubpipelineLiteParsed::parse);
     registerParser(extension::AggStageDescriptorHandle(&_expandToHostParseDescriptor));
     const auto extStageName =

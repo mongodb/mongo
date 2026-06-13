@@ -42,7 +42,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -68,7 +68,7 @@ public:
     IndexBuildsManager _indexBuildsManager;
 
 private:
-    RAIIServerParameterControllerForTest _featureFlag{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard _featureFlag{"featureFlagPrimaryDrivenIndexBuilds", true};
 };
 
 void IndexBuildsManagerTest::setUp() {

@@ -60,7 +60,6 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
@@ -70,6 +69,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -3054,13 +3054,13 @@ TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion
     // The behavior should not depend on the feature flag
     // 'gAddTransactionRuntimeContextAsAGenericArgument'.
     {
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
         test(false /* hasTxnCreatedAnyDatabase */);
         test(true /* hasTxnCreatedAnyDatabase */);
     }
     {
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
         test(false /* hasTxnCreatedAnyDatabase */);
         test(true /* hasTxnCreatedAnyDatabase */);
@@ -3096,13 +3096,13 @@ TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion
     // The behavior should not depend on the feature flag
     // 'gAddTransactionRuntimeContextAsAGenericArgument'.
     {
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
         test(false /* hasTxnCreatedAnyDatabase */);
         test(true /* hasTxnCreatedAnyDatabase */);
     }
     {
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
         test(false /* hasTxnCreatedAnyDatabase */);
         test(true /* hasTxnCreatedAnyDatabase */);
@@ -3177,14 +3177,14 @@ TEST_F(TransactionRouterTest,
 
     {
         const bool ffEnabled = false;
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
         test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
         test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
     }
     {
         const bool ffEnabled = true;
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
         test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
         test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
@@ -3264,14 +3264,14 @@ TEST_F(TransactionRouterTest,
 
     {
         const bool ffEnabled = false;
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
         test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
         test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
     }
     {
         const bool ffEnabled = true;
-        RAIIServerParameterControllerForTest ff(
+        unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
         test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
         test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);

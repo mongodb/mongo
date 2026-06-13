@@ -44,7 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -226,7 +226,7 @@ TEST_F(PlanExplainerTest, ClassicSingleSolutionPlanExplain) {
 
 TEST_F(PlanExplainerTest, SBESingleSolutionPlanExplain) {
     // Same as above, but with SBE enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
     auto& explainer = exec->getPlanExplainer();
 
@@ -253,7 +253,7 @@ TEST_F(PlanExplainerTest, ClassicSingleSolutionPlanExplainDiagnostics) {
 
 TEST_F(PlanExplainerTest, SBESingleSolutionPlanExplainDiagnostics) {
     // Same as above, but with SBE enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
 
     auto explainDiagnostics = printExplainDiagnostics(exec.get());
@@ -281,7 +281,7 @@ TEST_F(PlanExplainerTest, ClassicMultiPlannerExplain) {
 
 TEST_F(PlanExplainerTest, SBEMultiPlannerExplain) {
     // Same as above, but with SBE enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     auto& explainer = exec->getPlanExplainer();
 
@@ -308,7 +308,7 @@ TEST_F(PlanExplainerTest, ClassicMultiPlannerExplainDiagnostics) {
 
 TEST_F(PlanExplainerTest, SBEMultiPlannerExplainDiagnostics) {
     // Same as above, but with SBE enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
 
     auto explainDiagnostics = printExplainDiagnostics(exec.get());
@@ -388,8 +388,8 @@ TEST_F(PlanExplainerTest, ExpressPlanExecStatsIncludeExecutionTime) {
 TEST_F(PlanExplainerTest, ExpressPlanExecStatsIncludeNanoExecutionTime) {
     // With the nanosecond-precision knob enabled, the express stage output should expose
     // 'executionTimeMicros' and 'executionTimeNanos' alongside the millisecond estimate.
-    RAIIServerParameterControllerForTest nanosController(
-        "internalMeasureQueryExecutionTimeInNanoseconds", true);
+    unittest::ServerParameterGuard nanosController("internalMeasureQueryExecutionTimeInNanoseconds",
+                                                   true);
     expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
     auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
     auto& explainer = exec->getPlanExplainer();
@@ -423,7 +423,7 @@ TEST_F(PlanExplainerTest, ClassicPipelinePlanExplain) {
 
 TEST_F(PlanExplainerTest, SBEPipelinePlanExplain) {
     // Same as above, with SBE enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     auto stages =
         std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
                     fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
@@ -449,7 +449,7 @@ TEST_F(PlanExplainerTest, ClassicPipelinePlanExplainDiagnostics) {
 
 TEST_F(PlanExplainerTest, SBEPipelinePlanExplainDiagnostics) {
     // Same as above, with SBE enabled.
-    RAIIServerParameterControllerForTest sbeFullController("featureFlagSbeFull", true);
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     auto stages =
         std::vector{fromjson("{$match: {a: {$gte: 0}, b: {$gte: 0}}}"),
                     fromjson("{$redact: {$cond: {if: '$a', then: '$$PRUNE', else: '$$DESCEND'}}}")};
@@ -665,7 +665,7 @@ TEST_F(PlanExplainerTest, PlanExplainerDataMergeFull) {
 TEST_F(PlanExplainerTest, CBRSamplingMetadataSerializedInExplain) {
     // Verify that when CBR uses sampling CE, the 'ceSamplingMetadata' section appears in the
     // queryPlanner explain output and contains the expected fields for each collection.
-    RAIIServerParameterControllerForTest samplingController("internalQueryCBRCEMode", "samplingCE");
+    unittest::ServerParameterGuard samplingController("internalQueryCBRCEMode", "samplingCE");
 
     const auto verbosity = ExplainOptions::Verbosity::kQueryPlanner;
     expCtx->setExplain(verbosity);

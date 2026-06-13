@@ -335,7 +335,7 @@ class SorterTypedTest : public ServiceContextMongoDTest {
 public:
     static_assert(test::StorageTraits<Traits>);
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 
 protected:
     void SetUp() override {

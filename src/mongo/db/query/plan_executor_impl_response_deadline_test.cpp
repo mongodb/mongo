@@ -44,10 +44,10 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -205,7 +205,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest,
     auto opCtx = makeOperationContext();
 
     // 100 seconds – far enough in the future that the deadline will never fire in a unit test.
-    RAIIServerParameterControllerForTest controller("internalOperationResponseMaxMS", 100000LL);
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 100000LL);
 
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), kNss);
     DocumentSourceChangeStreamSpec spec;
@@ -250,7 +250,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest,
 // This verifies the core kInterruptWork deadline behaviour.
 TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
        ChangeStreamQuery_SmallKnob_DeadlineExpiredOnYield_ReturnsEOF) {
-    RAIIServerParameterControllerForTest controller("internalOperationResponseMaxMS", 1LL);
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 1LL);
 
     auto opCtx = operationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
@@ -293,7 +293,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
 // 100 000 ms deadline, so IS_EOF is never triggered.
 TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
        ChangeStreamQuery_LargeKnob_DeadlineNotExpired_ReturnsAllDocuments) {
-    RAIIServerParameterControllerForTest controller("internalOperationResponseMaxMS", 100000LL);
+    unittest::ServerParameterGuard controller("internalOperationResponseMaxMS", 100000LL);
 
     auto opCtx = operationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);

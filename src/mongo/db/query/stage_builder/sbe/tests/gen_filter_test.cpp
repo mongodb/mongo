@@ -44,7 +44,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -435,7 +435,7 @@ public:
 };
 
 TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFElision) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
 
     auto root = BSON("a" << BSON("b" << 1) << "c" << BSON("d" << 1));
     auto rootSlotId = _env->registerSlot("root"_sd,
@@ -458,7 +458,7 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFEli
 }
 
 TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArrayness) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
 
     // Document with scalar intermediate: "a" is 42, so getField(42, "b") returns Nothing.
     // All null-matching predicates should return true (field path doesn't exist).

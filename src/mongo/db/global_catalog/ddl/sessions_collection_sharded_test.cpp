@@ -44,8 +44,8 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -89,8 +89,7 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionOKTest) {
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
     for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", uweFlag);
         auto future = launchAsync([&] {
             auto now = Date_t::now();
             auto thePast = now - Minutes(5);
@@ -165,8 +164,7 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
     loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString::kLogicalSessionsNamespace,
                                                   BSON("_id" << 1));
     for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", uweFlag);
 
         auto future = launchAsync([&] {
             auto now = Date_t::now();
@@ -200,8 +198,7 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionOKTest) {
                                                   BSON("_id" << 1));
 
     for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", uweFlag);
 
         auto future = launchAsync([&] {
             _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()});
@@ -238,8 +235,7 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
                                                   BSON("_id" << 1));
 
     for (auto uweFlag : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweFlag);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", uweFlag);
 
         auto future = launchAsync([&] {
             _collection.removeRecords(operationContext(), {makeLogicalSessionIdForTest()});

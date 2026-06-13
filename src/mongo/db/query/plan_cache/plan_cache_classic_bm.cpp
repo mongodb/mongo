@@ -317,7 +317,7 @@ std::unique_ptr<QueryPlannerParams> extractFromBmParams(
 template <typename Query>
 void BM_PlanCacheClassic(benchmark::State& state) {
     PlanCacheClassicBenchmarkParameters bmParams(state);
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
+    unittest::ServerParameterGuard truncateFeatureFlag{
         "internalQueryPlannerEnableSortIndexIntersection", true};
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

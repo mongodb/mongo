@@ -55,9 +55,9 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -238,9 +238,9 @@ private:
             ->alwaysAllowWrites(true);
     }
 
-    boost::optional<RAIIServerParameterControllerForTest> _containerWritesEnabled;
-    boost::optional<RAIIServerParameterControllerForTest> _pdibEnabled;
-    boost::optional<RAIIServerParameterControllerForTest> _resumableEnabled;
+    boost::optional<unittest::ServerParameterGuard> _containerWritesEnabled;
+    boost::optional<unittest::ServerParameterGuard> _pdibEnabled;
+    boost::optional<unittest::ServerParameterGuard> _resumableEnabled;
 };
 
 TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
@@ -326,7 +326,7 @@ TEST_F(MultiIndexBlockResumableTest, DuplicateKeyRecordingSurvivesWriteConflict)
     auto* opCtx = operationContext();
     // Batch size >1 keeps both keys in the same in-memory batch, so the recordDuplicateKey insert
     // is the first time the WCE will hit.
-    RAIIServerParameterControllerForTest insertionBatchSize{
+    unittest::ServerParameterGuard insertionBatchSize{
         "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
     auto indexer = getIndexer();
     indexer->setBuildUUID(UUID::gen());
@@ -991,9 +991,9 @@ TEST_F(MultiIndexBlockTest, AbortDropsTemporaryTables) {
 // per-build internal WT table whose ident matches ident::generateNewIndexBuildIdent(buildUUID),
 // and MultiIndexBlock::commit must drop it.
 TEST_F(MultiIndexBlockTest, CommitDropsResumablePrimaryDrivenIndexBuildTable) {
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest resumableEnabled{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
 
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
@@ -1046,7 +1046,7 @@ TEST_F(MultiIndexBlockTest, CommitDropsResumablePrimaryDrivenIndexBuildTable) {
 // When the build is not resumable, MultiIndexBlock::init must NOT eagerly create the per-build
 // internal index build table — even if the container-write behavior is kReplicate.
 TEST_F(MultiIndexBlockTest, InitSkipsResumablePrimaryDrivenIndexBuildTableWhenNotResumable) {
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
 
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
@@ -1088,9 +1088,9 @@ TEST_F(MultiIndexBlockTest, InitSkipsResumablePrimaryDrivenIndexBuildTableWhenNo
 // per-build internal WT table whose ident matches ident::generateNewIndexBuildIdent(buildUUID),
 // and MultiIndexBlock::abort must drop it.
 TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest resumableEnabled{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
 
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
@@ -1136,10 +1136,10 @@ TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
 // transition into kDrainWrites and persist a ResumeIndexInfo with that phase to the replicated
 // internal-indexBuild-<UUID> table.
 TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest resumableEnabled{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
 
     // Container writes refuse if we're not the primary; the fixture's mock returns false from
     // canAcceptWritesFor by default, so allow writes explicitly.
@@ -1227,10 +1227,10 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
 }
 
 TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest resumableEnabled{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
 
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
@@ -1360,10 +1360,10 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
 // generation's collection scan inserts no new records (e.g. resumed from kCollectionScan or
 // kBulkLoad phase with no remaining records to process in this generation).
 TEST_F(MultiIndexBlockTest, ResumedPdibPersistsStateOnFirstDrainWithNoNewRecords) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     // Force frequent sorter spills so the first build's scan persists kCollectionScan state.
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
@@ -1468,10 +1468,10 @@ TEST_F(MultiIndexBlockTest, ResumedPdibPersistsStateOnFirstDrainWithNoNewRecords
 // initialized. Drain entry must skip the persist (rather than null-deref in _constructStateObject)
 // and not leave a resume record on disk.
 TEST_F(MultiIndexBlockTest, PdibSkipsResumeStateOnEmptyCollection) {
-    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest resumableEnabled{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard containerWritesEnabled{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableEnabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true};
 
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
@@ -1530,9 +1530,9 @@ TEST_F(MultiIndexBlockTest, PdibSkipsResumeStateOnEmptyCollection) {
 // With the resumable PDIB feature flag disabled, drainBackgroundWrites does not persist
 // resume info even on the PDIB path.
 TEST_F(MultiIndexBlockTest, PdibDoesNotPersistResumeStateWhenFeatureFlagOff) {
-    RAIIServerParameterControllerForTest pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest resumableDisabled{
-        "featureFlagResumablePrimaryDrivenIndexBuilds", false};
+    unittest::ServerParameterGuard pdibEnabled{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard resumableDisabled{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     false};
 
     auto indexer = getIndexer();
     const auto buildUUID = UUID::gen();
@@ -1871,10 +1871,10 @@ KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
 }
 
 TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     promoteMockReplCoordToPrimary(getServiceContext());
     static_cast<repl::ReplicationCoordinatorMock*>(
@@ -1976,10 +1976,10 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
 // When the build is hybrid (kDoNotReplicate), persistResumeState must not go through the
 // container-write path even if the resumable PDIB feature flag is on.
 TEST_F(MultiIndexBlockTest, HybridBuildDoesNotUseContainerWrites) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     promoteMockReplCoordToPrimary(getServiceContext());
     auto& observer = installResumeStateContainerObserver(operationContext());
@@ -2021,10 +2021,10 @@ TEST_F(MultiIndexBlockTest, HybridBuildDoesNotUseContainerWrites) {
 }
 
 TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     // Lower the per-build memory limit to 1 MB.
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
@@ -2095,10 +2095,10 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
 }
 
 TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2157,10 +2157,10 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
 }
 
 TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2224,10 +2224,10 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
 }
 
 TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2308,10 +2308,10 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes)
 // initialized from that state must reopen the existing tables and resume the scan from the saved
 // position rather than starting over.
 TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2422,10 +2422,10 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
 // A build that spilled during its scan and then resumed from the scan phase must still be treated
 // as "spilled" even when the resumed scan portion is small enough that it does not spill again.
 TEST_F(MultiIndexBlockTest, ResumeFromScanWithSpilledRangesPersistsLoadPhaseWithoutRespilling) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2533,10 +2533,10 @@ TEST_F(MultiIndexBlockTest, ResumeFromScanWithSpilledRangesPersistsLoadPhaseWith
 }
 
 TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpilledRecordId) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2717,10 +2717,10 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
 }
 
 TEST_F(MultiIndexBlockTest, ResumeRestoresLastSpilledRecordId) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
@@ -2810,11 +2810,11 @@ TEST_F(MultiIndexBlockTest, ResumeRestoresLastSpilledRecordId) {
 }
 
 TEST_F(MultiIndexBlockTest, ResumePdibDuringLoad) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
-    RAIIServerParameterControllerForTest resumeStateInterval{
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+    unittest::ServerParameterGuard resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 5};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
@@ -2948,11 +2948,11 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringLoad) {
 }
 
 TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRanges) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
-    RAIIServerParameterControllerForTest memUsage{"maxIndexBuildMemoryUsageMegabytes", 1};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+    unittest::ServerParameterGuard memUsage{"maxIndexBuildMemoryUsageMegabytes", 1};
 
     promoteMockReplCoordToPrimary(getServiceContext());
 
@@ -3055,10 +3055,10 @@ TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRan
 }
 
 TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     // Lower the per-build memory limit to 1 MB.
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
@@ -3119,10 +3119,10 @@ TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
 }
 
 TEST_F(MultiIndexBlockTest, SeedWriteSurvivesWriteConflict) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     promoteMockReplCoordToPrimary(getServiceContext());
 
@@ -3180,12 +3180,12 @@ TEST_F(MultiIndexBlockTest, SeedWriteSurvivesWriteConflict) {
 }
 
 TEST_F(MultiIndexBlockTest, SpillsDoNotWriteIndexBuildMetadata) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
-    RAIIServerParameterControllerForTest memUsage{"maxIndexBuildMemoryUsageMegabytes", 2};
-    RAIIServerParameterControllerForTest iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+    unittest::ServerParameterGuard memUsage{"maxIndexBuildMemoryUsageMegabytes", 2};
+    unittest::ServerParameterGuard iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1};
 
     promoteMockReplCoordToPrimary(getServiceContext());
     auto& observer = installResumeStateContainerObserver(operationContext());
@@ -3260,19 +3260,19 @@ TEST_F(MultiIndexBlockTest, SpillsDoNotWriteIndexBuildMetadata) {
 
 
 TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBuild) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
     // Force frequent batch commits and resume-state writes during the load phase.
-    RAIIServerParameterControllerForTest insertionBatchSize{
+    unittest::ServerParameterGuard insertionBatchSize{
         "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
-    RAIIServerParameterControllerForTest resumeStateInterval{
+    unittest::ServerParameterGuard resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
     // Periodic load-phase resume-state writes only happen when the build spilled during the scan.
     // Force spilling with a tiny memory budget and large index keys.
-    RAIIServerParameterControllerForTest memUsage{"maxIndexBuildMemoryUsageMegabytes", 2};
-    RAIIServerParameterControllerForTest iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1};
+    unittest::ServerParameterGuard memUsage{"maxIndexBuildMemoryUsageMegabytes", 2};
+    unittest::ServerParameterGuard iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1};
 
     promoteMockReplCoordToPrimary(getServiceContext());
     auto& observer = installResumeStateContainerObserver(operationContext());
@@ -3356,10 +3356,10 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
 }
 
 TEST_F(MultiIndexBlockTest, NonSpillingPrimaryDrivenBuildDoesNotPersistLoadPhase) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
 
     promoteMockReplCoordToPrimary(getServiceContext());
 
@@ -3388,14 +3388,14 @@ TEST_F(MultiIndexBlockTest, NonSpillingPrimaryDrivenBuildDoesNotPersistLoadPhase
 }
 
 TEST_F(MultiIndexBlockTest, NonSpillingPrimaryDrivenBuildSkipsPeriodicLoadResumeStateWrites) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
     // A tiny resume-state interval would trigger periodic load-phase writes if the build spilled.
-    RAIIServerParameterControllerForTest insertionBatchSize{
+    unittest::ServerParameterGuard insertionBatchSize{
         "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
-    RAIIServerParameterControllerForTest resumeStateInterval{
+    unittest::ServerParameterGuard resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -3448,13 +3448,13 @@ TEST_F(MultiIndexBlockTest, NonSpillingPrimaryDrivenBuildSkipsPeriodicLoadResume
 }
 
 TEST_F(MultiIndexBlockTest, LoadDoesNotPeriodicallyWriteWhenNotResumable) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
-    RAIIServerParameterControllerForTest insertionBatchSize{
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+    unittest::ServerParameterGuard insertionBatchSize{
         "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
-    RAIIServerParameterControllerForTest resumeStateInterval{
+    unittest::ServerParameterGuard resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -3506,13 +3506,13 @@ TEST_F(MultiIndexBlockTest, LoadDoesNotPeriodicallyWriteWhenNotResumable) {
 }
 
 TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
-    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
-    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
-                                                     true};
-    RAIIServerParameterControllerForTest insertionBatchSize{
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    unittest::ServerParameterGuard ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                               true};
+    unittest::ServerParameterGuard insertionBatchSize{
         "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
-    RAIIServerParameterControllerForTest resumeStateInterval{
+    unittest::ServerParameterGuard resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
 
     auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);

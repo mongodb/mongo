@@ -30,7 +30,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -95,30 +95,30 @@ protected:
 };
 
 TEST_F(ClusterBulkWriteUWETest, NoErrors) {
-    RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", true);
+    unittest::ServerParameterGuard controller("featureFlagBulkWriteCommand", true);
+    unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", true);
 
     testNoErrors(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
 TEST_F(ClusterBulkWriteUWETest, AttachesAtClusterTimeForSnapshotReadConcern) {
-    RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", true);
+    unittest::ServerParameterGuard controller("featureFlagBulkWriteCommand", true);
+    unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", true);
 
     testAttachesAtClusterTimeForSnapshotReadConcern(kBulkWriteCmdTargeted,
                                                     kBulkWriteCmdScatterGather);
 }
 
 TEST_F(ClusterBulkWriteUWETest, SnapshotReadConcernWithAfterClusterTime) {
-    RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", true);
+    unittest::ServerParameterGuard controller("featureFlagBulkWriteCommand", true);
+    unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", true);
 
     testSnapshotReadConcernWithAfterClusterTime(kBulkWriteCmdTargeted, kBulkWriteCmdScatterGather);
 }
 
 TEST_F(ClusterBulkWriteUWETest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
-    RAIIServerParameterControllerForTest controller("featureFlagBulkWriteCommand", true);
-    RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor", true);
+    unittest::ServerParameterGuard controller("featureFlagBulkWriteCommand", true);
+    unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor", true);
 
     auto asFireAndForgetRequest = [](const BSONObj& cmdObj) {
         BSONObjBuilder bob(cmdObj);

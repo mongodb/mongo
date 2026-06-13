@@ -59,7 +59,7 @@ protected:
     }
 
     UUID createViewfulTimeseriesCollection(const NamespaceString& nss) {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         createTimeseriesCollection(nss);
         auto collPtr =
@@ -73,7 +73,7 @@ protected:
     }
 
     UUID createViewlessTimeseriesCollection(const NamespaceString& nss) {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         createTimeseriesCollection(nss);
         auto collPtr = CollectionCatalog::get(operationContext())
@@ -120,7 +120,7 @@ protected:
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeOne) {
     auto uuid1 = createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1);
     assertIsViewlessTimeseries(nss1, uuid1);
@@ -129,7 +129,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeOne) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeOne) {
     auto uuid1 = createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(operationContext(), nss1);
     assertIsViewfulTimeseries(nss1, uuid1);
@@ -141,7 +141,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeOne) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeOneWithExpectedUUID) {
     auto uuid1 = createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1, uuid1 /* expectedUUID */);
     assertIsViewlessTimeseries(nss1, uuid1);
@@ -150,7 +150,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeOneWithExpectedUUID) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeIdempotency) {
     auto uuid1 = createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1);
     assertIsViewlessTimeseries(nss1, uuid1);
@@ -159,7 +159,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeIdempotency) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeOneWithExpectedUUID) {
     auto uuid1 = createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(operationContext(), nss1, uuid1 /* expectedUUID */);
     assertIsViewfulTimeseries(nss1, uuid1);
@@ -168,7 +168,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeOneWithExpectedUUID) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeIdempotency) {
     auto uuid = createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(operationContext(), nss1);
     assertIsViewfulTimeseries(nss1, uuid);
@@ -183,7 +183,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeIdempotency) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradedOptionsConsistentWithNewViewless) {
     createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1);
 
@@ -210,7 +210,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradedOptionsConsistentWithNewV
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradedOptionsConsistentWithNewViewful) {
     createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(operationContext(), nss1);
 
@@ -246,7 +246,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeMany) {
     auto uuid1 = createViewfulTimeseriesCollection(nss1);
     auto uuid2 = createViewfulTimeseriesCollection(nss2);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeAllTimeseriesToViewless(operationContext());
     assertIsViewlessTimeseries(nss1, uuid1);
@@ -257,7 +257,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeMany) {
     auto uuid1 = createViewlessTimeseriesCollection(nss1);
     auto uuid2 = createViewlessTimeseriesCollection(nss2);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeAllTimeseriesFromViewless(operationContext());
     assertIsViewfulTimeseries(nss1, uuid1);
@@ -270,7 +270,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeMany) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeWithoutView) {
     auto uuid1 = createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1);
     assertIsViewlessTimeseries(nss1, uuid1);
@@ -282,7 +282,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingCollec
     ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
     operationContext()->setEnforceConstraints(true);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1);
     assertIsTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace(), uuid1);
@@ -300,7 +300,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingView) 
     ASSERT_OK(createCollection(operationContext(), createViewCmd));
     operationContext()->setEnforceConstraints(true);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     upgradeToViewlessTimeseries(operationContext(), nss1);
     assertIsTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace(), uuid1);
@@ -311,7 +311,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingView) 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreation) {
     auto uuid = createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(
         operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
@@ -333,7 +333,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreation) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreationIdempotency) {
     auto uuid = createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     downgradeFromViewlessTimeseries(
@@ -356,7 +356,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreationIdem
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeReturnsOk) {
     createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_OK(canUpgradeToViewlessTimeseries(operationContext(), nss1));
@@ -365,7 +365,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeReturnsOk) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeReturnsOkWhenAlreadyConverted) {
     createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_OK(canUpgradeToViewlessTimeseries(operationContext(), nss1));
@@ -374,7 +374,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeReturnsOkWhenAlreadyCon
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsWithoutFeatureFlag) {
     createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
@@ -385,7 +385,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsWhenBucketsNotFoun
     // Create a regular collection (not timeseries) at the main namespace
     ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
@@ -399,7 +399,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingColle
     ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
     operationContext()->setEnforceConstraints(true);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
@@ -417,7 +417,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingView)
     ASSERT_OK(createCollection(operationContext(), createViewCmd));
     operationContext()->setEnforceConstraints(true);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
@@ -428,7 +428,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeSucceedsWithoutView) {
     // Buckets collection without a view (buckets-only)
     createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_OK(canUpgradeToViewlessTimeseries(operationContext(), nss1));
@@ -440,7 +440,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeSucceedsWithoutView) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeReturnsOk) {
     createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_OK(canDowngradeFromViewlessTimeseries(operationContext(), nss1));
@@ -449,7 +449,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeReturnsOk) {
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeReturnsOkWhenAlreadyConverted) {
     createViewfulTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_OK(canDowngradeFromViewlessTimeseries(operationContext(), nss1));
@@ -461,7 +461,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
     // This happens after downgrade with skipViewCreation=true.
     createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     // Must pass skipViewCreation=true to match the non-primary shard scenario
@@ -474,7 +474,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
     // Buckets collection exists but no view - with skipViewCreation=false this should fail
     createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     // Without skipViewCreation, we expect an error because the view is missing
@@ -485,7 +485,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithFeatureFlag) {
     createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
@@ -494,7 +494,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithFeatureFlag)
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWhenCollectionNotFound) {
     // No collection at the namespace
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
@@ -505,7 +505,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWhenNotViewlessT
     // Create a regular collection (not timeseries)
     ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
@@ -516,7 +516,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
     // Create viewless timeseries at main namespace
     createViewlessTimeseriesCollection(nss1);
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     {
@@ -541,8 +541,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
  * A viewless collection with fixedBucketing=true must have that field stripped after downgrade.
  */
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeStripsFixedBucketing) {
-    RAIIServerParameterControllerForTest fixedBucketingFlag("featureFlagFixedBucketingCatalog",
-                                                            true);
+    unittest::ServerParameterGuard fixedBucketingFlag("featureFlagFixedBucketingCatalog", true);
     auto uuid = createViewlessTimeseriesCollection(nss1);
 
     auto* opCtx = operationContext();
@@ -555,7 +554,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeStripsFixedBucketing) {
                ->getFixedBucketing()
                .has_value());
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(opCtx, nss1);
 

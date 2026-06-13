@@ -60,10 +60,10 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -222,7 +222,7 @@ TEST_F(ReplCoordTest,
 
 TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWithInvalidConfig) {
     // start up, become primary, receive uninitializable config
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     assertStartSuccess(BSON("_id" << "mySet"
                                   << "version" << 2 << "members"
                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -1040,7 +1040,7 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
 }
 
 TEST_F(ReplCoordTest, ReconfigThatKeepsIDWCAtW1WithoutCWWCSetPasses) {
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     assertStartSuccess(BSON("_id" << "mySet"
                                   << "version" << 2 << "members"
                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -2396,7 +2396,7 @@ TEST_F(ReplCoordReconfigTest, MultipleArbitersShouldFailWithoutServerParameter) 
 }
 
 TEST_F(ReplCoordReconfigTest, MultipleArbitersShouldSucceedWithServerParameter) {
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     multipleArbiterTest(true);
 }
 

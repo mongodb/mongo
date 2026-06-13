@@ -65,7 +65,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/db/views/view_graph.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -834,7 +834,7 @@ public:
 };
 
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     const NamespaceString viewName =
         NamespaceString::createNamespaceString_forTest(db()->name(), "view");
     const NamespaceString viewOn =
@@ -848,8 +848,8 @@ TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeature
 }
 
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOn) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString viewName =
         NamespaceString::createNamespaceString_forTest(db()->name(), "view");
     const NamespaceString viewOn =
@@ -863,7 +863,7 @@ TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeature
 }
 
 TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     const NamespaceString viewName =
         NamespaceString::createNamespaceString_forTest(db()->name(), "db1.view");
     const NamespaceString viewOn =
@@ -880,8 +880,8 @@ TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOff) 
 }
 
 TEST_F(ServerlessViewCatalogFixture, ModifyViewBelongingToTenantFeatureFlagOn) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString viewName =
         NamespaceString::createNamespaceString_forTest(db()->name(), "db1.view");
     const NamespaceString viewOn =

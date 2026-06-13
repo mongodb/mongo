@@ -38,7 +38,7 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -102,7 +102,7 @@ TEST_F(CatalogHelperTest, catalogWritesPlainViewAcquiresSystemViews) {
 TEST_F(CatalogHelperTest, catalogWritesViewfulTimeseriesAcquiresSystemViews) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     CreateCommand cmd(_mainNss);
@@ -123,7 +123,7 @@ TEST_F(CatalogHelperTest, catalogWritesViewfulTimeseriesAcquiresSystemViews) {
 TEST_F(CatalogHelperTest, catalogWritesViewlessTimeseriesDoesNotAcquireSystemViews) {
     auto opCtx = operationContext();
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     CreateCommand cmd(_mainNss);

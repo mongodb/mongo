@@ -66,6 +66,7 @@
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_results.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -981,7 +982,7 @@ public:
     CollectionOptions _options;
     collection_validation::ValidateMode _validateMode{
         collection_validation::ValidateMode::kForeground};
-    RAIIServerParameterControllerForTest _allowCorruptTimeseriesBuckets;
+    unittest::ServerParameterGuard _allowCorruptTimeseriesBuckets;
 
 protected:
     void setUp() override {

@@ -83,7 +83,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -900,8 +900,7 @@ TEST_F(RecordIdsReplicatedDatabaseTest, ProviderRequiresRecordIds_TrueWithoutFea
 // When the feature flag is enabled and the provider does not mandate RecordIds replication,
 // collections must still be created with recordIdsReplicated:true.
 TEST_F(RecordIdsReplicatedDatabaseTest, FeatureFlagEnabled_TrueWithoutProvider) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRecordIdsReplicated",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRecordIdsReplicated", true);
 
     auto opCtx = _opCtx.get();
     createTestCollection(opCtx, _testNss);
@@ -947,8 +946,7 @@ Status attemptUserCreateTimeseriesNS(OperationContext* opCtx,
 }
 
 TEST_F(DatabaseTest, UserCreateNSRejectsLegacyBucketsWhenViewlessTimeseriesEnabled) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              true);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
     const auto bucketsNss =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     ASSERT_THROWS_WITH_CHECK(
@@ -961,16 +959,14 @@ TEST_F(DatabaseTest, UserCreateNSRejectsLegacyBucketsWhenViewlessTimeseriesEnabl
 }
 
 TEST_F(DatabaseTest, UserCreateNSAllowsLegacyBucketsFromMigrateWhenViewlessTimeseriesEnabled) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              true);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
     const auto bucketsNss =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/true));
 }
 
 TEST_F(DatabaseTest, UserCreateNSRejectsViewlessTimeseriesWhenFlagDisabled) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              false);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", false);
     ASSERT_THROWS_WITH_CHECK(
         attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/false),
         DBException,
@@ -983,8 +979,7 @@ TEST_F(DatabaseTest, UserCreateNSRejectsViewlessTimeseriesWhenFlagDisabled) {
 // fromMigrate is not enough to bypass the guard once the FCV is fully downgraded.
 TEST_F(DatabaseTest,
        UserCreateNSRejectsViewlessTimeseriesFromMigrateWhenFlagDisabledAndFullyDowngraded) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              false);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", false);
     ASSERT_THROWS_WITH_CHECK(
         attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/true),
         DBException,
@@ -1013,8 +1008,7 @@ private:
 // migrations and other operations that perform collection cloning can be executed.
 TEST_F(DatabaseTest,
        UserCreateNSAllowsViewlessTimeseriesFromMigrateWhenFlagDisabledAndFCVTransitioning) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              false);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", false);
     // (Generic FCV reference): test usage
     ScopedFCV fcv(multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
 
@@ -1026,24 +1020,22 @@ TEST_F(DatabaseTest, UserCreateNSTimeseriesMismatchCheckSkippedByFailPoint) {
 
     // Flag ON + legacy buckets would normally tassert 12392800.
     {
-        RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                                  true);
+        unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
         const auto bucketsNss =
             NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
         ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/false));
     }
     // Flag OFF + viewless TS would normally tassert 12392801.
     {
-        RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                                  false);
+        unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections",
+                                            false);
         const auto viewlessNss = NamespaceString::createNamespaceString_forTest("test.vl");
         ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), viewlessNss, /*fromMigrate=*/false));
     }
 }
 
 TEST_F(DatabaseTest, UserCreateNSTimeseriesMismatchCheckSkippedWhenNotEnforcingConstraints) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              true);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
 
     auto opCtx = _opCtx.get();
     opCtx->setEnforceConstraints(false);
@@ -1056,14 +1048,12 @@ TEST_F(DatabaseTest, UserCreateNSTimeseriesMismatchCheckSkippedWhenNotEnforcingC
 
 // Regression: matching flag/NS combinations must keep succeeding.
 TEST_F(DatabaseTest, UserCreateNSAllowsViewlessTimeseriesWhenFlagEnabled) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              true);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", true);
     ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), _nss, /*fromMigrate=*/false));
 }
 
 TEST_F(DatabaseTest, UserCreateNSAllowsLegacyBucketsWhenFlagDisabled) {
-    RAIIServerParameterControllerForTest flag("featureFlagCreateViewlessTimeseriesCollections",
-                                              false);
+    unittest::ServerParameterGuard flag("featureFlagCreateViewlessTimeseriesCollections", false);
     const auto bucketsNss =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     ASSERT_OK(attemptUserCreateTimeseriesNS(_opCtx.get(), bucketsNss, /*fromMigrate=*/false));

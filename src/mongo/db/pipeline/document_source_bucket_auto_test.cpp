@@ -47,7 +47,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -416,7 +416,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
     expCtx->setTempDir(tempDir.path());
     expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
-    RAIIServerParameterControllerForTest queryKnobController(
+    unittest::ServerParameterGuard queryKnobController(
         "internalDocumentSourceBucketAutoMaxMemoryBytes",
         static_cast<long long>(maxMemoryUsageBytes));
 
@@ -466,7 +466,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
     expCtx->setTempDir(tempDir.path());
     expCtx->setAllowDiskUse(true);
     const size_t maxMemoryUsageBytes = 1000;
-    RAIIServerParameterControllerForTest queryKnobController(
+    unittest::ServerParameterGuard queryKnobController(
         "internalDocumentSourceBucketAutoMaxMemoryBytes",
         static_cast<long long>(maxMemoryUsageBytes));
 
@@ -827,7 +827,7 @@ TEST_F(BucketAutoTests, FailsWithInvalidOutputFieldName) {
 
 void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const size_t maxMemoryUsageBytes = 1000;
-    RAIIServerParameterControllerForTest queryKnobController(
+    unittest::ServerParameterGuard queryKnobController(
         "internalDocumentSourceBucketAutoMaxMemoryBytes",
         static_cast<long long>(maxMemoryUsageBytes));
 
@@ -868,7 +868,7 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 2000;
-    RAIIServerParameterControllerForTest queryKnobController(
+    unittest::ServerParameterGuard queryKnobController(
         "internalDocumentSourceBucketAutoMaxMemoryBytes",
         static_cast<long long>(maxMemoryUsageBytes));
 
@@ -1224,8 +1224,8 @@ TEST_F(BucketAutoTests, BucketAutoWithPushRespectsMemoryLimit) {
     // an upper bound, while the infrastructure that processes each element in the accumulator takes
     // up ~120 bytes. We should require 136 * 100 + 120 bytes for this operation to succeed, but
     // we'll round up to the nearest 500 for buffer.
-    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxPushBytes",
-                                                             kDebugBuild ? 14000 : 11500);
+    unittest::ServerParameterGuard queryKnobController("internalQueryMaxPushBytes",
+                                                       kDebugBuild ? 14000 : 11500);
     std::deque<Document> docs;
     for (size_t i = 0; i < 100; i++) {
         docs.push_back(
@@ -1236,7 +1236,7 @@ TEST_F(BucketAutoTests, BucketAutoWithPushRespectsMemoryLimit) {
     ASSERT_EQUALS(results.size(), 1UL);
 
     // Decrease the memory limit and run again, asserting that we hit an error.
-    RAIIServerParameterControllerForTest queryKnobController2("internalQueryMaxPushBytes", 9600);
+    unittest::ServerParameterGuard queryKnobController2("internalQueryMaxPushBytes", 9600);
     ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
 }
 
@@ -1257,8 +1257,8 @@ TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
     // an upper bound, while the infrastructure that processes each element in the accumulator takes
     // up ~120 bytes. We should require 136 * 100 + 120 bytes for this operation to succeed, but
     // we'll round up to the nearest 500 for buffer.
-    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxConcatArraysBytes",
-                                                             kDebugBuild ? 14000 : 11500);
+    unittest::ServerParameterGuard queryKnobController("internalQueryMaxConcatArraysBytes",
+                                                       kDebugBuild ? 14000 : 11500);
     std::deque<Document> docs;
     for (size_t i = 0; i < 100; i++) {
         docs.push_back(
@@ -1269,8 +1269,7 @@ TEST_F(BucketAutoTests, BucketAutoWithConcatArraysRespectsMemoryLimit) {
     ASSERT_EQUALS(results.size(), 1UL);
 
     // Decrease the memory limit and run again, asserting that we hit an error.
-    RAIIServerParameterControllerForTest queryKnobController2("internalQueryMaxConcatArraysBytes",
-                                                              9600);
+    unittest::ServerParameterGuard queryKnobController2("internalQueryMaxConcatArraysBytes", 9600);
     ASSERT_THROWS_CODE(getResults(spec, docs), AssertionException, ErrorCodes::ExceededMemoryLimit);
 }
 

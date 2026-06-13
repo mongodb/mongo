@@ -39,9 +39,9 @@
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/db/service_context.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -156,7 +156,7 @@ TEST_F(FaultManagerTest, ProgressMonitorCheck) {
 
 TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
     resetManager(std::make_unique<FaultManagerConfig>());
-    RAIIServerParameterControllerForTest _intervalController{
+    unittest::ServerParameterGuard _intervalController{
         "healthMonitoringIntervals",
         BSON("values" << BSON_ARRAY(BSON("type" << "test"
                                                 << "interval" << 1)))};
@@ -194,11 +194,11 @@ TEST_F(FaultManagerTest, PeriodicHealthCheckOnErrorMakesBadHealthStatus) {
 TEST_F(FaultManagerTest,
        DeadlineFutureCausesTransientFaultWhenObserverBlocksAndGetsResolvedWhenObserverUnblocked) {
     resetManager(std::make_unique<FaultManagerConfig>());
-    RAIIServerParameterControllerForTest _intervalController{
+    unittest::ServerParameterGuard _intervalController{
         "healthMonitoringIntervals",
         BSON("values" << BSON_ARRAY(BSON("type" << "test"
                                                 << "interval" << 1)))};
-    RAIIServerParameterControllerForTest _serverParamController{"activeFaultDurationSecs", 5};
+    unittest::ServerParameterGuard _serverParamController{"activeFaultDurationSecs", 5};
 
     AtomicWord<bool> shouldBlock{true};
     registerMockHealthObserver(

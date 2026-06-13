@@ -46,7 +46,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -197,8 +197,8 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
     auto initialBalance = retryBudget.getBalance_forTest();
 
     {
-        auto _ = RAIIServerParameterControllerForTest{"shardRetryTokenBucketCapacity",
-                                                      retryBudget.getBalance_forTest() + 1};
+        auto _ = unittest::ServerParameterGuard{"shardRetryTokenBucketCapacity",
+                                                retryBudget.getBalance_forTest() + 1};
         retryStrategy.recordSuccess(firstShardHostAndPort);
         ASSERT_GT(retryBudget.getBalance_forTest(), initialBalance);
     }
@@ -221,7 +221,7 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
     constexpr auto kReturnRate = 0.5;
 
     {
-        auto _ = RAIIServerParameterControllerForTest{"shardRetryTokenReturnRate", kReturnRate};
+        auto _ = unittest::ServerParameterGuard{"shardRetryTokenReturnRate", kReturnRate};
         // We consume some tokens in order to be able to observe the return rate.
         for (int i = 0; i < 2; ++i) {
             ASSERT(retryStrategy.recordFailureAndEvaluateShouldRetry(
@@ -417,8 +417,7 @@ TEST_F(ShardRemoteTest, FindOnConfigFromShardRespectsDefaultConfigCommandTimeout
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     // Set the timeout for config commands to 1 second.
     auto timeoutMs = 1000;
-    RAIIServerParameterControllerForTest configCommandTimeout{"defaultConfigCommandTimeoutMS",
-                                                              timeoutMs};
+    unittest::ServerParameterGuard configCommandTimeout{"defaultConfigCommandTimeoutMS", timeoutMs};
 
     auto kConfigShard = ShardId("config");
     auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), kConfigShard));

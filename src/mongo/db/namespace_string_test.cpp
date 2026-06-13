@@ -33,8 +33,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
@@ -648,7 +648,7 @@ TEST_F(NamespaceStringTest, isDbOnly) {
 }
 
 TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyColl) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", false);
     TenantId tenantId(OID::gen());
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTest");
     auto nssInclColl = makeNamespaceString(dbName, "coll");
@@ -660,7 +660,7 @@ TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyColl) {
 
 
 TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyCollMultitenancy) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTest");
     auto nssInclColl = makeNamespaceString(dbName, "coll");

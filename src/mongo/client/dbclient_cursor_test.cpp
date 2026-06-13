@@ -43,9 +43,9 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -233,11 +233,11 @@ TEST_F(DBClientCursorTest, DBClientCursorGetMoreWithTenant) {
         NamespaceString::createNamespaceString_forTest(tenantId, "test", "coll");
     FindCommandRequest findCmd{nss};
 
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
         cursor.setBatchSize(2);

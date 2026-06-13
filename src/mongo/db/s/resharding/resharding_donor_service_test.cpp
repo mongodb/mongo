@@ -57,11 +57,11 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -552,7 +552,7 @@ private:
     const int64_t _numDeletes = 2;
 
     // Set the batch size 1 to test multi-batch processing in unit tests with multiple events.
-    RAIIServerParameterControllerForTest _batchSize{
+    unittest::ServerParameterGuard _batchSize{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", 1};
 
 protected:

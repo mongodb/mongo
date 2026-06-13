@@ -1082,7 +1082,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
     auto batchSize = 2;
     auto smoothingFactor = 0.3;
 
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     loadCatalogCacheValues();
@@ -1094,10 +1094,10 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
                   "movingAvgFeatureFlag"_attr = movingAvgFeatureFlag,
                   "movingAvgServerParameter"_attr = movingAvgServerParameter);
 
-            const RAIIServerParameterControllerForTest movingAvgFeatureFlagRAII{
+            const unittest::ServerParameterGuard movingAvgFeatureFlagRAII{
                 "featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage",
                 movingAvgFeatureFlag};
-            const RAIIServerParameterControllerForTest movingAvgServerParameterRAII{
+            const unittest::ServerParameterGuard movingAvgServerParameterRAII{
                 "reshardingRemainingTimeEstimateBasedOnMovingAverage", movingAvgServerParameter};
 
             // Verify that the average started out uninitialized.

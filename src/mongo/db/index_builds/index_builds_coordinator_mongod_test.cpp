@@ -42,9 +42,9 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -600,8 +600,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTwoPhaseBuildAfterShutdown) 
 
 TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterStepdown) {
     // TODO (SERVER-116165): Remove feature flag controllers.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     otel::metrics::OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
@@ -627,8 +627,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterStepd
 
 TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterShutdown) {
     // TODO (SERVER-116165): Remove feature flag controllers.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     otel::metrics::OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
@@ -654,8 +654,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterShutd
 
 TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterAbort) {
     // TODO (SERVER-116165): Remove feature flag controllers.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     otel::metrics::OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {

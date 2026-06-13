@@ -44,6 +44,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/observable_mutex_registry.h"
@@ -177,8 +178,7 @@ protected:
 // code that behaves differently between paths.
 class ReplicatedFastCountManagerLegacyMetricsTest : public ReplicatedFastCountManagerMetricsTest {
 protected:
-    RAIIServerParameterControllerForTest _ffDurability{"featureFlagReplicatedFastCountDurability",
-                                                       false};
+    unittest::ServerParameterGuard _ffDurability{"featureFlagReplicatedFastCountDurability", false};
 };
 
 TEST_F(ReplicatedFastCountManagerLegacyMetricsTest,
@@ -554,10 +554,10 @@ protected:
             return;
         }
 
-        _ffDurability = std::make_unique<RAIIServerParameterControllerForTest>(
+        _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
             "featureFlagReplicatedFastCountDurability", true);
-        _ffContainerWrites = std::make_unique<RAIIServerParameterControllerForTest>(
-            "featureFlagContainerWrites", true);
+        _ffContainerWrites =
+            std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
 
         ASSERT_OK(createInternalFastCountContainers(opCtx,
                                                     NamespaceString::kAdminCommandNamespace,
@@ -582,8 +582,8 @@ protected:
     OtelMetricsCapturer capturer;
 
 private:
-    std::unique_ptr<RAIIServerParameterControllerForTest> _ffDurability;
-    std::unique_ptr<RAIIServerParameterControllerForTest> _ffContainerWrites;
+    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
+    std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
 };
 
 TEST_P(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {

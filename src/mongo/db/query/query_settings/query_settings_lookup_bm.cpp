@@ -33,8 +33,8 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 
@@ -348,9 +348,9 @@ protected:
     // Indicates how many threads have executed the setup code.
     size_t _configuredThreads = 0;
 
-    boost::optional<RAIIServerParameterControllerForTest> _querySettingsFeatureFlag;
-    boost::optional<RAIIServerParameterControllerForTest> _multitenancyFeatureFlag;
-    boost::optional<RAIIServerParameterControllerForTest> _internalQuerySettingsDisableBackfillFlag;
+    boost::optional<unittest::ServerParameterGuard> _querySettingsFeatureFlag;
+    boost::optional<unittest::ServerParameterGuard> _multitenancyFeatureFlag;
+    boost::optional<unittest::ServerParameterGuard> _internalQuerySettingsDisableBackfillFlag;
 };
 
 class QuerySettingsNotMultitenantLookupBenchmark : public QuerySettingsLookupBenchmark {

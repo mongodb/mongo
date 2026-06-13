@@ -60,12 +60,12 @@
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -586,8 +586,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
 
 TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
 
         auto aggReq = buildAggReq(nss, BSONArray());
@@ -599,8 +598,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) 
 
 TEST_F(AuthorizationSessionTest, CanAggregateEmptyPipelineWithFindAction) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -616,8 +614,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateEmptyPipelineWithFindAction) {
 
 TEST_F(AuthorizationSessionTest, CannotAggregateWithoutFindActionIfFirstStageNotIndexOrCollStats) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -637,8 +634,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateWithoutFindActionIfFirstStageNot
 
 TEST_F(AuthorizationSessionTest, CannotAggregateWithFindActionIfPipelineContainsIndexOrCollStats) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -656,8 +652,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateWithFindActionIfPipelineContains
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCollStatsWithoutCollStatsAction) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -674,8 +669,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCollStatsWithoutCollStatsAction)
 
 TEST_F(AuthorizationSessionTest, CanAggregateCollStatsWithCollStatsAction) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -692,8 +686,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCollStatsWithCollStatsAction) {
 
 TEST_F(AuthorizationSessionTest, CannotAggregateIndexStatsWithoutIndexStatsAction) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -710,8 +703,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateIndexStatsWithoutIndexStatsActio
 
 TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -728,8 +720,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoD) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -746,8 +737,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprog
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoS) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -764,8 +754,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInp
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoD) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
 
@@ -777,8 +766,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthe
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoS) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
 
@@ -793,8 +781,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthe
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoD) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -811,8 +798,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoS) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -829,8 +815,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoD) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -849,8 +834,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoS) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -869,8 +853,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
 
 TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoD) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -888,8 +871,7 @@ TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMon
 
 TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoS) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -907,8 +889,7 @@ TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMon
 
 TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotValid) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -926,8 +907,7 @@ TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotVa
 
 TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTargetNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -959,8 +939,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTarge
 
 TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -990,8 +969,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNames
 TEST_F(AuthorizationSessionTest,
        CannotAggregateOutBypassingValidationWithoutBypassDocumentValidationOnTargetNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1014,8 +992,7 @@ TEST_F(AuthorizationSessionTest,
 TEST_F(AuthorizationSessionTest,
        CanAggregateOutBypassingValidationWithBypassDocumentValidationOnTargetNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1039,8 +1016,7 @@ TEST_F(AuthorizationSessionTest,
 
 TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1059,8 +1035,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespa
 
 TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1083,8 +1058,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
 
 TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1110,8 +1084,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedN
 
 TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1139,8 +1112,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespa
 
 TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1194,8 +1166,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
 
 TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1213,8 +1184,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNa
 
 TEST_F(AuthorizationSessionTest, CanAggregateGraphLookupWithFindOnJoinedNamespace) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1236,8 +1206,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateGraphLookupWithFindOnJoinedNamespac
 TEST_F(AuthorizationSessionTest,
        CannotAggregateFacetWithLookupAndGraphLookupWithoutFindOnJoinedNamespaces) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1272,8 +1241,7 @@ TEST_F(AuthorizationSessionTest,
 TEST_F(AuthorizationSessionTest,
        CanAggregateFacetWithLookupAndGraphLookupWithFindOnJoinedNamespaces) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
 
         auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
@@ -1715,9 +1683,8 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
 TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     constexpr auto kVTSKey = "secret"_sd;
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          kVTSKey);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", kVTSKey);
 
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
@@ -1843,7 +1810,7 @@ TEST_F(AuthorizationSessionTest, CheckBuiltInRolesForBypassDefaultMaxTimeMS) {
 }
 
 TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryAuthorizedUser) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", false);
     authzManager->setAuthEnabled(true);
 
     UserName username("spencer", "admin", boost::none);
@@ -1906,7 +1873,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryAuthorizedUse
 }
 
 TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryUnauthorizedUser) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", false);
     authzManager->setAuthEnabled(true);
     UserName usernameUnauth("fakeSpencer", "admin");
 
@@ -2599,9 +2566,8 @@ DEATH_TEST_F(
     AggStageFailsRequiresAuthzChecksWithNoPrivilegesAndNoOptOutMultitenancyDisabled,
     "Must specify authorization checks for this stage: $testNoPrivsWithAuthzChecks or manually "
     "opt out by overriding requiresAuthzChecks to false") {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagMandatoryAuthzChecks",
-                                                               true};
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", false);
+    unittest::ServerParameterGuard featureFlagController{"featureFlagMandatoryAuthzChecks", true};
 
     auto nss = testFooNss;
     auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -2619,9 +2585,8 @@ DEATH_TEST_F(
     AggStageFailsRequiresAuthzChecksWithNoPrivilegesAndNoOptOutMultitenancyEnabled,
     "Must specify authorization checks for this stage: $testNoPrivsWithAuthzChecks or manually "
     "opt out by overriding requiresAuthzChecks to false") {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagMandatoryAuthzChecks",
-                                                               true};
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController{"featureFlagMandatoryAuthzChecks", true};
 
     auto nss = testTenant1FooNss;
     auto rsrc = ResourcePattern::forExactNamespace(nss);
@@ -2635,10 +2600,9 @@ DEATH_TEST_F(
 
 TEST_F(AuthorizationSessionTest, AggStagePassesRequiresAuthzChecksWithPrivilegesOrOptOut) {
     for (auto multitenancy : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
-        RAIIServerParameterControllerForTest featureFlagController{
-            "featureFlagMandatoryAuthzChecks", true};
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
+        unittest::ServerParameterGuard featureFlagController{"featureFlagMandatoryAuthzChecks",
+                                                             true};
 
         auto nss = multitenancy ? testTenant1FooNss : testFooNss;
         auto rsrc = ResourcePattern::forExactNamespace(nss);

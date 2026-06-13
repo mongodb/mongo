@@ -39,11 +39,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -978,7 +978,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesMultipleWriteConcernErrors) {
 }
 
 TEST_F(WriteBatchResponseProcessorTest, ProcessesExceededMemoryLimitError) {
-    RAIIServerParameterControllerForTest maxRepliesSizeController("bulkWriteMaxRepliesSize", 20);
+    unittest::ServerParameterGuard maxRepliesSizeController("bulkWriteMaxRepliesSize", 20);
 
     auto request = BulkWriteCommandRequest(
         {BulkWriteInsertOp(0, BSON("_id" << 1)), BulkWriteInsertOp(0, BSON("_id" << 2))},
@@ -1056,7 +1056,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesExceededMemoryLimitError) {
 
 TEST_F(WriteBatchResponseProcessorTest, IncrementApproxSizeOnceForRetry) {
     // Set the limit to just above the reply size for a single op.
-    RAIIServerParameterControllerForTest maxRepliesSizeController("bulkWriteMaxRepliesSize", 35);
+    unittest::ServerParameterGuard maxRepliesSizeController("bulkWriteMaxRepliesSize", 35);
     //  shard1: {code: ok, firstBatch: [{code: ok}, {code: CannotImplicitlyCreateCollection}]}
     // Note that we add a third op to the request such that we can detect that the memory limit has
     // been exceeded after our retry.

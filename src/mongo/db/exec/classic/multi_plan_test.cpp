@@ -86,9 +86,9 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -412,7 +412,7 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
 
 TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisabled) {
     // Set the global flag for disabling active entries.
-    RAIIServerParameterControllerForTest disableInactivePlanCacheEntries{
+    unittest::ServerParameterGuard disableInactivePlanCacheEntries{
         "internalQueryCacheDisableInactiveEntries", true};
 
     const int N = 100;
@@ -461,9 +461,9 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection);
 
     // Force index intersection and enable AND_SORTED intersection.
-    RAIIServerParameterControllerForTest forceIntersectionPlans{
-        "internalQueryForceIntersectionPlans", true};
-    RAIIServerParameterControllerForTest enableSortIntersection{
+    unittest::ServerParameterGuard forceIntersectionPlans{"internalQueryForceIntersectionPlans",
+                                                          true};
+    unittest::ServerParameterGuard enableSortIntersection{
         "internalQueryPlannerEnableSortIndexIntersection", true};
 
     // Plan.
@@ -627,10 +627,10 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 //
 // This is a regression test for SERVER-20111.
 TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
-    RAIIServerParameterControllerForTest controller("internalQueryFrameworkControl",
-                                                    "forceClassicEngine");
+    unittest::ServerParameterGuard controller("internalQueryFrameworkControl",
+                                              "forceClassicEngine");
     // Ensure running the test with multiplanner.
-    RAIIServerParameterControllerForTest cbrController("featureFlagCostBasedRanker", false);
+    unittest::ServerParameterGuard cbrController("featureFlagCostBasedRanker", false);
 
     const int N = 5000;
     for (int i = 0; i < N; ++i) {

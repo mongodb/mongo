@@ -36,8 +36,8 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::rule_based_rewrites::pipeline {
@@ -111,7 +111,7 @@ TEST_F(PipelineRewriteEngineTest, RespectPriority) {
 }
 
 TEST_F(PipelineRewriteEngineTest, RespectMaxRewritesQueryKnob) {
-    RAIIServerParameterControllerForTest controller("internalQueryMaxPipelineRewrites", 2);
+    unittest::ServerParameterGuard controller("internalQueryMaxPipelineRewrites", 2);
 
     REGISTER_TEST_RULES(DocumentSourceMatch,
                         {"CRASH_WHEN_RUN", alwaysTrue, shouldNeverRun, 1.0},
@@ -369,7 +369,7 @@ TEST_F(PipelineRewriteEngineTest, RunFeatureFlagGatedRuleWhenFlagEnabled) {
         &feature_flags::gFeatureFlagBlender,
         {"REMOVE_MATCH", alwaysTrue, Transforms::eraseCurrent, 1.0});
 
-    RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
+    unittest::ServerParameterGuard controller("featureFlagBlender", true);
     runTest(getExpCtx(), {"{$match: {a: 1}}"}, {});
 }
 
@@ -378,7 +378,7 @@ TEST_F(PipelineRewriteEngineTest, DontRunFeatureFlagGatedRuleWhenFlagDisabled) {
                                           &feature_flags::gFeatureFlagBlender,
                                           {"NEVER_RUN", alwaysTrue, shouldNeverRun, 1.0});
 
-    RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
+    unittest::ServerParameterGuard controller("featureFlagBlender", false);
     runTest(getExpCtx(), {"{$match: {a: 1}}"}, {"{$match: {a: 1}}"});
 }
 

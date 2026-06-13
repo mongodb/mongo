@@ -47,7 +47,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -663,8 +663,7 @@ class QueryStageCountScanMemoryLimitExceeded : public CountBase {
 public:
     void run() {
         // Set an absurdly small limit so the deduplicator overhead alone exceeds it.
-        RAIIServerParameterControllerForTest maxMemoryBytes{"internalCountScanStageMaxMemoryBytes",
-                                                            1};
+        unittest::ServerParameterGuard maxMemoryBytes{"internalCountScanStageMaxMemoryBytes", 1};
         dbtests::WriteContextForTests ctx(&_opCtx, ns().ns_forTest());
 
         insert(BSON("a" << BSON_ARRAY(1 << 2)));

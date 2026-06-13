@@ -36,8 +36,8 @@
 #include "mongo/db/s/resharding/resharding_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -250,7 +250,7 @@ private:
               "enableEstimateBasedOnMovingAvg"_attr = enableEstimateBasedOnMovingAvg,
               "expectedEstimate"_attr = expectedEstimate);
 
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
+        const unittest::ServerParameterGuard estimateBasedOnMovingAvgServerParameter{
             "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
 
         ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(
@@ -589,7 +589,7 @@ TEST_F(ReshardingMetricsTest, GetAndUpdateAverageTimeToFetchBasic) {
     metrics->registerDonors({shardId0, shardId1});
 
     auto smoothingFactor = 0.7;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     ASSERT_FALSE(metrics->getAverageTimeToFetchOplogEntries(shardId0));
@@ -650,7 +650,7 @@ TEST_F(ReshardingMetricsTest, GetAndUpdateAverageTimeToApplyBasic) {
     metrics->registerDonors({shardId0, shardId1});
 
     auto smoothingFactor = 0.8;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     ASSERT_FALSE(metrics->getAverageTimeToApplyOplogEntries(shardId0));
@@ -810,7 +810,7 @@ TEST_F(ReshardingMetricsTest,
 }
 
 TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeIfDisableMovingAvgCloningToDone) {
-    const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
+    const unittest::ServerParameterGuard estimateBasedOnMovingAvgServerParameter{
         "reshardingRemainingTimeEstimateBasedOnMovingAverage", false};
 
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
@@ -866,7 +866,7 @@ TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeIfDisableOrEnableMovi
     const auto elapsedTimeInc = Milliseconds(1200);
 
     const auto smoothingFactor = 0.7;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+    const unittest::ServerParameterGuard smoothingFactorServerParameter{
         "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
 
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
@@ -1112,7 +1112,7 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportsCriticalSectionTime) {
 
 TEST_F(ReshardingMetricsTest, RecipientEstimatesNoneOnNewInstance) {
     for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
+        const unittest::ServerParameterGuard estimateBasedOnMovingAvgServerParameter{
             "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
         auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
         ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
@@ -1122,7 +1122,7 @@ TEST_F(ReshardingMetricsTest, RecipientEstimatesNoneOnNewInstance) {
 TEST_F(ReshardingMetricsTest,
        RecipientEstimatesNoneBeforeExternalFieldsRestoredForRestoredInstance) {
     for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
+        const unittest::ServerParameterGuard estimateBasedOnMovingAvgServerParameter{
             "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
         auto metrics = makeRecipientMetricsWithAmbiguousTimeRemaining();
         ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
@@ -1131,7 +1131,7 @@ TEST_F(ReshardingMetricsTest,
 
 TEST_F(ReshardingMetricsTest, RecipientEstimatesAfterExternalFieldsRestoredForRestoredInstance) {
     for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
+        const unittest::ServerParameterGuard estimateBasedOnMovingAvgServerParameter{
             "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
         auto metrics = makeRecipientMetricsWithAmbiguousTimeRemaining();
         metrics->restoreExternallyTrackedRecipientFields(
@@ -1142,7 +1142,7 @@ TEST_F(ReshardingMetricsTest, RecipientEstimatesAfterExternalFieldsRestoredForRe
 
 TEST_F(ReshardingMetricsTest, CurrentOpDoesNotReportRecipientEstimateIfNotSet) {
     for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
+        const unittest::ServerParameterGuard estimateBasedOnMovingAvgServerParameter{
             "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
         auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
         auto report = metrics->reportForCurrentOp();

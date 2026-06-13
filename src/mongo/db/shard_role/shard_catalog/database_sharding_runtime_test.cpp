@@ -331,7 +331,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckReceivedDatabaseVersion
         // When the feature flag 'AddTransactionRuntimeContextAsAGenericArgument' is disabled, if
         // received version has 'placementConflictTime' == Timestamp(0, 0), then ignore conflict.
         {
-            RAIIServerParameterControllerForTest featureFlagController(
+            unittest::ServerParameterGuard featureFlagController(
                 "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
 
             auto receivedVersionWithPlacementConflictTimeZero = installedDbVersion;
@@ -373,7 +373,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
     // database timestamp is greater than 'placementConflictTime' attached to the DbVersion, then
     // throw MigrationConflict. (Except if 'placementConflictTime' is Timestamp(0, 0)).
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
 
         auto receivedVersionWithGreaterPlacementConflictTime = installedDbVersion;
@@ -402,7 +402,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
     // TransactionParticipant and the operation runs within a transaction, then throw
     // MigrationConflict. (Except if 'placementConflictTime' is Timestamp(0, 0)).
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
 
         // It should throw if the placementConflictTime is greater than the installed db timestamp

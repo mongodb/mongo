@@ -55,10 +55,10 @@
 #include "mongo/db/sharding_environment/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -388,7 +388,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         // No rate limit i.e., no requests are rate limited and each one is allowed to gather
         // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
         // to false.
-        RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
+        unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", -1);
 
         runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
         runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
@@ -397,7 +397,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
 
     {
         // Rate limit is 0 i.e., every request is rate-limited.
-        RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", 0);
+        unittest::ServerParameterGuard rateLimit("internalQueryStatsRateLimit", 0);
 
         // If the user doesn't give includeQueryStatsMetrics, we won't insert the field.
         runCommandInspectRequests(cmd, expectNoField, isTargeted);

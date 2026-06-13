@@ -34,7 +34,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -115,8 +115,8 @@ protected:
      */
     template <typename F>
     void runTest(F createMock) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                                   true);
+        unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking",
+                                                             true);
         int64_t inUseTrackedMemBytes, peakTrackedMemBytes;
 
         std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
@@ -183,8 +183,7 @@ TEST_F(OperationMemoryUsageTrackerTest, StageMemoryUsageAggregatedInOperationMem
  * case the metrics will stay at zero and won't be reported.
  */
 TEST_F(OperationMemoryUsageTrackerTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
     auto mock = MockStageTracking<SimpleMemoryUsageTracker>::createForTest(
         {Document{{"_id", 0}, {"a", 100}, {"b", "hello"_sd}}}, getExpCtx());
     ASSERT_TRUE(mock->getNext().isAdvanced());

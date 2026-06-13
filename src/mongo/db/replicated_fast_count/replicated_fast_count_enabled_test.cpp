@@ -32,6 +32,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 // TODO(SERVER-119896): Delete this test.
@@ -49,22 +50,22 @@ public:
 };
 
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
     EXPECT_FALSE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, EnabledWhenFeatureFlagOn) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     EXPECT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest, EnabledWhenProviderReturnsTrue) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
     EXPECT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest, EnabledWhenBothFlagAndProviderOn) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     EXPECT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
@@ -131,37 +132,32 @@ TEST(ReplicatedFastCountEligibleNsTest, OplogEligible) {
 // TODO(SERVER-128304): Add persistence provider testing for
 // isReplicatedFastCountListCollectionsEnabled.
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenBothFlagsOff) {
-    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                               false);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", false);
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenOnlyReplicatedFastCountOn) {
-    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                               true);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", false);
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenOnlyContainerWritesOn) {
-    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                               false);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsEnabledWhenBothFlagsOn) {
-    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                               true);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
     EXPECT_TRUE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenTestCommandsOff) {
-    RAIIServerParameterControllerForTest ffReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                               true);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
     setTestCommandsEnabled(false);
     const auto restoreTestCommands = ScopeGuard([] { setTestCommandsEnabled(true); });
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
@@ -176,7 +172,7 @@ TEST_F(IsReplicatedFastCountEnabledWithProviderTest, ShouldNotReadFromSizeStorer
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromReplicatedFastCountNoProviderFFOff) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
     std::vector<std::tuple<std::string, std::string>> disallowedCases{
         {"test", "coll1"},    // Normal user collection
         {"config", "coll1"},  // Internal non-local
@@ -200,7 +196,7 @@ TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromReplicatedFastCountNoProv
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromReplicatedFastCountNoProviderFFOn) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     std::vector<std::tuple<std::string, std::string>> allowedCases{
         {"test", "coll1"},    // Normal user collection
         {"config", "coll1"},  // Internal non-local
@@ -232,7 +228,7 @@ TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromReplicatedFastCountNoProv
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
        ShouldReadFromReplicatedFastCountWithProviderFFOff) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
     std::vector<std::tuple<std::string, std::string>> allowedCases{
         {"test", "coll1"},    // Normal user collection
         {"config", "coll1"},  // Internal non-local
@@ -264,7 +260,7 @@ TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest,
        ShouldReadFromReplicatedFastCountWithProviderFFOn) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     std::vector<std::tuple<std::string, std::string>> allowedCases{
         {"test", "coll1"},    // Normal user collection
         {"config", "coll1"},  // Internal non-local

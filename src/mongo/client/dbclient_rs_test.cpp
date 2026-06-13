@@ -59,9 +59,9 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -99,8 +99,7 @@ protected:
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
 
 private:
-    RAIIServerParameterControllerForTest _findHostTimeout{"defaultFindReplicaSetHostTimeoutMS",
-                                                          100};
+    unittest::ServerParameterGuard _findHostTimeout{"defaultFindReplicaSetHostTimeoutMS", 100};
 };
 
 /**

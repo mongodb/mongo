@@ -70,11 +70,11 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -1246,7 +1246,7 @@ public:
     }
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> _controller;
+    boost::optional<unittest::ServerParameterGuard> _controller;
 };
 
 class TransactionCoordinatorDecisionPersistenceTestWithEOTChangeEventFalse
@@ -1262,7 +1262,7 @@ public:
     }
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> _controller;
+    boost::optional<unittest::ServerParameterGuard> _controller;
 };
 
 TEST_TRANSACTION_COORDINATOR_DECISION_PERSISTENCE(
@@ -1537,7 +1537,7 @@ TEST_F(TransactionCoordinatorTest,
 }
 
 TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) {
-    RAIIServerParameterControllerForTest controller("featureFlagEndOfTransactionChangeEvent", true);
+    unittest::ServerParameterGuard controller("featureFlagEndOfTransactionChangeEvent", true);
     auto coordinator = std::make_shared<TransactionCoordinator>(
         operationContext(),
         _lsid,

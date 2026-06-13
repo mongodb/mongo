@@ -50,6 +50,7 @@ mongo_cc_unit_test(
     deps = [
         ":trace_settings",
         "//src/mongo/db:server_parameter",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
@@ -238,7 +239,7 @@ mongo_cc_unit_test(
         ":trace_settings",
         ":tracing_initialization_impl",
         "//src/mongo/db:server_base",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
     ],
@@ -261,8 +262,8 @@ mongo_cc_unit_test(
         ":tracing_initialization",
         ":tracing_test_util",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )

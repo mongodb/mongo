@@ -390,10 +390,10 @@ TEST_F(EqualStepSamplingStrategyTest, SampleSizeOneDefinedByServerParameter) {
     // Set the number of samples per nsUUID via server parameter, and sample with the "official"
     // process that selects the sampling strategy. This will select the "equal step" sampling
     // strategy.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagUseReplicatedTruncatesForDeletions", true);
-    RAIIServerParameterControllerForTest sampleSizeController{
-        "changeStreamPreImagesSamplePointsPerUUID", 1};
+    unittest::ServerParameterGuard sampleSizeController{"changeStreamPreImagesSamplePointsPerUUID",
+                                                        1};
 
     auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
 
@@ -432,10 +432,10 @@ TEST_F(EqualStepSamplingStrategyTest, SampleSizeTwentyDefinedByServerParameter) 
     // Set the number of samples per nsUUID via server parameter, and sample with the "official"
     // process that selects the sampling strategy. This will select the "equal step" sampling
     // strategy.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagUseReplicatedTruncatesForDeletions", true);
-    RAIIServerParameterControllerForTest sampleSizeController{
-        "changeStreamPreImagesSamplePointsPerUUID", 20};
+    unittest::ServerParameterGuard sampleSizeController{"changeStreamPreImagesSamplePointsPerUUID",
+                                                        20};
 
     auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
 

@@ -58,10 +58,10 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/request_types/resharding_operation_time_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -156,7 +156,7 @@ private:
     ReshardingCumulativeMetrics _cumulativeMetrics;
     std::shared_ptr<ReshardingMetrics> _metrics;
 
-    RAIIServerParameterControllerForTest _maxDelaysBetweenQueries{
+    unittest::ServerParameterGuard _maxDelaysBetweenQueries{
         "reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis", 0};
 };
 
@@ -365,10 +365,10 @@ TEST_F(CoordinatorCommitMonitorTest,
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
-        RAIIServerParameterControllerForTest accountForDonorReplLag{
+        unittest::ServerParameterGuard accountForDonorReplLag{
             "reshardingRemainingTimeEstimateAccountsForDonorReplicationLag",
             testOptions.accountForDonorReplLag};
-        RAIIServerParameterControllerForTest accountForRecipientReplLag{
+        unittest::ServerParameterGuard accountForRecipientReplLag{
             "reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag",
             testOptions.accountForRecipientReplLag};
 
@@ -436,10 +436,10 @@ TEST_F(CoordinatorCommitMonitorTest,
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
-        RAIIServerParameterControllerForTest accountForDonorReplLag{
+        unittest::ServerParameterGuard accountForDonorReplLag{
             "reshardingRemainingTimeEstimateAccountsForDonorReplicationLag",
             testOptions.accountForDonorReplLag};
-        RAIIServerParameterControllerForTest accountForRecipientReplLag{
+        unittest::ServerParameterGuard accountForRecipientReplLag{
             "reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag",
             testOptions.accountForRecipientReplLag};
 
@@ -513,10 +513,10 @@ TEST_F(CoordinatorCommitMonitorTest,
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
-        RAIIServerParameterControllerForTest accountForDonorReplLag{
+        unittest::ServerParameterGuard accountForDonorReplLag{
             "reshardingRemainingTimeEstimateAccountsForDonorReplicationLag",
             testOptions.accountForDonorReplLag};
-        RAIIServerParameterControllerForTest accountForRecipientReplLag{
+        unittest::ServerParameterGuard accountForRecipientReplLag{
             "reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag",
             testOptions.accountForRecipientReplLag};
 
@@ -675,8 +675,8 @@ TEST_F(CoordinatorCommitMonitorTest, ReconfiguringThreshold) {
     };
     auto thresholdAfter = thresholdBefore + 2;
 
-    RAIIServerParameterControllerForTest threshold{
-        "remainingReshardingOperationTimeThresholdMillis", thresholdAfter};
+    unittest::ServerParameterGuard threshold{"remainingReshardingOperationTimeThresholdMillis",
+                                             thresholdAfter};
 
     mockResponses(responses);
 

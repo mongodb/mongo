@@ -40,7 +40,6 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
@@ -74,6 +73,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/enhanced_reporter.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -2727,8 +2727,7 @@ public:
         while (severity.toInt() < 6) {
             // The logLevel server parameter accepts an integer 0 ('LogSeverity::Log()') to 5
             // ('LogSeverity::Debug(5)') as it's argument.
-            RAIIServerParameterControllerForTest logVerbosityController{"logLevel",
-                                                                        severity.toInt()};
+            unittest::ServerParameterGuard logVerbosityController{"logLevel", severity.toInt()};
             if (options) {
                 LOGV2_PROD_ONLY_OPTIONS(9757701, {LogTag::kNone}, "test");
             } else {
@@ -2747,13 +2746,13 @@ public:
 
 // Tests that '_suppressProdOnly' is configured with the enableTestCommands parameter.
 TEST_F(ProdOnlySeverityTest, SuppressProdOnlyTrueWhenEnableTestCommandsTrue) {
-    RAIIServerParameterControllerForTest enableTestCommandsController{"enableTestCommands", false};
+    unittest::ServerParameterGuard enableTestCommandsController{"enableTestCommands", false};
     ASSERT_EQUALS(LogSeverity::getSuppressProdOnly(), false);
 }
 
 // Tests that '_suppressProdOnly' is configured with the enableTestCommands parameter.
 TEST_F(ProdOnlySeverityTest, SuppressProdOnlyFalseWhenEnableTestCommandsFalse) {
-    RAIIServerParameterControllerForTest enableTestCommandsController{"enableTestCommands", true};
+    unittest::ServerParameterGuard enableTestCommandsController{"enableTestCommands", true};
     ASSERT_EQUALS(LogSeverity::getSuppressProdOnly(), true);
 }
 

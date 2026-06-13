@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <filesystem>
@@ -57,9 +57,8 @@ protected:
     static inline const std::string kMetricsStageName = "$vectorSearchMetrics";
 
     static void SetUpTestSuite() {
-        RAIIServerParameterControllerForTest extensionsAPIController{"featureFlagExtensionsAPI",
-                                                                     true};
-        RAIIServerParameterControllerForTest vecSimilarityExprController{
+        unittest::ServerParameterGuard extensionsAPIController{"featureFlagExtensionsAPI", true};
+        unittest::ServerParameterGuard vecSimilarityExprController{
             "featureFlagVectorSimilarityExpressions", true};
         ExtensionLoader::load(
             "nativeVectorSearch",
@@ -145,10 +144,10 @@ protected:
         boost::none, "load_native_vector_search_extension_test");
 
 private:
-    RAIIServerParameterControllerForTest _extensionsAPIController{"featureFlagExtensionsAPI", true};
-    RAIIServerParameterControllerForTest _vecSimilarityExprController{
+    unittest::ServerParameterGuard _extensionsAPIController{"featureFlagExtensionsAPI", true};
+    unittest::ServerParameterGuard _vecSimilarityExprController{
         "featureFlagVectorSimilarityExpressions", true};
-    RAIIServerParameterControllerForTest _signatureValidationController{
+    unittest::ServerParameterGuard _signatureValidationController{
         "featureFlagExtensionsApiSignatureValidation", true};
 };
 

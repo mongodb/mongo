@@ -36,7 +36,7 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -511,10 +511,9 @@ TEST_F(CurOpStatsTest, CheckAdmissionQueueStats) {
 }
 
 TEST(CurOpTest, DelinquentInterruptChecksNotDoubleCounted) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
 
     QueryTestServiceContext serviceContext;
 
@@ -550,10 +549,9 @@ TEST(CurOpTest, DelinquentInterruptChecksNotDoubleCounted) {
 }
 
 TEST(CurOpTest, OpWhichNeverChecksForInterruptBumpsDelinquentCounter) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
 
     QueryTestServiceContext serviceContext;
 
@@ -582,10 +580,9 @@ TEST(CurOpTest, OpWhichNeverChecksForInterruptBumpsDelinquentCounter) {
 TEST(CurOpTest, InterruptChecksSamplingRespectsFeatureFlag) {
     // When the feature flag is set to false, we should never sample an operation, even if the
     // sampling rate is set to 1.0
-    RAIIServerParameterControllerForTest disableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", false);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard disableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                             false);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
 
     QueryTestServiceContext serviceContext;
 
@@ -605,12 +602,11 @@ TEST(CurOpTest, InterruptChecksSamplingRespectsFeatureFlag) {
 }
 
 TEST(CurOpTest, InterruptCheckTrackingWithSamplingRateZero) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
     // When the sampling rate is 0, an operation should not track interrupts, but should
     // otherwise behave normally.
-    RAIIServerParameterControllerForTest neverTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                              0);
+    unittest::ServerParameterGuard neverTrackInterrupts("overdueInterruptCheckSamplingRate", 0);
 
     QueryTestServiceContext serviceContext;
 
@@ -630,10 +626,10 @@ TEST(CurOpTest, InterruptCheckTrackingWithSamplingRateZero) {
 }
 
 TEST(CurOpTest, InterruptCheckTrackingIsSampled) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1.0 / 1000.0);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
+                                                         1.0 / 1000.0);
 
     QueryTestServiceContext serviceContext;
 

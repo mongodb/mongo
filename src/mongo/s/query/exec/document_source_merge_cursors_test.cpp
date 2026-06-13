@@ -69,8 +69,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -449,7 +449,7 @@ class DocumentSourceMergeCursorsMultiTenancyTest : public DocumentSourceMergeCur
 public:
     DocumentSourceMergeCursorsMultiTenancyTest()
         : _multitenancyController(
-              std::make_unique<RAIIServerParameterControllerForTest>("multitenancySupport", true)) {
+              std::make_unique<unittest::ServerParameterGuard>("multitenancySupport", true)) {
         _nss =
             NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), kMergeCursorNsStr);
     }
@@ -465,7 +465,7 @@ private:
         return ExpressionContextBuilder{}.opCtx(operationContext()).ns(_nss).build();
     }
 
-    std::unique_ptr<RAIIServerParameterControllerForTest> _multitenancyController;
+    std::unique_ptr<unittest::ServerParameterGuard> _multitenancyController;
 };
 
 TEST_F(DocumentSourceMergeCursorsMultiTenancyTest, ShouldBeAbleToParseSerializedARMParams) {
@@ -522,11 +522,11 @@ class DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest
     : public DocumentSourceMergeCursorsMultiTenancyTest {
 public:
     DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest()
-        : _featureFlagController(std::make_unique<RAIIServerParameterControllerForTest>(
+        : _featureFlagController(std::make_unique<unittest::ServerParameterGuard>(
               "featureFlagRequireTenantID", true)) {}
 
 private:
-    std::unique_ptr<RAIIServerParameterControllerForTest> _featureFlagController;
+    std::unique_ptr<unittest::ServerParameterGuard> _featureFlagController;
 };
 
 TEST_F(DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest,

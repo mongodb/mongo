@@ -36,7 +36,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::query_settings {
@@ -62,7 +62,7 @@ public:
 
 TEST_F(QuerySettingsCmdsCommandTestFixture,
        SetQuerySettingsRejectsQueryKnobsWhenFeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest featureFlagCtrl("featureFlagPqsQueryKnobs", false);
+    unittest::ServerParameterGuard featureFlagCtrl("featureFlagPqsQueryKnobs", false);
     runCommand(BSON("setQuerySettings"
                     << BSON("find" << "testColl" << "$db" << "testDb" << "filter" << BSONObj())
                     << "settings" << BSON("queryKnobs" << BSON("testIntKnobWire" << 99))),

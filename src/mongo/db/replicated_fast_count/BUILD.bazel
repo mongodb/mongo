@@ -643,8 +643,8 @@ mongo_cc_unit_test(
         "size_count_timestamp_store",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:storage_engine_impl",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:fail_point",
     ],
 )

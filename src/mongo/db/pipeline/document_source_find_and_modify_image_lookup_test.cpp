@@ -54,8 +54,8 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/version_context.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
@@ -184,7 +184,7 @@ public:
 
 private:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-    RAIIServerParameterControllerForTest _featureFlagController{
+    unittest::ServerParameterGuard _featureFlagController{
         "featureFlagDisallowFindAndModifyImageCollection", false};
 };
 
@@ -233,7 +233,7 @@ TEST_F(FindAndModifyImageLookupTest,
               "test"_attr = unittest::getTestName(),
               "disallowImageCollection"_attr = disallowImageCollection);
 
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagDisallowFindAndModifyImageCollection", disallowImageCollection);
         auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
 
@@ -539,7 +539,7 @@ TEST_F(FindAndModifyImageLookupTest,
               "test"_attr = unittest::getTestName(),
               "disallowImageCollection"_attr = disallowImageCollection);
 
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagDisallowFindAndModifyImageCollection", disallowImageCollection);
         auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
 

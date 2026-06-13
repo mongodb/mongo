@@ -33,7 +33,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/jwk_manager_test_framework.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 
@@ -282,7 +282,7 @@ BSONObj getTestJWKSet() {
 
 
 void validateJWKManagerWithToken(JWKManagerTest* instance, StringData token) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+    unittest::ServerParameterGuard quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
     instance->jwksFetcher()->setKeys(getTestJWKSet());
     ASSERT_OK(instance->jwkManager()->loadKeys());
     ASSERT_THROWS(JWSValidatedToken(instance->jwkManager(), token), DBException);
@@ -292,7 +292,7 @@ void validateTokenFromKeys(JWKManagerTest* instance,
                            const auto validTokenHeader,
                            const auto validTokenBody,
                            const auto validTokenSignature) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+    unittest::ServerParameterGuard quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
 
     auto validToken =
         fmt::format("{}.{}.{}", validTokenHeader, validTokenBody, validTokenSignature);
@@ -501,7 +501,7 @@ TEST_F(JWKManagerTest, parsingErrors) {
 }
 
 TEST_F(JWKManagerTest, getLastAttemptedFetchTime) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+    unittest::ServerParameterGuard quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
 
     // Load just the second key (custom-key-2) from testJWKSet into the JWKManager.
     auto key = [this]() {

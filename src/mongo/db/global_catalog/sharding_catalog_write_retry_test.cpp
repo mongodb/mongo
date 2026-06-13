@@ -59,7 +59,6 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_response.h"

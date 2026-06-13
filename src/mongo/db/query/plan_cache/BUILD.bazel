@@ -71,8 +71,8 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/shard_role/shard_catalog:catalog_impl",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/s:sharding_router_api",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
@@ -105,6 +105,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_planner_test_lib",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog_mock",
-        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )

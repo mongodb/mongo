@@ -30,8 +30,8 @@
 #include "mongo/otel/traces/trace_initialization.h"
 
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <gmock/gmock.h>
@@ -79,7 +79,7 @@ TEST_F(TraceInitializationTest, Shutdown) {
     ASSERT_TRUE(tracerProviderService);
     EXPECT_FALSE(tracerProviderService->isEnabled());
 
-    RAIIServerParameterControllerForTest directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+    unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
     shutdown(getServiceContext());
 
     tracerProviderService = TracerProviderService::get(getServiceContext());
@@ -88,7 +88,7 @@ TEST_F(TraceInitializationTest, Shutdown) {
 }
 
 TEST_F(TraceInitializationTest, FileTraceProvider) {
-    RAIIServerParameterControllerForTest directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+    unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
     ASSERT_OK(initialize(getServiceContext(), kServiceName));
 
     auto tracerProviderService = TracerProviderService::get(getServiceContext());
@@ -98,8 +98,8 @@ TEST_F(TraceInitializationTest, FileTraceProvider) {
 }
 
 TEST_F(TraceInitializationTest, HttpTraceProvider) {
-    RAIIServerParameterControllerForTest endpointParam{"opentelemetryHttpEndpoint",
-                                                       "http://localhost:4318/v1/traces"};
+    unittest::ServerParameterGuard endpointParam{"opentelemetryHttpEndpoint",
+                                                 "http://localhost:4318/v1/traces"};
     ASSERT_OK(initialize(getServiceContext(), kServiceName));
 
     auto tracerProviderService = TracerProviderService::get(getServiceContext());
@@ -109,9 +109,9 @@ TEST_F(TraceInitializationTest, HttpTraceProvider) {
 }
 
 TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
-    RAIIServerParameterControllerForTest endpointParam{"opentelemetryHttpEndpoint",
-                                                       "http://localhost:4318/v1/traces"};
-    RAIIServerParameterControllerForTest directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+    unittest::ServerParameterGuard endpointParam{"opentelemetryHttpEndpoint",
+                                                 "http://localhost:4318/v1/traces"};
+    unittest::ServerParameterGuard directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
     ASSERT_THROWS_CODE(
         initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
 
@@ -122,37 +122,34 @@ TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
 }
 
 TEST_F(TraceInitializationTest, InvalidCompressionFails) {
-    RAIIServerParameterControllerForTest compressionParam{"openTelemetryTracingCompression",
-                                                          "zstd"};
+    unittest::ServerParameterGuard compressionParam{"openTelemetryTracingCompression", "zstd"};
     ASSERT_THROWS_CODE(
         initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST_F(TraceInitializationTest, GzipCompressionWithoutHttpEndpointFails) {
-    RAIIServerParameterControllerForTest compressionParam{"openTelemetryTracingCompression",
-                                                          "gzip"};
+    unittest::ServerParameterGuard compressionParam{"openTelemetryTracingCompression", "gzip"};
     ASSERT_THROWS_CODE(
         initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST_F(TraceInitializationTest, GzipCompressionWithHttpEndpointSucceeds) {
-    RAIIServerParameterControllerForTest compressionParam{"openTelemetryTracingCompression",
-                                                          "gzip"};
-    RAIIServerParameterControllerForTest endpointParam{"opentelemetryHttpEndpoint",
-                                                       "http://localhost:4318/v1/traces"};
+    unittest::ServerParameterGuard compressionParam{"openTelemetryTracingCompression", "gzip"};
+    unittest::ServerParameterGuard endpointParam{"opentelemetryHttpEndpoint",
+                                                 "http://localhost:4318/v1/traces"};
     ASSERT_OK(initialize(getServiceContext(), kServiceName));
 }
 
 TEST_F(TraceInitializationTest, MaxBatchSizeExceedsMaxQueueSizeFails) {
-    RAIIServerParameterControllerForTest batchSizeParam{"openTelemetryTracingMaxBatchSize", 5000};
-    RAIIServerParameterControllerForTest queueSizeParam{"openTelemetryTracingMaxQueueSize", 100};
+    unittest::ServerParameterGuard batchSizeParam{"openTelemetryTracingMaxBatchSize", 5000};
+    unittest::ServerParameterGuard queueSizeParam{"openTelemetryTracingMaxQueueSize", 100};
     ASSERT_THROWS_CODE(
         initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
 }
 
 TEST_F(TraceInitializationTest, MaxBatchSizeEqualToMaxQueueSizeSucceeds) {
-    RAIIServerParameterControllerForTest batchSizeParam{"openTelemetryTracingMaxBatchSize", 512};
-    RAIIServerParameterControllerForTest queueSizeParam{"openTelemetryTracingMaxQueueSize", 512};
+    unittest::ServerParameterGuard batchSizeParam{"openTelemetryTracingMaxBatchSize", 512};
+    unittest::ServerParameterGuard queueSizeParam{"openTelemetryTracingMaxQueueSize", 512};
     ASSERT_OK(initialize(getServiceContext(), kServiceName));
 }
 

@@ -29,20 +29,20 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-// Tests set the ratio via RAIIServerParameterControllerForTest. A MONGO_INITIALIZER sets the ratio
+// Tests set the ratio via unittest::ServerParameterGuard. A MONGO_INITIALIZER sets the ratio
 // at 0.0 at startup for tests in general; these unit tests override that value by the using the
 // RAII controller for the duration of each test.
 
 TEST(ChooseBlindWriteOverwriteTest, ProviderDisallowsReturnsDefault) {
     PseudoRandom prng(123);
-    RAIIServerParameterControllerForTest ratio{"wiredTigerBlindWriteRatio", 0.5};
+    unittest::ServerParameterGuard ratio{"wiredTigerBlindWriteRatio", 0.5};
 
     ASSERT_TRUE(chooseBlindWriteOverwrite(
         /*defaultOverwrite=*/true, /*providerAllowsBlindWrite=*/false, prng));
@@ -55,7 +55,7 @@ TEST(ChooseBlindWriteOverwriteTest, ProviderDisallowsReturnsDefault) {
 
 TEST(ChooseBlindWriteOverwriteTest, RatioOneAlwaysBlind) {
     PseudoRandom prng(123);
-    RAIIServerParameterControllerForTest ratio{"wiredTigerBlindWriteRatio", 1.0};
+    unittest::ServerParameterGuard ratio{"wiredTigerBlindWriteRatio", 1.0};
 
     for (int i = 0; i < 100; ++i) {
         ASSERT_TRUE(chooseBlindWriteOverwrite(
@@ -67,7 +67,7 @@ TEST(ChooseBlindWriteOverwriteTest, RatioOneAlwaysBlind) {
 
 TEST(ChooseBlindWriteOverwriteTest, RatioZeroNeverUpgrades) {
     PseudoRandom prng(123);
-    RAIIServerParameterControllerForTest ratio{"wiredTigerBlindWriteRatio", 0.0};
+    unittest::ServerParameterGuard ratio{"wiredTigerBlindWriteRatio", 0.0};
 
     for (int i = 0; i < 100; ++i) {
         // With ratio=0.0 and the provider allowing, a default of false is never upgraded.
@@ -83,7 +83,7 @@ TEST(ChooseBlindWriteOverwriteTest, RatioZeroNeverUpgrades) {
 
 TEST(ChooseBlindWriteOverwriteTest, IntermediateRatioSamplesRoughly) {
     PseudoRandom prng(123);
-    RAIIServerParameterControllerForTest ratio{"wiredTigerBlindWriteRatio", 0.5};
+    unittest::ServerParameterGuard ratio{"wiredTigerBlindWriteRatio", 0.5};
 
     constexpr int iter = 2000;
     int blindCount = 0;

@@ -68,9 +68,9 @@
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -902,9 +902,8 @@ protected:
     // default-on, so forcing them off is required to keep these tests covering the legacy
     // path; the gated-off code paths are covered by ReshardingCoordinatorNoRefreshPersistenceTest
     // below and by resharding_coordinator_service_util_test.
-    RAIIServerParameterControllerForTest _initNoRefreshFlag{"featureFlagReshardingInitNoRefresh",
-                                                            false};
-    RAIIServerParameterControllerForTest _noRefreshApplyingAndBlockingWritesFlag{
+    unittest::ServerParameterGuard _initNoRefreshFlag{"featureFlagReshardingInitNoRefresh", false};
+    unittest::ServerParameterGuard _noRefreshApplyingAndBlockingWritesFlag{
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false};
 
     const std::vector<ChunkRange> _oldChunkRanges = {
@@ -1279,8 +1278,8 @@ protected:
 private:
     // Re-flip the parent's controllers back on for the test body. Destruction unwinds in
     // reverse so the parent's off-state is restored cleanly.
-    RAIIServerParameterControllerForTest _initNoRefreshOn;
-    RAIIServerParameterControllerForTest _noRefreshApplyingAndBlockingWritesOn;
+    unittest::ServerParameterGuard _initNoRefreshOn;
+    unittest::ServerParameterGuard _noRefreshApplyingAndBlockingWritesOn;
 };
 
 TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,

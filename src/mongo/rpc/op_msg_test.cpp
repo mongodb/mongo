@@ -59,9 +59,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
@@ -841,10 +841,9 @@ protected:
 };
 
 TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const auto kTenantId = TenantId(OID::gen());
     const auto token = std::string{auth::ValidatedTenancyScopeFactory::create(
@@ -878,8 +877,8 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
 }
 
 TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
     const auto kTenantId = TenantId(OID::gen());
@@ -954,10 +953,9 @@ TEST(OpMsgRequest, GetDatabaseThrowsMissing) {
 }
 
 TEST(OpMsgRequestBuilder, WithVTS) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
     const auto vts = auth::ValidatedTenancyScopeFactory::create(
@@ -977,10 +975,9 @@ TEST(OpMsgRequestBuilder, WithVTS) {
 }
 
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
     const StringData dbString = "testDb";
@@ -1045,19 +1042,17 @@ void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
 }
 
 TEST_F(OpMsgWithAuth, TestVTSSetsPrefixStateFalse) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     CheckVtsSetsPrefix(client.get(), false);
 }
 
 TEST_F(OpMsgWithAuth, TestVTSSetsPrefixStateTrue) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     CheckVtsSetsPrefix(client.get(), true);
 }
@@ -1083,28 +1078,25 @@ void CheckCommandMsgIdlParsingForOpMsgRequest(bool simulateAtlasProxyTenantProto
 }
 
 TEST_F(OpMsgWithAuth, TestExpectPrefixTrueParsedInMsg) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     CheckCommandMsgIdlParsingForOpMsgRequest(true);
 }
 
 TEST_F(OpMsgWithAuth, TestExpectPrefixFalseParsedInMsg) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     CheckCommandMsgIdlParsingForOpMsgRequest(false);
 }
 
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
     const StringData dbString = "testDb";
@@ -1127,10 +1119,9 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
 }
 
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
     const TenantId tenantId(OID::gen());
     const StringData dbString = "testDb";
@@ -1153,12 +1144,10 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
 }
 
 TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest requireTenantIdController("featureFlagRequireTenantID",
-                                                                   true);
-    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
-    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
-                                                          "secret");
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard requireTenantIdController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard securityTokenController("featureFlagSecurityToken", true);
+    unittest::ServerParameterGuard secretController("testOnlyValidatedTenancyScopeKey", "secret");
 
 
     const TenantId tenantId(OID::gen());
@@ -1203,7 +1192,7 @@ TEST(OpMsgTest, EmptyMessageWithChecksumFlag) {
 }
 
 TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
     const auto kTenantId = TenantId(OID::gen());
@@ -1248,7 +1237,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
 }
 
 TEST_F(OpMsgWithAuth, GetDbNameWithVTSIncludePrefix) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 
     const auto kTenantId = TenantId(OID::gen());

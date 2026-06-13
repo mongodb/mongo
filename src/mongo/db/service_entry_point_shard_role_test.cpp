@@ -45,11 +45,11 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
@@ -321,8 +321,7 @@ TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDe
 }
 
 TEST_F(ServiceEntryPointShardServerTest, WaitForAdmissionResolvesDeferredTokenBeforeInvocation) {
-    RAIIServerParameterControllerForTest rateLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                            true};
+    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     RateLimiter limiterForDeferredToken(
         /*refreshRatePerSec=*/1.0,
@@ -350,8 +349,7 @@ TEST_F(ServiceEntryPointShardServerTest, WaitForAdmissionResolvesDeferredTokenBe
 
 TEST_F(ServiceEntryPointShardServerTest,
        PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled) {
-    RAIIServerParameterControllerForTest rateLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                            false};
+    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
 
     RateLimiter limiterForDeferredToken(
         /*refreshRatePerSec=*/1.0,
@@ -378,8 +376,7 @@ TEST_F(ServiceEntryPointShardServerTest,
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionInterrupted) {
-    RAIIServerParameterControllerForTest rateLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                            true};
+    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     auto opCtx = makeOperationContext();
     auto* client = opCtx->getClient();
@@ -419,8 +416,7 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionInterrupted) {
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionRespectsMaxTimeMS) {
     gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     auto* clockSource =
         static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
@@ -475,8 +471,7 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionRespectsMaxTimeMS) {
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSucceeds) {
     gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     auto* clockSource =
         static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());

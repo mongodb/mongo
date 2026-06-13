@@ -71,11 +71,11 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
@@ -1606,7 +1606,7 @@ EncryptedFieldConfig makeTextEfcSingleField(StringData path,
 }  // namespace
 
 TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
-    RAIIServerParameterControllerForTest ffctrl{"featureFlagQETextSearchPreview", true};
+    unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
     auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
     auto fields = efc.getFields();
@@ -1618,7 +1618,7 @@ TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
 }
 
 TEST_F(FleCrudTest, validateTextSearchInsertValidContention) {
-    RAIIServerParameterControllerForTest ffctrl{"featureFlagQETextSearchPreview", true};
+    unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
     auto efc = makeTextEfcSingleField("encrypted"_sd, keyId, 1 /* contention */);
     auto fields = efc.getFields();
@@ -1931,7 +1931,7 @@ protected:
     static constexpr StringData kTestFieldName = "field"_sd;
     std::vector<TextSearchSchema> _schemas;
     StackBufBuilder _stackBuf;
-    boost::optional<RAIIServerParameterControllerForTest> _ffctrl;
+    boost::optional<unittest::ServerParameterGuard> _ffctrl;
 };
 
 EncryptedFieldConfig QETextSearchCrudTest::getEFC() {

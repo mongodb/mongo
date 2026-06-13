@@ -32,8 +32,8 @@
 #include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -303,12 +303,12 @@ TEST_F(FeatureFlagTest, OperationFCVUpgrade) {
         feature_flags::gFeatureFlagSpoon.isEnabled(kLastLTSVersionContext, kLatestFCVSnapshot));
 }
 
-// Test that the RAIIServerParameterControllerForTest works correctly on a feature flag.
+// Test that the unittest::ServerParameterGuard works correctly on a feature flag.
 TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     // Set false feature flag to true
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
     {
-        RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
+        unittest::ServerParameterGuard controller("featureFlagBlender", true);
         ASSERT_TRUE(
             feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
     }
@@ -318,7 +318,7 @@ TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
     // Set true feature flag to false
     ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
     {
-        RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
+        unittest::ServerParameterGuard controller("featureFlagBlender", false);
         ASSERT_FALSE(
             feature_flags::gFeatureFlagBlender.isEnabled(kNoVersionContext, kLatestFCVSnapshot));
     }

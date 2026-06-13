@@ -103,6 +103,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -1359,8 +1360,8 @@ DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateRidOnNonRridCollectionGro
 DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateNoRidOnRridCollectionGrouped, "11454703") {
     auto nss = NamespaceString::createNamespaceString_forTest(
         "test.SteadyStateNoRidOnRridCollectionGrouped");
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
     createCollection(_opCtx.get(), nss, {});
 
     MutableOplogEntry op1Mutable;
@@ -1560,7 +1561,7 @@ TEST_F(OplogApplierImplTest, TxnTableUpdatesGetCoalescedForRetryableWritesWithSa
 
 TEST_F(OplogApplierImplTest,
        TxnTableUpdatesDoNotGetCoalescedForRetryableWritesWithDisableTransactionUpdateCoalescing) {
-    RAIIServerParameterControllerForTest ff("featureFlagDisableTransactionUpdateCoalescing", true);
+    unittest::ServerParameterGuard ff("featureFlagDisableTransactionUpdateCoalescing", true);
     const NamespaceString& nss = NamespaceString::createNamespaceString_forTest("test", "foo");
     const auto sessionId = makeLogicalSessionIdForTest();
     std::vector<OplogEntry> insertOps;
@@ -2274,7 +2275,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
 // candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
 
@@ -2333,7 +2334,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
 // candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerUpdateOperation) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
 
@@ -2393,7 +2394,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerUpdateOperation) {
 // candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.t");
 
@@ -2420,7 +2421,7 @@ TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
 // candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyContainerUpdateOperation) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.t");
 
@@ -7456,9 +7457,9 @@ TEST_F(PreparedTxnSplitTest, SinglePreparedTxnMultipleOpsOnOneDoc) {
 }
 
 class PreparedTxnSplitSizeMetadataTest : public PreparedTxnSplitTest {
-    RAIIServerParameterControllerForTest _fastCountFlag{"featureFlagReplicatedFastCount", true};
-    RAIIServerParameterControllerForTest _durabilityFlag{"featureFlagReplicatedFastCountDurability",
-                                                         true};
+    unittest::ServerParameterGuard _fastCountFlag{"featureFlagReplicatedFastCount", true};
+    unittest::ServerParameterGuard _durabilityFlag{"featureFlagReplicatedFastCountDurability",
+                                                   true};
 };
 
 TEST_F(PreparedTxnSplitSizeMetadataTest, SizeMetadataIsSummedAcrossSplits) {

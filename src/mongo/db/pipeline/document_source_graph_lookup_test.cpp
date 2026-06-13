@@ -44,8 +44,8 @@
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -305,7 +305,7 @@ using DocumentSourceGraphLookupServerlessTest = ServerlessAggregationContextFixt
 
 TEST_F(DocumentSourceGraphLookupServerlessTest,
        LiteParsedDocumentSourceLookupStringExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     auto originalBSON = BSON("$graphLookup" << BSON("from" << "foo"
@@ -331,7 +331,7 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
 
 TEST_F(DocumentSourceGraphLookupServerlessTest,
        CreateFromBSONContainsExpectedNamespacesInServerless) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     auto expCtx = getExpCtx();
     auto tenantId = expCtx->getNamespaceString().tenantId();

@@ -53,8 +53,8 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -131,8 +131,8 @@ private:
     }
     intrusive_ptr<DocumentSource> _sort;
 
-    RAIIServerParameterControllerForTest _featureFlagController;
-    RAIIServerParameterControllerForTest _curopWriteThreshold;
+    unittest::ServerParameterGuard _featureFlagController;
+    unittest::ServerParameterGuard _curopWriteThreshold;
 };
 
 
@@ -500,7 +500,7 @@ public:
           _chunkController("internalQueryMaxWriteToCurOpMemoryUsageBytes", ChunkSize) {}
 
 private:
-    RAIIServerParameterControllerForTest _chunkController;
+    unittest::ServerParameterGuard _chunkController;
 };
 
 using DocumentSourceSortExecutionLargeChunkTest = DocumentSourceSortExecutionChunkTest<1000000>;
@@ -784,8 +784,8 @@ initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 1000000};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   1000000};
     auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 1000000);
 
     // There were 2 pauses, so we should expect 2 paused results before any results can be
@@ -808,8 +808,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToPauseLoadingWhileSpilled) 
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturningFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 1000000};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   1000000};
     auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 10);
 
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -831,8 +831,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillBeforeReturni
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToManuallySpillAfterReturningFirstDocument) {
     unittest::TempDir tempDir("DocumentSourceSortTest");
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 1000000};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   1000000};
     auto [mock, sort, sortStage] = initSpillingTest(getExpCtx(), tempDir, 10);
 
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -915,8 +915,8 @@ TEST_F(DocumentSourceSortExecutionTest,
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBoundedSort) {
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 3 * 1024};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   3 * 1024};
 
     unittest::TempDir tempDir("DocumentSourceSortTest");
     auto expCtx = getExpCtx();
@@ -975,8 +975,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
 
 TEST_F(DocumentSourceSortExecutionTest,
        ShouldBeAbleToReportSpillingStatsInBoundedSortWithSortKeyMetadata) {
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", 3 * 1024};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   3 * 1024};
 
     unittest::TempDir tempDir("DocumentSourceSortTest");
     auto expCtx = getExpCtx();
@@ -1042,8 +1042,8 @@ TEST_F(DocumentSourceSortExecutionTest,
     auto expCtx = getExpCtx();
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", int(maxMemoryUsageBytes)};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   int(maxMemoryUsageBytes)};
 
     auto sort = DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx});
 
@@ -1062,8 +1062,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     auto expCtx = getExpCtx();
     expCtx->setAllowDiskUse(false);
     const size_t maxMemoryUsageBytes = 1000;
-    RAIIServerParameterControllerForTest sortMemoryLimit{
-        "internalQueryMaxBlockingSortMemoryUsageBytes", int(maxMemoryUsageBytes)};
+    unittest::ServerParameterGuard sortMemoryLimit{"internalQueryMaxBlockingSortMemoryUsageBytes",
+                                                   int(maxMemoryUsageBytes)};
 
     auto sort = DocumentSourceSort::create(expCtx, {BSON("_id" << -1), expCtx});
 
@@ -1090,8 +1090,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
 }
 
 TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagQueryMemoryTracking",
-                                                               false};
+    unittest::ServerParameterGuard featureFlagController{"featureFlagQueryMemoryTracking", false};
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(
         sort()->getSortPattern(), DocumentSourceSort::kMin, 1337, 10, false, getExpCtx());
@@ -1172,8 +1171,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithoutMemoryTracking) {
 }
 
 TEST_F(DocumentSourceSortTest, RedactionWithSortKeyMetadata) {
-    RAIIServerParameterControllerForTest featureFlagController{"featureFlagQueryMemoryTracking",
-                                                               false};
+    unittest::ServerParameterGuard featureFlagController{"featureFlagQueryMemoryTracking", false};
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(
         sort()->getSortPattern(), DocumentSourceSort::kMin, 1337, 10, true, getExpCtx());
@@ -1254,8 +1252,7 @@ TEST_F(DocumentSourceSortTest, RedactionWithSortKeyMetadata) {
 }
 
 TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
     createSort(BSON("a" << 1));
     createSortStage();
     auto boundedSort = DocumentSourceSort::createBoundedSort(

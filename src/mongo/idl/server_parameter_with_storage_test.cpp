@@ -335,14 +335,14 @@ TEST(IDLServerParameterWithStorage, annotationsOnClusterParameter) {
     ASSERT_BSONOBJ_EQ(sp->annotations(), BSON("cluster_meta" << BSON("scope" << "global")));
 }
 
-// Test that the RAIIServerParameterControllerForTest works correctly on IDL-generated types.
+// Test that the unittest::ServerParameterGuard works correctly on IDL-generated types.
 TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     // Test int
     auto* stdIntDeclared = getNodeServerParameter("stdIntDeclared");
     ASSERT_OK(stdIntDeclared->setFromString("42", boost::none));
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
     {
-        RAIIServerParameterControllerForTest controller("stdIntDeclared", 10);
+        unittest::ServerParameterGuard controller("stdIntDeclared", 10);
         ASSERT_EQ(test::gStdIntDeclared.load(), 10);
     }
     ASSERT_EQ(test::gStdIntDeclared.load(), 42);
@@ -352,7 +352,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     ASSERT_OK(uglyComplicated->setFromString("false", boost::none));
     ASSERT_EQ(test::gUglyComplicatedNameSp, false);
     {
-        RAIIServerParameterControllerForTest controller("ugly complicated-name.sp", true);
+        unittest::ServerParameterGuard controller("ugly complicated-name.sp", true);
         ASSERT_EQ(test::gUglyComplicatedNameSp, true);
     }
     ASSERT_EQ(test::gUglyComplicatedNameSp, false);
@@ -364,7 +364,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
     ASSERT_EQ(test::gStartupString, coolStartupString);
     {
         const auto badStartupString = "Bad startup string";
-        RAIIServerParameterControllerForTest controller("startupString", badStartupString);
+        unittest::ServerParameterGuard controller("startupString", badStartupString);
         ASSERT_EQ(test::gStartupString, badStartupString);
     }
     ASSERT_EQ(test::gStartupString, coolStartupString);

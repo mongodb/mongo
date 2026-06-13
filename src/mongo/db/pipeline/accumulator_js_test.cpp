@@ -43,8 +43,8 @@
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -215,7 +215,7 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
 TEST_F(
     MapReduceFixture,
     InternalJsReduceFailsDependentOnDocumentCountWhenEvalIsInvalidJavascriptWithSingleReduceOpt) {
-    RAIIServerParameterControllerForTest flag("mrEnableSingleReduceOptimization", true);
+    unittest::ServerParameterGuard flag("mrEnableSingleReduceOptimization", true);
     std::string eval("INVALID_JAVASCRIPT");
     // Multiple source documents should evaluate the passed in function and return an error with
     // invalid javascript.

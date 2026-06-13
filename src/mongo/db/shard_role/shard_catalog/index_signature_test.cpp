@@ -53,7 +53,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 

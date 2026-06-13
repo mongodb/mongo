@@ -35,7 +35,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
@@ -324,8 +324,8 @@ TEST(WiredTigerConnectionTest, RecordsEngineTime) {
 
 TEST(WiredTigerConnectionTest, ThrowsWhenCreatingMoreThanSessionMax) {
     constexpr auto maxSessionCount = 50;
-    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
-    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax", 10};
+    unittest::ServerParameterGuard sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    unittest::ServerParameterGuard reservedSession{"wiredTigerReservedSessionMax", 10};
 
     WiredTigerConnectionHarnessHelper helper("", 10);
     WiredTigerConnection* const connection = helper.getConnection();
@@ -343,9 +343,9 @@ TEST(WiredTigerConnectionTest, ThrowsWhenCreatingMoreThanSessionMax) {
 TEST(WiredTigerConnectionTest, ThrowsWhenCreatingMoreThanAllowedUserSessions) {
     constexpr auto maxSessionCount = 50;
     constexpr auto reservedSessionCount = 10;
-    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
-    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax",
-                                                         reservedSessionCount};
+    unittest::ServerParameterGuard sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    unittest::ServerParameterGuard reservedSession{"wiredTigerReservedSessionMax",
+                                                   reservedSessionCount};
 
     WiredTigerConnectionHarnessHelper helper("", 10);
     WiredTigerConnection* const connection = helper.getConnection();
@@ -366,8 +366,8 @@ TEST(WiredTigerConnectionTest, ThrowsWhenCreatingMoreThanAllowedUserSessions) {
 
 TEST(WiredTigerConnectionTest, DecrementsSessionCountWhenSessionIsDestroyed) {
     constexpr auto maxSessionCount = 50;
-    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
-    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax", 10};
+    unittest::ServerParameterGuard sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    unittest::ServerParameterGuard reservedSession{"wiredTigerReservedSessionMax", 10};
 
     WiredTigerConnectionHarnessHelper helper("", 10);
     WiredTigerConnection* const connection = helper.getConnection();
@@ -388,9 +388,9 @@ TEST(WiredTigerConnectionTest, DecrementsSessionCountWhenSessionIsDestroyed) {
 TEST(WiredTigerConnectionTest, RollsBackWhenAssertionTriggers) {
     constexpr auto maxSessionCount = 50;
     constexpr auto reservedSessionCount = 10;
-    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
-    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax",
-                                                         reservedSessionCount};
+    unittest::ServerParameterGuard sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    unittest::ServerParameterGuard reservedSession{"wiredTigerReservedSessionMax",
+                                                   reservedSessionCount};
 
     WiredTigerConnectionHarnessHelper helper("", 10);
     WiredTigerConnection* const connection = helper.getConnection();

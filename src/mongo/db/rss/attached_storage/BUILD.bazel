@@ -48,7 +48,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":attached_persistence_provider",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )

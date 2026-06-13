@@ -43,8 +43,8 @@
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/record_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -357,7 +357,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
 
 TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     // Used to set 'score' metadata.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "
@@ -448,7 +448,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddSingleMetaExpressionDependency) 
 
 TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
     // Used to set 'score' metadata.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(fromjson("{a: 0, c: {$meta: 'textScore'}, "
                                                             "d: {$meta: 'randVal'}, "

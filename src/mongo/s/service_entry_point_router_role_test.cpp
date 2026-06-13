@@ -34,10 +34,10 @@
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_test_fixture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
@@ -105,8 +105,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestCommandFailsRunInvocationWithExcepti
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, WaitForAdmissionResolvesDeferredTokenBeforeInvocation) {
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     RateLimiter limiterForDeferredToken(
         /*refreshRatePerSec=*/1.0,
@@ -134,8 +133,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, WaitForAdmissionResolvesDeferredTokenBef
 
 TEST_F(ServiceEntryPointRouterRoleTest,
        PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled) {
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               false};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
 
     RateLimiter limiterForDeferredToken(
         /*refreshRatePerSec=*/1.0,
@@ -162,8 +160,7 @@ TEST_F(ServiceEntryPointRouterRoleTest,
 
 TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionInterrupted) {
     gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     RateLimiter limiterForDeferredToken(
         /*refreshRatePerSec=*/1.0,
@@ -200,8 +197,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionInterrupted) {
 
 TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionRespectsMaxTimeMS) {
     gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     auto* clockSource =
         static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
@@ -252,8 +248,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionRespectsMaxTimeMS) {
 
 TEST_F(ServiceEntryPointRouterRoleTest, QueuedAdmissionWithLargeMaxTimeMSSucceeds) {
     gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    RAIIServerParameterControllerForTest requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
-                                                               true};
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
 
     auto* clockSource =
         static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());

@@ -432,7 +432,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "116059
 class ContainerIteratorTest : public testing::TestWithParam<SorterChecksumVersion> {
 public:
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 };
 
 INSTANTIATE_TEST_SUITE_P(ContainerIteratorTestSuite,
@@ -456,7 +456,7 @@ class SortedContainerWriterTest : public ServiceContextMongoDTest {
 public:
     SorterTracker sorterTracker;
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 
     /**
      * Creates and exhausts iterators created from the writer to ensure that the final checksum
@@ -783,7 +783,7 @@ class ContainerBasedSpillerTest : public ServiceContextMongoDTest,
                                   public testing::WithParamInterface<std::tuple<int64_t, int64_t>> {
 public:
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 
     int64_t batchSize() const {
         return std::get<0>(GetParam());
@@ -1465,7 +1465,7 @@ TEST(ContainerIteratorTest, RecoverCursorAfterAbandoningSnapshot) {
 class ContainerBasedSpillerWriteConflictTest : public ServiceContextMongoDTest {
 public:
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 
 protected:
     void setUp() override {
@@ -1641,7 +1641,7 @@ TEST_F(ContainerBasedSpillerWriteConflictTest, MergeSpillsRemoveSurvivesWCE) {
 class ContainerBasedSpillerCallbackTest : public ServiceContextMongoDTest {
 public:
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 
 protected:
     using Settings = sorter::Spiller<IntWrapper, NullValue, IWComparator>::Settings;

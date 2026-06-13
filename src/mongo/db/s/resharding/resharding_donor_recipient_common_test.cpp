@@ -66,9 +66,9 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -694,7 +694,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ConstructDonorDocumentFromRe
                   "performVerification"_attr = performVerification,
                   "enableVerification"_attr = enableVerification);
 
-            RAIIServerParameterControllerForTest verificationFeatureFlagController(
+            unittest::ServerParameterGuard verificationFeatureFlagController(
                 "featureFlagReshardingVerification", enableVerification);
 
             auto reshardingFields = createCommonReshardingFields(
@@ -738,7 +738,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
                   "performVerification"_attr = performVerification,
                   "enableVerification"_attr = enableVerification);
 
-            RAIIServerParameterControllerForTest verificationFeatureFlagController(
+            unittest::ServerParameterGuard verificationFeatureFlagController(
                 "featureFlagReshardingVerification", enableVerification);
 
             auto reshardingFields = createCommonReshardingFields(
@@ -886,7 +886,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerificationUnspecified_FeatureFlagEnabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", true);
     auto performVerification = boost::none;
 
@@ -899,7 +899,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerificationUnspecified_FeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
     auto performVerification = boost::none;
 
@@ -922,7 +922,7 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsNotPerformVerificat
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerification_FeatureFlagEnabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", true);
     bool performVerification = true;
 
@@ -935,7 +935,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsPerformVerification_FeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
     bool performVerification = true;
 
@@ -960,7 +960,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardOwnsChunks_NotStoreOplogFetcherProgress) {
-    RAIIServerParameterControllerForTest storeOplogFetcherProgressFeatureFlagController(
+    unittest::ServerParameterGuard storeOplogFetcherProgressFeatureFlagController(
         "featureFlagReshardingStoreOplogFetcherProgress", false);
 
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
@@ -981,7 +981,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 TEST_F(
     ReshardingDonorRecipientCommonTest,
     ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningAndApplyIfApplicable) {
-    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
@@ -994,9 +994,9 @@ TEST_F(
 TEST_F(
     ReshardingDonorRecipientCommonTest,
     ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningAndApplyIfApplicable) {
-    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
@@ -1008,9 +1008,9 @@ TEST_F(
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningIfApplicable) {
-    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", true);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
@@ -1022,9 +1022,9 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningIfApplicable) {
-    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningAndApplyingFeatureFlagController(
         "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
-    RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
+    unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
     testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
@@ -1036,7 +1036,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagEnabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", true);
     boost::optional<bool> performVerification = boost::none;
 
@@ -1049,7 +1049,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsPerformVerificationUnspecified_FeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
     auto performVerification = boost::none;
 
@@ -1073,7 +1073,7 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsNotPerformVerif
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsPerformVerification_FeatureFlagEnabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", true);
     bool performVerification = true;
 
@@ -1087,7 +1087,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsPerformVerification_FeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest verificationFeatureFlagController(
+    unittest::ServerParameterGuard verificationFeatureFlagController(
         "featureFlagReshardingVerification", false);
     bool performVerification = true;
 

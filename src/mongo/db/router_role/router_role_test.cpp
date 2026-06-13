@@ -37,11 +37,11 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -347,7 +347,7 @@ TEST_F(RouterRoleTest, DBPrimaryRouterExceedsMaxRetryAttempts) {
     int maxTestRetries = 10;
 
     // Sets the number of retries, but values less than 10 are rejected due to parameter validation.
-    RAIIServerParameterControllerForTest controller("maxNumStaleVersionRetries", maxTestRetries);
+    unittest::ServerParameterGuard controller("maxNumStaleVersionRetries", maxTestRetries);
 
     // The DBPrimaryRouter should retry until it reaches the maximum available retries.
     int tries = 0;
@@ -1084,7 +1084,7 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
 
     // Sets the number of retries, but values less than 10 are rejected due to parameter
     // validation.
-    RAIIServerParameterControllerForTest controller("maxNumStaleVersionRetries", maxTestRetries);
+    unittest::ServerParameterGuard controller("maxNumStaleVersionRetries", maxTestRetries);
 
     // The CollectionRouter should retry until it reaches the maximum available retries.
     int tries = 0;

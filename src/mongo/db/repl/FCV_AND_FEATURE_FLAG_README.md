@@ -1166,7 +1166,7 @@ when testing a specific codepath:
 ```c++
 // featureFlagToaster has the default value.
 {
-    RAIIServerParameterControllerForTest controller("featureFlagToaster", true);
+    unittest::ServerParameterGuard controller("featureFlagToaster", true);
     // Test things that should only happen when featureFlagToaster is enabled.
 }
 // featureFlagToaster has the default value.

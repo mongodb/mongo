@@ -52,10 +52,10 @@ protected:
             return;
         }
 
-        _ffDurability = std::make_unique<RAIIServerParameterControllerForTest>(
+        _ffDurability = std::make_unique<unittest::ServerParameterGuard>(
             "featureFlagReplicatedFastCountDurability", true);
-        _ffContainerWrites = std::make_unique<RAIIServerParameterControllerForTest>(
-            "featureFlagContainerWrites", true);
+        _ffContainerWrites =
+            std::make_unique<unittest::ServerParameterGuard>("featureFlagContainerWrites", true);
 
         ASSERT_OK(createInternalFastCountContainers(opCtx,
                                                     NamespaceString::kAdminCommandNamespace,
@@ -81,8 +81,8 @@ protected:
         wuow.commit();
     }
 
-    std::unique_ptr<RAIIServerParameterControllerForTest> _ffDurability;
-    std::unique_ptr<RAIIServerParameterControllerForTest> _ffContainerWrites;
+    std::unique_ptr<unittest::ServerParameterGuard> _ffDurability;
+    std::unique_ptr<unittest::ServerParameterGuard> _ffContainerWrites;
     std::unique_ptr<SizeCountTimestampStore> _store;
 };
 

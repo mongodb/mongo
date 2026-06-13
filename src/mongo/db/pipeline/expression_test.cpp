@@ -49,10 +49,10 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -1099,7 +1099,7 @@ TEST(ExpressionMetaTest, ExpressionMetaStreamNotSupported) {
         ExpressionMeta::parse(&expCtx, expr.firstElement(), vps), DBException, 17308);
 
     // Even with feature flag on, field path only supported for $meta: "stream.path".
-    RAIIServerParameterControllerForTest streamsFeatureFlag("featureFlagStreams", true);
+    unittest::ServerParameterGuard streamsFeatureFlag("featureFlagStreams", true);
     auto ctxWithFlag = ExpressionContextForTest{};
     expr = fromjson("{$meta: \"textScore.foo\"}");
     ASSERT_THROWS_CODE(

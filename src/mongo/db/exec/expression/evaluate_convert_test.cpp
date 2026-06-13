@@ -44,8 +44,8 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -365,7 +365,7 @@ TEST_F(EvaluateConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvide
 }
 
 TEST_F(EvaluateConvertTest, FeatureFlagGatedConversionShouldThrowUnlessOnErrorProvided) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagMqlJsEngineGap", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagMqlJsEngineGap", false);
 
     Value str{"string"_sd};
     std::vector<std::pair<Value, Value>> unsupportedConversions{
@@ -967,7 +967,7 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBool) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFailsWhenFeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", false};
+    unittest::ServerParameterGuard featureFlag{"featureFlagConvertObjectToBinData", false};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -4641,7 +4641,7 @@ TEST(ExpressionConvert, StringToDouble) {
  */
 
 TEST(ExpressionConvertTest, CanRoundTripBitArrays) {
-    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
 
@@ -4687,7 +4687,7 @@ TEST(ExpressionConvertTest, CanRoundTripBitArrays) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripIntArray) {
-    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
     auto originalArray = Value(BSON_ARRAY(1 << 5 << 10 << 24 << -30 << 79 << 83));
@@ -4711,7 +4711,7 @@ TEST(ExpressionConvertTest, CanRoundTripIntArray) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripIntArrayHexFormat) {
-    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
     auto originalArray = Value(BSON_ARRAY(1 << 5 << 10 << 24 << -30 << 79 << 83));
@@ -4754,7 +4754,7 @@ BSONArray createBsonArrayFromFloats(std::vector<double> arr) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripFloatArray) {
-    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
 
     auto expCtx = ExpressionContextForTest{};
     auto bsonArray = createBsonArrayFromFloats({10.3, 5.87, 10.10294, 24.1, -30.2, 79, 83});
@@ -4779,7 +4779,7 @@ TEST(ExpressionConvertTest, CanRoundTripFloatArray) {
 }
 
 TEST(ExpressionConvertTest, CanRoundTripFloatArrayBigEndian) {
-    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    unittest::ServerParameterGuard convertFlag{"featureFlagConvertBinDataVectors", true};
     auto expCtx = ExpressionContextForTest{};
 
     auto bsonArray = createBsonArrayFromFloats({10.3, 5.87, 10.10294, 24.1, -30.2, 79, 83});

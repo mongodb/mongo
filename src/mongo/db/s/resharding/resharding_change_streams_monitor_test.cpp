@@ -55,9 +55,9 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -448,7 +448,7 @@ protected:
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory;
 
     // Set the batch size 1 to test multi-batch processing in unit tests with multiple events.
-    RAIIServerParameterControllerForTest batchSize{
+    unittest::ServerParameterGuard batchSize{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", 1};
 
     int delta = 0;
@@ -567,7 +567,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, KillCursorAfterCancellationAndExecuto
 
 TEST_F(ReshardingChangeStreamsMonitorTest, ExitsPromptlyWhenChangeStreamInvalidates) {
     // Short batchTimeLimit so a busy loop would be visibly slow.
-    RAIIServerParameterControllerForTest batchTimeOverride{
+    unittest::ServerParameterGuard batchTimeOverride{
         "reshardingVerificationChangeStreamsEventsBatchTimeLimitSeconds", 3};
 
     createCollectionAndInsertDocuments(tempNss, 0 /*minDocValue*/, 0 /*maxDocValue*/);
@@ -1188,7 +1188,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
     auto timesEntered = monitortHangFp->setMode(FailPoint::alwaysOn);
 
     // Update the batch size.
-    RAIIServerParameterControllerForTest batchSizeServerParameter0{
+    unittest::ServerParameterGuard batchSizeServerParameter0{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", numEventsBatch0};
 
     auto monitorThread = stdx::thread([&] {
@@ -1216,7 +1216,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ChangeBatchSizeWhileChangeStreamOpen)
     monitortHangFp->waitForTimesEntered(timesEntered + 1);
 
     // Update the batch size.
-    RAIIServerParameterControllerForTest batchSizeServerParameter1{
+    unittest::ServerParameterGuard batchSizeServerParameter1{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", numEventsBatch1};
 
     // Turn on failpoint during processing to ensure the monitor will fail if the new batchSize is

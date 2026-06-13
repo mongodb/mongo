@@ -52,8 +52,8 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <algorithm>
@@ -100,7 +100,7 @@ public:
                              benchmark::State& benchmarkState,
                              const std::vector<Document>& documents) final {
         // TODO SERVER-100579 Remove this when feature flag is removed
-        RAIIServerParameterControllerForTest sbeUpgradeBinaryTreesFeatureFlag{
+        unittest::ServerParameterGuard sbeUpgradeBinaryTreesFeatureFlag{
             "featureFlagSbeUpgradeBinaryTrees", true};
 
         auto opCtx = getServiceContext()->makeOperationContext();

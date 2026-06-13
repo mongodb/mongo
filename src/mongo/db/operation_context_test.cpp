@@ -44,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
@@ -52,6 +51,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
@@ -1169,10 +1169,9 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
 }
 
 TEST_F(OperationTestWithMockClock, InterruptCheckOnTime) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
     auto client = getService()->makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
     opCtx->trackOverdueInterruptChecks(mockTickSource()->getTicks());
@@ -1201,10 +1200,9 @@ TEST_F(OperationTestWithMockClock, InterruptCheckOnTime) {
 }
 
 TEST_F(OperationTestWithMockClock, InfrequentInterruptChecks) {
-    RAIIServerParameterControllerForTest enableDelinquentTracking(
-        "featureFlagRecordDelinquentMetrics", true);
-    RAIIServerParameterControllerForTest alwaysTrackInterrupts("overdueInterruptCheckSamplingRate",
-                                                               1);
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
     auto client = getService()->makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
     opCtx->trackOverdueInterruptChecks(mockTickSource()->getTicks());

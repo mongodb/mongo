@@ -38,7 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <initializer_list>
@@ -89,11 +89,11 @@ TEST(ViewResponseFormatter, GetCountValueTenantIdInitialResponse) {
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString_forTest());
 
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         CursorResponse cr(nss, testCursor, {BSON("count" << 7)});
         ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
@@ -134,11 +134,11 @@ TEST(ViewResponseFormatter, FormatInitialDistinctResponseWithTenantIdSuccessfull
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(tenantId, testNss.toString_forTest());
 
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                             flagStatus);
 
         CursorResponse cr(nss, testCursor, {fromjson("{_id: null, distinct: [5, 9]}")});
         ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));

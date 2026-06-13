@@ -44,8 +44,8 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -584,7 +584,7 @@ protected:
 };
 
 TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
 
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listCollections");
@@ -618,8 +618,8 @@ TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
 
 TEST_F(DatabaseClonerMultitenancyTest,
        ListCollectionsMultitenancySupportFeatureFlagRequireTenantId) {
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listCollections");

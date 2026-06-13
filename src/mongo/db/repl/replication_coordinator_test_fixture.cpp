@@ -59,9 +59,9 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -404,7 +404,7 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
 
 void ReplCoordTest::simulateSuccessfulV1ElectionWithoutExitingDrainMode(Date_t electionTime,
                                                                         OperationContext* opCtx) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
 
@@ -502,7 +502,7 @@ void ReplCoordTest::signalApplierDrainComplete(OperationContext* opCtx) noexcept
 }
 
 void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
-    RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard controller("featureFlagReduceMajorityWriteLatency", true);
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(1, 1), 0),
                                                         Date_t() + Seconds(1));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));

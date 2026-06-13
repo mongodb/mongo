@@ -41,9 +41,9 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -124,7 +124,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFEnabled) {
 
 // TODO (SERVER-112863): Remove feature flag controller and FF Disabled test
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFDisabled) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagReplicationUsageOfPriorityPort", false);
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
@@ -855,7 +855,7 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortFCVEnabled) {
 // TODO (SERVER-112863): Remove feature flag disabled test once the feature flag is enabled on
 // lastLTS.
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortFCVDisabled) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagReplicationUsageOfPriorityPort", false);
 
     ReplicationCoordinatorExternalStateMock externalState;
@@ -1235,7 +1235,7 @@ TEST_F(ServiceContextTest, ValidateForReconfig_SimultaneousAddAndRemoveOfArbiter
 }
 
 TEST_F(ServiceContextTest, ValidateForReconfig_MultiNodeAdditionOfArbitersDisallowed) {
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     BSONArray oldMembers = BSON_ARRAY(m1 << m2);
     BSONArray newMembers = BSON_ARRAY(m1 << m2 << m3_Arbiter << m4_Arbiter);  // add two arbiters.
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,

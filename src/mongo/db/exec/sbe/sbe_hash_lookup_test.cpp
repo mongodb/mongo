@@ -401,7 +401,7 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
 
     // Set the memory limit so that the initial key fits into memory, but adding more duplicates
     // push memory over the limit.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
         static_cast<long long>(kKey.objsize() + 8 * kDupCount / 2));
 
@@ -472,7 +472,7 @@ TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
     constexpr size_t kStringLength = 64;
     constexpr size_t kStringCount = 26;
 
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
         static_cast<long long>(kStringCount * kStringLength / 2));
 

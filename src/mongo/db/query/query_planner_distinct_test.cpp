@@ -32,7 +32,7 @@
 #include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -92,8 +92,7 @@ namespace {
  * A query solution that contains a FETCH with a filter is not eligible for a DISTINCT_SCAN.
  */
 TEST_F(QueryPlannerDistinctTest, PredicateNotCovered) {
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1}"));
     addIndex(fromjson("{y: 1}"));
     addIndex(fromjson("{z: 1}"));
@@ -116,8 +115,7 @@ TEST_F(QueryPlannerDistinctTest, PredicateNotCovered) {
  * bounds (namely, covered by a DISTINCT_SCAN), it is eligible for conversion.
  */
 TEST_F(QueryPlannerDistinctTest, PredicateCovered) {
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1}"));
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{y: 1, z: 1}"));
@@ -137,8 +135,7 @@ TEST_F(QueryPlannerDistinctTest, PredicateCovered) {
  * the sort pattern.
  */
 TEST_F(QueryPlannerDistinctTest, SortCovered) {
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1}"));
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{y: 1, z: 1}"));
@@ -158,8 +155,7 @@ TEST_F(QueryPlannerDistinctTest, SortCovered) {
  */
 TEST_F(QueryPlannerDistinctTest, StrictDistinctOnlyRequirements) {
     params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1}"));
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{y: 1, x: 1}"));
@@ -181,8 +177,7 @@ TEST_F(QueryPlannerDistinctTest, StrictDistinctOnlyRequirements) {
  * direction of the sort pattern.
  */
 TEST_F(QueryPlannerDistinctTest, DifferentSortDirections) {
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{x: 1, y: -1}"));
     addIndex(fromjson("{x: -1, y: 1}"));
@@ -205,8 +200,7 @@ TEST_F(QueryPlannerDistinctTest, DifferentSortDirections) {
  * transformed to have a distinct scan.
  */
 TEST_F(QueryPlannerDistinctTest, DistinctScanWithProjection) {
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{x: 1, z: 1}"));
 
@@ -238,8 +232,7 @@ TEST_F(QueryPlannerDistinctTest, DistinctScanWithProjection) {
  * rewritten pipeline.
  */
 TEST_F(QueryPlannerDistinctTest, FlipDistinctScanDirection) {
-    RAIIServerParameterControllerForTest shardFiltering("featureFlagShardFilteringDistinctScan",
-                                                        true);
+    unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1, y: 1}"));
     addIndex(fromjson("{x: 1, z: 1}"));
 

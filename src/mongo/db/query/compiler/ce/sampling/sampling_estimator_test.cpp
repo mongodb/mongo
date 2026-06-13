@@ -132,7 +132,7 @@ TEST_F(SamplingEstimatorTest, HashModStrideSampling) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    RAIIServerParameterControllerForTest stridesKnob("internalQuerySamplingByStrides", true);
+    unittest::ServerParameterGuard stridesKnob("internalQuerySamplingByStrides", true);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -168,7 +168,7 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingSmallCollection) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    RAIIServerParameterControllerForTest stridesKnob("internalQuerySamplingByStrides", true);
+    unittest::ServerParameterGuard stridesKnob("internalQuerySamplingByStrides", true);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -193,7 +193,7 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingWithProjection) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    RAIIServerParameterControllerForTest stridesKnob("internalQuerySamplingByStrides", true);
+    unittest::ServerParameterGuard stridesKnob("internalQuerySamplingByStrides", true);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1579,8 +1579,7 @@ void assertBetween(CardinalityEstimate actual, double min, double max) {
 
 void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t sampleSize) {
     // For the purposes of safe assertions, we must generate a stable sample.
-    RAIIServerParameterControllerForTest knobController("internalQuerySamplingBySequentialScan",
-                                                        true);
+    unittest::ServerParameterGuard knobController("internalQuerySamplingBySequentialScan", true);
     estimator.generateSample(ce::NoProjection{});
 
     // We know the true NDV for each of these fields; see 'createDocumentsForNDVTesting' for
@@ -1716,7 +1715,7 @@ class EstimateNDVMultiKeyTest : public SamplingEstimatorTest,
 
 TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
     // Use sequential scan so all estimators draw a deterministic, identically-sized sample.
-    RAIIServerParameterControllerForTest knob("internalQuerySamplingBySequentialScan", true);
+    unittest::ServerParameterGuard knob("internalQuerySamplingBySequentialScan", true);
 
     const size_t card = GetParam().card;
     const size_t sampleSize = GetParam().sampleSize;
@@ -2199,7 +2198,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
 
 TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Source collection has docs that must NOT appear in the returned sample — hitting the
     // persistent sample means we never read from them.
     insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
@@ -2243,7 +2242,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
 
 TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(kTestNss,
                     {BSON("_id" << 1 << "tag" << "not_persisted"),
                      BSON("_id" << 2 << "tag" << "not_persisted"),
@@ -2278,7 +2277,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
 
 TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // A matching persistent sample exists, but the estimator is constructed with kOnTheFlySample so
     // it must ignore it and sample fresh from the source collection.
     insertDocuments(kTestNss,
@@ -2328,7 +2327,7 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
 
 TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Source collection has docs that must NOT appear in the returned sample — hitting the
     // persistent sample means we never read from them.
     insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
@@ -2375,7 +2374,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", false};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", false};
     // A matching persistent sample exists, but the estimator must ignore it and sample
     // fresh from the source collection.
     insertDocuments(kTestNss,
@@ -2425,7 +2424,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlag
 }
 
 TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", false};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", false};
     insertDocuments(kTestNss,
                     {BSON("_id" << 1 << "tag" << "not_persisted"),
                      BSON("_id" << 2 << "tag" << "not_persisted"),
@@ -2484,7 +2483,7 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
     // field disagrees with the docs array length). tryLoadPersistentSample must log the error and
     // fall back to on-the-fly sampling rather than crashing or returning a corrupt sample.
     // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(kTestNss,
                     {BSON("_id" << 1 << "tag" << "not_persisted"),
                      BSON("_id" << 2 << "tag" << "not_persisted"),

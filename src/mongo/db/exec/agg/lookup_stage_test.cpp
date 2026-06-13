@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -318,7 +318,7 @@ TEST_F(LookupStageTest, ShouldAbandonCacheIfMaxSizeIsExceededAfterFirstSubPipeli
 
 TEST_F(LookupStageTest, AddingCacheStageWorksWithDisablePipelineRewrites) {
     // Disable pipeline rewrites.
-    RAIIServerParameterControllerForTest controller("internalQueryMaxPipelineRewrites", 0);
+    unittest::ServerParameterGuard controller("internalQueryMaxPipelineRewrites", 0);
 
     auto expCtx = getExpCtx();
     NamespaceString fromNs =

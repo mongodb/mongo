@@ -44,7 +44,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
@@ -132,7 +132,7 @@ private:
 };
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     TenantId tenantId1(OID::fromTerm(1));
     TenantId tenantId2(OID::fromTerm(2));
 

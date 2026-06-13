@@ -36,8 +36,8 @@
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mock_periodic_runner.h"
 
@@ -85,7 +85,7 @@ public:
     }
 
     void setReplicatedTruncatesFeatureFlag(bool useReplicatedTruncates) {
-        _featureFlag = std::make_unique<RAIIServerParameterControllerForTest>(
+        _featureFlag = std::make_unique<unittest::ServerParameterGuard>(
             "featureFlagUseReplicatedTruncatesForDeletions", useReplicatedTruncates);
     }
 
@@ -99,7 +99,7 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ChangeStreamExpiredPreImagesRemoverService> _preImagesRemover;
 
-    std::unique_ptr<RAIIServerParameterControllerForTest> _featureFlag;
+    std::unique_ptr<unittest::ServerParameterGuard> _featureFlag;
 };
 
 TEST_F(ChangeStreamExpiredPreImageRemoverTest, ReplicatedTruncatesNotPopulatedInitially) {

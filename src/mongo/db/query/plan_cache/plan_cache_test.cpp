@@ -1623,7 +1623,7 @@ TEST_F(CachePlanSelectionTest, CachedPlanForCompoundMultikeyIndexCanCompoundBoun
 TEST_F(CachePlanSelectionTest,
        CachedPlanForSelfIntersectionOfMultikeyIndexPointRangesCannotIntersectBounds) {
     // Enable a merge sort based index intersection plan to be generated.
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
+    unittest::ServerParameterGuard truncateFeatureFlag{
         "internalQueryPlannerEnableSortIndexIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
@@ -1669,7 +1669,7 @@ TEST_F(CachePlanSelectionTest,
 
 TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsingElemMatch) {
     // Enable a merge sort based index intersection plan to be generated.
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
+    unittest::ServerParameterGuard truncateFeatureFlag{
         "internalQueryPlannerEnableSortIndexIntersection", true};
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;

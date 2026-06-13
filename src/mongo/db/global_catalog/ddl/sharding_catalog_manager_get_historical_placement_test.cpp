@@ -335,8 +335,8 @@ private:
     // change stream readers to be enabled.
     // TODO (SERVER-98118): Delete this field once featureFlagChangeStreamPreciseShardTargeting
     // reaches last-lts.
-    std::unique_ptr<RAIIServerParameterControllerForTest> _scopedFeatureFlagEnabled =
-        std::make_unique<RAIIServerParameterControllerForTest>(
+    std::unique_ptr<unittest::ServerParameterGuard> _scopedFeatureFlagEnabled =
+        std::make_unique<unittest::ServerParameterGuard>(
             "featureFlagChangeStreamPreciseShardTargeting", true);
 };
 

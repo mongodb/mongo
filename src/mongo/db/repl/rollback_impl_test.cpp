@@ -72,12 +72,12 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -2302,7 +2302,7 @@ TEST_F(RollbackImplObserverInfoTest,
 TEST_F(
     RollbackImplObserverInfoTest,
     NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfRenameCollectionOplogEntryWithMultitenancy) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     boost::optional<TenantId> tid(OID::gen());
     auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
@@ -2328,8 +2328,8 @@ TEST_F(
 TEST_F(
     RollbackImplObserverInfoTest,
     NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfRenameCollectionOplogEntryRequiresTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     boost::optional<TenantId> tid(OID::gen());
     auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");

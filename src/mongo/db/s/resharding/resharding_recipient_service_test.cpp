@@ -80,10 +80,10 @@
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -1532,11 +1532,11 @@ private:
     const int64_t _numDeletes = 2;
 
     // Set the batch size 1 to test multi-batch processing in unit tests with multiple events.
-    RAIIServerParameterControllerForTest _batchSize{
+    unittest::ServerParameterGuard _batchSize{
         "reshardingVerificationChangeStreamsEventsBatchSizeLimit", 1};
 
     // Feature flag controller for test options
-    boost::optional<RAIIServerParameterControllerForTest> _cloneNoRefreshController;
+    boost::optional<unittest::ServerParameterGuard> _cloneNoRefreshController;
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
@@ -3149,12 +3149,12 @@ TEST_F(ReshardingRecipientServiceTest, TestVerifyIndexSpecsThrowsExceptionOnMism
 
 TEST_F(ReshardingRecipientServiceTest,
        TestVerifyIndexSpecsDoesNotPerformVerificationIfFeatureFlagIsNotSet) {
-    RAIIServerParameterControllerForTest indexVerificationServerParameter(
-        "reshardingIndexVerification", false);
+    unittest::ServerParameterGuard indexVerificationServerParameter("reshardingIndexVerification",
+                                                                    false);
     // Enable the resharding verification feature flag to verify that it does not override the index
     // validation parameter.
-    RAIIServerParameterControllerForTest countVerificationFeatureFlag(
-        "featureFlagReshardingVerification", true);
+    unittest::ServerParameterGuard countVerificationFeatureFlag("featureFlagReshardingVerification",
+                                                                true);
 
     // Set sourceCollectionIndexSpecs to create mismatched index specs.
     sourceCollectionIndexSpecs = {BSON("key" << BSON("a" << 1) << "name"
@@ -3266,7 +3266,7 @@ TEST_F(ReshardingRecipientServiceTest,
 // If the feature was turned on we would catch the mismatched options and throw an exception.
 TEST_F(ReshardingRecipientServiceTest,
        TestVerifyCollectionOptionsDoesNotPerformVerificationIfFeatureFlagIsNotSet) {
-    RAIIServerParameterControllerForTest collectionOptionsVerificationServerParameter(
+    unittest::ServerParameterGuard collectionOptionsVerificationServerParameter(
         "reshardingCollectionOptionsVerification", false);
 
     // Set tempReshardingCollectionOptions to create mismatched collection options.
@@ -3274,8 +3274,8 @@ TEST_F(ReshardingRecipientServiceTest,
 
     // Enable the resharding verification feature flag to verify that it does not override the
     // collection options validation parameter.
-    RAIIServerParameterControllerForTest countVerificationFeatureFlag(
-        "featureFlagReshardingVerification", true);
+    unittest::ServerParameterGuard countVerificationFeatureFlag("featureFlagReshardingVerification",
+                                                                true);
     for (const auto& testOptions : makeBasicTestOptions()) {
         setupFeatureFlags(testOptions);
 

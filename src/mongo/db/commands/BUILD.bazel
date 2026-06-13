@@ -1192,6 +1192,7 @@ mongo_cc_unit_test(
         "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/scripting:scripting_server",
         "//src/mongo/shell:kms_idl",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:version_impl",
     ],
 )

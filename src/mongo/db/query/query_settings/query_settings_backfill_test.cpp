@@ -32,7 +32,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #include <memory>
 
@@ -194,16 +194,16 @@ TEST_F(BackfillCoordinatorTest, ShouldmarkForBackfillAndScheduleIfNeeded) {
     ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
 
     // It should skip backfilling queries if 'internalQuerySettingsDisableBackfill' is set to true.
-    RAIIServerParameterControllerForTest internalQuerySettingsDisableBackfill{
+    unittest::ServerParameterGuard internalQuerySettingsDisableBackfill{
         "internalQuerySettingsDisableBackfill", true};
     expCtx->setExplain(boost::none);
     ASSERT_FALSE(BackfillCoordinator::shouldBackfill(expCtx, /* hasRepresentativeQuery*/ false));
 }
 
 TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBufferAndExecute) {
-    RAIIServerParameterControllerForTest internalQuerySettingsBackfillDelaySeconds{
+    unittest::ServerParameterGuard internalQuerySettingsBackfillDelaySeconds{
         "internalQuerySettingsBackfillDelaySeconds", 30};
-    RAIIServerParameterControllerForTest internalQuerySettingsBackfillMemoryLimitBytes{
+    unittest::ServerParameterGuard internalQuerySettingsBackfillMemoryLimitBytes{
         "internalQuerySettingsBackfillMemoryLimitBytes", 16777248};
     const auto clusterParameterTime = LogicalTime(Timestamp(1234));
     std::string veryLargeQueryField(BSONObjMaxUserSize - 11, 'x');
@@ -313,7 +313,7 @@ TEST_F(BackfillCoordinatorTest, markForBackfillAndScheduleIfNeededShouldWaitBuff
 }
 
 TEST_F(BackfillCoordinatorTest, ExecuteDoesNotInsertQueriesWithoutSettings) {
-    RAIIServerParameterControllerForTest internalQuerySettingsBackfillDelaySeconds{
+    unittest::ServerParameterGuard internalQuerySettingsBackfillDelaySeconds{
         "internalQuerySettingsBackfillDelaySeconds", 30};
 
     // Start by setting some settings on 'hash, mark it and expect it to be buffered.
@@ -353,7 +353,7 @@ TEST_F(BackfillCoordinatorTest, ExecuteDoesNotInsertQueriesWithoutSettings) {
 }
 
 TEST_F(BackfillCoordinatorTest, CancelStopsFutureTasks) {
-    RAIIServerParameterControllerForTest internalQuerySettingsBackfillDelaySeconds{
+    unittest::ServerParameterGuard internalQuerySettingsBackfillDelaySeconds{
         "internalQuerySettingsBackfillDelaySeconds", 30};
     auto future = expectFutureBackfillCompletion();
     setInsertRepresentativeQueriesImpl([](auto&&) {
@@ -382,7 +382,7 @@ TEST_F(BackfillCoordinatorTest, CancelStopsFutureTasks) {
 }
 
 TEST_F(BackfillCoordinatorTest, MarkForBackfillAndScheduleIfNeededDoesNotLeakErrors) {
-    RAIIServerParameterControllerForTest internalQuerySettingsBackfillDelaySeconds{
+    unittest::ServerParameterGuard internalQuerySettingsBackfillDelaySeconds{
         "internalQuerySettingsBackfillDelaySeconds", 30};
     auto future = expectFutureBackfillCompletion();
     setInsertRepresentativeQueriesImpl([](auto&&) {

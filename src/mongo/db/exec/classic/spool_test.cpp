@@ -40,7 +40,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -147,10 +147,10 @@ public:
             expCtx()->setAllowDiskUse(maxAllowedDiskUsageBytes.has_value());
         }
 
-        RAIIServerParameterControllerForTest maxMemoryUsage("internalQueryMaxSpoolMemoryUsageBytes",
-                                                            maxAllowedMemoryUsageBytes);
-        RAIIServerParameterControllerForTest maxDiskUsage("internalQueryMaxSpoolDiskUsageBytes",
-                                                          maxAllowedDiskUsageBytes.value_or(1));
+        unittest::ServerParameterGuard maxMemoryUsage("internalQueryMaxSpoolMemoryUsageBytes",
+                                                      maxAllowedMemoryUsageBytes);
+        unittest::ServerParameterGuard maxDiskUsage("internalQueryMaxSpoolDiskUsageBytes",
+                                                    maxAllowedDiskUsageBytes.value_or(1));
 
         return SpoolStage(expCtx(), &ws, std::move(root));
     }

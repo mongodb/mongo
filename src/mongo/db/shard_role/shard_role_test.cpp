@@ -77,9 +77,9 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -194,7 +194,7 @@ protected:
     }
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> _featureFlagScope;
+    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
 };
 
 INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,
@@ -2199,7 +2199,7 @@ TimeseriesOptions createTimeseriesOptions() {
 // TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreatedTimeseries(
     AcquisitionPrerequisites::OperationType operationType) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     NamespaceString nss(NamespaceString::createNamespaceString_forTest(
         dbNameTestDb, "NonExistentCollectionWhichWillBeCreatedAsTimeseries"));
@@ -2241,12 +2241,12 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(
     NamespaceString nss(NamespaceString::createNamespaceString_forTest(
         dbNameTestDb, "TimeseriesCollectionThatWillBeUpgraded"));
 
-    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+    unittest::ServerParameterGuard throwsTimeseriesUpgradeDowngradeEnable(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create legacy (viewful) timeseries collection.
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext(), nss);
@@ -2267,7 +2267,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(
 
     // Create timeseries collection
     withNewOpCtx([&](OperationContext* newOpCtx) {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         timeseries::upgradeToViewlessTimeseries(newOpCtx, nss);
     });
@@ -2290,12 +2290,12 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsN
     NamespaceString nss(NamespaceString::createNamespaceString_forTest(
         dbNameTestDb, "TimeseriesCollectionThatWillBeUpgraded"));
 
-    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+    unittest::ServerParameterGuard throwsTimeseriesUpgradeDowngradeEnable(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create legacy (viewful) timeseries collection.
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext(), nss);
@@ -2317,7 +2317,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsN
 
     // Create timeseries collection
     withNewOpCtx([&](OperationContext* newOpCtx) {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         timeseries::upgradeToViewlessTimeseries(newOpCtx, nss);
     });
@@ -2343,12 +2343,12 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNs
     NamespaceString nss(NamespaceString::createNamespaceString_forTest(
         dbNameTestDb, "TimeseriesCollectionThatWillBeDowngraded"));
 
-    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+    unittest::ServerParameterGuard throwsTimeseriesUpgradeDowngradeEnable(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create viewless timeseries collection.
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext(), nss);
@@ -2369,7 +2369,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNs
 
     // Create timeseries collection
     withNewOpCtx([&](OperationContext* newOpCtx) {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         timeseries::downgradeFromViewlessTimeseries(newOpCtx, nss);
     });
@@ -2394,12 +2394,12 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughBucket
     NamespaceString nss(NamespaceString::createNamespaceString_forTest(
         dbNameTestDb, "TimeseriesCollectionThatWillBeDowngraded"));
 
-    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+    unittest::ServerParameterGuard throwsTimeseriesUpgradeDowngradeEnable(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create viewless timeseries collection.
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext(), nss);
@@ -2421,7 +2421,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughBucket
 
     // Create timeseries collection
     withNewOpCtx([&](OperationContext* newOpCtx) {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         timeseries::downgradeFromViewlessTimeseries(newOpCtx, nss);
     });
@@ -3424,7 +3424,7 @@ void ShardRoleTest::testRestoreFailsWhenMetadataInvalidated(
     bool terminateSecondaryReadsUponRangeDeletion,
     bool terminateSecondaryReadsOnOrphan,
     bool mustFail) {
-    RAIIServerParameterControllerForTest featureFlagController{
+    unittest::ServerParameterGuard featureFlagController{
         "featureFlagTerminateSecondaryReadsUponRangeDeletion",
         terminateSecondaryReadsUponRangeDeletion};
 

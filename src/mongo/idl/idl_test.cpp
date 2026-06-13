@@ -59,12 +59,12 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/idl_test_defs.h"
 #include "mongo/idl/idl_test_types.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/idl/unittest_import_gen.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -2854,7 +2854,7 @@ TEST(IDLCommand, NonStrictCommandRejectsDuplicateFields) {
 }
 
 TEST(IDLCommand, TestConcatenateWithDb_WithTenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     const auto tenantId = TenantId(OID::gen());
     const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
@@ -3009,7 +3009,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS) {
 }
 
 TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestNSS_WithTenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     const auto tenantId = TenantId(OID::gen());
     const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
@@ -3089,7 +3089,7 @@ TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID) {
 }
 
 TEST(IDLCommand, TestConcatenateWithDbOrUUID_TestUUID_WithTenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
 
     UUID uuid = UUID::gen();
     const auto tenantId = TenantId(OID::gen());
@@ -4336,8 +4336,8 @@ TEST(IDLTypeCommand, ReplyTypeCanParseWithGenericFields) {
 
 TEST(IDLCommand,
      TestCommandTypeNamespaceCommand_WithMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
 
     auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName << "db.coll1"
@@ -4357,8 +4357,8 @@ TEST(IDLCommand,
 }
 
 TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
 
     const auto tenantId = TenantId(OID::gen());
@@ -4438,8 +4438,8 @@ TEST(IDLCommand, TestCommandGenericArguments) {
 }
 
 TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     const char* ns1 = "db.coll1";
     const char* ns2 = "a.b";
     const char* ns3 = "c.d";
@@ -4471,8 +4471,8 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
 }
 
 TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     const char* ns1 = "db.coll1";
     const char* ns2 = "a.b";
     const char* ns3 = "c.d";
@@ -4519,7 +4519,7 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
 TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
     // Negative: Test the child IDLParserContext cannot has different tenant id from its
     // predecessor.
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
 
@@ -4546,11 +4546,11 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
 
 TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
 
             const std::string ns1 = "db.coll1";
             const std::string ns2 = "a.b";
@@ -4619,11 +4619,11 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
 
 TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
             boost::optional<auth::ValidatedTenancyScope> vts = boost::none;
             boost::optional<TenantId> tenantId = boost::none;
             if (multitenancySupport) {
@@ -4682,11 +4682,11 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
 
 TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
             boost::optional<auth::ValidatedTenancyScope> vts = boost::none;
             boost::optional<TenantId> tenantId = boost::none;
             if (multitenancySupport) {
@@ -4745,11 +4745,11 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
 
 TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_EmptyConstruct) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
 
             auto testStruct = CommandWithBypassAndNamespaceStruct();
 
@@ -4784,11 +4784,11 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_EmptyConstruct) {
 
 TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_EmptyConstruct) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
 
             auto testStruct = BypassStruct();
 
@@ -4816,11 +4816,11 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_EmptyConstruct) {
 
 TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_EmptyConstruct) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
 
             auto testStruct = BypassReplyStruct();
 
@@ -4848,11 +4848,11 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_EmptyConstruct)
 
 TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgsNoCtxt) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
             boost::optional<TenantId> tenantId =
                 multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
 
@@ -4904,11 +4904,11 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgsNo
 
 TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgs) {
     for (bool multitenancySupport : {false, true}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancySupport);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport",
+                                                              multitenancySupport);
         for (bool featureFlag : {false, true}) {
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       featureFlag);
+            unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID",
+                                                                 featureFlag);
             boost::optional<TenantId> tenantId =
                 multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
 

@@ -42,7 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <optional>
@@ -134,7 +134,7 @@ protected:
     }
 
 private:
-    std::optional<RAIIServerParameterControllerForTest> _enableV4;
+    std::optional<unittest::ServerParameterGuard> _enableV4;
     std::optional<multiversion::FeatureCompatibilityVersion> _fcvBefore;
 };
 

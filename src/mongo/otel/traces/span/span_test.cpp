@@ -29,11 +29,11 @@
 
 #include "mongo/otel/traces/span/span.h"
 
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
 #include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/span/span_names.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 namespace mongo {
 namespace otel {
@@ -83,8 +83,7 @@ template <typename T>
 class SpanTest : public OtelTestFixture {
 protected:
     // Enable OTel sampling for all span tests; individual tests may override.
-    RAIIServerParameterControllerForTest _samplingFlagController{"featureFlagOtelTraceSampling",
-                                                                 true};
+    unittest::ServerParameterGuard _samplingFlagController{"featureFlagOtelTraceSampling", true};
 
     auto name1() {
         return SpanNameHelper<T>::name1();
@@ -362,7 +361,7 @@ TYPED_TEST(SpanTest, StartIfExistingTraceParentIfTraceParent) {
 
 TYPED_TEST(SpanTest, SamplingFlagDisabledDropsRootSpan) {
     auto guard = setTraceSamplingFnForTest([](StringData) { return true; });
-    RAIIServerParameterControllerForTest flagController("featureFlagOtelTraceSampling", false);
+    unittest::ServerParameterGuard flagController("featureFlagOtelTraceSampling", false);
 
     auto opCtx = this->makeOperationContext();
     {
@@ -373,7 +372,7 @@ TYPED_TEST(SpanTest, SamplingFlagDisabledDropsRootSpan) {
 
 TYPED_TEST(SpanTest, TracingFlagDisabledDropsRootSpan) {
     auto guard = setTraceSamplingFnForTest([](StringData) { return true; });
-    RAIIServerParameterControllerForTest flagController("featureFlagTracing", false);
+    unittest::ServerParameterGuard flagController("featureFlagTracing", false);
 
     auto opCtx = this->makeOperationContext();
     {

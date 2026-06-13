@@ -1801,8 +1801,8 @@ TEST_F(BucketCatalogTest, SchemaChanges) {
 }
 
 TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
-    RAIIServerParameterControllerForTest allowCorruptBucket(
-        "timeseriesDisableStrictBucketValidator", true);
+    unittest::ServerParameterGuard allowCorruptBucket("timeseriesDisableStrictBucketValidator",
+                                                      true);
 
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},

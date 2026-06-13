@@ -88,12 +88,12 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -3827,8 +3827,8 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchOnShutdown) {
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughGetNextApplierBatchInLockError) {
     // oplog version validation is moved from oplog batcher to oplog fetcher. This test can be
     // removed after removing the feture flag.
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         false);
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -3896,8 +3896,8 @@ TEST_F(
     InitialSyncerReturnsEmptyBatchFromGetNextApplierBatchInLockIfRsSyncApplyStopFailPointIsEnabled) {
     // oplog version validation is moved from oplog batcher to oplog fetcher. This test can be
     // removed after removing the feture flag.
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         false);
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -5717,7 +5717,7 @@ TEST_F(InitialSyncerTest, InitialSyncerWaitLoopRetriesUntilStableTimestampAdvanc
 
 TEST_F(InitialSyncerTest, InitialSyncerWaitLoopTimesOut) {
     initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
-    RAIIServerParameterControllerForTest noRetryPeriod(
+    unittest::ServerParameterGuard noRetryPeriod(
         "initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs", 1);
 
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
@@ -5773,7 +5773,7 @@ TEST_F(InitialSyncerTest, InitialSyncerWaitLoopTimesOut) {
 // waits fire before the deadline, leaving one unsatisfied expectation and failing the test.
 TEST_F(InitialSyncerTest, InitialSyncerWaitLoopBackoffCappedAt30Seconds) {
     initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
-    RAIIServerParameterControllerForTest retryPeriod(
+    unittest::ServerParameterGuard retryPeriod(
         "initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs", 82);
 
     auto initialSyncer = &getInitialSyncer();

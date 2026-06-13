@@ -256,10 +256,6 @@ void OplogApplierImplTest::tearDown() {
     _consistencyMarkers = {};
     StorageInterface::set(serviceContext, {});
     ServiceContextMongoDTest::tearDown();
-
-    for (auto&& serverParamController : _serverParamControllers) {
-        serverParamController.reset();
-    }
 }
 
 ReplicationConsistencyMarkers* OplogApplierImplTest::getConsistencyMarkers() const {

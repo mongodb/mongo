@@ -61,7 +61,6 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
@@ -70,6 +69,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -2097,8 +2097,8 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckReturnsStopSyncingAndDropBatch) {
 }
 
 TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasWrongVersion) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         true);
     auto firstEntry = makeNoopOplogEntry(Seconds(123));
     auto secondEntry = makeNoopOplogEntry(Seconds(456),
                                           firstEntry.getIntField(OplogEntry::kVersionFieldName) -
@@ -2111,8 +2111,8 @@ TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasWrong
 }
 
 TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasMissingVersion) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         true);
     auto firstEntry = makeNoopOplogEntry(Seconds(123));
     auto secondEntry = makeNoopOplogEntry(Seconds(456)).removeField(OplogEntry::kVersionFieldName);
 

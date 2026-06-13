@@ -59,7 +59,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -297,7 +297,7 @@ protected:
     // This test is executed twice, with and without replicated truncates.
     void testEnsureNoMoreInternalScansWithTruncates(long long expectedDocsDeleted,
                                                     bool useReplicatedTruncates) {
-        RAIIServerParameterControllerForTest minBytesPerMarker{
+        unittest::ServerParameterGuard minBytesPerMarker{
             "preImagesCollectionTruncateMarkersMinBytes", 1};
 
         auto uuid =
@@ -378,7 +378,7 @@ protected:
     // This test is executed twice, with and without replicated truncates.
     void testTruncatesAreOnlyAfterAllDurable(long long expectedDocsDeleted,
                                              bool useReplicatedTruncates) {
-        RAIIServerParameterControllerForTest minBytesPerMarkerController{
+        unittest::ServerParameterGuard minBytesPerMarkerController{
             "preImagesCollectionTruncateMarkersMinBytes", 1};
 
         auto uuid =
@@ -429,8 +429,8 @@ protected:
 };
 
 TEST_F(PreImagesRemoverTest, TruncateThrowsExceptionWhenNotPrimaryWithReplicatedTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", true};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    true};
 
     auto uuid = CollectionCatalog::get(operationContext())
                     ->lookupCollectionByNamespace(operationContext(), kPreImageEnabledCollection)
@@ -542,32 +542,32 @@ TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimestampRetrieval) {
 
 // Run test with local truncates.
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithLocalTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
     testEnsureNoMoreInternalScansWithTruncates(2 /* expectedDocsDeleted */,
                                                false /* useReplicatedTruncates */);
 }
 
 // Run test with replicated truncates.
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithReplicatedTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", true};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    true};
     testEnsureNoMoreInternalScansWithTruncates(3 /* expectedDocsDeleted */,
                                                true /* useReplicatedTruncates */);
 }
 
 TEST_F(PreImagesRemoverTest,
        EnsureAllDocsEventuallyTruncatedFromPrePopulatedCollectionLocalTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
     testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
         1000 /* expectedDocsDeleted */, false /* useReplicatedTruncates */);
 }
 
 TEST_F(PreImagesRemoverTest,
        EnsureAllDocsEventuallyTruncatedFromPrePopulatedCollectionReplicatedTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", true};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    true};
     // Note: the expected value here is very inaccurate, but this is due to no size information
     // being used when estimating the number of documents in the truncate markers.
     testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
@@ -575,8 +575,8 @@ TEST_F(PreImagesRemoverTest,
 }
 
 TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
 
     setExpirationTime(Seconds{1});
 
@@ -587,8 +587,8 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTrunca
 }
 
 TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", true};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    true};
 
     setExpirationTime(Seconds{1});
 
@@ -599,8 +599,8 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesT
 }
 
 TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
     testTruncatesAreOnlyAfterAllDurable(1000 /* expectedDocsDeleted */,
                                         false /* useReplicatedTruncates */);
 }
@@ -615,7 +615,7 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
 // documents, which makes the test fail.
 // TODO SERVER-119222: Reconsider the sampling algorithm and re-enable this test.
 // TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableReplicatedTruncates) {
-//     RAIIServerParameterControllerForTest featureFlagScope{
+//     unittest::ServerParameterGuard featureFlagScope{
 //         "featureFlagUseReplicatedTruncatesForDeletions", true};
 //     testTruncatesAreOnlyAfterAllDurable(1 /* expectedDocsDeleted */, true /*
 //     useReplicatedTruncates */);
@@ -647,8 +647,8 @@ protected:
 };
 
 TEST_F(PreImagesRemoverServiceTest, PeriodicJobStartupHonorsRollbackFlagOnConsistentDataAvailable) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
 
     auto opCtx = operationContext();
     auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
@@ -667,8 +667,8 @@ TEST_F(PreImagesRemoverServiceTest, PeriodicJobStartupHonorsRollbackFlagOnConsis
 }
 
 TEST_F(PreImagesRemoverServiceTest, PeriodicJobOnSecondary) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
 
     auto opCtx = operationContext();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -690,8 +690,8 @@ TEST_F(PreImagesRemoverServiceTest, PeriodicJobOnSecondary) {
 }
 
 TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesntStartOnStandalone) {
-    RAIIServerParameterControllerForTest featureFlagScope{
-        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    unittest::ServerParameterGuard featureFlagScope{"featureFlagUseReplicatedTruncatesForDeletions",
+                                                    false};
 
     auto opCtx = operationContext();
     repl::ReplicationCoordinator::set(getServiceContext(),

@@ -163,7 +163,7 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
 
 class ContainerInMemIterTest : public ServiceContextMongoDTest {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest _ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
 };
 
 TEST_F(ContainerInMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
@@ -253,7 +253,7 @@ template <typename Traits>
 class MakeFromExistingRangesTest : public MakeFromExistingRangesTypedTestBase<Traits> {
 public:
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 };
 
 using MakeFromExistingRangesTypes = ::testing::Types<FileTraits<>, ContainerTraits<>>;
@@ -698,7 +698,7 @@ namespace {
 using FileBasedMakeFromExistingRangesDeathTest = MakeFromExistingRangesFixture;
 
 class ContainerBasedMakeFromExistingRangesDeathTest : public MakeFromExistingRangesFixture {
-    RAIIServerParameterControllerForTest _ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
 
 protected:
     void SetUp() override {
@@ -940,7 +940,7 @@ protected:
 
 private:
     // TODO (SERVER-109578): Remove.
-    RAIIServerParameterControllerForTest _ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard _ffContainerWrites{"featureFlagContainerWrites", true};
     boost::optional<Traits> _storage;
 };
 
@@ -1579,7 +1579,7 @@ TYPED_TEST(BoundedSorterTest, LargeSpill) {
 template <typename Traits>
 class SpillerMergeDiskSpaceTest : public MakeFromExistingRangesTypedTestBase<Traits> {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    unittest::ServerParameterGuard ffContainerWrites{"featureFlagContainerWrites", true};
 };
 
 TYPED_TEST_SUITE(SpillerMergeDiskSpaceTest, MakeFromExistingRangesTypes);

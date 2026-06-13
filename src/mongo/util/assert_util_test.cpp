@@ -32,8 +32,8 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/demangle.h"
 #include "mongo/util/exit_code.h"
@@ -679,8 +679,7 @@ DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  InvariantWhenSignalHandlerLoggingDisabled,
                  "(?s)^(?!.*h"
                  "ello)") {
-    RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
-                                                        false);
+    unittest::ServerParameterGuard knobController("signalHandlerUsesDiagnosticLogging", false);
     // The literal is split so it doesn't appear verbatim in stacktrace code snippet.
     ScopedDebugInfo guard("test",
                           "h"
@@ -719,8 +718,7 @@ DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  SignalWhenSignalHandlerLoggingDisabled,
                  "(?s)^(?!.*h"
                  "ello)") {
-    RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
-                                                        false);
+    unittest::ServerParameterGuard knobController("signalHandlerUsesDiagnosticLogging", false);
     // The literal is split so it doesn't appear verbatim in stacktrace code snippet.
     ScopedDebugInfo guard("test",
                           "h"
@@ -812,7 +810,7 @@ TEST(ScopedDebugInfoStack, Enabled) {
 }
 
 TEST(ScopedDebugInfoStack, Disabled) {
-    RAIIServerParameterControllerForTest knobController("enableDiagnosticLogging", false);
+    unittest::ServerParameterGuard knobController("enableDiagnosticLogging", false);
     ASSERT(!getScopedDebugInfoStackEnabled());
     ASSERT_EQ(error_details::scopedDebugInfoStack().size(), 0);
     ScopedDebugInfo scopedInfo("test", "hello");

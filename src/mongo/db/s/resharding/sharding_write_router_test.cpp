@@ -71,7 +71,6 @@
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"

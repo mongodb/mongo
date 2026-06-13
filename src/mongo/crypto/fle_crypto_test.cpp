@@ -52,12 +52,12 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/shell/kms_gen.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
@@ -2640,7 +2640,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
             FLEOverrideTagOverheadData tagOverheadOverride;
             tagOverheadOverride.setShouldOverride(true);
 
-            RAIIServerParameterControllerForTest overrideTagOverheadLimit(
+            unittest::ServerParameterGuard overrideTagOverheadLimit(
                 "fleAllowTotalTagOverheadToExceedBSONLimit", tagOverheadOverride);
             ASSERT_DOES_NOT_THROW(
                 EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(efc));

@@ -36,7 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
@@ -87,8 +87,8 @@ protected:
 
 TEST_F(ClusterUpdateTest, NoErrors) {
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweKnobValue);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor",
+                                                     uweKnobValue);
         testNoErrors(kUpdateCmdTargeted, kUpdateCmdScatterGather);
     }
 }
@@ -112,8 +112,8 @@ TEST_F(ClusterUpdateTest, CorrectMetrics) {
 
     const BSONObj obj = b.obj();
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweKnobValue);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor",
+                                                     uweKnobValue);
         testOpcountersAreCorrect(kUpdateCmdTargeted, /* expectedValue */ obj);
     }
 }

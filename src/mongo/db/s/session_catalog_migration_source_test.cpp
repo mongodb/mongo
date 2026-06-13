@@ -132,7 +132,7 @@ public:
                                     bool viaNewWrite);
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> _disallowImageCollectionFeatureFlag;
+    boost::optional<unittest::ServerParameterGuard> _disallowImageCollectionFeatureFlag;
 };
 
 /**

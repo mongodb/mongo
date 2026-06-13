@@ -36,9 +36,9 @@
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 #include "mongo/db/topology/cluster_parameters/migration_blocking_operation_cluster_parameters_gen.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/session_catalog_router.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -813,8 +813,8 @@ TEST_F(WriteOpAnalyzerTestImpl,
        MultiWriteWithOnlyTargetDataOwningShardsForMultiWritesParamEnabled) {
     OnlyTargetDataOwningShardsForMultiWritesParam onlyTargetParam;
     onlyTargetParam.setEnabled(true);
-    RAIIServerParameterControllerForTest onlyTargetGuard("onlyTargetDataOwningShardsForMultiWrites",
-                                                         onlyTargetParam);
+    unittest::ServerParameterGuard onlyTargetGuard("onlyTargetDataOwningShardsForMultiWrites",
+                                                   onlyTargetParam);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
@@ -857,8 +857,7 @@ TEST_F(WriteOpAnalyzerTestImpl,
 TEST_F(WriteOpAnalyzerTestImpl, PauseMigrationsDuringMultiUpdatesParamEnabledWithMultiUpdate) {
     migration_blocking_operation::PauseMigrationsDuringMultiUpdatesParam pauseParam;
     pauseParam.setEnabled(true);
-    RAIIServerParameterControllerForTest pauseGuard("pauseMigrationsDuringMultiUpdates",
-                                                    pauseParam);
+    unittest::ServerParameterGuard pauseGuard("pauseMigrationsDuringMultiUpdates", pauseParam);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
@@ -886,7 +885,7 @@ TEST_F(WriteOpAnalyzerTestImpl, PauseMigrationsDuringMultiUpdatesParamEnabledWit
 }
 
 TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
-    RAIIServerParameterControllerForTest enableTimeseriesUpdatesSupport(
+    unittest::ServerParameterGuard enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
@@ -920,7 +919,7 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
 }
 
 TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesNonTargeted) {
-    RAIIServerParameterControllerForTest enableTimeseriesUpdatesSupport(
+    unittest::ServerParameterGuard enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
@@ -945,7 +944,7 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesNonTargeted) {
 }
 
 TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesRetryableWrite) {
-    RAIIServerParameterControllerForTest enableTimeseriesUpdatesSupport(
+    unittest::ServerParameterGuard enableTimeseriesUpdatesSupport(
         "featureFlagTimeseriesUpdatesSupport", true);
     operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
     operationContext()->setTxnNumber(TxnNumber(1));

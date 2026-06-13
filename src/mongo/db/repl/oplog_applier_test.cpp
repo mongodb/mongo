@@ -38,9 +38,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
@@ -126,8 +126,8 @@ void OplogApplierTest::tearDown() {
 const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsBadValueIfAnyOplogEntryHasWrongVersion) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         false);
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(
         makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "foo")));

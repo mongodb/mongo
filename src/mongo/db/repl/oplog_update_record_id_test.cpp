@@ -49,6 +49,7 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstring>
@@ -90,8 +91,8 @@ protected:
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 };
 
 typedef SetSteadyStateConstraints<UpdateWithRecordIdTest, false>
@@ -594,8 +595,8 @@ protected:
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 };
 
 TEST_F(UpdateWithRecordIdAndPreImagesTest,
@@ -687,8 +688,8 @@ protected:
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 };
 
 typedef SetSteadyStateConstraints<CappedUpdateWithRecordIdTest, false>

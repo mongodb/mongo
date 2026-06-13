@@ -48,7 +48,7 @@
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/query/fle/server_rewrite_helper.h"
 #include "mongo/db/query/fle/text_search_predicate.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -1157,26 +1157,26 @@ protected:
     NamespaceString _primaryNss = NamespaceString::createNamespaceString_forTest("test.coll_a"_sd);
 };
 
-#define TEST_FLE_REWRITE_PIPELINE(name,                                                       \
-                                  input,                                                      \
-                                  expected,                                                   \
-                                  additionalNamespaces,                                       \
-                                  encryptionInformation,                                      \
-                                  enableMultiSchemaFeatureFlag)                               \
-    TEST_F(FLEServerRewritePipelineTest, name##_PipelineRewrite) {                            \
-        RAIIServerParameterControllerForTest _scopedFeature{                                  \
-            "featureFlagLookupEncryptionSchemasFLE", enableMultiSchemaFeatureFlag};           \
-        setResolvedNamespacesForTest(additionalNamespaces);                                   \
-        auto pipeline = jsonToPipeline(_expCtx, _primaryNss, input);                          \
-        auto pipelineRewrite =                                                                \
-            MockPipelineRewrite(_primaryNss,                                                  \
-                                EncryptionInformation::parse(fromjson(encryptionInformation), \
-                                                             IDLParserContext("root")),       \
-                                std::move(pipeline));                                         \
-        pipelineRewrite.doRewrite(nullptr);                                                   \
-        auto rewrittenPipeline = pipelineRewrite.getPipeline();                               \
-        ASSERT(rewrittenPipeline);                                                            \
-        assertExpectedPipeline(*rewrittenPipeline, _expCtx, _primaryNss, expected);           \
+#define TEST_FLE_REWRITE_PIPELINE(name,                                                        \
+                                  input,                                                       \
+                                  expected,                                                    \
+                                  additionalNamespaces,                                        \
+                                  encryptionInformation,                                       \
+                                  enableMultiSchemaFeatureFlag)                                \
+    TEST_F(FLEServerRewritePipelineTest, name##_PipelineRewrite) {                             \
+        unittest::ServerParameterGuard _scopedFeature{"featureFlagLookupEncryptionSchemasFLE", \
+                                                      enableMultiSchemaFeatureFlag};           \
+        setResolvedNamespacesForTest(additionalNamespaces);                                    \
+        auto pipeline = jsonToPipeline(_expCtx, _primaryNss, input);                           \
+        auto pipelineRewrite =                                                                 \
+            MockPipelineRewrite(_primaryNss,                                                   \
+                                EncryptionInformation::parse(fromjson(encryptionInformation),  \
+                                                             IDLParserContext("root")),        \
+                                std::move(pipeline));                                          \
+        pipelineRewrite.doRewrite(nullptr);                                                    \
+        auto rewrittenPipeline = pipelineRewrite.getPipeline();                                \
+        ASSERT(rewrittenPipeline);                                                             \
+        assertExpectedPipeline(*rewrittenPipeline, _expCtx, _primaryNss, expected);            \
     }
 
 TEST_FLE_REWRITE_PIPELINE(Match,
@@ -1395,8 +1395,7 @@ TEST_FLE_REWRITE_PIPELINE(LookupDoublyNestedMatch_FeatureFlagDisabled,
                           false);
 
 TEST_F(FLEServerRewritePipelineTest, MissingEscPrimaryCollectionFails_PipelineRewrite) {
-    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagLookupEncryptionSchemasFLE",
-                                                        true};
+    unittest::ServerParameterGuard _scopedFeature{"featureFlagLookupEncryptionSchemasFLE", true};
     setResolvedNamespacesForTest({});
     auto pipeline = jsonToPipeline(
         _expCtx, _primaryNss, "[{$match: {$and: [{ssn: {encrypt: 2}}, {age: {encrypt: 4}}]}}]");
@@ -1412,8 +1411,7 @@ TEST_F(FLEServerRewritePipelineTest, MissingEscPrimaryCollectionFails_PipelineRe
 // EncryptionInformation, so sub-pipeline rewriters (e.g. $lookup) can validate find payloads
 // against the foreign collection's EFC.
 TEST_F(FLEServerRewritePipelineTest, BuildsEfcMapForAllSchemas_PipelineRewrite) {
-    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagLookupEncryptionSchemasFLE",
-                                                        true};
+    unittest::ServerParameterGuard _scopedFeature{"featureFlagLookupEncryptionSchemasFLE", true};
     setResolvedNamespacesForTest({});
     auto pipeline = jsonToPipeline(_expCtx, _primaryNss, "[]");
     MockPipelineRewrite pipelineRewrite(
@@ -1428,8 +1426,7 @@ TEST_F(FLEServerRewritePipelineTest, BuildsEfcMapForAllSchemas_PipelineRewrite) 
 }
 
 TEST_F(FLEServerRewritePipelineTest, MissingEscForeignCollectionFails_PipelineRewrite) {
-    RAIIServerParameterControllerForTest _scopedFeature{"featureFlagLookupEncryptionSchemasFLE",
-                                                        true};
+    unittest::ServerParameterGuard _scopedFeature{"featureFlagLookupEncryptionSchemasFLE", true};
 
     const auto foreignNss = NamespaceString::createNamespaceString_forTest("test.coll_d"_sd);
     setResolvedNamespacesForTest({foreignNss});

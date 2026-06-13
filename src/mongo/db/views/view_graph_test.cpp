@@ -44,7 +44,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -256,7 +256,7 @@ TEST_F(ViewGraphFixture, DroppingViewPreservesNodeInGraphIfDependedOnByOtherView
 }
 
 TEST_F(ViewGraphFixture, DifferentTenantsCanCreateViewWithConflictingNamespaces) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     DatabaseName db1 = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "test");
     DatabaseName db2 = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "test");

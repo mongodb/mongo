@@ -40,7 +40,7 @@
 #include "mongo/db/repl/repl_set_config_test.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -214,7 +214,7 @@ TEST(ReplSetConfig, MajorityCalculationThreeVotersNoArbiters) {
 }
 
 TEST(ReplSetConfig, MajorityCalculationNearlyHalfArbiters) {
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     ReplSetConfig config(ReplSetConfig::parse(
         BSON("_id" << "mySet"
                    << "version" << 2 << "protocolVersion" << 1 << "members"
@@ -309,7 +309,7 @@ TEST(ReplSetConfig, ConfigMajorityInFourNodeSet) {
 TEST(ReplSetConfig, ConfigMajorityInFiveNodeSetOneArbiter) {
     // 4 node set with 2 arbiters, which also qualify for $configMajority. This
     // test confirms that an arbiter counts towards the required majority of 3.
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     ReplSetConfig config(ReplSetConfig::parse(
         BSON("_id" << "mySet"
                    << "version" << 2 << "protocolVersion" << 1 << "members"
@@ -1901,7 +1901,7 @@ TEST(ReplSetConfig, ConfigVersionAndTermToString) {
     ASSERT_EQ(ConfigVersionAndTerm(1, -1).toString(), "{version: 1, term: -1}");
 }
 TEST(ReplSetConfig, IsImplicitDefaultWriteConcernMajority) {
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
 
     ReplSetConfig config(ReplSetConfig::parse(createConfigDocWithArbiters(1, 0)));
     ASSERT_OK(config.validate());

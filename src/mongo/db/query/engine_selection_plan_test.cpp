@@ -38,7 +38,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -385,8 +385,7 @@ TEST_F(EngineSelectionPlanFixture, LuAllFlagsEnabledSelectsSbeForAllCombinations
 
 // Disabling the IXSCAN+FETCH LU flag must NOT affect a plain IXSCAN+FETCH query without $LU.
 TEST_F(EngineSelectionPlanFixture, LuIxscanFetchFlagDoesNotAffectNonLuQuery) {
-    RAIIServerParameterControllerForTest flagOff{"featureFlagSbeEqLookupUnwindLocalIxscanFetch",
-                                                 false};
+    unittest::ServerParameterGuard flagOff{"featureFlagSbeEqLookupUnwindLocalIxscanFetch", false};
 
     // A plain IXSCAN+FETCH without any LU node is already Classic (no GROUP/EqLookup to push
     // down), and disabling the LU access plan flag must not change that result.
@@ -411,8 +410,7 @@ TEST_F(EngineSelectionPlanFixture, LuIxscanFetchFlagDoesNotAffectNonLuQuery) {
 
 // Disabling the COLLSCAN LU flag must NOT affect a plain COLLSCAN query without $LU.
 TEST_F(EngineSelectionPlanFixture, LuCollscanFlagDoesNotAffectNonLuQuery) {
-    RAIIServerParameterControllerForTest flagOff{"featureFlagSbeEqLookupUnwindLocalCollscan",
-                                                 false};
+    unittest::ServerParameterGuard flagOff{"featureFlagSbeEqLookupUnwindLocalCollscan", false};
 
     // A plain COLLSCAN without any LU node stays Classic regardless of the LU collscan flag.
     auto solution = makePlan(std::make_unique<CollectionScanNode>(nss));
@@ -437,7 +435,7 @@ TEST_F(EngineSelectionPlanFixture, LuCollscanFlagDoesNotAffectNonLuQuery) {
 // Disabling featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans must NOT affect a plain
 // complex data-access query without $LU.
 TEST_F(EngineSelectionPlanFixture, LuComplexFlagDoesNotAffectNonLuQuery) {
-    RAIIServerParameterControllerForTest flagOff{
+    unittest::ServerParameterGuard flagOff{
         "featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans", false};
 
     // A plain FETCH+SORT+IXSCAN without any LU node stays Classic regardless of the complex flag.
@@ -658,7 +656,7 @@ TEST_F(EngineSelectionPlanFixture, LuEachFlagDisablesExactlyExpectedCombinations
     };
 
     for (auto* flag : allFlags) {
-        RAIIServerParameterControllerForTest flagOff{flag->getName(), false};
+        unittest::ServerParameterGuard flagOff{flag->getName(), false};
         for (const auto& combo : matrix) {
             const bool expectClassic = (combo.strategyFlag == flag || combo.accessPlanFlag == flag);
             auto dataAccess = combo.makeDataAccess();
@@ -688,8 +686,7 @@ TEST_F(EngineSelectionPlanFixture, LuNonExistentForeignCollectionFlagGatedByNlj)
 
     // With NLJ flag off: NonExistentForeignCollection falls back to Classic.
     {
-        RAIIServerParameterControllerForTest flagOff{"featureFlagSbeEqLookupUnwindNestedLoopJoin",
-                                                     false};
+        unittest::ServerParameterGuard flagOff{"featureFlagSbeEqLookupUnwindNestedLoopJoin", false};
         auto dataAccess = std::make_unique<CollectionScanNode>(nss);
         const auto* dan = dataAccess.get();
         auto solution = makePlan(

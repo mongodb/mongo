@@ -30,7 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwk_manager_test_framework.h"
 #include "mongo/crypto/unix_epoch.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -176,7 +176,7 @@ void assertCorrectKeys(JWKManager* manager, BSONObj data) {
 }
 
 TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+    unittest::ServerParameterGuard quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
 
     auto data = getCompleteTestJWKSet();
     jwksFetcher()->setKeys(getCompleteTestJWKSet());
@@ -212,7 +212,7 @@ TEST_F(JWKManagerTest, parseJWKSetBasicFromSource) {
 }
 
 TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
-    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 5);
+    unittest::ServerParameterGuard quiesceController("JWKSMinimumQuiescePeriodSecs", 5);
 
     // Initially the fetcher will contain no keys.
     ASSERT_EQ(jwkManager()->size(), 0);

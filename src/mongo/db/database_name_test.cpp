@@ -32,9 +32,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <absl/container/node_hash_map.h>
@@ -64,7 +64,7 @@ TEST(DatabaseNameTest, MultitenancySupportDisabled) {
 
 TEST(DatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     // TODO SERVER-62114 remove this test case.
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     DatabaseName dbnWithoutTenant = DatabaseName::createDatabaseName_forTest(boost::none, "a");
     ASSERT(!dbnWithoutTenant.tenantId());

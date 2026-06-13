@@ -44,8 +44,8 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #include <vector>
 
@@ -239,7 +239,7 @@ private:
 
 TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID) {
     auto minBytesPerMarker = 1;
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -269,7 +269,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID) {
 
 TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID1Doc) {
     auto minBytesPerMarker = 1;
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -299,7 +299,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID1Doc) {
 
 TEST_F(PreImagesTruncateManagerTest, EmptyCollection) {
     auto minBytesPerMarker = 1;
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -320,7 +320,7 @@ TEST_F(PreImagesTruncateManagerTest, EmptyCollection) {
 
 TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
     auto minBytesPerMarker = 1;
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -353,7 +353,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
 
 TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUID) {
     auto minBytesPerMarker = 1024 * 25;  // 25KB to downsize for testing.
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -387,7 +387,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUID) {
 // of records across the nsUUIDs will be consistent.
 TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDs) {
     auto minBytesPerMarker = 1024 * 100;  // 100KB.
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -419,7 +419,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDs) {
 
 TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFew) {
     auto minBytesPerMarker = 1024 * 100;  // 100KB.
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -452,7 +452,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFew) {
 
 TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
     auto minBytesPerMarker = 1024 * 100;  // 100KB.
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();
@@ -491,7 +491,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
 
 TEST_F(PreImagesTruncateManagerTest, SamplingMultiplePassesStatsAreCumulative) {
     auto minBytesPerMarker = 1024 * 100;  // 100KB.
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+    unittest::ServerParameterGuard minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
     createPreImagesCollection();

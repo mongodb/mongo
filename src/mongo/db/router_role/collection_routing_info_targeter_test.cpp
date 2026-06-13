@@ -50,7 +50,6 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/versioning_protocol/database_version.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/query/exec/target_write_op.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"

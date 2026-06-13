@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional.hpp>
@@ -155,8 +155,8 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest _attrsController{"openTelemetryTracingResourceAttributes",
-                                                          BSONObj{}};
+    unittest::ServerParameterGuard _attrsController{"openTelemetryTracingResourceAttributes",
+                                                    BSONObj{}};
 };
 
 TEST_F(ResourceAttributesTest, EmptyDocumentClearsAttributes) {

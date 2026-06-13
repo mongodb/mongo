@@ -55,10 +55,10 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -302,7 +302,7 @@ protected:
 
     std::unique_ptr<ClusterStatistics> _clusterStats;
     stdx::unordered_set<NamespaceString> _imbalancedCollectionsCache;
-    RAIIServerParameterControllerForTest _balancerChunksSelectionTimeout{
+    unittest::ServerParameterGuard _balancerChunksSelectionTimeout{
         "balancerChunksSelectionTimeoutMs", 60000};
 
     // Object under test
@@ -531,7 +531,7 @@ TEST_F(BalancerChunkSelectionTest, MaxTimeToScheduleBalancingOperationsExceeded)
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         // Forcing timeout to exceed by setting it to 0
-        RAIIServerParameterControllerForTest balancerChunksSelectionTimeoutMsIsZero(
+        unittest::ServerParameterGuard balancerChunksSelectionTimeoutMsIsZero(
             "balancerChunksSelectionTimeoutMs", 0);
 
         const auto& chunksToMove = selectChunksToMove(opCtx.get());

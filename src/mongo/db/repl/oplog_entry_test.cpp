@@ -54,8 +54,8 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -992,8 +992,8 @@ TEST_F(OplogEntryTest, OpTimeBaseNonStrictParsing) {
 }
 
 TEST_F(OplogEntryTest, InsertIncludesTidField) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     const BSONObj doc = BSON("_id" << docId << "a" << 5);
     TenantId tid(OID::gen());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "foo", "bar");
@@ -1007,8 +1007,8 @@ TEST_F(OplogEntryTest, InsertIncludesTidField) {
 }
 
 TEST_F(OplogEntryTest, ParseMutableOplogEntryIncludesTidField) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const TenantId tid(OID::gen());
 
@@ -1034,8 +1034,8 @@ TEST_F(OplogEntryTest, ParseMutableOplogEntryIncludesTidField) {
 }
 
 TEST_F(OplogEntryTest, ParseDurableOplogEntryIncludesTidField) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const TenantId tid(OID::gen());
     const NamespaceString nssWithTid =
@@ -1061,8 +1061,8 @@ TEST_F(OplogEntryTest, ParseDurableOplogEntryIncludesTidField) {
 }
 
 TEST_F(OplogEntryTest, ParseReplOperationIncludesTidField) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     UUID uuid(UUID::gen());
     TenantId tid(OID::gen());
@@ -1090,8 +1090,8 @@ TEST_F(OplogEntryTest, ParseReplOperationIncludesTidField) {
 
 TEST_F(OplogEntryTest, ConvertMutableOplogEntryToReplOperation) {
     // Required by setTid to take effect
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancySupportController("multitenancySupport", true);
     auto tid = TenantId(OID::gen());
     auto nssWithTid = NamespaceString::createNamespaceString_forTest(tid, nss.ns_forTest());
     auto opType = repl::OpTypeEnum::kCommand;
@@ -1362,7 +1362,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                                            << "internal-constraintViolations-1"))));
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
         EXPECT_EQ(parsed.indexBuildMethod, IndexBuildMethodEnum::kPrimaryDriven);
@@ -1394,7 +1394,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                                              << "internal-skippedRecords-0"))));
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
         EXPECT_EQ(parsed.indexBuildMethod, IndexBuildMethodEnum::kPrimaryDriven);
@@ -1436,9 +1436,9 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                       << "indexBuildIdent" << expectedIdent);
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
-        RAIIServerParameterControllerForTest resumablePrimaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard resumablePrimaryDrivenIndexBuildsEnabled(
             "featureFlagResumablePrimaryDrivenIndexBuilds", true);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
         ASSERT_EQ(parsed.indexes.size(), 2);
@@ -1469,9 +1469,9 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                       << "indexBuildIdent" << "not/a/valid/ident");
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
-        RAIIServerParameterControllerForTest resumablePrimaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard resumablePrimaryDrivenIndexBuildsEnabled(
             "featureFlagResumablePrimaryDrivenIndexBuilds", true);
         auto result = IndexBuildOplogEntry::parse(_opCtx.get(), entry);
         ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
@@ -1498,7 +1498,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                            << "indexBuildIdent" << wellFormedIdent);
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         // featureFlagResumablePrimaryDrivenIndexBuilds intentionally NOT enabled.
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
@@ -1592,7 +1592,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                                                 << "skippedRecordsIdent"
                                                                 << "internal-skippedRecords-1"))));
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
         ASSERT_EQ(parsed.commandType, OplogEntry::CommandType::kCommitIndexBuild);
@@ -1722,7 +1722,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                                    << "skippedRecordsIdent"
                                                    << "internal-skippedRecordsTracker-1"))));
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
         EXPECT_EQ(parsed.commandType, OplogEntry::CommandType::kAbortIndexBuild);
@@ -1883,7 +1883,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Non-unique indexes always omit constraintViolationsIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(
             _opCtx.get(),
@@ -1904,7 +1904,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject an internalIdents object that omits one of its required non-optional fields.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
@@ -1919,7 +1919,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject a startIndexBuild batch where only some indexes specify internalIdents.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         const auto mixedBaseObj = BSON(
             "startIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
@@ -1944,7 +1944,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Unique indexes require constraintViolationsIdent in primary-driven index builds.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         const auto uniqueBaseObj =
             BSON("startIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
@@ -1965,7 +1965,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // _id indexes require constraintViolationsIdent in primary-driven index builds.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         const auto idBaseObj = BSON(
             "startIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
@@ -2030,7 +2030,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         ErrorCodes::BadValue);
     // Reject a commitIndexBuild batch where only some indexes specify internalIdents.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_EQ(
             parse(baseObj,
@@ -2046,7 +2046,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject commitIndexBuild internalIdents missing required sideWritesIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(
@@ -2064,7 +2064,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject commitIndexBuild internalIdents missing required sorterIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
@@ -2083,7 +2083,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject commitIndexBuild internalIdents missing required skippedRecordsIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
@@ -2131,7 +2131,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         ErrorCodes::BadValue);
     // Reject a commitIndexBuild batch where only some indexes specify internalIdents.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_EQ(
             parse(baseObj,
@@ -2147,7 +2147,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject commitIndexBuild internalIdents missing required sideWritesIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(
@@ -2165,7 +2165,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject commitIndexBuild internalIdents missing required sorterIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
@@ -2184,7 +2184,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject commitIndexBuild internalIdents missing required skippedRecordsIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
@@ -2211,7 +2211,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         const auto uniqueBaseObj = BSON("commitIndexBuild" << "test.coll"
                                                            << "indexBuildUUID" << UUID::gen()
                                                            << "indexes" << uniqueIndexSpecs);
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_EQ(
             parse(uniqueBaseObj,
@@ -2298,7 +2298,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         ErrorCodes::BadValue);
     // Reject an abortIndexBuild batch where only some indexes specify internalIdents.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_EQ(
             parse(baseObj,
@@ -2314,7 +2314,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject abortIndexBuild internalIdents missing required sideWritesIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(
@@ -2332,7 +2332,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject abortIndexBuild internalIdents missing required sorterIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
@@ -2351,7 +2351,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
 
     // Reject abortIndexBuild internalIdents missing required skippedRecordsIdent.
     {
-        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        unittest::ServerParameterGuard primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,

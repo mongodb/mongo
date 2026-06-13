@@ -598,8 +598,8 @@ TEST_F(ApplyOpsTest, ApplyOpsNoRidOnRridCollection) {
 
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.ApplyOpsNoRidOnRridCollection");
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
 
     auto insertOp = BSON("op" << "i"
@@ -624,8 +624,8 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsReplicatedRridDisabled) {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithRecordIdsReplicated));
     BSONObjBuilder resultBuilder;
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", false};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 false};
     ASSERT_EQ(ErrorCodes::CommandNotSupported,
               applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 }
@@ -656,8 +656,8 @@ TEST_F(ApplyOpsTest, ContainerOpsRequireFeatureFlagAndTestCommands) {
 
     auto testContainerOps =
         [&](bool featureFlagEnabled, bool testCommandsEnabled, bool commandSucceeds) {
-            RAIIServerParameterControllerForTest featureFlagController{"featureFlagContainerWrites",
-                                                                       featureFlagEnabled};
+            unittest::ServerParameterGuard featureFlagController{"featureFlagContainerWrites",
+                                                                 featureFlagEnabled};
             setTestCommandsEnabled(testCommandsEnabled);
 
             BSONObjBuilder resultBuilder;
@@ -693,8 +693,8 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithoutRecordIdsReplicatedRridEnabled) {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithoutRecordIdsReplicated));
     BSONObjBuilder resultBuilder;
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 true};
     ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 
     // validating that the collection has recordIdsReplicated even when it was not present.
@@ -722,8 +722,8 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsTrueReplicatedRridEnabled) {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithRecordIdsReplicatedTrue));
     BSONObjBuilder resultBuilder;
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 true};
     ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 
     // validating that the collection has recordIdsReplicated.
@@ -751,8 +751,8 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsFalseReplicatedRridEnabled) {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithRecordIdsReplicatedFalse));
     BSONObjBuilder resultBuilder;
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _featureFlagReplRidController{"featureFlagRecordIdsReplicated",
+                                                                 true};
     ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 
     // validating that the collection does not have recordIdsReplicated.
@@ -774,8 +774,8 @@ DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateNoRidOnRridCollection, "11454701") {
     // Create a collection on the admin database.
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.SteadyStateNoRidOnRridCollection");
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
 
     auto insertOp = BSON("op" << "i"

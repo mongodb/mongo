@@ -69,9 +69,9 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -2893,7 +2893,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSetWithCollat
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsAddToSetThrowsWhenExceedingSizeLimit) {
-    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxAddToSetBytes", 50);
+    unittest::ServerParameterGuard queryKnobController("internalQueryMaxAddToSetBytes", 50);
 
     auto accStatement = makeAccumulationStatement("$addToSet"_sd);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
@@ -2972,7 +2972,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSetUnionWithCollat
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsSetUnionThrowsWhenExceedingSizeLimit) {
-    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxSetUnionBytes", 50);
+    unittest::ServerParameterGuard queryKnobController("internalQueryMaxSetUnionBytes", 50);
 
     auto accStatement = makeAccumulationStatement("$setUnion"_sd);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
@@ -3016,8 +3016,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsConcatArrays) {
 
 TEST_F(SbeStageBuilderGroupAggCombinerTest,
        CombinePartialAggsConcatArraysThrowsWhenExceedingSizeLimit) {
-    RAIIServerParameterControllerForTest queryKnobController("internalQueryMaxConcatArraysBytes",
-                                                             50);
+    unittest::ServerParameterGuard queryKnobController("internalQueryMaxConcatArraysBytes", 50);
 
     auto accStatement = makeAccumulationStatement("$concatArrays"_sd);
     auto compiledExpr = compileSingleInputNoCollator(accStatement);

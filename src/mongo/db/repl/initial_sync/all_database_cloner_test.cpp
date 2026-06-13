@@ -42,9 +42,9 @@
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -89,8 +89,8 @@ protected:
 };
 
 TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyGlobalAdminBeforeTenantAdmin) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     auto atid = TenantId(OID::gen());
     auto btid = TenantId(OID::gen());
     // global Admin before tenant secific admins.
@@ -124,8 +124,8 @@ TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyGlobalAdminBef
 }
 
 TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyTenantAdminSetToFirst) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     auto atid = TenantId(OID::gen());
     auto btid = TenantId(OID::gen());
     // tenant specific admin is the first database.
@@ -666,8 +666,8 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
 
 TEST_F(AllDatabaseClonerTest,
        DatabaseStatsMultitenancySupportAndFeatureFlagRequireTenantIdEnabled) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto tid = TenantId(OID::gen());
     _mockServer->setCommandReply("listDatabasesForAllTenants",

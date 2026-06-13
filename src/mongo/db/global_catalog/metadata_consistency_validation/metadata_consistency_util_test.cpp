@@ -49,9 +49,9 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -589,9 +589,9 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
 }
 
 TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     Timestamp dbTimestamp{1, 0};
@@ -618,9 +618,9 @@ TEST_F(MetadataConsistencyTest, FindMissingDatabaseMetadataInShardCatalogCache) 
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCache) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     Timestamp dbTimestamp{1, 0};
@@ -648,9 +648,9 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCac
 }
 
 TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     Timestamp dbTimestamp{1, 0};
@@ -671,9 +671,9 @@ TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWithConfig) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     Timestamp dbTimestamp{1, 0};
@@ -702,9 +702,9 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShardWi
 }
 
 TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     Timestamp dbTimestamp{1, 0};
@@ -730,9 +730,9 @@ TEST_F(MetadataConsistencyTest, FindMatchingDurableDatabaseMetadataInWrongShard)
 }
 
 TEST_F(MetadataConsistencyTest, CheckDatabaseMetadataConsistency_CriticalSection) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     // Use the same database metadata for the global catalog and the shard catalog.
@@ -763,9 +763,9 @@ TEST_F(MetadataConsistencyTest, CheckDatabaseMetadataConsistency_CriticalSection
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) {
-    RAIIServerParameterControllerForTest featureFlagControllerForDDL(
-        "featureFlagAuthoritativeShardsDDL", true);
-    RAIIServerParameterControllerForTest featureFlagControllerForCRUD(
+    unittest::ServerParameterGuard featureFlagControllerForDDL("featureFlagAuthoritativeShardsDDL",
+                                                               true);
+    unittest::ServerParameterGuard featureFlagControllerForCRUD(
         "featureFlagAuthoritativeShardsCRUD", true);
 
     Timestamp dbTimestamp{1, 0};
@@ -1628,8 +1628,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        ValidateCollectionMetadata_NotOwnedChunksDisallowed_DurableAuthoritativeShardCatalogChunks) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
 
@@ -1803,8 +1803,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        ValidateCollectionMetadata_DurablePathGuardedByFeatureFlag) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1826,8 +1826,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_AllMatch) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1856,8 +1856,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_AllMatch) {
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_UuidMismatch) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1884,8 +1884,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_UuidMismatch) {
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShardKeyMismatch) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1915,8 +1915,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ShardKeyMismatch) {
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ChunksDomainMismatch) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1941,8 +1941,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_ChunksDomainMismatch) {
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_PreviouslyOwnedChunkIgnoredInDomainCheck) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -1981,8 +1981,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_PreviouslyOwnedChunkIgno
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingCollectionInDurableCatalog) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2000,8 +2000,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingCollectionInDurab
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingChunksInDurableCatalog) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2022,8 +2022,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingChunksInDurableCa
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, OrphanCollectrionEntryInUntrackedCollection) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     OperationContext* opCtx = operationContext();
     createTestCollection(opCtx, _nss);
@@ -2047,8 +2047,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, OrphanCollectrionEntryInUntrackedCol
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInUntrackedCollection) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     OperationContext* opCtx = operationContext();
     createTestCollection(opCtx, _nss);
@@ -2076,8 +2076,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInUntrackedCollectio
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInTrackedCollection) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2107,8 +2107,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, OrphanChunkEntryInTrackedCollection)
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        OrphanNoCurrentChunkEntriesButCollectionEntryInTrackedCollectionAccepted) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2123,8 +2123,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        OrphanNoCurrentChunkEntriesAndCollectionEntryInTrackedCollectionAccepted) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2137,8 +2137,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_NonPrimaryWithNoOwnedChunksIsAccepted) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2173,8 +2173,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_PrimaryIsReportedWhenGlobalCatalogTracked) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2190,8 +2190,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_PrimaryIsReportedWhenGlob
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_GlobalCatalogOwnedChunksAreReported) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2209,8 +2209,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_GlobalCatalogOwnedChunksA
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_DurableOwnedChunksAreReported) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2230,8 +2230,8 @@ TEST_F(MetadataConsistencyShardCatalogTest, UnownedCSR_DurableOwnedChunksAreRepo
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        PrimaryHasNoCollectionEntryForChunklessCollectionGlobalCatalogHas) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
@@ -2246,8 +2246,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 
 TEST_F(MetadataConsistencyShardCatalogTest,
        GlobalCatalogHasNoCollectionEntryForChunklessCollectionPrimaryHas) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     OperationContext* opCtx = operationContext();
     createTestCollection(opCtx, _nss);
@@ -2273,8 +2273,8 @@ TEST_F(MetadataConsistencyShardCatalogTest,
 }
 
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_SkippedWhenNonAuthoritative) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                         true);
 
     const auto localUuid = setUpLocalCollection();
     auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);

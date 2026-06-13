@@ -33,7 +33,7 @@
 
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 namespace mongo::sbe {
 void HashLookupSharedTest::prepareAndEvalStageWithReopen(
@@ -109,7 +109,7 @@ void HashLookupSharedTest::prepareAndEvalStageWithReopen(
     }
 
     // Execute the stage with spilling to disk.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 10);
 
     // Run the stage after the knob is set and spill to disk. We need to hold a global IS lock

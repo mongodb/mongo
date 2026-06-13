@@ -50,6 +50,7 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -227,7 +228,7 @@ public:
 
 TEST_F(ReplicatedFastCountTxnTest,
        UncommittedChangesPreservedAcrossResumedMultiDocumentTransactionCommit) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     auto doc1 = BSON("_id" << 0 << "x" << 1);
     auto doc2 = BSON("_id" << 1 << "x" << 2);
@@ -288,7 +289,7 @@ TEST_F(ReplicatedFastCountTxnTest,
 }
 
 TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocumentTxnAbort) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     auto doc1 = BSON("_id" << 0 << "x" << 1);
 
@@ -331,7 +332,7 @@ TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocument
 TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) {
     // Tests that the 'UncommittedFastCountChange' is reset when there is a new
     // 'RecoveryUnit::Snapshot', even across a single OperationContext.
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const auto doc1 = BSON("_id" << 0 << "x" << 1);
 
@@ -367,7 +368,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
 }
 
 TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadataSingleInsert) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     auto doc = BSON("_id" << 0 << "x" << 1);
     auto sessionId = makeLogicalSessionIdForTest();
@@ -402,7 +403,7 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadataSi
 }
 
 TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     // Both collections begin empty.
     EXPECT_EQ(CollectionSizeCount{}, test_helpers::scanForAccurateSizeCount(_opCtx, _nss1));
@@ -710,10 +711,8 @@ protected:
 };
 
 TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataToSessionTxnRecord) {
-    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                                 true);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        true);
+    unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -733,12 +732,10 @@ TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataToSessionTx
 }
 
 TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataForSplitLinkedApplyOps) {
-    RAIIServerParameterControllerForTest flagBase("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        true);
+    unittest::ServerParameterGuard flagBase("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
     // Force a split after every 2 ops, so 3 total ops yields 2 linked applyOps entries.
-    RAIIServerParameterControllerForTest maxOps(
-        "maxNumberOfTransactionOperationsInSingleOplogEntry", 2);
+    unittest::ServerParameterGuard maxOps("maxNumberOfTransactionOperationsInSingleOplogEntry", 2);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -758,10 +755,8 @@ TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataForSplitLin
 }
 
 TEST_F(PreparedSizeMetadataTest, CommitTransactionWritesSizeMetadataToOplogEntry) {
-    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                                 true);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        true);
+    unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -788,10 +783,8 @@ TEST_F(PreparedSizeMetadataTest, CommitTransactionWritesSizeMetadataToOplogEntry
 
 TEST_F(PreparedSizeMetadataTest,
        RestorePreciseCheckpointPopulatesPreparedSizeMetadataOnParticipant) {
-    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                                 true);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        true);
+    unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -819,10 +812,8 @@ TEST_F(PreparedSizeMetadataTest,
 }
 
 TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCountChanges) {
-    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                                 true);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        true);
+    unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     const LogicalSessionId sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNumber(0);
@@ -856,10 +847,8 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
 }
 
 TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointThrowsWhenCollectionMissingFromCatalog) {
-    RAIIServerParameterControllerForTest flagReplicatedFastCount("featureFlagReplicatedFastCount",
-                                                                 true);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        true);
+    unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     const LogicalSessionId sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNumber(0);
@@ -900,10 +889,9 @@ TEST_P(PreparedSizeMetadataFlagTest,
        OmitsSizeMetadataFromConfigTransactionsUnlessBothFlagsEnabled) {
     const auto [baseFlagEnabled, durabilityFlagEnabled] = GetParam();
 
-    RAIIServerParameterControllerForTest flagBase("featureFlagReplicatedFastCount",
-                                                  baseFlagEnabled);
-    RAIIServerParameterControllerForTest flagDurability("featureFlagReplicatedFastCountDurability",
-                                                        durabilityFlagEnabled);
+    unittest::ServerParameterGuard flagBase("featureFlagReplicatedFastCount", baseFlagEnabled);
+    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability",
+                                                  durabilityFlagEnabled);
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
 

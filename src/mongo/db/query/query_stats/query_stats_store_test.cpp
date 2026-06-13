@@ -53,8 +53,8 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -276,7 +276,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     auto opCtx = makeOperationContext();
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcrCopy).build();
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStats", true);
 
     auto&& globalQueryStatsStoreManager = QueryStatsStoreManager::get(opCtx->getServiceContext());
     globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);

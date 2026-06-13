@@ -56,9 +56,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -536,8 +536,8 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
 
 TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingDocuments) {
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking",
+                                                             flagStatus);
 
         auto expCtx = getExpCtx();
         expCtx->setExplain(ExplainOptions::Verbosity::kExecStats);
@@ -661,7 +661,7 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfIdNotSupersetOfSh
 }
 
 TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdEqualToShardKey) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
@@ -671,7 +671,7 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdEqualToSh
 }
 
 TEST_F(DocumentSourceGroupTest, DistributedLogicDoesRequireMergeIfIdEqualToShardKeyButFFDisabled) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", false);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", false);
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
@@ -681,7 +681,7 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicDoesRequireMergeIfIdEqualToShard
 }
 
 TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdSupersetOfShardKey) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
@@ -692,7 +692,7 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdSupersetO
 
 TEST_F(DocumentSourceGroupTest,
        DistributedLogicDoesRequireMergeIfIdSupersetOfShardKeyButFFDisabled) {
-    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", false);
+    unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", false);
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
@@ -705,8 +705,8 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
     auto expCtx = getExpCtx();
 
     for (bool flagStatus : {true, false}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                                   flagStatus);
+        unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking",
+                                                             flagStatus);
 
         // Pause between input docs so we have a chance to check memory tracking.
         auto mock = exec::agg::MockStage::createForTest(
@@ -793,10 +793,9 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
  */
 TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
     auto expCtx = getExpCtx();
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
-    RAIIServerParameterControllerForTest curOpWriteBytes(
-        "internalQueryMaxWriteToCurOpMemoryUsageBytes", 64);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    unittest::ServerParameterGuard curOpWriteBytes("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                   64);
 
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = exec::agg::MockStage::createForTest(
@@ -899,8 +898,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
  */
 TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
     auto expCtx = getExpCtx();
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
 
     // Pause between input docs so we have a chance to check memory tracking.
     auto mock = exec::agg::MockStage::createForTest(

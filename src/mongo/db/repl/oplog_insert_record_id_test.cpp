@@ -36,8 +36,8 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/move/utility_core.hpp>
@@ -63,8 +63,8 @@ protected:
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-    RAIIServerParameterControllerForTest featureFlagController =
-        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    unittest::ServerParameterGuard featureFlagController =
+        unittest::ServerParameterGuard("featureFlagRecordIdsReplicated", true);
 };
 
 // =============================================================================

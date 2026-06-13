@@ -69,13 +69,13 @@
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -413,7 +413,7 @@ TEST_F(BatchWriteExecTest, SingleOpUnordered) {
 
 TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
     // Enable query stats collection and configure rate limiting
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsUpdateCommand", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStatsUpdateCommand", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4470,7 +4470,7 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientDispatchError) {
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponse) {
     // Enable query stats collection and configure rate limiting
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsUpdateCommand", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStatsUpdateCommand", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4526,7 +4526,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponse) {
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShards) {
     // Enable query stats collection and configure rate limiting
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsUpdateCommand", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStatsUpdateCommand", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4619,7 +4619,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShards) {
 }
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForDelete) {
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsDelete", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStatsDelete", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4666,7 +4666,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForDelete
 }
 
 TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelete) {
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsDelete", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStatsDelete", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);
@@ -4752,7 +4752,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelet
 // Verifies that when featureFlagQueryStatsDelete is enabled, each outgoing delete op entry is
 // stamped with includeQueryStatsMetricsForOpIndex, instructing the shard to return per-op metrics.
 TEST_F(BatchWriteExecTest, QueryStatsMetricsFieldSetOnOutgoingDeleteRequest) {
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsDelete", true);
+    unittest::ServerParameterGuard controller("featureFlagQueryStatsDelete", true);
     auto& limiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     limiter.configureWindowBased(-1);

@@ -36,7 +36,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,8 +47,8 @@ namespace {
 class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
                                      public AggregationContextFixture {
 private:
-    RAIIServerParameterControllerForTest featureFlagController1{"featureFlagRankFusionBasic", true};
-    RAIIServerParameterControllerForTest featureFlagController2{"featureFlagRankFusionFull", true};
+    unittest::ServerParameterGuard featureFlagController1{"featureFlagRankFusionBasic", true};
+    unittest::ServerParameterGuard featureFlagController2{"featureFlagRankFusionFull", true};
 };
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
@@ -123,7 +123,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowedBasicRankFusion) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -437,7 +437,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfEmptyPipeline) {
 
 TEST_F(DocumentSourceRankFusionTest,
        CheckMultiplePipelinesAndOptionalArgumentsAllowedBasicRankFusion) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
 
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
@@ -2743,7 +2743,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckWeightsAppliedMultiplePipelines) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, ScoreDetailsIsRejectedWithoutRankFusionFullFF) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", false);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -2768,7 +2768,7 @@ TEST_F(DocumentSourceRankFusionTest, ScoreDetailsIsRejectedWithoutRankFusionFull
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -3009,7 +3009,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -3262,7 +3262,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOneScorePipelineScoreDetailsDesugaring
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineScoreDetailsDesugaring) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
@@ -4307,7 +4307,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto spec = fromjson(R"({
         $rankFusion: {
             input: {
@@ -4475,7 +4475,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineRankFusionFullDesugaring) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
@@ -4752,7 +4752,7 @@ TEST_F(DocumentSourceRankFusionTest, CheckTwoPipelineRankFusionFullDesugaring) {
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckFourPipelinesScoreDetailsDesugaring) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = getExpCtx();
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
         {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});

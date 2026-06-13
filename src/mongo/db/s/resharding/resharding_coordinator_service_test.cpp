@@ -45,11 +45,11 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -591,7 +591,7 @@ public:
         CoordinatorStateEnum state, resharding::AbortType abortTypeAfterFailover) {
         // Set a large quiesce period to test that there is no quiescing both before and after
         // failover, regardless of the abort type after failover.
-        RAIIServerParameterControllerForTest quiescePeriodMillis{
+        unittest::ServerParameterGuard quiescePeriodMillis{
             "reshardingCoordinatorQuiescePeriodMillis", kOneDayMillis.count()};
 
         // Set the failpoint to pause the coordinator before it removes the state doc. Otherwise,
@@ -675,7 +675,7 @@ public:
         CoordinatorStateEnum state, resharding::AbortType abortTypeAfterFailover) {
         // Set a large quiesce period to test that there is quiescing before failover and no
         // quiescing after failover if the abort type after failover specifies skip quiescing.
-        RAIIServerParameterControllerForTest quiescePeriodMillis{
+        unittest::ServerParameterGuard quiescePeriodMillis{
             "reshardingCoordinatorQuiescePeriodMillis", kOneDayMillis.count()};
 
         auto opCtx = operationContext();
@@ -802,8 +802,8 @@ public:
 
 TEST_F(ReshardingCoordinatorServiceCriticalSectionWithBlockingDeltaTest,
        CriticalSectionTimeoutAbortsWhileDeltaFetchIsInProgress) {
-    RAIIServerParameterControllerForTest criticalSectionTimeout{
-        "reshardingCriticalSectionTimeoutMillis", 1};
+    unittest::ServerParameterGuard criticalSectionTimeout{"reshardingCriticalSectionTimeoutMillis",
+                                                          1};
 
     PauseDuringStateTransitions stateTransitionsGuard{controller(),
                                                       CoordinatorStateEnum::kAborting};
@@ -852,8 +852,7 @@ public:
 TEST_F(ReshardingCoordinatorServiceWithBlockingDocumentsToCopyTest,
        VerificationSkippedWhenFetchDocumentsToCopyTimesOut) {
     // Set the timeout to 0 so the timer fires immediately while fetch is blocked.
-    RAIIServerParameterControllerForTest fetchTimeout{"reshardingFetchDocumentsToCopyTimeoutSecs",
-                                                      0};
+    unittest::ServerParameterGuard fetchTimeout{"reshardingFetchDocumentsToCopyTimeoutSecs", 0};
 
     auto opCtx = operationContext();
     auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
@@ -953,7 +952,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransi
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfulWithRefresh) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
     runReshardingToCompletion();
 }
@@ -1607,7 +1606,7 @@ TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierInvokedOnRecovery) {
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, CausalityBarrierSkippedOnRecoveryWithoutFeatureFlag) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
 
     runReshardingToCompletionWithFailoverAt(CoordinatorStateEnum::kPreparingToDonate);
@@ -1824,7 +1823,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingSendsRecipientInitCmd) {
 TEST_F(ReshardingCoordinatorServiceTest,
        UnrecoverableErrorWhileEstablishingDonorsDuringPreparingToDonate) {
     // Force the legacy path so establishAllDonorsAsParticipants is called.
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
 
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kPreparingToDonate,
@@ -1834,7 +1833,7 @@ TEST_F(ReshardingCoordinatorServiceTest,
 TEST_F(ReshardingCoordinatorServiceTest,
        UnrecoverableErrorWhileEstablishingRecipientsDuringPreparingToDonate) {
     // Force the legacy path so kEstablishAllRecipientsAsParticipants is called.
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", false);
 
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kPreparingToDonate,
@@ -1842,20 +1841,20 @@ TEST_F(ReshardingCoordinatorServiceTest,
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringCloning) {
-    RAIIServerParameterControllerForTest noCloneNoRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noCloneNoRefreshFeatureFlagController(
         "featureFlagReshardingCloneNoRefresh", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kCloning,
                                         kTellAllRecipientsToRefresh);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringApplying) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kApplying, kTellAllDonorsToRefresh);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringBlockingWrites) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false);
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kBlockingWrites,
                                         kTellAllDonorsToRefresh);
@@ -2313,9 +2312,9 @@ TEST_F(ReshardingCoordinatorServiceTest, TransientErrorAfterCoordinatorDocRemove
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, NoRefreshBlockingWritesWithFeatureFlag) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true);
-    RAIIServerParameterControllerForTest initNoRefreshFeatureFlagController(
+    unittest::ServerParameterGuard initNoRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", true);
     externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kBlockingWrites,
                                                kTellAllDonorsToRefresh);
@@ -2324,9 +2323,9 @@ TEST_F(ReshardingCoordinatorServiceTest, NoRefreshBlockingWritesWithFeatureFlag)
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, NoRefreshApplyingWithFeatureFlag) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+    unittest::ServerParameterGuard noRefreshFeatureFlagController(
         "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true);
-    RAIIServerParameterControllerForTest initNoRefreshFeatureFlagController(
+    unittest::ServerParameterGuard initNoRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", true);
     externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kApplying,
                                                kTellAllDonorsToRefresh);

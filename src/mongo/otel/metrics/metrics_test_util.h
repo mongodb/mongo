@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/modules.h"
 

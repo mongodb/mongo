@@ -32,7 +32,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
 
 #include <chrono>

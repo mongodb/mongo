@@ -43,7 +43,7 @@
 #include "mongo/db/pipeline/lite_parsed_score_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -90,8 +90,8 @@ protected:
     }
 
 private:
-    RAIIServerParameterControllerForTest featureFlagController1{
-        "featureFlagSearchHybridScoringFull", true};
+    unittest::ServerParameterGuard featureFlagController1{"featureFlagSearchHybridScoringFull",
+                                                          true};
 };
 
 TEST_F(LiteParsedScoreFusionDesugarerTest, SinglePipelineDefault) {

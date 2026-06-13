@@ -490,7 +490,7 @@ protected:
 };
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsInsertsSingleUUID) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const std::vector<BSONObj> docs{
         BSON("_id" << 0),
         BSON("_id" << 1),
@@ -541,7 +541,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsIns
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsUpdatesSingleUUID) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const std::vector<BSONObj> docs{
         BSON("_id" << 0),
         BSON("_id" << 1),
@@ -580,7 +580,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsUpd
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsDeletesSingleUUID) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const std::vector<BSONObj> docs{
         BSON("_id" << 0),
         BSON("_id" << 1),
@@ -621,7 +621,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsDel
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMultiOpsSingleUUID) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const BSONObj doc0 = BSON("_id" << 0 << "x" << "0");
     const BSONObj doc1 = BSON("_id" << 1 << "x" << "0");
 
@@ -657,7 +657,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMul
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMultiUUID) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
     const BSONObj doc1 = BSON("_id" << 0 << "x" << "0");
     const BSONObj doc2 = BSON("_id" << 1 << "x" << "0" << "y" << 1);
 
@@ -744,7 +744,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest,
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForNestedApplyOpsMultiUUID) {
     // Nested applyOps are allowed from user commands. Tests that extraction of replicated size and
     // count works across nested applyOps for multiple collections.
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     const BSONObj docA = BSON("_id" << 0 << "x" << "0");
     const BSONObj docB = BSON("_id" << 1 << "x" << "0" << "y" << 1);

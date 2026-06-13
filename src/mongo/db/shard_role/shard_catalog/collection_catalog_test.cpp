@@ -69,9 +69,9 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -646,7 +646,7 @@ TEST_F(CollectionCatalogTest, GetAllDbNamesForTenantMultitenancyFalse) {
 }
 
 TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     TenantId tid1 = TenantId(OID::gen());
     TenantId tid2 = TenantId(OID::gen());
     NamespaceString dbA = NamespaceString::createNamespaceString_forTest(tid1, "dbA.collA");
@@ -690,7 +690,7 @@ TEST_F(CollectionCatalogTest, GetAllTenantsMultitenancyFalse) {
 }
 
 TEST_F(CollectionCatalogTest, GetAllTenants) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     TenantId tid1 = TenantId(OID::gen());
     TenantId tid2 = TenantId(OID::gen());
     std::vector<NamespaceString> nsss = {
@@ -2617,7 +2617,7 @@ public:
 
         // Create viewful timeseries (for upgrade) or viewless timeseries (for downgrade).
         {
-            RAIIServerParameterControllerForTest featureFlagController(
+            unittest::ServerParameterGuard featureFlagController(
                 "featureFlagCreateViewlessTimeseriesCollections", !isUpgrade);
             CreateCommand cmd = CreateCommand(mainNs);
             cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("t"));
@@ -2655,7 +2655,7 @@ public:
         {
             ConcurrentDDL ddl(
                 getServiceContext(), upgradeDowngradeTs, [&](OperationContext* opCtx) {
-                    RAIIServerParameterControllerForTest featureFlagController(
+                    unittest::ServerParameterGuard featureFlagController(
                         "featureFlagCreateViewlessTimeseriesCollections", isUpgrade);
                     if (isUpgrade) {
                         timeseries::upgradeToViewlessTimeseries(opCtx, mainNs);
@@ -2703,7 +2703,7 @@ TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
 
     // Create a viewless timeseries collection.
     {
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         CreateCommand cmd = CreateCommand(mainNs);
         cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("t"));
@@ -2724,7 +2724,7 @@ TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
     // Downgrade to viewful format at downgradeTs.
     {
         ConcurrentDDL ddl(getServiceContext(), downgradeTs, [&](OperationContext* opCtx) {
-            RAIIServerParameterControllerForTest featureFlagController(
+            unittest::ServerParameterGuard featureFlagController(
                 "featureFlagCreateViewlessTimeseriesCollections", false);
             timeseries::downgradeFromViewlessTimeseries(opCtx, mainNs);
         });
@@ -3986,8 +3986,7 @@ TEST(GetConfigDebugDumpTest, AuthoritativeShardCatalogCollections) {
 TEST(GetConfigDebugDumpTest, FeatureFlagDisabled) {
     // With the feature flag disabled, it should always return boost::none.
 
-    RAIIServerParameterControllerForTest featureFlagScope("featureFlagConfigDebugDumpSupported",
-                                                          false);
+    unittest::ServerParameterGuard featureFlagScope("featureFlagConfigDebugDumpSupported", false);
 
     const auto resultNonConfig = catalog::getConfigDebugDump(
         kNoVersionContext, NamespaceString::createNamespaceString_forTest("nonConfig", "dummy"));

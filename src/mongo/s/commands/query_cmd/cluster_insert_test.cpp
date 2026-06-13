@@ -36,7 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
@@ -82,8 +82,8 @@ protected:
 
 TEST_F(ClusterInsertTest, NoErrors) {
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweKnobValue);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor",
+                                                     uweKnobValue);
         testNoErrors(kInsertCmdTargeted, kInsertCmdScatterGather);
     }
 }
@@ -108,8 +108,8 @@ TEST_F(ClusterInsertTest, CorrectMetricsSingleInsert) {
     const BSONObj obj = b.obj();
 
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweKnobValue);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor",
+                                                     uweKnobValue);
         testOpcountersAreCorrect(kInsertCmdTargeted, /* expectedValue */ obj);
     }
 }
@@ -128,8 +128,8 @@ TEST_F(ClusterInsertTest, CorrectMetricsBulkInsert) {
     const BSONObj obj = b.obj();
 
     for (auto uweKnobValue : {false, true}) {
-        RAIIServerParameterControllerForTest uweController("featureFlagUnifiedWriteExecutor",
-                                                           uweKnobValue);
+        unittest::ServerParameterGuard uweController("featureFlagUnifiedWriteExecutor",
+                                                     uweKnobValue);
         testOpcountersAreCorrect(bulkInsertCmd, /* expectedValue */ obj);
     }
 }

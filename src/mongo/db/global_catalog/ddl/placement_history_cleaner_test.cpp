@@ -59,7 +59,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/serialization_context.h"
@@ -247,8 +247,8 @@ private:
         std::make_unique<DDLCoordinatorServiceMock>();
     // getHistoricalPlacement() requires this feature flag to return real placement data.
     // TODO (SERVER-98118): Remove once featureFlagChangeStreamPreciseShardTargeting is last-lts.
-    RAIIServerParameterControllerForTest _preciseTargeting{
-        "featureFlagChangeStreamPreciseShardTargeting", true};
+    unittest::ServerParameterGuard _preciseTargeting{"featureFlagChangeStreamPreciseShardTargeting",
+                                                     true};
 };
 
 // ---------------------------------------------------------------------------

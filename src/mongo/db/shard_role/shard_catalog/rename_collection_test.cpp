@@ -72,8 +72,8 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_block_reason_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -1224,7 +1224,7 @@ protected:
 };
 
 void RenameCollectionTestMultitenancy::setUp() {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     RenameCollectionTest::setUp();
 
@@ -1236,8 +1236,8 @@ void RenameCollectionTestMultitenancy::setUp() {
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOps) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const NamespaceString targetNssTid =
         NamespaceString::createNamespaceString_forTest(_tenantId, _otherNs);
@@ -1259,8 +1259,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOps) {
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonRandomTid) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const NamespaceString targetNssTid =
         NamespaceString::createNamespaceString_forTest(_otherTenantId, _sourceNs);
@@ -1276,8 +1276,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonRandom
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonTid) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const NamespaceString targetNssTid =
         NamespaceString::createNamespaceString_forTest(_otherTenantId, _otherNs);
@@ -1294,8 +1294,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsCommonTid) {
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSourceExistsOnWrongTenant) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const NamespaceString otherSourceNssTid =
         NamespaceString::createNamespaceString_forTest(_otherTenantId, _sourceNs);
@@ -1315,8 +1315,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSourceExists
 
 TEST_F(RenameCollectionTestMultitenancy,
        RenameCollectionForApplyOpsSourceExistsOnWrongTenantRequireTenantIdFalse) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
     const NamespaceString otherSourceNssTid =
         NamespaceString::createNamespaceString_forTest(_otherTenantId, _sourceNs);
@@ -1335,8 +1335,8 @@ TEST_F(RenameCollectionTestMultitenancy,
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsRequireTenantIdFalse) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
     const NamespaceString targetNssTid =
         NamespaceString::createNamespaceString_forTest(_tenantId, _otherNs);
@@ -1350,8 +1350,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsRequireTenan
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSameNS) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     // A tid field supersedes tenantIds maintained in source or target. See above.
     auto cmd = BSON("renameCollection" << _sourceNssTid.toString_forTest() << "to"
@@ -1360,8 +1360,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSameNS) {
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSameNSRequireTenantIdFalse) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
     auto cmd = BSON("renameCollection" << _sourceNssTid.toStringWithTenantId_forTest() << "to"
                                        << _sourceNssTid.toStringWithTenantId_forTest());
@@ -1369,8 +1369,8 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsSameNSRequir
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsAcrossTenantIds) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
 
     const NamespaceString targetNssTid =
         NamespaceString::createNamespaceString_forTest(_otherTenantId, _sourceNs);
@@ -1386,7 +1386,7 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionForApplyOpsAcrossTenant
 }
 
 TEST_F(RenameCollectionTestMultitenancy, RenameCollectionAcrossTenantIds) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     const NamespaceString targetNssTid =
         NamespaceString::createNamespaceString_forTest(_otherTenantId, _otherNs);
     ASSERT_NOT_EQUALS(_sourceNssTid, targetNssTid);

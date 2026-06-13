@@ -39,7 +39,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -61,8 +61,8 @@ protected:
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-    RAIIServerParameterControllerForTest _recordIdsFlag{"featureFlagRecordIdsReplicated", true};
-    RAIIServerParameterControllerForTest _fastCountFlag{"featureFlagReplicatedFastCount", true};
+    unittest::ServerParameterGuard _recordIdsFlag{"featureFlagRecordIdsReplicated", true};
+    unittest::ServerParameterGuard _fastCountFlag{"featureFlagReplicatedFastCount", true};
 };
 
 typedef SetSteadyStateConstraints<SizeDeltaTest, false> SizeDeltaTestDisable;

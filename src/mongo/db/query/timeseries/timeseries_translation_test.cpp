@@ -44,7 +44,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_test_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -62,7 +62,7 @@ protected:
     void setUp() override {
         timeseries::TimeseriesTestFixture::setUp();
         expCtx = make_intrusive<ExpressionContextForTest>(_opCtx, nss);
-        RAIIServerParameterControllerForTest featureFlagController(
+        unittest::ServerParameterGuard featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
 
         // Create a viewless timeseries collection.

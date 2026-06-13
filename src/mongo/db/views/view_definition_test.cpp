@@ -38,8 +38,8 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -150,7 +150,7 @@ TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlySetsTimeseries) {
 }
 
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStringsWithTenantIds) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     TenantId tenantId(OID::gen());
     NamespaceString viewNss =

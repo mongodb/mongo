@@ -33,8 +33,8 @@
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <queue>
@@ -440,7 +440,7 @@ TEST_F(OplogWriterBatcherTest, BatcherCheckDraining) {
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherWaitDelayMillisWhenBatchIsSmall) {
-    RAIIServerParameterControllerForTest controller("oplogBatchDelayMillis", 100);
+    unittest::ServerParameterGuard controller("oplogBatchDelayMillis", 100);
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
     OplogWriterBatch batch({makeNoopOplogEntry(Seconds(123))}, 1);
@@ -452,7 +452,7 @@ TEST_F(OplogWriterBatcherTest, BatcherWaitDelayMillisWhenBatchIsSmall) {
 }
 
 TEST_F(OplogWriterBatcherTest, BatcherNotWaitDelayMillisWhenBatchIsLarge) {
-    RAIIServerParameterControllerForTest controller("oplogBatchDelayMillis", 5000);
+    unittest::ServerParameterGuard controller("oplogBatchDelayMillis", 5000);
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
     OplogWriterBatch batch({makeNoopOplogEntry(Seconds(123))}, _limits.minBytes + 1);
@@ -465,7 +465,7 @@ TEST_F(OplogWriterBatcherTest, BatcherNotWaitDelayMillisWhenBatchIsLarge) {
 }
 
 TEST_F(OplogWriterBatcherTest, OplogBatchDelayMillisCapAtMaxWaitTime) {
-    RAIIServerParameterControllerForTest controller("oplogBatchDelayMillis", 10000);
+    unittest::ServerParameterGuard controller("oplogBatchDelayMillis", 10000);
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
     OplogWriterBatch batch({makeNoopOplogEntry(Seconds(123))}, 1);

@@ -48,8 +48,8 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -580,8 +580,7 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
 // when the persistence provider does not mandate it.
 TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
        ApplyOpsCreate_Allowed_WhenFeatureFlagEnabledWithoutProvider) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRecordIdsReplicated",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRecordIdsReplicated", true);
     auto opCtx = cc().makeOperationContext();
     auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
 

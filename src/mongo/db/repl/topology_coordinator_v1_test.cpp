@@ -59,7 +59,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
@@ -67,6 +66,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -583,8 +583,8 @@ TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortSpecified) {
 }
 
 TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortDisabled) {
-    RAIIServerParameterControllerForTest disablePriorityPort(
-        "disableReplicationUsageOfPriorityPort", true);
+    unittest::ServerParameterGuard disablePriorityPort("disableReplicationUsageOfPriorityPort",
+                                                       true);
     testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 2)
@@ -595,8 +595,8 @@ TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortDisabled) {
 }
 
 TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortDisabledMixedCluster) {
-    RAIIServerParameterControllerForTest disablePriorityPort(
-        "disableReplicationUsageOfPriorityPort", true);
+    unittest::ServerParameterGuard disablePriorityPort("disableReplicationUsageOfPriorityPort",
+                                                       true);
     testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 2)
@@ -2353,8 +2353,8 @@ void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectPriority) {
     // information for replSetGetStatus from a different source than the nodes that aren't
     // ourself.  After this setup, we call prepareStatusResponse and make sure that the fields
     // returned for each member match our expectations.
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         true);
     Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
     Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
     Seconds uptimeSecs(10);
@@ -2625,7 +2625,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatusOmitsLastStableRecoveryTimestampWhenAbsent
 TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCount) {
     // This tests that writeMajorityCount differs from majorityVoteCount in replSetGetStatus when
     // the number of non-arbiter voters is less than majorityVoteCount.
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
     Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
     Seconds uptimeSecs(10);
@@ -2664,7 +2664,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembers
     // This test verifies that `votingMembersCount` and `writableVotingMembersCount` in
     // replSetGetStatus are set correctly when arbiters and non-voting nodes are included in the
     // replica set.
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     updateConfig(
         BSON("_id" << "mySet" << "version" << 1 << "members"
                    << BSON_ARRAY(
@@ -2691,8 +2691,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatusVotingMembersCountAndWritableVotingMembers
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {
     // This test starts by configuring a TopologyCoordinator to NOT be a member of a 3 node
     // replica set. Then running prepareStatusResponse should fail.
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         true);
     Date_t startupTime = Date_t::fromMillisSinceEpoch(100);
     Date_t heartbeatTime = Date_t::fromMillisSinceEpoch(5000);
     Seconds uptimeSecs(10);
@@ -5638,8 +5638,7 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByFailPoint) {
 // Test that we will select the node specified by the 'unsupportedSyncSource' parameter as a sync
 // source even if it is farther away.
 TEST_F(ReevalSyncSourceTest, ChooseSyncSourceForcedByStartupParameterEvenIfFarther) {
-    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
-                                                              "host2:27017"};
+    unittest::ServerParameterGuard syncSourceParamGuard{"unsupportedSyncSource", "host2:27017"};
 
     // Make the desired host much farther away.
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
@@ -5655,8 +5654,7 @@ TEST_F(ReevalSyncSourceTest, ChooseSyncSourceForcedByStartupParameterEvenIfFarth
 // due to ping time.
 TEST_F(ReevalSyncSourceTest, NoChangeDueToPingTimeWhenSyncSourceForcedByStartupParameter) {
     auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
-    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
-                                                              "host2:27017"};
+    unittest::ServerParameterGuard syncSourceParamGuard{"unsupportedSyncSource", "host2:27017"};
     // Select a sync source.
     auto syncSource =
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
@@ -5680,8 +5678,7 @@ TEST_F(ReevalSyncSourceTest, NoChangeDueToPingTimeWhenSyncSourceForcedByStartupP
 // the 'unsupportedSyncSource' startup parameter is set - that is, the parameter should always
 // take priority.
 TEST_F(ReevalSyncSourceTest, NoChangeDueToReplSetSyncFromWhenSyncSourceForcedByStartupParameter) {
-    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
-                                                              "host2:27017"};
+    unittest::ServerParameterGuard syncSourceParamGuard{"unsupportedSyncSource", "host2:27017"};
     // Select a sync source.
     auto syncSource =
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
@@ -5703,8 +5700,7 @@ TEST_F(ReevalSyncSourceTest, NoChangeDueToReplSetSyncFromWhenSyncSourceForcedByS
 // Test that if a node is REMOVED but has 'unsupportedSyncSource' specified, we select no sync
 // source.
 TEST_F(ReevalSyncSourceTest, RemovedNodeSpecifiesSyncSourceStartupParameter) {
-    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
-                                                              "host2:27017"};
+    unittest::ServerParameterGuard syncSourceParamGuard{"unsupportedSyncSource", "host2:27017"};
     // Remove ourselves from the config.
     updateConfig(BSON("_id" << "rs0" << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host" << "host2:27017")
@@ -5722,16 +5718,14 @@ TEST_F(ReevalSyncSourceTest, RemovedNodeSpecifiesSyncSourceStartupParameter) {
 // replica set config.
 using ReevalSyncSourceTestDeathTest = ReevalSyncSourceTest;
 DEATH_TEST_F(ReevalSyncSourceTestDeathTest, CrashOnSyncSourceParameterNotInReplSet, "7785600") {
-    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
-                                                              "host4:27017"};
+    unittest::ServerParameterGuard syncSourceParamGuard{"unsupportedSyncSource", "host4:27017"};
     auto syncSource =
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
 }
 
 // Test that we crash if the 'unsupportedSyncSource' parameter specifies ourself as a node.
 DEATH_TEST_F(ReevalSyncSourceTestDeathTest, CrashOnSyncSourceParameterIsSelf, "7785601") {
-    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
-                                                              "host1:27017"};
+    unittest::ServerParameterGuard syncSourceParamGuard{"unsupportedSyncSource", "host1:27017"};
     auto syncSource =
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
 }
@@ -7260,8 +7254,8 @@ TEST_F(TopoCoordTest, OnlyDataBearingVoterIncludedInInternalMajorityWriteConcern
 
 TEST_F(TopoCoordTest, HaveTaggedNodesReachedOpTime) {
     // The config has 3 voting members, so the majority number is 2.
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         true);
     updateConfig(BSON("_id" << "rs0" << "version" << 2 << "term" << 0 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host" << "host0:27017")
                                           << BSON("_id" << 1 << "host" << "host1:27017")
@@ -7342,7 +7336,7 @@ TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
 TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
     // In a PSSAA set, a w:2 write should only be acknowledged if at least one of the
     // secondaries can satisfy it.
-    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    unittest::ServerParameterGuard controller{"allowMultipleArbiters", true};
     updateConfig(
         BSON("_id" << "rs0" << "version" << 2 << "members"
                    << BSON_ARRAY(
@@ -7378,8 +7372,8 @@ TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
 TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
     // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy
     // it.
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReduceMajorityWriteLatency", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagReduceMajorityWriteLatency",
+                                                         true);
     updateConfig(BSON("_id" << "rs0" << "version" << 2 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host" << "host0:27017")
                                           << BSON("_id" << 1 << "host" << "host1:27017")

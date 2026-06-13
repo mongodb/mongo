@@ -42,11 +42,11 @@ TEST(AttachedPersistenceProviderTest, SupportsPersistentOplogCapMaintainerThread
 TEST(AttachedPersistenceProviderTest, SupportsAsyncOplogMarkerGenerationMatchesParameter) {
     rss::AttachedPersistenceProvider provider;
     {
-        RAIIServerParameterControllerForTest disableAsync("oplogSamplingAsyncEnabled", false);
+        unittest::ServerParameterGuard disableAsync("oplogSamplingAsyncEnabled", false);
         ASSERT_FALSE(provider.supportsAsyncOplogMarkerGeneration());
     }
     {
-        RAIIServerParameterControllerForTest enableAsync("oplogSamplingAsyncEnabled", true);
+        unittest::ServerParameterGuard enableAsync("oplogSamplingAsyncEnabled", true);
         ASSERT_TRUE(provider.supportsAsyncOplogMarkerGeneration());
     }
 }

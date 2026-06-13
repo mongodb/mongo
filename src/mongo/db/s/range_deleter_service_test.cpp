@@ -52,10 +52,10 @@
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -622,7 +622,7 @@ TEST_F(RangeDeleterServiceTest, TotalNumOfRegisteredTasks) {
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlagEnabled) {
-    RAIIServerParameterControllerForTest disableRangeDeleter{"disableResumableRangeDeleter", true};
+    unittest::ServerParameterGuard disableRangeDeleter{"disableResumableRangeDeleter", true};
 
     auto rds = RangeDeleterService::get(opCtx);
     auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
@@ -657,7 +657,7 @@ TEST_F(RangeDeleterServiceTest,
         uuidCollA, taskWithOngoingQueries->getTask().getRange());
     ASSERT(!overlappingRangeFuture.isReady());
 
-    RAIIServerParameterControllerForTest disableRangeDeleter{"disableResumableRangeDeleter", true};
+    unittest::ServerParameterGuard disableRangeDeleter{"disableResumableRangeDeleter", true};
     auto overlappingRangeFutureWhenDisabled = rds->getOverlappingRangeDeletionsFuture(
         uuidCollA, taskWithOngoingQueries->getTask().getRange());
     ASSERT(overlappingRangeFutureWhenDisabled.isReady());

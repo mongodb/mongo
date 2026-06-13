@@ -40,9 +40,9 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -239,8 +239,8 @@ protected:
      * function starts one additional thread for each consumer.
      */
     void runExchangeMemoryTrackingTest(const ExchangeTestParams& params) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                                   true);
+        unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking",
+                                                             true);
         // The exchange execution flow is to submit the initial aggregate() request with a batchSize
         // of 0, and then follow up with standard getMore() requests.
         auto aggCmdObj = fromjson(
@@ -468,8 +468,7 @@ REGISTER_AGG_STAGE_MAPPING(trackingMockStage,
  * getMore()s.
  */
 TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
     auto aggCmdObj = fromjson(R"({
         aggregate: 1,
         pipeline: [{$trackingMock: [
@@ -543,8 +542,7 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
 }
 
 TEST_F(RunAggregateTest, MemoryTrackerWithinSubpipelineIsProperlyDestroyedOnKillCursor) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",
-                                                               true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
 
     // Set up the collection.
     BSONArrayBuilder docsBuilder;

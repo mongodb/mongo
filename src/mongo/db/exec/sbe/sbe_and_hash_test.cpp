@@ -42,7 +42,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -216,7 +216,7 @@ TEST_F(AndHashStageTest, TestHashValueIsCopied) {
 
 TEST_F(AndHashStageTest, AndHashMemoryLimitExceeded) {
     // Set a 1-byte limit so the first document inserted into the hash table exceeds it.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalSlotBasedExecutionAndHashStageMaxMemoryBytes", 1);
 
     // Outer side: one row with key=1 and projected value 1.

@@ -108,10 +108,10 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -549,7 +549,7 @@ protected:
                                bool viewless = false,
                                bool viewlessParam = false) {
         gFeatureFlagMarkTimeseriesEventsInOplog.setForServerParameter(viewlessParam);
-        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        unittest::ServerParameterGuard replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
 
         auto opCtxWrapper = cc().makeOperationContext();
@@ -588,9 +588,9 @@ protected:
     }
 
     void testOnCreateCollRecordIdsReplicated(bool recordIdsReplicated) {
-        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        unittest::ServerParameterGuard replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", true);
-        RAIIServerParameterControllerForTest recordIdsReplicatedController(
+        unittest::ServerParameterGuard recordIdsReplicatedController(
             "featureFlagRecordIdsReplicated", true);
 
         auto opCtxWrapper = cc().makeOperationContext();
@@ -630,7 +630,7 @@ protected:
     }
 
     void testOnCreateCollClustered(bool catalogReplicationEnabled) {
-        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        unittest::ServerParameterGuard replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
 
         auto opCtxWrapper = cc().makeOperationContext();
@@ -681,7 +681,7 @@ protected:
     // collection persisted in the local catalog.
     void testOnCreateUnreplicatedCollection(bool catalogReplicationEnabled,
                                             bool isPersistedInLocalCatalog) {
-        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+        unittest::ServerParameterGuard replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
         auto opCtx = cc().makeOperationContext();
@@ -786,7 +786,7 @@ public:
 // the oplog entry even when the feature flag is disabled.
 TEST_F(OpObserverOnCreateCollectionTest,
        RecordIdsReplicated_IncludedInOplog_WhenProviderRequiresItWithoutFeatureFlag) {
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+    unittest::ServerParameterGuard replicateLocalCatalogInfoController(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     // Explicitly leave featureFlagRecordIdsReplicated disabled (default).
 
@@ -827,7 +827,7 @@ TEST_F(OpObserverOnCreateCollectionTest,
 // recordIdsReplicated field must be absent from the oplog entry.
 TEST_F(OpObserverOnCreateCollectionTest,
        RecordIdsReplicated_NotIncludedInOplog_WhenNeitherProviderNorFlagEnabled) {
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+    unittest::ServerParameterGuard replicateLocalCatalogInfoController(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     // Both featureFlagRecordIdsReplicated and provider are at their disabled defaults.
 
@@ -887,7 +887,7 @@ DEATH_TEST_F(OpObserverOnCreateCollectionTestDeathTest,
              "Missing catalog identifier") {
     // Invariant only enforced when replicated local catalog identifiers are required for
     // replication correctness.
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+    unittest::ServerParameterGuard replicateLocalCatalogInfoController(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -1049,10 +1049,10 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
 }
 
 TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogUpdate) {
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
-    RAIIServerParameterControllerForTest viewlessController2(
-        "featureFlagMarkTimeseriesEventsInOplog", true);
+    unittest::ServerParameterGuard viewlessController2("featureFlagMarkTimeseriesEventsInOplog",
+                                                       true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
 
@@ -1091,10 +1091,10 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogUpdate) {
 }
 
 TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
-    RAIIServerParameterControllerForTest viewlessController2(
-        "featureFlagMarkTimeseriesEventsInOplog", true);
+    unittest::ServerParameterGuard viewlessController2("featureFlagMarkTimeseriesEventsInOplog",
+                                                       true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -1122,10 +1122,10 @@ TEST_F(OpObserverTest, checkIsTimeseriesOnReplLogDelete) {
 }
 
 TEST_F(OpObserverTest, checkIsTimeseriesOnInserts) {
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
-    RAIIServerParameterControllerForTest viewlessController2(
-        "featureFlagMarkTimeseriesEventsInOplog", true);
+    unittest::ServerParameterGuard viewlessController2("featureFlagMarkTimeseriesEventsInOplog",
+                                                       true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
     auto opCtx = cc().makeOperationContext();
@@ -1326,8 +1326,8 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
 }
 
 TEST_F(OpObserverTest, OnDropCollectionIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
@@ -1399,8 +1399,8 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -1443,8 +1443,8 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -1578,8 +1578,8 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
 }
 
 TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -1623,8 +1623,8 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
 }
 
 TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     std::vector<InsertStatement> insert;
     insert.emplace_back(BSON("_id" << 0 << "data"
@@ -1657,8 +1657,8 @@ TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
 }
 
 TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     const auto criteria = BSON("_id" << 0);
     // Create a fake preImageDoc; the tested code path does not care about this value.
@@ -1691,8 +1691,8 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
 }
 
 TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto opCtx = cc().makeOperationContext();
     WriteUnitOfWork wuow(opCtx.get());
@@ -1755,13 +1755,13 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
         WriteUnitOfWork wuow(opCtx);
         // featureFlagUseReplicatedTruncatesForDeletions is ignored
         {
-            RAIIServerParameterControllerForTest featureFlagScope{
+            unittest::ServerParameterGuard featureFlagScope{
                 "featureFlagUseReplicatedTruncatesForDeletions", true};
             collection_internal::truncateRange(
                 opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1);
         }
         {
-            RAIIServerParameterControllerForTest featureFlagScope{
+            unittest::ServerParameterGuard featureFlagScope{
                 "featureFlagUseReplicatedTruncatesForDeletions", false};
             collection_internal::truncateRange(
                 opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1);
@@ -1773,7 +1773,7 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
 
     {
         // Tests that with feature flag disabled, the OpObserver would throw
-        RAIIServerParameterControllerForTest featureFlagScope{
+        unittest::ServerParameterGuard featureFlagScope{
             "featureFlagUseReplicatedTruncatesForDeletions", false};
         WriteUnitOfWork wuow(opCtx);
         ASSERT_THROWS_CODE(collection_internal::truncateRange(
@@ -1786,7 +1786,7 @@ TEST_F(OpObserverTest, TruncateRangeIsReplicated) {
     }
 
     {
-        RAIIServerParameterControllerForTest featureFlagScope{
+        unittest::ServerParameterGuard featureFlagScope{
             "featureFlagUseReplicatedTruncatesForDeletions", true};
         WriteUnitOfWork wuow(opCtx);
         collection_internal::truncateRange(opCtx, *autoColl, RecordId("a"), RecordId("b"), 1, 1);
@@ -2118,8 +2118,8 @@ protected:
 };
 
 TEST_F(OpObserverTransactionTest, checkIsTimeseriesOnMultiDocTransaction) {
-    RAIIServerParameterControllerForTest viewlessController(
-        "featureFlagMarkTimeseriesEventsInOplog", true);
+    unittest::ServerParameterGuard viewlessController("featureFlagMarkTimeseriesEventsInOplog",
+                                                      true);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
@@ -2678,8 +2678,8 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
@@ -2809,8 +2809,8 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
@@ -2906,8 +2906,8 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
@@ -3879,10 +3879,10 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
 }
 
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseries) {
-    RAIIServerParameterControllerForTest viewlessController(
+    unittest::ServerParameterGuard viewlessController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
-    RAIIServerParameterControllerForTest viewlessController2(
-        "featureFlagMarkTimeseriesEventsInOplog", true);
+    unittest::ServerParameterGuard viewlessController2("featureFlagMarkTimeseriesEventsInOplog",
+                                                       true);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.tsColl");
 
     auto opCtxRaii = cc().makeOperationContext();
@@ -3968,8 +3968,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateOnViewlessTimeseri
 
 // Repeat the same test as above, but assert tenantId is included when available
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     // Setup.
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
@@ -4135,8 +4135,8 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
 
 // Verifies a WUOW that would result in a an oplog entry >16MB fails with TransactionTooLarge.
 TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagLargeBatchedOperations",
-                                                               false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagLargeBatchedOperations",
+                                                         false);
 
     // Setup.
     auto opCtxRaii = cc().makeOperationContext();
@@ -4172,8 +4172,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
 
 // TODO SERVER-66577: Remove.
 TEST_F(BatchedWriteOutputsTest, RuntimeOpCountLimitThrowsWithFeatureFlagOff) {
-    RAIIServerParameterControllerForTest featureFlagScope("featureFlagLargeBatchedOperations",
-                                                          false);
+    unittest::ServerParameterGuard featureFlagScope("featureFlagLargeBatchedOperations", false);
 
     constexpr int kDocsInBatch = 5;
     constexpr int kOpLimitForTransactionTooLarge = 1;
@@ -4203,8 +4202,8 @@ TEST_F(BatchedWriteOutputsTest, RuntimeOpCountLimitThrowsWithFeatureFlagOff) {
     // throw.
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
-    RAIIServerParameterControllerForTest opCountLimit(
-        "maxNumberOfBatchedOperationsInSingleOplogEntry", kOpLimitForTransactionTooLarge);
+    unittest::ServerParameterGuard opCountLimit("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                kOpLimitForTransactionTooLarge);
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     for (int docId = 0; docId < kDocsInBatch; docId++) {
@@ -4235,9 +4234,9 @@ TEST_F(BatchedWriteOutputsTest, RuntimeLimitsAffectApplyOpsBatchingWithFeatureFl
     auto verifyOplogEntryCount = [&](int maxOps, int maxBytes, size_t expectedEntries) {
         reset(opCtx, _nss);
         reset(opCtx, NamespaceString::kRsOplogNamespace);
-        RAIIServerParameterControllerForTest maxOpsController(
+        unittest::ServerParameterGuard maxOpsController(
             "maxNumberOfBatchedOperationsInSingleOplogEntry", maxOps);
-        RAIIServerParameterControllerForTest maxBytesController(
+        unittest::ServerParameterGuard maxBytesController(
             "maxSizeOfBatchedOperationsInSingleOplogEntryBytes", maxBytes);
 
         WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
@@ -4509,8 +4508,8 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertMultiApplyOpsGrouping
     constexpr int kMaxDocsInBatch = 2;
     // This test expects the docsToInsert0 to be two batches long, and docsToInsert1 to fit in one
     // batch.
-    RAIIServerParameterControllerForTest batchReducer(
-        "maxNumberOfBatchedOperationsInSingleOplogEntry", kMaxDocsInBatch);
+    unittest::ServerParameterGuard batchReducer("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                kMaxDocsInBatch);
     const BSONObj docsToInsert0[] = {
         BSON("_id" << 0 << "a" << 10),
         BSON("_id" << 1 << "a" << 11),
@@ -4657,8 +4656,8 @@ TEST_F(BatchedWriteOutputsTest, TestNonRetryableVectoredInsertMultiApplyOpsGroup
     constexpr int kMaxDocsInBatch = 2;
     // This test expects the docsToInsert0 to be two batches long, and docsToInsert1 to fit in one
     // batch.
-    RAIIServerParameterControllerForTest batchReducer(
-        "maxNumberOfBatchedOperationsInSingleOplogEntry", kMaxDocsInBatch);
+    unittest::ServerParameterGuard batchReducer("maxNumberOfBatchedOperationsInSingleOplogEntry",
+                                                kMaxDocsInBatch);
     const BSONObj docsToInsert0[] = {
         BSON("_id" << 0 << "a" << 10),
         BSON("_id" << 1 << "a" << 11),
@@ -6347,7 +6346,7 @@ TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
     auto indexes = makeSpecs(opCtx.get(), {"a"});
 
     for (bool enable : {false, true}) {
-        RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        unittest::ServerParameterGuard replicatedLocalCatalogIdentifiers(
             "featureFlagReplicateLocalCatalogIdentifiers", enable);
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
@@ -6378,7 +6377,7 @@ TEST_F(OpObserverTest, OnCreateIndexTimeseriesFlag) {
     auto indexes = makeSpecs(opCtx.get(), {"a"});
 
     for (bool timeseries : {false, true}) {
-        RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        unittest::ServerParameterGuard replicatedLocalCatalogIdentifiers(
             "featureFlagReplicateLocalCatalogIdentifiers", true);
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
@@ -6392,7 +6391,7 @@ TEST_F(OpObserverTest, OnCreateIndexTimeseriesFlag) {
 }
 
 TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+    unittest::ServerParameterGuard replicatedLocalCatalogIdentifiers(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
 
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -6462,13 +6461,13 @@ TEST_P(IndexBuildOplogO2Test, IncludesIndexIdentWithReplicateLocalCatalogIdentif
         WriteUnitOfWork wunit(opCtx.get());
         {
             // With the flag enabled, o2 with indexIdent expected.
-            RAIIServerParameterControllerForTest flagEnabled(
+            unittest::ServerParameterGuard flagEnabled(
                 "featureFlagReplicateLocalCatalogIdentifiers", true);
             invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
         }
         {
             // With the flag disabled, no o2 entry is expected.
-            RAIIServerParameterControllerForTest flagDisabled(
+            unittest::ServerParameterGuard flagDisabled(
                 "featureFlagReplicateLocalCatalogIdentifiers", false);
             invokeOp(opCtx.get(), opObserver, nss, {indexes[1]});
         }
@@ -6504,9 +6503,9 @@ TEST_P(IndexBuildOplogO2Test, IncludesInternalIdentsWhenPrimaryDrivenEnabled) {
     // before WUOW construction puts it in grouped-oplog mode; the operation then writes a direct
     // command oplog entry first, and onBatchedWriteCommit starts with non-empty reservedOpTimes
     // which trips the ReservedTimes invariant.
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
     wunit.commit();
@@ -6541,11 +6540,11 @@ TEST_P(IndexBuildOplogO2Test, EmitsTopLevelIndexBuildIdentWhenResumabilityEnable
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest resumableEnabled(
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard resumableEnabled("featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]}, indexBuildUUID);
     wunit.commit();
@@ -6571,10 +6570,10 @@ TEST_P(IndexBuildOplogO2Test, OmitsIndexBuildIdentWhenResumabilityDisabled) {
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
     // featureFlagResumablePrimaryDrivenIndexBuilds intentionally NOT enabled.
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
     wunit.commit();
@@ -6605,9 +6604,9 @@ TEST_P(IndexBuildOplogO2Test, OmitsIndexBuildIdentWhenPrimaryDrivenDisabled) {
     WriteUnitOfWork wunit(opCtx.get());
     // featureFlagPrimaryDrivenIndexBuilds intentionally NOT enabled. Enabling resumable alone
     // should not leak indexBuildIdent either.
-    RAIIServerParameterControllerForTest resumableEnabled(
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard resumableEnabled("featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
     wunit.commit();
@@ -6630,11 +6629,11 @@ TEST_P(IndexBuildOplogO2Test, NoO2WhenReplicateLocalCatalogIdentifiersDisabled) 
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest resumableEnabled(
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdentsDisabled(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard resumableEnabled("featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true);
+    unittest::ServerParameterGuard replicatedCatalogIdentsDisabled(
         "featureFlagReplicateLocalCatalogIdentifiers", false);
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
     wunit.commit();
@@ -6656,11 +6655,11 @@ TEST_P(IndexBuildOplogO2Test, MultipleIndexesEmitsSingleTopLevelIndexBuildIdent)
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest resumableEnabled(
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard resumableEnabled("featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, indexes, indexBuildUUID);
     wunit.commit();
@@ -6686,11 +6685,11 @@ TEST_P(IndexBuildOplogO2Test, EmitThenParseRoundTripsIndexBuildIdent) {
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest resumableEnabled(
-        "featureFlagResumablePrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard resumableEnabled("featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                    true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]}, indexBuildUUID);
     wunit.commit();
@@ -6717,9 +6716,9 @@ TEST_P(IndexBuildOplogO2Test, IncludesConstraintViolationsIdentForUniqueIndexes)
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, {indexBuildInfo});
     wunit.commit();
@@ -6747,9 +6746,9 @@ TEST_P(IndexBuildOplogO2Test, MultipleIndexesIncludesAllIdents) {
     auto indexes = makeSpecs(opCtx.get(), {"x", "y"});
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invokeOp(opCtx.get(), opObserver, nss, indexes);
     wunit.commit();
@@ -6784,7 +6783,7 @@ TEST_P(IndexBuildOplogO2Test, NoInternalIdentsWhenPrimaryDrivenDisabled) {
     auto indexes = makeSpecs(opCtx.get(), {"a"});
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     // featureFlagPrimaryDrivenIndexBuilds intentionally NOT enabled
     invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
@@ -6830,9 +6829,9 @@ void runMissingConstraintViolationsIdentDeathTest(
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
-                                                              true);
-    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+    unittest::ServerParameterGuard primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                        true);
+    unittest::ServerParameterGuard replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     invoke(opCtx.get(), opObserver, nss, {indexBuildInfo});
 }

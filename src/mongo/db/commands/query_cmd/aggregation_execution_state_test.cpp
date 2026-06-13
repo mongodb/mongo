@@ -566,7 +566,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateView) {
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewfulTimeseries) {
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     StringData timeseriesColl{"timeseries"};
@@ -595,7 +595,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewfulTimeser
 }
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewlessTimeseries) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     StringData timeseriesColl{"timeseries"};
@@ -630,7 +630,7 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateViewlessTimese
 TEST_F(AggregationExecutionStateTest,
        CheckViewfulTimeseriesCollWithRawDataIsNotConsideredTimeseries) {
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     StringData timeseriesColl{"timeseries"};
@@ -649,7 +649,7 @@ TEST_F(AggregationExecutionStateTest,
 
 TEST_F(AggregationExecutionStateTest,
        CheckViewlessTimeseriesCollWithRawDataIsNotConsideredTimeseries) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     StringData timeseriesColl{"timeseries"};
@@ -668,7 +668,7 @@ TEST_F(AggregationExecutionStateTest,
 
 TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewfulTsNssRequiresExtendedRangeSupport) {
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     StringData main{"coll"};
@@ -689,7 +689,7 @@ TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewfulTsNssRequiresExte
 }
 
 TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewlessTsNssRequiresExtendedRangeSupport) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     StringData main{"coll"};
@@ -711,7 +711,7 @@ TEST_F(AggregationExecutionStateTest, UnshardedSecondaryViewlessTsNssRequiresExt
 
 TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewfulTsNssRequiresExtendedRangeSupport) {
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
@@ -731,7 +731,7 @@ TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewfulTsNssRequiresExtend
 }
 
 TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewlessTsNssRequiresExtendedRangeSupport) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
@@ -752,7 +752,7 @@ TEST_F(AggregationExecutionStateTest, ShardedSecondaryViewlessTsNssRequiresExten
 
 TEST_F(AggregationExecutionStateTest, SecondaryViewfulTsNssNoExtendedRangeSupport) {
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
@@ -772,7 +772,7 @@ TEST_F(AggregationExecutionStateTest, SecondaryViewfulTsNssNoExtendedRangeSuppor
 }
 
 TEST_F(AggregationExecutionStateTest, SecondaryViewlessTsNssNoExtendedRangeSupport) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     StringData main{"coll"};
     StringData timeseriesColl{"timeseries"};
@@ -799,7 +799,7 @@ TEST_F(AggregationExecutionStateTest, ViewOnViewfulTsUsingExtendRangeAsSecondary
     // and confirm that AggCatalogState reports that the aggregation uses extended range data.
     //
     // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     StringData main{"main"};
@@ -831,7 +831,7 @@ TEST_F(AggregationExecutionStateTest, ViewOnViewlessTsUsingExtendRangeAsSecondar
     // - That has extended range data
     // and confirm that AggCatalogState reports that the aggregation uses extended range data.
 
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     StringData main{"main"};
@@ -901,7 +901,7 @@ TEST_F(AggregationExecutionStateTest, CreateOplogAggCatalogStateFailsOnView) {
 
 TEST_F(AggregationExecutionStateTest,
        CreateOplogAggCatalogStateFailsOnViewfulTimeseriesCollection) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     StringData timeseriesColl{"timeseries"};
@@ -919,7 +919,7 @@ TEST_F(AggregationExecutionStateTest,
 
 TEST_F(AggregationExecutionStateTest,
        Given_OplogAggCatalogStateWithViewlessTimeseriesColl_Then_IsTimeseries) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     StringData timeseriesColl{"timeseries"};
     createTimeseriesCollection(
@@ -933,7 +933,7 @@ TEST_F(AggregationExecutionStateTest,
 TEST_F(
     AggregationExecutionStateTest,
     Given_OplogAggCatalogStateWithViewTimeseriesColl_When_CallingValidate_Then_ExceptionIsThrown) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     StringData timeseriesColl{"timeseries"};
     createTimeseriesCollection(
@@ -961,7 +961,7 @@ TEST_F(
 TEST_F(
     AggregationExecutionStateTest,
     Given_OplogAggCatalogStateWithViewlessTimeseriesCollAndNoRawData_When_CallingValidate_Then_ExceptionIsThrown) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     StringData timeseriesColl{"timeseries"};
@@ -977,7 +977,7 @@ TEST_F(
 TEST_F(
     AggregationExecutionStateTest,
     Given_OplogAggCatalogStateWithViewlessTimeseriesCollAndRawData_When_CallingValidate_Then_NoExceptionIsThrown) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
 
     StringData timeseriesColl{"timeseries"};

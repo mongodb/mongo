@@ -40,8 +40,8 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/message.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -883,7 +883,7 @@ public:
     }
 
     BSONObj runGetErrorLabelsTest(long long serverParameterValue, ErrorCodes::Error code) {
-        RAIIServerParameterControllerForTest spGuard("overloadRetryAfterMS", serverParameterValue);
+        unittest::ServerParameterGuard spGuard("overloadRetryAfterMS", serverParameterValue);
         OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
         return getErrorLabels(opCtx(),
                               sessionInfo,

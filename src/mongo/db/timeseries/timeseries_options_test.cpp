@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -277,8 +277,7 @@ TEST(TimeseriesOptionsTest, CanUseFixedBucketOptimizations) {
         EXPECT_FALSE(timeseries::canUseFixedBucketOptimizations(opts));
     }
 
-    RAIIServerParameterControllerForTest flagController("featureFlagFixedBucketingOptimizations",
-                                                        true);
+    unittest::ServerParameterGuard flagController("featureFlagFixedBucketingOptimizations", true);
 
     // Flag on: result depends on fixedBucketing field and maxSpan == rounding.
     EXPECT_TRUE(timeseries::canUseFixedBucketOptimizations(withFixedBucketing(optionsEqualAndNone)))

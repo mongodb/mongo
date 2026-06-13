@@ -65,7 +65,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -657,7 +657,7 @@ class QueryStageUpdateMemoryLimitExceeded : public QueryStageUpdateBase {
 public:
     void run() {
         // Set an absurdly small limit so the deduplicator overhead alone exceeds it.
-        RAIIServerParameterControllerForTest maxMemoryBytes{"internalUpdateStageMaxMemoryBytes", 1};
+        unittest::ServerParameterGuard maxMemoryBytes{"internalUpdateStageMaxMemoryBytes", 1};
 
         for (int i = 0; i < 10; ++i) {
             insert(BSON("_id" << i << "x" << i));

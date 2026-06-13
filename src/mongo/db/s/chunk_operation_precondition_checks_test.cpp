@@ -47,7 +47,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -162,7 +162,7 @@ protected:
     }
 
 private:
-    boost::optional<RAIIServerParameterControllerForTest> _featureFlagScope;
+    boost::optional<unittest::ServerParameterGuard> _featureFlagScope;
 };
 
 INSTANTIATE_TEST_SUITE_P(UniqueShardIdentifiers,

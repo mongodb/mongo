@@ -44,7 +44,6 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
@@ -52,6 +51,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -105,7 +105,7 @@ DEATH_TEST_F(QueryAnalysisSamplerRateLimiterTestDeathTest, CannotUseNegativeRate
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, BurstMultiplierEqualToOne) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     // multiplier * rate > 1
@@ -128,7 +128,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, BurstMultiplierEqualToOne) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, BurstMultiplierGreaterThanOne) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2.5};
 
     // multiplier * rate > 1
@@ -151,7 +151,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, BurstMultiplierGreaterThanOne) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterOneSecond) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -169,7 +169,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterOneSecond) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterLessThanOneSecond) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -187,7 +187,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterLessThanOneSecond) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterMoreThanOneSecond) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -204,7 +204,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterMoreThanOneSecond) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeEpsilonAbove) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -222,7 +222,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeEpsilonAbove) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeRemainingTokens) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -244,7 +244,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeRemainingTokens) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeBurstCapacity) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2};
 
     auto rateLimiter =
@@ -262,7 +262,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeBurstCapacity) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAboveBurstCapacity) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2};
 
     auto rateLimiter =
@@ -280,7 +280,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAboveBurstCapacity) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeBelowBurstCapacity) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2};
 
     auto rateLimiter =
@@ -301,7 +301,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeBelowBurstCapacity) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateIncreased) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2};
 
     auto rateLimiter =
@@ -330,7 +330,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateIncreased) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateDecreased) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2};
 
     auto rateLimiter =
@@ -361,7 +361,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateDecreased) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateUnchanged) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 2};
 
     auto rateLimiter =
@@ -385,7 +385,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateUnchanged) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, MicrosecondResolution) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -402,7 +402,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, MicrosecondResolution) {
 }
 
 TEST_F(QueryAnalysisSamplerRateLimiterTest, NanosecondsResolution) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     auto rateLimiter =
@@ -969,7 +969,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
 }
 
 TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     transport::TransportLayerMock transportLayer;
@@ -1022,7 +1022,7 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
 }
 
 TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     // Note how this client does not have a network session.
@@ -1057,7 +1057,7 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
 }
 
 TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
-    const RAIIServerParameterControllerForTest burstMultiplierController{
+    const unittest::ServerParameterGuard burstMultiplierController{
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     transport::TransportLayerMock transportLayer;

@@ -51,10 +51,10 @@
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -257,8 +257,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTablePrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kInsert,
                                          LazyRecordStore::CreateMode::immediate);
 }
@@ -270,8 +270,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsSavedToSideWritesTable) {
 
 TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsSavedToSideWritesTablePrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kDelete,
                                          LazyRecordStore::CreateMode::immediate);
 }
@@ -296,8 +296,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsIntRidTra
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsTableIntRidPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -338,8 +338,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToskippedRecordsTableStri
 TEST_F(IndexBuilderInterceptorTest,
        SingleInsertIsSavedToskippedRecordsTableStringRidPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -384,8 +384,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTable) {
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto indexBuildInfo =
         buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
     auto interceptor =
@@ -424,8 +424,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
     }
 
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -501,8 +501,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
     }
 
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -584,8 +584,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
 // SideWritesTracker::drainWritesIntoIndex tolerates a write conflict during the drain.
 TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -595,7 +595,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
     // Buffer N >= 2 side writes so applySingleBatch processes a real batch, with kBatchMaxSize
     // pinned > N so the whole drain is a single batch.
     constexpr int kNumKeys = 4;
-    RAIIServerParameterControllerForTest batchSize("maxIndexBuildDrainBatchSize", kNumKeys + 1);
+    unittest::ServerParameterGuard batchSize("maxIndexBuildDrainBatchSize", kNumKeys + 1);
     std::vector<key_string::Value> keyStrings;
     keyStrings.reserve(kNumKeys);
     for (int i = 0; i < kNumKeys; ++i) {
@@ -671,9 +671,9 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
 // loop runs writeConflictRetry across multiple batches.
 TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMultiBatch) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest batchSize("maxIndexBuildDrainBatchSize", 2);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard batchSize("maxIndexBuildDrainBatchSize", 2);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -753,8 +753,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
 }
 
 TEST_F(IndexBuilderInterceptorTest, CheckDuplicateKeyConstraintsSurvivesWriteConflict) {
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo =
         buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
@@ -1051,8 +1051,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
 
 TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -1102,8 +1102,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
 
 TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -1175,8 +1175,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
 
 TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -1202,8 +1202,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContaine
 
 TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -1261,8 +1261,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
 TEST_F(IndexBuilderInterceptorTest,
        DrainMixedInsertDeleteSideWritesGeneratesCorrectContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -1354,10 +1354,10 @@ TEST_F(IndexBuilderInterceptorTest,
 
 TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     // Force each side write to drain in its own WriteUnitOfWork batch.
-    RAIIServerParameterControllerForTest batchSize("maxIndexBuildDrainBatchSize", 1);
+    unittest::ServerParameterGuard batchSize("maxIndexBuildDrainBatchSize", 1);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -1415,8 +1415,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
 TEST_F(IndexBuilderInterceptorTest,
        DrainDuplicateInsertOnUniqueIndexRecordsConstraintViolationPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observerPtr = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo =
@@ -1501,8 +1501,8 @@ TEST_F(IndexBuilderInterceptorTest,
 TEST_F(IndexBuilderInterceptorTest,
        DrainInsertOnUniqueIndexWithNoDuplicateGeneratesNoConstraintViolationPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo =
@@ -1555,8 +1555,8 @@ TEST_F(IndexBuilderInterceptorTest,
 
 TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOpsPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo =
@@ -1623,8 +1623,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
 TEST_F(IndexBuilderInterceptorTest,
        DrainDuplicateInsertOnUniqueIndexWithNoTrackGeneratesNoConstraintViolationPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo =
@@ -1700,8 +1700,8 @@ TEST_F(IndexBuilderInterceptorTest,
 TEST_F(IndexBuilderInterceptorTest,
        DrainDuplicateInsertOnPrepareUniqueIndexReturnsErrorPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(
@@ -1776,8 +1776,8 @@ TEST_F(IndexBuilderInterceptorTest,
 TEST_F(IndexBuilderInterceptorTest,
        DrainSameKeyAndRecordIdInsertOnUniqueIndexIsIdempotentPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo =
@@ -1856,8 +1856,8 @@ TEST_F(IndexBuilderInterceptorTest,
 TEST_F(IndexBuilderInterceptorTest,
        DrainDuplicateInsertOnPrepareUniqueIndexWithNoTrackReturnsErrorPrimaryDriven) {
     // TODO (SERVER-116165): Remove.
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
-    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto* observer = installContainerOpObserver(operationContext());
 
     auto indexBuildInfo = buildIndexBuildInfo(

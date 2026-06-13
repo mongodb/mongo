@@ -52,8 +52,8 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -549,7 +549,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
 TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // We estimate the size of result row like {int64, int64} at 50B. Set the memory threshold to
     // 64B so that exactly one row fits in memory.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
 
     auto ctx = makeCompileCtx();
@@ -616,11 +616,11 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     // 64B so that exactly one row fits in memory and spill would be required. At the same time, set
     // the memory check bounds to exceed the number of processed records so the checks are never run
     // and the need to spill is never discovered.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
-    RAIIServerParameterControllerForTest checkPerAdvanceAtMost(
+    unittest::ServerParameterGuard checkPerAdvanceAtMost(
         "internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost", 100);
-    RAIIServerParameterControllerForTest checkPerAdvanceAtLeast(
+    unittest::ServerParameterGuard checkPerAdvanceAtLeast(
         "internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast", 100);
 
     auto ctx = makeCompileCtx();
@@ -679,7 +679,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
 TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // We estimate the size of result row like {double, int64} at 50B. Set the memory threshold to
     // 64B so that exactly one row fits in memory.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
 
     auto ctx = makeCompileCtx();
@@ -742,7 +742,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
 }
 
 TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 128);
 
     auto ctx = makeCompileCtx();
@@ -801,7 +801,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
 TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // We estimate the size of result row like {double, int64} at 59B. Set the memory threshold to
     // 128B so that two rows fit in memory.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 128);
 
     auto ctx = makeCompileCtx();
@@ -876,7 +876,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
 
 TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     // Set available memory to 1 byte so all aggregated rows have to be spilled.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 1);
 
     auto ctx = makeCompileCtx();
@@ -1044,7 +1044,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
 TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // We estimate the size of result row like {double, int64} at 59B. Set the memory threshold to
     // 128B so that two rows fit in memory.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 128);
 
     auto ctx = makeCompileCtx();
@@ -1129,7 +1129,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
     // estimated size is >= 128. This should spilt the number of ints between the hash table and
     // the record store somewhat evenly.
     const auto memLimit = 128;
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", memLimit);
 
     auto ctx = makeCompileCtx();

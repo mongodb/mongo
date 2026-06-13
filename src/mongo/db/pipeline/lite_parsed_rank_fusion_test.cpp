@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -55,10 +55,10 @@ protected:
     }
 
 private:
-    RAIIServerParameterControllerForTest featureFlagController1{"featureFlagRankFusionBasic", true};
-    RAIIServerParameterControllerForTest featureFlagController2{"featureFlagRankFusionFull", true};
-    RAIIServerParameterControllerForTest _ifrFlagController{
-        "featureFlagExtensionsInsideHybridSearch", true};
+    unittest::ServerParameterGuard featureFlagController1{"featureFlagRankFusionBasic", true};
+    unittest::ServerParameterGuard featureFlagController2{"featureFlagRankFusionFull", true};
+    unittest::ServerParameterGuard _ifrFlagController{"featureFlagExtensionsInsideHybridSearch",
+                                                      true};
 };
 
 TEST_F(LiteParsedRankFusionTest, ErrorsIfNoInputsField) {
@@ -195,8 +195,7 @@ TEST_F(LiteParsedRankFusionTest, ErrorsIfRankFusionNotFirstStage) {
 }
 
 TEST_F(LiteParsedRankFusionTest, ErrorsIfScoreDetailsWithoutRankFusionFullFF) {
-    RAIIServerParameterControllerForTest rankFusionFullController{"featureFlagRankFusionFull",
-                                                                  false};
+    unittest::ServerParameterGuard rankFusionFullController{"featureFlagRankFusionFull", false};
     std::vector<BSONObj> pipeline = {fromjson(R"({
         $rankFusion: {
             input: {

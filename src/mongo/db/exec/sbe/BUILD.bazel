@@ -417,8 +417,8 @@ mongo_cc_benchmark(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec:expression_bm_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:pcre_wrapper",
     ],
 )
@@ -435,8 +435,8 @@ mongo_cc_benchmark(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec:expression_bm_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:pcre_wrapper",
     ],
 )
@@ -453,8 +453,8 @@ mongo_cc_benchmark(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec:expression_bm_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:pcre_wrapper",
     ],
 )
@@ -471,8 +471,8 @@ mongo_cc_benchmark(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec:expression_bm_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
-        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 #include <climits>

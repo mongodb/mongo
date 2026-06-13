@@ -34,9 +34,9 @@
 #include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_knobs/query_knob_test_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/server_parameter_guard.h"
 
 namespace mongo {
 namespace {
@@ -85,31 +85,31 @@ TEST(QueryKnobTest, ReadGlobalSynchronizedEnum) {
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesInt) {
-    RAIIServerParameterControllerForTest controller("testIntKnob", 999);
+    unittest::ServerParameterGuard controller("testIntKnob", 999);
     auto val = entryFor(test_knobs::testIntKnob).readGlobal();
     ASSERT_EQ(std::get<int>(val), 999);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesDouble) {
-    RAIIServerParameterControllerForTest controller("testDoubleKnob", 6.28);
+    unittest::ServerParameterGuard controller("testDoubleKnob", 6.28);
     auto val = entryFor(test_knobs::testDoubleKnob).readGlobal();
     ASSERT_APPROX_EQUAL(std::get<double>(val), 6.28, 1e-9);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesBool) {
-    RAIIServerParameterControllerForTest controller("testBoolKnob", false);
+    unittest::ServerParameterGuard controller("testBoolKnob", false);
     auto val = entryFor(test_knobs::testBoolKnob).readGlobal();
     ASSERT_EQ(std::get<bool>(val), false);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesLongLong) {
-    RAIIServerParameterControllerForTest controller("testLLKnob", 9999LL);
+    unittest::ServerParameterGuard controller("testLLKnob", 9999LL);
     auto val = entryFor(test_knobs::testLLKnob).readGlobal();
     ASSERT_EQ(std::get<long long>(val), 9999LL);
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesSynchronizedEnum) {
-    RAIIServerParameterControllerForTest controller("testEnumKnob", "beta");
+    unittest::ServerParameterGuard controller("testEnumKnob", "beta");
     auto val = entryFor(test_knobs::testEnumKnob).readGlobal();
     ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kBeta));
 }

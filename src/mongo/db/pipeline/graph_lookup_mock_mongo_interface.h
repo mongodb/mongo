@@ -49,7 +49,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

@@ -54,7 +54,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -867,9 +867,8 @@ private:
 TEST(AggregationRequestTest, AddIfrFlagsSerializesOutgoingIfrFlagsAtLatestFCV) {
     // (Generic FCV reference): test usage
     ScopedFCV fcv(multiversion::GenericFCV::kLatest);
-    RAIIServerParameterControllerForTest hybridFlag("featureFlagExtensionsInsideHybridSearch",
-                                                    true);
-    RAIIServerParameterControllerForTest vectorFlag("featureFlagVectorSearchExtension", true);
+    unittest::ServerParameterGuard hybridFlag("featureFlagExtensionsInsideHybridSearch", true);
+    unittest::ServerParameterGuard vectorFlag("featureFlagVectorSearchExtension", true);
 
     const auto flagsForWire = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
     ASSERT_FALSE(flagsForWire.empty());
@@ -896,9 +895,8 @@ TEST(AggregationRequestTest, AddIfrFlagsSerializesOutgoingIfrFlagsAtLatestFCV) {
 TEST(AggregationRequestTest, AddIfrFlagsOmitsIfrFlagsAtLastLTSFCV) {
     // (Generic FCV reference): test usage
     ScopedFCV fcv(multiversion::GenericFCV::kLastLTS);
-    RAIIServerParameterControllerForTest hybridFlag("featureFlagExtensionsInsideHybridSearch",
-                                                    true);
-    RAIIServerParameterControllerForTest vectorFlag("featureFlagVectorSearchExtension", true);
+    unittest::ServerParameterGuard hybridFlag("featureFlagExtensionsInsideHybridSearch", true);
+    unittest::ServerParameterGuard vectorFlag("featureFlagVectorSearchExtension", true);
 
     ASSERT_TRUE(IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests().empty());
 

@@ -33,11 +33,11 @@
 #include "mongo/db/admission/execution_control/execution_admission_type_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -275,7 +275,7 @@ TEST_F(TaskTypeTest, SequentialDifferentTypes) {
 
 // TODO (SERVER-122847): Remove this test.
 TEST_F(TaskTypeTest, WriteMetadataNoFieldWhenFeatureFlagDisabled) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", false);
 
     auto opCtx = makeOperationContext();
@@ -290,7 +290,7 @@ TEST_F(TaskTypeTest, WriteMetadataNoFieldWhenFeatureFlagDisabled) {
 
 // TODO (SERVER-122847): Remove the feature flag controller from the following tests.
 TEST_F(TaskTypeTest, WriteMetadataNoFieldForNormalPriorityDefaultTaskType) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", true);
     auto opCtx = makeOperationContext();
 
@@ -301,7 +301,7 @@ TEST_F(TaskTypeTest, WriteMetadataNoFieldForNormalPriorityDefaultTaskType) {
 }
 
 TEST_F(TaskTypeTest, WriteMetadataLowPriority) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", true);
     auto opCtx = makeOperationContext();
     ScopedAdmissionPriority<ExecutionAdmissionContext> lowPriority(
@@ -316,7 +316,7 @@ TEST_F(TaskTypeTest, WriteMetadataLowPriority) {
 }
 
 TEST_F(TaskTypeTest, WriteMetadataExemptPriority) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", true);
     auto opCtx = makeOperationContext();
     ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(
@@ -331,7 +331,7 @@ TEST_F(TaskTypeTest, WriteMetadataExemptPriority) {
 }
 
 TEST_F(TaskTypeTest, WriteMetadataBackgroundTaskType) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", true);
     auto opCtx = makeOperationContext();
     ScopedTaskTypeBackground bg(opCtx.get());
@@ -345,7 +345,7 @@ TEST_F(TaskTypeTest, WriteMetadataBackgroundTaskType) {
 }
 
 TEST_F(TaskTypeTest, WriteMetadataNonDeprioritizableTaskType) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", true);
     auto opCtx = makeOperationContext();
     ScopedTaskTypeNonDeprioritizable nd(opCtx.get());
@@ -359,7 +359,7 @@ TEST_F(TaskTypeTest, WriteMetadataNonDeprioritizableTaskType) {
 }
 
 TEST_F(TaskTypeTest, WriteMetadataExemptPriorityTakesPrecedenceOverTaskType) {
-    RAIIServerParameterControllerForTest featureFlagDisabled(
+    unittest::ServerParameterGuard featureFlagDisabled(
         "featureFlagExecutionControlRemoteSpecification", true);
     auto opCtx = makeOperationContext();
     ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(

@@ -52,8 +52,8 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -297,7 +297,7 @@ private:
     const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID _uuid{UUID::gen()};
 
-    RAIIServerParameterControllerForTest controller{"reshardingOplogBatchLimitOperations", 1};
+    unittest::ServerParameterGuard controller{"reshardingOplogBatchLimitOperations", 1};
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
@@ -458,7 +458,7 @@ using ReshardingDonorOplogIterTestDeathTest = ReshardingDonorOplogIterTest;
 DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTestDeathTest,
                    ThrowsIfProgressMarkEntriesAfterFinalOp,
                    "Tripwire assertion.*6077499") {
-    RAIIServerParameterControllerForTest controller{"reshardingOplogBatchLimitOperations", 100};
+    unittest::ServerParameterGuard controller{"reshardingOplogBatchLimitOperations", 100};
 
     const auto oplog1 = makeInsertOplog(Timestamp(2, 4), BSON("x" << 1));
     const auto progressMarkOplog1 = makeProgressMarkOplogEntry(Timestamp(15, 3));

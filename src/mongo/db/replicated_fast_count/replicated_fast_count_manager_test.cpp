@@ -101,7 +101,7 @@ TEST_F(ReplicatedFastCountManagerIdempotenceTest, IdempotentStartupAndShutdown) 
 using ReplicatedFastCountManagerNoCollectionsTest = CatalogTestFixture;
 
 TEST_F(ReplicatedFastCountManagerNoCollectionsTest, InitializeMetadataDoesNothing) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     ReplicatedFastCountManager manager;
     manager.initializeMetadata(operationContext());
@@ -110,13 +110,13 @@ TEST_F(ReplicatedFastCountManagerNoCollectionsTest, InitializeMetadataDoesNothin
 using ReplicatedFastCountManagerInitializeMetadataTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataNoData) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     manager->initializeMetadata(operationContext());
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -139,7 +139,7 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogData) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -164,7 +164,7 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogData) {
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -201,7 +201,7 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) 
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -235,7 +235,7 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     // Insert a size/count for a UUID that has no corresponding collection in the catalog.
     test_helpers::insertSizeCountEntry(
@@ -249,7 +249,7 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTracksOplogSizeCount) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -426,7 +426,7 @@ protected:
 
 TEST_F(ReplicatedFastCountManagerColdBootTest,
        InitializePopulatesMetadataFromExistingInternalCollection) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
 
     // Pre-populate the internal replicated fast count collection with two entries.
     const int64_t expectedCount1 = 5;
@@ -499,8 +499,8 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
 
 TEST_F(ReplicatedFastCountManagerColdBootTest,
        InitializePopulatesMetadataFromExistingInternalContainer) {
-    RAIIServerParameterControllerForTest ffFastCount("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     ASSERT_OK(createInternalFastCountContainers(_opCtx,
                                                 NamespaceString::kAdminCommandNamespace,
@@ -587,8 +587,8 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
 // (the collection-backed implementation was still in place before initializeContainerStores()).
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
        ContainerModeReadsTimestampFromIdentToFilterOplogScan) {
-    RAIIServerParameterControllerForTest ffFastCount("featureFlagReplicatedFastCount", true);
-    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    unittest::ServerParameterGuard ffFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));

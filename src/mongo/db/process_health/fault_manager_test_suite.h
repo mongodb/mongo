@@ -35,9 +35,9 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
@@ -233,8 +233,8 @@ public:
 
     static inline const int kActiveFaultDurationSecs = 5;
 
-    RAIIServerParameterControllerForTest serverParamController{"activeFaultDurationSecs",
-                                                               kActiveFaultDurationSecs};
+    unittest::ServerParameterGuard serverParamController{"activeFaultDurationSecs",
+                                                         kActiveFaultDurationSecs};
 
     void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTimeout) {
         Timer t;

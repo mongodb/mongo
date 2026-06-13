@@ -40,8 +40,8 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/move/utility_core.hpp>
@@ -186,8 +186,8 @@ TEST_P(StartupFCVSequenceTestFixtureWithDefaultStartupFCV,
        ReplicaSetCleanStartupDefaultStartupFCVParameterLastLTS) {
     const auto& params = GetParam();
 
-    RAIIServerParameterControllerForTest defaultStartupFCV{"defaultStartupFCV",
-                                                           toString(params.defaultStartupFCV)};
+    unittest::ServerParameterGuard defaultStartupFCV{"defaultStartupFCV",
+                                                     toString(params.defaultStartupFCV)};
 
     serverGlobalParams.clusterRole = params.clusterRole;
 
@@ -335,8 +335,8 @@ INSTANTIATE_TEST_SUITE_P(UpgradingFromDifferentStartingPhasesWithSymmetricFCV,
 
 TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedUpgrade) {
     const auto& params = GetParam();
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV",
-                                                      params.symmetricFCVEnabled};
+    unittest::ServerParameterGuard symmetricFCV{"featureFlagSymmetricFCV",
+                                                params.symmetricFCVEnabled};
     const Timestamp lastChangeTimestamp =
         VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
@@ -393,7 +393,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(UpdateDocumentPreviousVersionTestFixture, UpdateDocumentPreviousVersion) {
     const auto& params = GetParam();
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    unittest::ServerParameterGuard symmetricFCV{"featureFlagSymmetricFCV", true};
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
 
@@ -459,7 +459,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, CanInitFCVWithIncompleteForegroun
 }
 
 TEST_F(FeatureCompatibilityVersionTestFixture, UpdateDocumentClearsPreviousVersionOnFinalize) {
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    unittest::ServerParameterGuard symmetricFCV{"featureFlagSymmetricFCV", true};
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
 
@@ -482,7 +482,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, UpdateDocumentClearsPreviousVersi
 
 TEST_F(FeatureCompatibilityVersionTestFixture,
        UpdateDocumentDoesNotWritePreviousVersionWhenSymmetricFCVDisabled) {
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", false};
+    unittest::ServerParameterGuard symmetricFCV{"featureFlagSymmetricFCV", false};
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
 

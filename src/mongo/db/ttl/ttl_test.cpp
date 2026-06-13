@@ -57,9 +57,9 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/ttl/ttl_monitor.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -303,7 +303,7 @@ private:
 };
 
 TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -341,7 +341,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -381,7 +381,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -422,7 +422,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -466,7 +466,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -501,7 +501,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -551,7 +551,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -586,7 +586,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -620,7 +620,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
 }
 
 TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -657,7 +657,7 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
 }
 
 TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -693,7 +693,7 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
 }
 
 TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -735,7 +735,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
 
 
 TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 
@@ -780,17 +780,17 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
 // Demonstrate sub-pass behavior when all expired documents are drained before the sub-pass reaches
 // its time limit.
 TEST_F(TTLTest, TTLSingleSubPass) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set 'ttlMonitorSubPasstargetSecs' to a day to guarantee the sub-pass target time is never
     // reached.
-    RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", 60 * 60 * 24);
 
     // Each batched delete issued on a TTL index will only delete up to ttlIndexDeleteTargetDocs.
     auto ttlIndexDeleteTargetDocs = 20;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetDocsController(
-        "ttlIndexDeleteTargetDocs", ttlIndexDeleteTargetDocs);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
 
     SimpleClient client(opCtx());
 
@@ -825,7 +825,7 @@ TEST_F(TTLTest, TTLSingleSubPass) {
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
     // performed on TTL indexes per sub pass.
@@ -834,19 +834,19 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
     // that a limited amount of documents are removed from each TTL index before moving to the next
     // TTL index, regardless of the number of expired documents remaining.
     auto ttlMonitorSubPassTargetSecs = 0;
-    RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", ttlMonitorSubPassTargetSecs);
 
     // Do not limit the amount of time in performing a batched delete each pass by setting
     // the target time to 0.
     auto ttlIndexDeleteTargetTimeMS = 0;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetTimeMSController(
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
         "ttlIndexDeleteTargetTimeMS", ttlIndexDeleteTargetTimeMS);
 
     // Expect each sub-pass to delete up to 20 documents from each index.
     auto ttlIndexDeleteTargetDocs = 20;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetDocsController(
-        "ttlIndexDeleteTargetDocs", ttlIndexDeleteTargetDocs);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
 
     SimpleClient client(opCtx());
 
@@ -904,7 +904,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
     // performed on TTL indexes per sub pass.
@@ -913,19 +913,19 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
     // that a limited amount of documents are removed from each TTL index before moving to the next
     // TTL index, regardless of the number of expired documents remaining.
     auto ttlMonitorSubPassTargetSecs = 0;
-    RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", ttlMonitorSubPassTargetSecs);
 
     // Do not limit the amount of time in performing a batched delete each pass by setting
     // the target time to 0.
     auto ttlIndexDeleteTargetTimeMS = 0;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetTimeMSController(
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
         "ttlIndexDeleteTargetTimeMS", ttlIndexDeleteTargetTimeMS);
 
     // Expect each sub-pass to delete up to 20 documents from each index.
     auto ttlIndexDeleteTargetDocs = 20;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetDocsController(
-        "ttlIndexDeleteTargetDocs", ttlIndexDeleteTargetDocs);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
 
     SimpleClient client(opCtx());
 
@@ -987,7 +987,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
 // Tests that, between sub-passes, newly added TTL indexes are not ignored.
 TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
     // performed on TTL indexes per sub pass.
@@ -996,19 +996,19 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
     // that a limited amount of documents are removed from each TTL index before moving to the next
     // TTL index, regardless of the number of expired documents remaining.
     auto ttlMonitorSubPassTargetSecs = 0;
-    RAIIServerParameterControllerForTest ttlMonitorSubPassTargetSecsController(
+    unittest::ServerParameterGuard ttlMonitorSubPassTargetSecsController(
         "ttlMonitorSubPassTargetSecs", ttlMonitorSubPassTargetSecs);
 
     // Do not limit the amount of time in performing a batched delete each pass by setting
     // the target time to 0.
     auto ttlIndexDeleteTargetTimeMS = 0;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetTimeMSController(
+    unittest::ServerParameterGuard ttlIndexDeleteTargetTimeMSController(
         "ttlIndexDeleteTargetTimeMS", ttlIndexDeleteTargetTimeMS);
 
     // Expect each sub-pass to delete up to 20 documents from each index.
     auto ttlIndexDeleteTargetDocs = 20;
-    RAIIServerParameterControllerForTest ttlIndexDeleteTargetDocsController(
-        "ttlIndexDeleteTargetDocs", ttlIndexDeleteTargetDocs);
+    unittest::ServerParameterGuard ttlIndexDeleteTargetDocsController("ttlIndexDeleteTargetDocs",
+                                                                      ttlIndexDeleteTargetDocs);
 
 
     SimpleClient client(opCtx());
@@ -1069,7 +1069,7 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
 // This involves manual sleeps; we will just test this way once and test the pass
 // function directly in all other tests of ttl logic.
 TEST_F(TTLTest, TTLRunMonitorThread) {
-    RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
+    unittest::ServerParameterGuard ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
 

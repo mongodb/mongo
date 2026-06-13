@@ -38,7 +38,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -266,7 +266,7 @@ TEST_F(MergeJoinStageTest, MergeJoinSortDirectionDescending) {
 
 TEST_F(MergeJoinStageTest, MergeJoinMemoryLimitExceeded) {
     // Set a 1-byte limit so any buffered row immediately exceeds it.
-    RAIIServerParameterControllerForTest maxMemoryLimit(
+    unittest::ServerParameterGuard maxMemoryLimit(
         "internalSlotBasedExecutionMergeJoinStageMaxMemoryBytes", 1);
 
     // Two outer rows share the same key so the second emplace_back enters the loop and hits the

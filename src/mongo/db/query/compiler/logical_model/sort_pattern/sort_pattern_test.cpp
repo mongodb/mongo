@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
@@ -129,7 +129,7 @@ TEST(SortStageDefaultTest, WrongSortKeyDefinition) {
 
 // Testing expected behavior of 'isSortOnSingleMetaField()' stateless function.
 TEST(IsSortOnSingleMetaFieldTest, TestingIsSortOnSingleMetaFieldFn) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
 
     auto expCtx = getExpCtx();
 

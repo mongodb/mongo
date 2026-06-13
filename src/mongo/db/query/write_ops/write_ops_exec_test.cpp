@@ -45,7 +45,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -353,7 +353,7 @@ TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
 }
 
 TEST_F(WriteOpsExecTest, InsertFailsIfTimeseriesCollectionCreatedDuringInsert) {
-    RAIIServerParameterControllerForTest featureFlagController(
+    unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
     NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
@@ -630,7 +630,7 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertCappedOplogDoesntBatch) {
 }
 
 TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertMultipleBatches) {
-    RAIIServerParameterControllerForTest batchSizeController("internalInsertMaxBatchSize", 2);
+    unittest::ServerParameterGuard batchSizeController("internalInsertMaxBatchSize", 2);
 
     NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
@@ -662,7 +662,7 @@ TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertMultipleBatches) {
 }
 
 TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertBatchedAndUnbatched) {
-    RAIIServerParameterControllerForTest batchSizeController("internalInsertMaxBatchSize", 2);
+    unittest::ServerParameterGuard batchSizeController("internalInsertMaxBatchSize", 2);
 
     NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");

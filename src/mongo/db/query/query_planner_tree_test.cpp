@@ -40,8 +40,8 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/util/cartesian_product.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -383,8 +383,8 @@ TEST_F(QueryPlannerTest, ContainedOrOfAndCollapseIdenticalScansTwoFilters) {
     // With the simplifer enabled the solution below will be simplified to "{a:1, b:2, c:1, $or:
     // [{d:3}, {e:4}]}", with the common terms '{a:1, b:2}' moved out of the nested $or. See the
     // test below for the behaviour with the enabled simplifier.
-    RAIIServerParameterControllerForTest controller(
-        "internalQueryEnableBooleanExpressionsSimplifier", false);
+    unittest::ServerParameterGuard controller("internalQueryEnableBooleanExpressionsSimplifier",
+                                              false);
 
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{c: 1, $or: [{a:1, b:2, d:3}, {a:1, b:2, e:4}]}"));
@@ -402,8 +402,8 @@ TEST_F(QueryPlannerTest,
     // With the simplifer enabled the solution below will be simplified to "{a:1, b:2, c:1, $or:
     // [{d:3}, {e:4}]}" which allow the multiplanner to build more effective test with only one
     // fecth instead of two.
-    RAIIServerParameterControllerForTest controller(
-        "internalQueryEnableBooleanExpressionsSimplifier", true);
+    unittest::ServerParameterGuard controller("internalQueryEnableBooleanExpressionsSimplifier",
+                                              true);
 
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{c: 1, $or: [{a:1, b:2, d:3}, {a:1, b:2, e:4}]}"));
@@ -1192,7 +1192,7 @@ TEST_F(QueryPlannerTest, ExplodeRootedOrForSortWorksWithShardingFilter) {
 }
 
 TEST_F(QueryPlannerTest, NoIndexDeduplicationWhenShardKeyExists) {
-    RAIIServerParameterControllerForTest controller("internalQueryPlannerEnableIndexPruning", true);
+    unittest::ServerParameterGuard controller("internalQueryPlannerEnableIndexPruning", true);
     params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
     // If there's a shard key, we shouldn't deduplicate indexes in case one of them provides value
     // for a shard filter.
@@ -2889,8 +2889,8 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
     // to a single $or and the test won't make sense: `{a: 1, $or: [{b: 2.1, c: 2.1}, {b:2.2,
     // c: 2.2}, {unindexed: 'thisPredicateToEnsureNestedOrsAreNotCombined', x: 3.0, y: 3.0},
     // {unindexed: 'thisPredicateToEnsureNestedOrsAreNotCombined', x: 3.1, y: 3.1}]}`.
-    RAIIServerParameterControllerForTest controller(
-        "internalQueryEnableBooleanExpressionsSimplifier", false);
+    unittest::ServerParameterGuard controller("internalQueryEnableBooleanExpressionsSimplifier",
+                                              false);
 
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
@@ -2958,15 +2958,15 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationWithNestedOrWhereInnerOrHitsEnumer
     // Disable the simplifier, since when enabled it will collapse nested $or nodes into a single
     // $or. Similarly, turn on the failpoint to disable match expression simplification which would
     // also eliminate the redundant $or.
-    RAIIServerParameterControllerForTest boolSimplificationController(
+    unittest::ServerParameterGuard boolSimplificationController(
         "internalQueryEnableBooleanExpressionsSimplifier", false);
     FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
 
     // The repro depends on the inner $or hitting its enumeration limit. The original problem from
     // SERVER-83091 can be reproduced with a simpler query if we lower the limit on the number of
     // plans that the 'PlanEnumerator' is allowed to generate for any $or node.
-    RAIIServerParameterControllerForTest maxOrPlansController(
-        "internalQueryEnumerationMaxOrSolutions", 3);
+    unittest::ServerParameterGuard maxOrPlansController("internalQueryEnumerationMaxOrSolutions",
+                                                        3);
 
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;

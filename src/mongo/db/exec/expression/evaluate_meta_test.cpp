@@ -34,7 +34,7 @@
 #include "mongo/db/exec/expression/evaluate_test_helpers.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -179,7 +179,7 @@ TEST(ExpressionMetaTest, ExpressionMetaVectorSearchScore) {
 
 TEST(ExpressionMetaTest, ExpressionMetaScore) {
     // Used to set 'score' metadata.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"score\"}");
     auto expressionMeta =
@@ -192,7 +192,7 @@ TEST(ExpressionMetaTest, ExpressionMetaScore) {
 
 TEST(ExpressionMetaTest, ExpressionMetaScoreDetails) {
     // Used to set 'scoreDetails' metadata.
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRankFusionFull", true);
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{$meta: \"scoreDetails\"}");
     auto expressionMeta =
@@ -207,8 +207,8 @@ TEST(ExpressionMetaTest, ExpressionMetaScoreDetails) {
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaStream) {
-    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagStreams", true);
+    unittest::ServerParameterGuard searchHybridScoringPrerequisitesController("featureFlagStreams",
+                                                                              true);
 
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
@@ -290,8 +290,8 @@ TEST(ExpressionMetaTest, ExpressionMetaStream) {
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaStreamSerialization) {
-    RAIIServerParameterControllerForTest searchHybridScoringPrerequisitesController(
-        "featureFlagStreams", true);
+    unittest::ServerParameterGuard searchHybridScoringPrerequisitesController("featureFlagStreams",
+                                                                              true);
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 

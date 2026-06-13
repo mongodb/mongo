@@ -33,7 +33,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -48,7 +48,7 @@ namespace mongo {
 
 TEST(AuthNamespaceStringUtil, Deserialize) {
     {
-        RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
+        unittest::ServerParameterGuard multitenanyController("multitenancySupport", false);
         ASSERT_THROWS_CODE(AuthNamespaceStringUtil::deserialize(TenantId{OID::gen()}, "foo", "bar"),
                            DBException,
                            ErrorCodes::InternalError);
@@ -60,7 +60,7 @@ TEST(AuthNamespaceStringUtil, Deserialize) {
     }
 
     {
-        RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+        unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
         TenantId tenant{OID::gen()};
         auto tenantNs = AuthNamespaceStringUtil::deserialize(tenant, "foo", "bar");
         ASSERT_EQ(tenantNs.tenantId(), tenant);
@@ -77,8 +77,8 @@ TEST(AuthNamespaceStringUtil, Deserialize) {
 // TenantID is not included in serialization when multitenancySupport and
 // featureFlagRequireTenantID are enabled.
 TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
     ASSERT_EQ(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()), "foo.bar");
@@ -87,8 +87,8 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTe
 // TenantID is included in serialization when multitenancySupport is enabled and
 // featureFlagRequireTenantID is disabled.
 TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTenantIDOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
@@ -98,7 +98,7 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTe
 
 // Serialize correctly when multitenancySupport is disabled.
 TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", false);
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
     ASSERT_EQ(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()), "foo.bar");
 }
@@ -106,8 +106,8 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOff) {
 // Assert that if multitenancySupport and featureFlagRequireTenantID are on, then tenantId is set.
 TEST(NamespaceStringUtilTest,
      DeserializeAssertTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     ASSERT_THROWS_CODE(NamespaceStringUtil::deserialize(
                            boost::none, "foo.bar", SerializationContext::stateDefault()),
                        AssertionException,
@@ -119,8 +119,8 @@ TEST(NamespaceStringUtilTest,
 // tenantID.
 TEST(NamespaceStringUtilTest,
      DeserializeNSSWithoutPrefixedTenantIDMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     NamespaceString nss =
         NamespaceStringUtil::deserialize(tenantId, "foo.bar", SerializationContext::stateDefault());
@@ -133,8 +133,8 @@ TEST(NamespaceStringUtilTest,
 // then tenantId parsed from ns and tenantID passed to NamespaceString object are equal.
 TEST(NamespaceStringUtilTest,
      DeserializeAssertTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
     TenantId tenantId(OID::gen());
     TenantId tenantId2(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
@@ -147,8 +147,8 @@ TEST(NamespaceStringUtilTest,
 // Deserialize NamespaceString when multitenancySupport is enabled and featureFlagRequireTenantID is
 // disabled.
 TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequireTenantIDOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
     NamespaceString nss = NamespaceStringUtil::deserialize(
@@ -163,7 +163,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequire
 
 // Assert tenantID is not initialized when multitenancySupport is disabled.
 TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", false);
     TenantId tenantId(OID::gen());
     ASSERT_THROWS_CODE(
         NamespaceStringUtil::deserialize(tenantId, "foo.bar", SerializationContext::stateDefault()),
@@ -175,7 +175,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOff) {
 // featureFlagRequireTenantId are disabled.
 TEST(NamespaceStringUtilTest,
      DeserializeWithTenantIdInStringMultitenancySupportOffFeatureFlagRequireTenantIDOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", false);
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
     std::string dbNameStr = str::stream() << tenantId.toString() << "_foo";
@@ -197,7 +197,7 @@ TEST(NamespaceStringUtilTest, NamespaceStringToDatabaseNameRoundTrip) {
              Scenario{true, boost::none, "config"},
              Scenario{true, TenantId{OID::gen()}, "foo"},
          }) {
-        RAIIServerParameterControllerForTest mc("multitenancySupport", scenario.multitenancy);
+        unittest::ServerParameterGuard mc("multitenancySupport", scenario.multitenancy);
 
         auto expected = NamespaceString::createNamespaceString_forTest(
             scenario.tenant, scenario.database, "bar");
@@ -209,8 +209,8 @@ TEST(NamespaceStringUtilTest, NamespaceStringToDatabaseNameRoundTrip) {
 
 // Deserialize NamespaceString when multitenancySupport and featureFlagRequireTenantID are disabled.
 TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequireTenantIDOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", false);
+    unittest::ServerParameterGuard featureFlagController("featureFlagRequireTenantID", false);
     NamespaceString nss = NamespaceStringUtil::deserialize(
         boost::none, "foo.bar", SerializationContext::stateDefault());
     ASSERT_EQ(nss.ns_forTest(), "foo.bar");
@@ -223,7 +223,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequir
 // already test the default codepath.
 
 TEST(NamespaceStringUtilTest, SerializeExpectPrefixFalse_CommandReply) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
     const std::string nsString = "foo.bar";
     const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
@@ -245,7 +245,7 @@ TEST(NamespaceStringUtilTest, SerializeExpectPrefixFalse_CommandReply) {
 
 // Serializing with SerializationContext, with an expectPrefix set to true
 TEST(NamespaceStringUtilTest, SerializeExpectPrefixTrue_CommandReply) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
     const std::string nsString = "foo.bar";
     const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
@@ -269,7 +269,7 @@ TEST(NamespaceStringUtilTest, SerializeExpectPrefixTrue_CommandReply) {
 }
 
 TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
     const std::string nsString = "foo.bar";
     const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
@@ -311,7 +311,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
 }
 
 TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenanyController("multitenancySupport", true);
     TenantId tenantId(OID::gen());
     const std::string nsString = "foo.bar";
     const std::string nsPrefixString = str::stream() << tenantId.toString() << "_" << nsString;
@@ -349,7 +349,7 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
 }
 
 TEST(NamespaceStringUtilTest, ParseNSSWithTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
 
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
@@ -364,8 +364,7 @@ TEST(NamespaceStringUtilTest, ParseNSSWithTenantId) {
 
 TEST(NamespaceStringUtilTest, ParseNSSWithUnderscoreAfterDbPortion) {
     for (const bool multitenancy : {true, false}) {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                    multitenancy);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", multitenancy);
         // no tenant, "foo.bar"
         {
             NamespaceString nss =
@@ -415,7 +414,7 @@ TEST(NamespaceStringUtilTest, ParseNSSWithUnderscoreAfterDbPortion) {
 }
 
 TEST(NamespaceStringUtilTest, ParseNSSWithTenantIdAndUnderscoreAfterDbPortionMultitenancyOff) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", false);
     // no tenant
     {
         NamespaceString nss =
@@ -479,7 +478,7 @@ TEST(NamespaceStringUtilTest, ParseNSSWithTenantIdAndUnderscoreAfterDbPortionMul
 }
 
 TEST(NamespaceStringUtilTest, ParseNSSWithTenantIdAndUnderscoreAfterDbPortionMultitenancyOn) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
     // no tenant
     {
         NamespaceString nss =
@@ -572,7 +571,7 @@ TEST(NamespaceStringUtilTest, SerializingEmptyNamespaceSting) {
     ASSERT_EQ(NamespaceStringUtil::serialize(emptyDbNss, sc),
               NamespaceStringUtil::serialize(kEmptyNss, sc));
     {
-        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+        unittest::ServerParameterGuard multitenancyController("multitenancySupport", true);
         const TenantId tid = TenantId(OID::gen());
         const auto emptyTenantIdDbNss =
             NamespaceString(DatabaseName::createDatabaseName_forTest(tid, ""));

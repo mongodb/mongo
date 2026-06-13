@@ -39,7 +39,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 namespace mongo {
 namespace {
@@ -133,7 +133,7 @@ CollectionOrViewAcquisition acquireCollectionForRead(OperationContext* opCtx,
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndexOnEmptyCollection) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
     auto indexA = BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1) << "unique" << false);
     createIndexOnEmptyCollection(indexA);
 
@@ -146,7 +146,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndexOnEmptyCollect
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
         docs.push_back(BSON("_id" << i << "a" << i));
@@ -167,7 +167,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
         docs.push_back(BSON("_id" << i << "a" << i << "b" << 0));
@@ -215,7 +215,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
         docs.push_back(BSON("_id" << i << "b" << i));
@@ -253,7 +253,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
         docs.push_back(BSON("_id" << i << "a" << i << "b" << i));
@@ -285,7 +285,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
     }
 }
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdateForSetMultikeyIncrementsEpoch) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 10; ++i) {
         docs.push_back(BSON("_id" << i << "a" << i));
