@@ -149,8 +149,7 @@ assertErrorCode(
     [51132, 51185],
 );
 
-// SERVER-38349 Make sure external clients cannot specify exchange directly.
-// External clients are now rejected with BadValue before reaching the mongos-level check (51028).
+// SERVER-38349 Make sure mongos rejects specifying exchange directly.
 assert.commandFailedWithCode(
     mongosDB.runCommand({
         aggregate: inColl.getName(),
@@ -164,7 +163,7 @@ assert.commandFailedWithCode(
             consumerIds: [NumberInt(0), NumberInt(1)],
         },
     }),
-    [ErrorCodes.BadValue, 51028],
+    51028,
 );
 
 assert.commandFailedWithCode(
@@ -188,7 +187,7 @@ assert.commandFailedWithCode(
             consumerIds: [NumberInt(0), NumberInt(1)],
         },
     }),
-    [ErrorCodes.BadValue, 51028],
+    51028,
 );
 
 st.stop();

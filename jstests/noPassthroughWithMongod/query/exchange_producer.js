@@ -8,19 +8,6 @@ TestData.disableImplicitSessions = true;
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-// Exchange requires an internal client connection. Create one by sending hello with internalClient.
-const internalConn = (() => {
-    const conn = new Mongo(db.getMongo().host);
-    assert.commandWorked(
-        conn.getDB("admin").runCommand({
-            hello: 1,
-            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
-        }),
-    );
-    return conn;
-})();
-const internalDB = internalConn.getDB(db.getName());
-
 const coll = db.testCollection;
 coll.drop();
 
@@ -71,30 +58,24 @@ const numConsumers = 4;
 assert.eq(0, numDocs % numConsumers);
 
 (function testParameterValidation() {
-    const internalColl = internalDB[coll.getName()];
-
     const tooManyConsumers = 101;
-    assertErrorCode(internalColl, [], 50950, "Expected too many consumers", {
+    assertErrorCode(coll, [], 50950, "Expected too many consumers", {
         exchange: {
             policy: "roundrobin",
             consumers: NumberInt(tooManyConsumers),
             bufferSize: NumberInt(1024),
         },
         cursor: {batchSize: 0},
-        readConcern: {},
-        writeConcern: {},
     });
 
     const bufferTooLarge = 200 * 1024 * 1024; // 200 MB
-    assertErrorCode(internalColl, [], 50951, "Expected buffer too large", {
+    assertErrorCode(coll, [], 50951, "Expected buffer too large", {
         exchange: {
             policy: "roundrobin",
             consumers: NumberInt(numConsumers),
             bufferSize: NumberInt(bufferTooLarge),
         },
         cursor: {batchSize: 0},
-        readConcern: {},
-        writeConcern: {},
     });
 })();
 
@@ -103,7 +84,7 @@ assert.eq(0, numDocs % numConsumers);
  */
 (function testRoundRobin() {
     let res = assert.commandWorked(
-        internalDB.runCommand({
+        db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
             exchange: {
@@ -112,7 +93,6 @@ assert.eq(0, numDocs % numConsumers);
                 bufferSize: NumberInt(1024),
             },
             cursor: {batchSize: 0},
-            writeConcern: {},
         }),
     );
     assert.eq(numConsumers, res.cursors.length);
@@ -132,7 +112,7 @@ assert.eq(0, numDocs % numConsumers);
  */
 (function testBroadcast() {
     let res = assert.commandWorked(
-        internalDB.runCommand({
+        db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
             exchange: {
@@ -141,7 +121,6 @@ assert.eq(0, numDocs % numConsumers);
                 bufferSize: NumberInt(1024),
             },
             cursor: {batchSize: 0},
-            writeConcern: {},
         }),
     );
     assert.eq(numConsumers, res.cursors.length);
@@ -161,7 +140,7 @@ assert.eq(0, numDocs % numConsumers);
  */
 (function testRange() {
     let res = assert.commandWorked(
-        internalDB.runCommand({
+        db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
             exchange: {
@@ -173,7 +152,6 @@ assert.eq(0, numDocs % numConsumers);
                 consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
             },
             cursor: {batchSize: 0},
-            writeConcern: {},
         }),
     );
     assert.eq(numConsumers, res.cursors.length);
@@ -193,7 +171,7 @@ assert.eq(0, numDocs % numConsumers);
  */
 (function testRangeComplex() {
     let res = assert.commandWorked(
-        internalDB.runCommand({
+        db.runCommand({
             aggregate: coll.getName(),
             pipeline: [{$match: {a: {$gte: 5000}}}, {$sort: {a: -1}}, {$project: {_id: 0, b: 0}}],
             exchange: {
@@ -205,7 +183,6 @@ assert.eq(0, numDocs % numConsumers);
                 consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
             },
             cursor: {batchSize: 0},
-            writeConcern: {},
         }),
     );
     assert.eq(numConsumers, res.cursors.length);
@@ -227,7 +204,7 @@ assert.eq(0, numDocs % numConsumers);
  */
 (function testRangeDottedPath() {
     let res = assert.commandWorked(
-        internalDB.runCommand({
+        db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
             exchange: {
@@ -245,7 +222,6 @@ assert.eq(0, numDocs % numConsumers);
                 consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
             },
             cursor: {batchSize: 0},
-            writeConcern: {},
         }),
     );
     assert.eq(numConsumers, res.cursors.length);
@@ -265,7 +241,7 @@ assert.eq(0, numDocs % numConsumers);
  */
 (function testRangeDottedPath() {
     let res = assert.commandWorked(
-        internalDB.runCommand({
+        db.runCommand({
             aggregate: coll.getName(),
             pipeline: [],
             exchange: {
@@ -283,7 +259,6 @@ assert.eq(0, numDocs % numConsumers);
                 consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
             },
             cursor: {batchSize: 0},
-            writeConcern: {},
         }),
     );
     assert.eq(numConsumers, res.cursors.length);
@@ -311,7 +286,7 @@ assert.eq(0, numDocs % numConsumers);
         );
 
         let res = assert.commandWorked(
-            internalDB.runCommand({
+            db.runCommand({
                 aggregate: coll.getName(),
                 pipeline: [],
                 exchange: {
@@ -323,7 +298,6 @@ assert.eq(0, numDocs % numConsumers);
                     consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
                 },
                 cursor: {batchSize: 0},
-                writeConcern: {},
             }),
         );
         assert.eq(numConsumers, res.cursors.length);

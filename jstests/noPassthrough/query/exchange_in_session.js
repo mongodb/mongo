@@ -16,25 +16,9 @@ TestData.disableImplicitSessions = true;
 const st = new ShardingTest({shards: 1, mongos: 1});
 
 const adminDB = st.shard0.getDB("admin");
-
-// Exchange requires an internal client connection. Mark the shard connection as internal.
-const internalShard0 = (() => {
-    const conn = new Mongo(st.shard0.host);
-    assert.commandWorked(
-        conn.getDB("admin").runCommand({
-            hello: 1,
-            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
-        }),
-    );
-    return conn;
-})();
-const session = internalShard0.startSession();
+const session = st.shard0.getDB("test").getMongo().startSession();
 const shardDB = session.getDatabase("test");
-const collName = "exchange_in_session";
-
-// Use a regular (non-internal) connection for inserts to avoid the internal client
-// writeConcern requirement on non-transaction commands.
-const regularColl = st.shard0.getDB("test")[collName];
+const coll = shardDB.exchange_in_session;
 
 let bigString = "";
 for (let i = 0; i < 20; i++) {
@@ -44,17 +28,15 @@ for (let i = 0; i < 20; i++) {
 // Insert some documents.
 const nDocs = 50;
 for (let i = 0; i < nDocs; i++) {
-    assert.commandWorked(regularColl.insert({_id: i, bigString: bigString}));
+    assert.commandWorked(coll.insert({_id: i, bigString: bigString}));
 }
 
-// Pass writeConcern so that abortTransaction (also sent through the internal
-// client session) satisfies the internal client writeConcern requirement.
-session.startTransaction({writeConcern: {}});
+session.startTransaction();
 
 // Set up an Exchange with two cursors.
 let res = assert.commandWorked(
     shardDB.runCommand({
-        aggregate: collName,
+        aggregate: coll.getName(),
         pipeline: [],
         exchange: {
             policy: "keyRange",
@@ -65,14 +47,13 @@ let res = assert.commandWorked(
             bufferSize: NumberInt(128),
         },
         cursor: {batchSize: 0},
-        readConcern: {},
     }),
 );
 
 function spawnShellToIterateCursor(cursorId) {
     let code = `const cursor = ${tojson(cursorId)};`;
     code += `const sessionId = ${tojson(session.getSessionId())};`;
-    code += `const collName = "${collName}";`;
+    code += `const collName = "${coll.getName()}";`;
     /* eslint-disable */
     function iterateCursorWithNoDocs() {
         const getMoreCmd = {
