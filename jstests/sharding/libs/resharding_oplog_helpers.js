@@ -12,6 +12,7 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 
 // ---------------------------------------------------------------------------
 // Pair 1: resharding_oplog_fetcher_repl_lag
@@ -237,9 +238,12 @@ export function runOplogSyncAggAssertMinOplogTest(config) {
         nodeOptions: {syncdelay: 1},
         nodes: 1,
     });
-    // Set max oplog size to 1MB.
-    rst.startSet({oplogSize: 1});
+    // Set max oplog size to 1MB, disable time-based retention
+    rst.startSet({oplogSize: 1, oplogMinRetentionHours: 0.000001});
     rst.initiate();
+
+    // This test relies on size-based oplog truncation, which may be disabled in disagg.
+    skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
     jsTest.log("Inserting documents to generate oplog entries");
     let testDB = rst.getPrimary().getDB("test");

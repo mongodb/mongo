@@ -125,11 +125,13 @@ export class PreImageTruncateAfterShutdownTest {
             );
         }
 
-        while (!this._oplogIsRolledOver(lastOplogEntryToBeRemoved.ts)) {
+        assert.soon(() => {
+            if (this._oplogIsRolledOver(lastOplogEntryToBeRemoved.ts)) return true;
             assert.commandWorked(
                 testDB.tmp.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}),
             );
-        }
+            return false;
+        }, "Timeout waiting for oplog to roll over on primary");
     }
 
     /** @private */

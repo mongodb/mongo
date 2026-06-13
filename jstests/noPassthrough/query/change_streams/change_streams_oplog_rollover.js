@@ -10,12 +10,17 @@ import {
 } from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 
 const oplogSize = 1; // size in MB
 const rst = new ReplSetTest({nodes: 1, oplogSize: oplogSize});
 
-rst.startSet();
+// Set max oplog size to 1MB, disable time-based retention
+rst.startSet({oplogSize: 1, oplogMinRetentionHours: 0.000001});
 rst.initiate();
+
+// This test relies on size-based oplog truncation, which may be disabled in disagg.
+skipTestIfSizeBasedOplogTruncationDisabled(rst.getPrimary(), () => rst.stopSet());
 
 const testDB = rst.getPrimary().getDB(jsTestName());
 const testColl = testDB[jsTestName()];
@@ -95,21 +100,19 @@ const mostRecentOplogEntry = getLatestOp(primaryNode);
 assert.neq(mostRecentOplogEntry, null);
 const largeStr = "abcdefghi".repeat(4 * 1024 * oplogSize);
 
-function oplogIsRolledOver() {
-    // The oplog has rolled over if the op that used to be newest is now older than the
-    // oplog's current oldest entry. Said another way, the oplog is rolled over when
-    // everything in the oplog is newer than what used to be the newest entry.
-    return (
+assert.soon(() => {
+    // The oplog has rolled over when everything in it is newer than what used to be the newest entry.
+    if (
         bsonWoCompare(
             mostRecentOplogEntry.ts,
             getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts,
         ) < 0
-    );
-}
+    )
+        return true;
 
-while (!oplogIsRolledOver()) {
     assert.commandWorked(testColl.insert({long_str: largeStr}, {writeConcern: {w: "majority"}}));
-}
+    return false;
+}, "Timeout waiting for oplog to roll over on primary");
 
 // Confirm that attempting to continue reading an existing change stream throws CappedPositionLost.
 assert.throwsWithCode(

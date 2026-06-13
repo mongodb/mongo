@@ -102,3 +102,6 @@ filters:
   - "block_replica_set_writes_utils.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "oplog_truncation_util.js":
+    approvers:
+      - 10gen/server-oplog

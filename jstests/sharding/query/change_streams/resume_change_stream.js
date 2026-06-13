@@ -8,6 +8,7 @@ import {
     ChangeStreamTest,
     validateChangeStreamHistoryLostException,
 } from "jstests/libs/query/change_stream_util.js";
+import {skipTestIfSizeBasedOplogTruncationDisabled} from "jstests/libs/oplog_truncation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
@@ -17,10 +18,13 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         oplogSize: oplogSize,
+        oplogMinRetentionHours: 0.000001,
         // Use the noop writer with a higher frequency for periodic noops to speed up the test.
         setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
     },
 });
+
+skipTestIfSizeBasedOplogTruncationDisabled(st.rs0.getPrimary(), () => st.stop());
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
@@ -124,26 +128,25 @@ function testResume(mongosColl, collToWatch) {
     assert.neq(mostRecentOplogEntry, null);
     const largeStr = "abcdefghi".repeat(4 * 1024 * oplogSize);
     let i = 0;
-
-    function oplogIsRolledOver() {
-        // The oplog has rolled over if the op that used to be newest is now older than the
-        // oplog's current oldest entry. Said another way, the oplog is rolled over when
-        // everything in the oplog is newer than what used to be the newest entry.
-        return (
+    assert.soon(() => {
+        // The oplog has rolled over when everything in it is newer than what used to be the newest entry.
+        if (
             bsonWoCompare(
                 mostRecentOplogEntry.ts,
                 getFirstOplogEntry(shardWithResumeToken, {readConcern: "majority"}).ts,
             ) < 0
-        );
-    }
+        )
+            return true;
 
-    while (!oplogIsRolledOver()) {
-        let idVal = 100 + i++;
         assert.commandWorked(
-            mongosColl.insert({_id: idVal, long_str: largeStr}, {writeConcern: {w: "majority"}}),
+            mongosColl.insert(
+                {_id: 100 + i++, long_str: largeStr},
+                {writeConcern: {w: "majority"}},
+            ),
         );
         sleep(100);
-    }
+        return false;
+    }, "Timeout waiting for oplog to roll over on primary");
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
         db: mongosDB,
