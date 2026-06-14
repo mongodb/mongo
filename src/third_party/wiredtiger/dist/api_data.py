@@ -824,8 +824,8 @@ connection_runtime_config = [
         type='list', undoc=True,
         choices=[
         'aggressive_sweep', 'backup_rename', 'checkpoint_evict_page', 'checkpoint_handle',
-        'checkpoint_slow', 'checkpoint_stop', 'compact_slow', 'evict_reposition',
-        'failpoint_eviction_fail_after_reconciliation',
+        'checkpoint_slow', 'checkpoint_stop', 'compact_slow', 'conn_close_stress_log_printf',
+        'evict_reposition', 'failpoint_eviction_fail_after_reconciliation',
         'failpoint_history_store_delete_key_from_ts', 'history_store_checkpoint_delay',
         'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay',
         'prepare_resolution', 'prepare_resolution_2', 'sleep_before_read_overflow_onpage',

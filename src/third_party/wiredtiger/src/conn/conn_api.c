@@ -2354,6 +2354,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
       {"checkpoint_stop", WT_TIMING_STRESS_CHECKPOINT_STOP},
       {"compact_slow", WT_TIMING_STRESS_COMPACT_SLOW},
+      {"conn_close_stress_log_printf", WT_TIMING_STRESS_CLOSE_STRESS_LOG},
       {"evict_reposition", WT_TIMING_STRESS_EVICT_REPOSITION},
       {"failpoint_eviction_fail_after_reconciliation",
         WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION},

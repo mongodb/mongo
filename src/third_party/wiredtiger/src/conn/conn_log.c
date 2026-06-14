@@ -422,6 +422,16 @@ __log_remove_once(WT_SESSION_IMPL *session, uint32_t backup_file)
     }
     __wt_verbose(session, WT_VERB_LOG, "log_remove: remove to log number %" PRIu32, min_lognum);
 
+#ifdef HAVE_DIAGNOSTIC
+
+    /* Encourage race conditions in log subsystem during database shutdown. */
+    if (FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CLOSE_STRESS_LOG) &&
+      F_ISSET(conn, WT_CONN_CLOSING)) {
+        for (int i = 0; i < 50; i++)
+            WT_IGNORE_RET(__wt_log_printf(session, "DEBUG: Stress for concurrency control"));
+    }
+#endif
+
     /*
      * Main remove code. Get the list of all log files and remove any earlier than the minimum log
      * number.
@@ -819,9 +829,12 @@ __log_wrlsn_server(void *arg)
     }
     /*
      * On close we need to do this one more time because there could be straggling log writes that
-     * need to be written.
+     * need to be written. It is possible to return EBUSY due to the database shutting down.
+     * Therefore loop until we finish the log write.
      */
-    WT_ERR(__wt_log_force_write(session, 1, NULL));
+    do {
+        WT_ERR_ERROR_OK(__wt_log_force_write(session, true, NULL), EBUSY, true);
+    } while (ret == EBUSY);
     __wt_log_wrlsn(session, NULL);
     if (0) {
 err:
@@ -919,6 +932,14 @@ __log_server(void *arg)
         force_write_timediff = WT_CLOCKDIFF_MS(time_stop, force_write_time_start);
     }
 
+    /*
+     * On close, force out buffered writes to move the write_lsn forward. The write_lsn needs to be
+     * updated to avoid hangs from the wrlsn thread. It is possible to return EBUSY due to the
+     * database shutting down. Therefore loop until we finish the log write.
+     */
+    do {
+        WT_ERR_ERROR_OK(__wt_log_force_write(session, false, &did_work), EBUSY, true);
+    } while (ret == EBUSY);
     if (0) {
 err:
         WT_IGNORE_RET(__wt_panic(session, ret, "log server error"));
