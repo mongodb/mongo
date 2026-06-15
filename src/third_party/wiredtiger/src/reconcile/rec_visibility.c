@@ -635,11 +635,20 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
     if (WT_REC_HAS_ON_DISK(vpack) && !WT_TIME_WINDOW_HAS_PREPARE(&(vpack->tw))) {
         char ts_string[4][WT_TS_INT_STRING_SIZE];
         prepare_state = __wt_atomic_load_uint8_v_acquire(&prev_upd->prepare_state);
+        /*
+         * The on-disk durable_ts may be ahead of the chain's prev_upd durable_ts when an obsolete
+         * check has removed a globally visible tombstone that previously sat between them. The
+         * tombstone semantically deleted the on-disk value, so the chain's later re-insert was
+         * legitimately committed without aligning to the now-stale on-disk durable_ts. Once the
+         * tombstone is gone the asserts below would see this out of order edge case, but it is
+         * benign. Check global visibility to handle this case.
+         */
         if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw)) {
             WT_ASSERT_ALWAYS(session,
               prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
                 prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
-                prev_upd->upd_durable_ts >= vpack->tw.durable_stop_ts,
+                prev_upd->upd_durable_ts >= vpack->tw.durable_stop_ts ||
+                __wt_txn_upd_visible_all(session, prev_upd),
               "Stop: Durable timestamps cannot be out of order for updates: "
               "prev_upd->upd_start_ts=%s, prev_upd->prepare_ts=%s, prev_upd->upd_durable_ts=%s, "
               "prev_upd->flags=%" PRIu16 ", vpack->tw.durable_stop_ts=%s",
@@ -651,7 +660,8 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *
             WT_ASSERT_ALWAYS(session,
               prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED ||
                 prev_upd->upd_start_ts == prev_upd->upd_durable_ts ||
-                prev_upd->upd_durable_ts >= vpack->tw.durable_start_ts,
+                prev_upd->upd_durable_ts >= vpack->tw.durable_start_ts ||
+                __wt_txn_upd_visible_all(session, prev_upd),
               "Start: Durable timestamps cannot be out of order for updates: "
               "prev_upd->upd_start_ts=%s, prev_upd->prepare_ts=%s, prev_upd->upd_durable_ts=%s, "
               "prev_upd->flags=%" PRIu16 ", vpack->tw.durable_start_ts=%s",
