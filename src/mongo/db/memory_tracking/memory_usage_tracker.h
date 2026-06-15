@@ -299,6 +299,19 @@ public:
         return _curMemoryUsageBytes;
     }
 
+    void add(int64_t diff) {
+        if (!_tracker) {
+            return;
+        }
+
+        _curMemoryUsageBytes += diff;
+        _tracker->add(diff);
+    }
+
+    void set(int64_t total) {
+        add(total - _curMemoryUsageBytes);
+    }
+
     const Tracker* tracker() const {
         return _tracker;
     }

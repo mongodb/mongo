@@ -265,6 +265,67 @@ TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenCanBeStoredInVector) {
     assertZeroMemory();
 }
 
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenAddUpdatesCurrentAndTracker) {
+    MemoryUsageToken token{50LL, &_funcTracker};
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+
+    token.add(30LL);
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 80LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 80LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 80LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 80LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenAddNegativeDecreasesCurrentAndTracker) {
+    MemoryUsageToken token{80LL, &_funcTracker};
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 80LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 80LL);
+
+    token.add(-30LL);
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 80LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenAddWithNullTrackerIsNoOp) {
+    MemoryUsageToken token;
+    token.add(100LL);
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 0LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenSetIncreasesCurrentAndTracker) {
+    MemoryUsageToken token{50LL, &_funcTracker};
+    token.set(80LL);
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 80LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 80LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 80LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 80LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenSetDecreasesCurrentAndTracker) {
+    MemoryUsageToken token{80LL, &_funcTracker};
+    token.set(30LL);
+    ASSERT_EQ(token.getCurrentMemoryUsageBytes(), 30LL);
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 30LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 30LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 80LL);
+}
+
+TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenSetReleasesCorrectAmountOnDestruction) {
+    {
+        MemoryUsageToken token{50LL, &_funcTracker};
+        token.set(80LL);
+        ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 80LL);
+    }
+    ASSERT_EQ(_funcTracker.inUseTrackedMemoryBytes(), 0LL);
+    ASSERT_EQ(_funcTracker.peakTrackedMemoryBytes(), 80LL);
+    ASSERT_EQ(_tracker.inUseTrackedMemoryBytes(), 0LL);
+    ASSERT_EQ(_tracker.peakTrackedMemoryBytes(), 80LL);
+}
+
 TEST_F(MemoryUsageTrackerTest, MemoryUsageTokenWith) {
     static const std::vector<std::string> kLines = {"a", "bb", "ccc", "dddd"};
 
