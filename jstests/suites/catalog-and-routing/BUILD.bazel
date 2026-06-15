@@ -138,6 +138,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
+        "resources:cpu:2",
         "unsplittable_collections",
     ],
     deps = [
