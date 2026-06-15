@@ -37,7 +37,7 @@ def get_mongo_repository(app_id, private_key):
     """
     Gets the mongo github repository
     """
-    app = GithubIntegration(int(app_id), private_key)
+    app = GithubIntegration(str(int(app_id)), private_key)
     installation = app.get_repo_installation(OWNER_NAME, REPO_NAME)
     g = installation.get_github_for_installation()
     return g.get_repo(f"{OWNER_NAME}/{REPO_NAME}")

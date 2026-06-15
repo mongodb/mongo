@@ -22,7 +22,7 @@ def get_installation_access_token(
     Returns:
     - Optional[str]: The installation access token. Returns `None` if there's an error obtaining the token.
     """
-    integration = GithubIntegration(app_id, private_key)
+    integration = GithubIntegration(str(int(app_id)), private_key)
     auth = integration.get_access_token(installation_id)
     if auth:
         return auth.token

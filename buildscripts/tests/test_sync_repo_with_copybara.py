@@ -2760,6 +2760,19 @@ class TestCopybaraConfigHelpers(unittest.TestCase):
         self.assertEqual(config.destination.branch, "copybara_test_branch_patch123_v8.2")
         self.assertEqual(config.destination.repo_name, sync_repo_with_copybara.TEST_REPO_NAME)
 
+    def test_get_installation_access_token_stringifies_app_id_for_jwt_issuer(self):
+        mock_github_integration = MagicMock()
+        mock_integration = mock_github_integration.return_value
+        mock_integration.get_access_token.return_value = MagicMock(token="github-token")
+
+        mock_github_module = MagicMock(GithubIntegration=mock_github_integration)
+        with patch.dict(sys.modules, {"github": mock_github_module}):
+            token = sync_repo_with_copybara.get_installation_access_token(101, "private-key", 202)
+
+        self.assertEqual(token, "github-token")
+        mock_github_integration.assert_called_once_with("101", "private-key")
+        mock_integration.get_access_token.assert_called_once_with(202)
+
     @patch("buildscripts.copybara.sync_repo_with_copybara.get_installation_access_token")
     def test_get_copybara_tokens_uses_master_sync_public_app_expansion(
         self, mock_get_installation_access_token
