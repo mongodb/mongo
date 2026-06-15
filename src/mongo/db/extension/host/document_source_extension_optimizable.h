@@ -48,6 +48,8 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
+#include <algorithm>
+
 namespace mongo::extension::host_connector {
 class PipelineDependenciesAdapter;
 }  // namespace mongo::extension::host_connector
@@ -229,6 +231,12 @@ public:
             this->transactionNotSupported(this->getParseTimeName());
         }
 
+        bool isAllowedInLookupPipeline() const override {
+            return std::all_of(_expanded.begin(), _expanded.end(), [](const auto& s) {
+                return s->isAllowedInLookupPipeline();
+            });
+        }
+
         // Define how to desugar a LiteParsedExpandable.
         static LiteParsedDesugarer::StageExpander stageExpander;
 
@@ -361,6 +369,10 @@ public:
             this->transactionNotSupported(this->getParseTimeName());
         }
 
+        bool isAllowedInLookupPipeline() const override {
+            return _properties.getAllowedInLookup();
+        }
+
         bool isRankedStage() const override;
 
         bool isScoredStage() const override;
@@ -402,16 +414,9 @@ public:
 
         if (expCtx->getInLookup() && !hybridSearchFlagEnabled) {
             const auto stageName = std::string(astNode->getName());
-            // Throw the IFR retry error for extension $search/$searchMeta in $lookup if the
-            // feature flag is not enabled. Note: $vectorSearch is independently disallowed in
-            // $lookup (see LookupRequirement::kNotAllowed) and is not handled here.
-            //
-            // TODO SERVER-117259: today this kickback is unreachable because the pre-desugar
-            // LookupRequirement::kNotAllowed constraint on DocumentSourceExtensionForQueryShape
-            // (and on DocumentSourceExtensionOptimizable post-desugar) rejects the stage before
-            // create() is called. Once that ticket lifts the constraint to kAllowed, this
-            // kickback becomes the runtime gate for extension $search/$searchMeta in $lookup
-            // when featureFlagExtensionsInsideHybridSearch is disabled.
+            // Throw the IFR retry error for extension $search/$searchMeta in $lookup when
+            // featureFlagExtensionsInsideHybridSearch is disabled. $vectorSearch is handled
+            // separately via LookupRequirement::kNotAllowed and is not covered here.
             search_helpers::throwIfrKickbackIfNecessary(
                 search_helpers::isExtensionSearchStage(stageName),
                 feature_flags::gFeatureFlagSearchExtension,

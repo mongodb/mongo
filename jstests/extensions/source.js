@@ -1,7 +1,7 @@
 /**
  * Tests an extension source stage.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -64,10 +64,28 @@ if (!FixtureHelpers.isMongos(db)) {
     assert.gte(results.length, 4, results);
 }
 
-// TODO SERVER-117259 Enable tests for $lookup.
 // Source stage in $lookup.
-// results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}], as: "slices"}}]).toArray();
-// assert.eq(results, [{breadType: "sourdough", slices: [{slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]}]);
+results = coll
+    .aggregate([
+        {
+            $lookup: {
+                from: collName,
+                pipeline: [{$toast: {temp: 350.0, numSlices: 2}}],
+                as: "slices",
+            },
+        },
+        {$project: {_id: 0}},
+    ])
+    .toArray();
+assert.eq(results, [
+    {
+        breadType: "sourdough",
+        slices: [
+            {slice: 0, isBurnt: false},
+            {slice: 1, isBurnt: false},
+        ],
+    },
+]);
 
 // Two source stages in the pipeline.
 const twoSourceStagePipeline = [

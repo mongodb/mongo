@@ -8,6 +8,11 @@
             "stageName": "$testFoo",
             "message": "The $testFoo stage should be loaded by the libfoo_mongo_extension extension. If this extension is loaded, we expect this error to be silently skipped.",
             "featureFlag": "featureFlagExtensionStubParsers"
+        },
+        {
+            "stageName": "$desugarFoo",
+            "message": "The $desugarFoo stage should be loaded by the libfoo_mongo_extension extension. If this extension is loaded, we expect this error to be silently skipped.",
+            "featureFlag": "featureFlagExtensionStubParsers"
         }
     ]
 }

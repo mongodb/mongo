@@ -265,6 +265,18 @@ void LiteParsedLookUp::bindResolvedNamespace(const ResolvedNamespace& view,
     }
 }
 
+void LiteParsedLookUp::validate() const {
+    if (_pipelines.empty()) {
+        return;
+    }
+    for (const auto& stage : _pipelines[0]->getStages()) {
+        uassert(11725900,
+                str::stream() << stage->getParseTimeName()
+                              << " is not allowed to be used within a $lookup pipeline",
+                stage->isAllowedInLookupPipeline());
+    }
+}
+
 void LiteParsedLookUp::validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {
     uassert(ErrorCodes::FailedToParse,
             "$lookup stage without explicit collection must have a pipeline with $documents as "

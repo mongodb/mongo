@@ -466,6 +466,13 @@ public:
     virtual void validate() const {};
 
     /**
+     * Returns true if this stage is allowed inside a $lookup sub-pipeline.
+     */
+    virtual bool isAllowedInLookupPipeline() const {
+        return true;
+    }
+
+    /**
      * Returns true if this is a search stage ($search, $vectorSearch, $rankFusion, etc.)
      */
     virtual bool isSearchStage() const {

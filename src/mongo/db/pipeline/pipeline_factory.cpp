@@ -79,6 +79,16 @@ std::unique_ptr<Pipeline> parseAndDesugarPipeline(
 
     desugarIfNecessary(liteParsedPipeline, opts, expCtx);
 
+    if (expCtx->getView()) {
+        // TODO SERVER-121094 When featureFlagExtensionsInsideHybridSearch is removed, all
+        // pipelines will use resolveInvolvedNamespacesFn and this legacy branch can be deleted.
+        // Handle legacy mongot pipelines separately.
+        liteParsedPipeline.bindResolvedNamespaceToStages(*expCtx->getView(),
+                                                         expCtx->getResolvedNamespaces());
+    } else if (opts.resolveInvolvedNamespacesFn) {
+        opts.resolveInvolvedNamespacesFn(liteParsedPipeline);
+    }
+
     return Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
 }
 

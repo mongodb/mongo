@@ -1,7 +1,7 @@
 /**
  * Tests an extension transform stage.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionsInsideHybridSearch]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -278,9 +278,10 @@ assert.eq(results.length, 0, results);
     runTestcase(inputPipeline, expectedResults);
 }
 
-// TODO SERVER-117259 Enable tests for $lookup.
 // Transform stage in $lookup.
-// results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$loaf: {numSlices: 2}}], as: "slices"}}]).toArray();
-// assert.gt(results.length, 0);
+results = coll
+    .aggregate([{$lookup: {from: collName, pipeline: [{$loaf: {numSlices: 2}}], as: "slices"}}])
+    .toArray();
+assert.gt(results.length, 0);
 
 // TODO SERVER-117260 Test transform stage in $facet.

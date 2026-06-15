@@ -55,7 +55,6 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
     // relying on constraints() before desugaring for correctness, we may need to surface
     // constraint metadata on the ParseNode or delay constraint checks until after desugar.
     //
-    // TODO SERVER-117259 Change LookupRequirement.
     // TODO SERVER-117260 Change FacetRequirement.
     auto constraints = StageConstraints(StreamType::kStreaming,
                                         PositionRequirement::kNone,
@@ -63,7 +62,7 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
                                         DiskUseRequirement::kNoDiskUse,
                                         FacetRequirement::kNotAllowed,
                                         TransactionRequirement::kNotAllowed,
-                                        LookupRequirement::kNotAllowed,
+                                        LookupRequirement::kAllowed,
                                         UnionRequirement::kAllowed,
                                         ChangeStreamRequirement::kDenylist);
     constraints.canRunOnTimeseries = false;

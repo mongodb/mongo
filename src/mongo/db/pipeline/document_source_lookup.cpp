@@ -223,6 +223,9 @@ BSONObj createMatchStageJoinObj(const Document& input,
 }  // namespace
 
 void lookupPipeValidator(const Pipeline& pipeline) {
+    // TODO SERVER-128961: Teach the LiteParsed layer the lookup constraints of built-in stages (as
+    // is already done for extension stages) so lite-parse can own this check uniformly and this
+    // full-parse validation can be removed.
     for (const auto& src : pipeline.getSources()) {
         uassert(51047,
                 str::stream() << src->getSourceName()

@@ -469,6 +469,10 @@ export function getSearchInHybridSearchKickbackRetryCount(conn) {
     return getExtensionMetric(conn, "search", "inHybridSearchKickbackRetries");
 }
 
+export function getSearchInLookupKickbackRetryCount(conn) {
+    return getExtensionMetric(conn, "search", "inLookupKickbackRetries");
+}
+
 /**
  * Sets up mongotmock responses for a $search or $searchMeta query, possibly on a view.
  *

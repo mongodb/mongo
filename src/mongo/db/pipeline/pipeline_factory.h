@@ -32,7 +32,11 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/modules.h"
 
+#include <functional>
+
 namespace mongo {
+class LiteParsedPipeline;
+
 namespace MONGO_MOD_PUBLIC pipeline_factory {
 /**
  * Options for creating a pipeline.
@@ -53,6 +57,10 @@ struct MakePipelineOptions {
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed;
     PipelineValidatorCallback validator = nullptr;
     boost::optional<BSONObj> readConcern;
+
+    // Optional caller-supplied hook invoked on the desugared LiteParsedPipeline to resolve/bind
+    // involved-namespace views onto its stages.
+    std::function<void(LiteParsedPipeline&)> resolveInvolvedNamespacesFn;
 };
 
 static const MakePipelineOptions kOptionsMinimal{

@@ -106,6 +106,20 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
     // Optimize the pipeline, with the cache in its correct position if it exists.
     pipeline_optimization::optimizeEachStage(*pipeline.getContext(), &container);
 }
+
+// Returns a callback (for MakePipelineOptions::resolveInvolvedNamespacesFn) that binds foreign-view
+// info onto the (extension) stages of a $lookup subpipeline that targets a non-mongot view.
+std::function<void(LiteParsedPipeline&)> makeLookupViewBinder(
+    const boost::intrusive_ptr<ExpressionContext>& fromExpCtx) {
+    return [fromExpCtx](LiteParsedPipeline& liteParsedPipeline) {
+        const auto& resolvedNamespaces = fromExpCtx->getResolvedNamespaces();
+        auto it = resolvedNamespaces.find(fromExpCtx->getUserNss());
+        if (it == resolvedNamespaces.end() || !it->second.involvedNamespaceIsAView) {
+            return;
+        }
+        liteParsedPipeline.bindResolvedNamespaceToStages(it->second, resolvedNamespaces);
+    };
+}
 }  // namespace
 
 namespace exec::agg {
@@ -398,7 +412,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     // Parse the new pipeline and prepare it again. We must resolve the view before entering
     // 'finalizeAndMaybePreparePipelineForExecution', since that function requires accessing
     // collection catalog data.
-    pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kOptionsMinimal;
+    pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kDesugarOnly;
     pipelineOpts.validator = mongo::lookupPipeValidator;
     std::unique_ptr<mongo::Pipeline> parsedPipeline = mongo::pipeline_factory::makePipeline(
         _sharedState->resolvedPipeline, _fromExpCtx, pipelineOpts);
@@ -471,9 +485,9 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         ? ShardTargetingPolicy::kAllowed
         : ShardTargetingPolicy::kNotAllowed;
 
-    // Parse the pipeline.
-    pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kOptionsMinimal;
+    pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kDesugarOnly;
     pipelineOpts.validator = mongo::lookupPipeValidator;
+    pipelineOpts.resolveInvolvedNamespacesFn = makeLookupViewBinder(fromExpCtx);
     std::unique_ptr<mongo::Pipeline> parsedPipeline = mongo::pipeline_factory::makePipeline(
         _sharedState->resolvedPipeline, fromExpCtx, pipelineOpts);
 

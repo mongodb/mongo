@@ -64,6 +64,7 @@ protected:
     LoadExtensionsTest() : expCtx(make_intrusive<ExpressionContextForTest>()) {}
 
     static inline const std::string kTestFooStageName = "$testFoo";
+    static inline const std::string kDesugarFooStageName = "$desugarFoo";
     static inline const std::string kTestFooLibExtensionPath = "libfoo_mongo_extension.so";
 
     /**
@@ -84,6 +85,7 @@ protected:
                 _previousExtensionsSignaturePublicKeyPath;
         }
         LiteParsedDocumentSource::unregisterParser_forTest(kTestFooStageName);
+        LiteParsedDocumentSource::unregisterParser_forTest(kDesugarFooStageName);
         ExtensionLoader::unload_forTest("foo");
         LiteParsedDocumentSource::unregisterParser_forTest(kMatchTopNStageName);
         ExtensionLoader::unload_forTest("matchTopN");

@@ -338,7 +338,7 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
                          DiskUseRequirement::kNoDiskUse,
                          FacetRequirement::kNotAllowed,
                          TransactionRequirement::kNotAllowed,
-                         LookupRequirement::kNotAllowed,
+                         LookupRequirement::kAllowed,
                          UnionRequirement::kAllowed,
                          ChangeStreamRequirement::kDenylist);
     constraints.canRunOnTimeseries = false;
@@ -356,10 +356,12 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     if (!_properties.getAllowedInUnionWith()) {
         constraints.unionRequirement = StageConstraints::UnionRequirement::kNotAllowed;
     }
-    // TODO SERVER-117259 Enable extension stages in $lookup; change the default back to 'kAllowed'.
-    // if (!_properties.getAllowedInLookup()) {
-    //     constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
-    // }
+    auto ifrCtx = getExpCtx()->getIfrContext();
+    const bool hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+    if (!_properties.getAllowedInLookup() || !hybridSearchFlagEnabled) {
+        constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
+    }
 
     // TODO SERVER-117260 Enable extension stages in $facet; change the default back to 'kAllowed'.
     // if (!_properties.getAllowedInFacet()) {

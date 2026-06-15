@@ -17,7 +17,10 @@ other.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(other.insert({_id: 1}));
 
-const kNotAllowedInLookupErrorCode = 51047;
+// TODO SERVER-128961 Most existing stages don't correctly implement AllowedInLookup stage
+// constraints at LiteParsed time and so they hit the full DocumentSourceLookup validation
+// code instead. When this is implemented, remove the 51047 code.
+const kNotAllowedInLookupErrorCode = [51047, 11725900];
 const kNotAllowedInUnionWithErrorCode = 31441;
 const kNotAllowedInFacetErrorCode = 40600;
 
@@ -59,42 +62,18 @@ const kNotAllowedInFacetErrorCode = 40600;
         kNotAllowedInLookupErrorCode,
     );
     {
-        const viewName = "testBar_in_def";
-        assert.commandWorked(db.createView(viewName, other.getName(), [{$testBar: {noop: false}}]));
+        const viewName = "testFoo_in_def";
+        assert.commandWorked(db.createView(viewName, other.getName(), [{$testFoo: {}}]));
 
         assertErrorCode(
             coll,
             [{$lookup: {from: viewName, pipeline: [], as: "joined"}}],
             kNotAllowedInLookupErrorCode,
-            "Using $lookup on view with $testBar in view definition should be rejected",
+            "Using $lookup on view with $testFoo in view definition should be rejected",
         );
 
         db[viewName].drop();
     }
-    // TODO SERVER-117259: Re-enable. The structural ban on expandable extensions in $lookup
-    // sub-pipelines does not currently catch desugar-only extensions baked into a view definition,
-    // because viewInfo.desugarViewPipeline() expands $matchTopN into native $match/$sort/$limit
-    // before lookupPipeValidator runs.
-    /*
-    {
-        const viewName = "matchTopN_in_def";
-        assert.commandWorked(
-            db.createView(viewName, other.getName(), [
-                {$addFields: {type: "A"}},
-                {$matchTopN: {filter: {}, sort: {_id: 1}, limit: 1}},
-            ]),
-        );
-
-        assertErrorCode(
-            coll,
-            [{$lookup: {from: viewName, pipeline: [], as: "joined"}}],
-            kNotAllowedInLookupErrorCode,
-            "Using $lookup on view with $matchTopN in view definition should be rejected",
-        );
-
-        db[viewName].drop();
-    }
-    */
 }
 
 // Test that a $unionWith pipeline can reject an extension stage.
@@ -112,33 +91,29 @@ const kNotAllowedInFacetErrorCode = 40600;
         kNotAllowedInUnionWithErrorCode,
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
     );
-    // Outer $lookup may reject the inner $unionWith via strictness propagation before the
-    // $unionWith's own validator runs, so accept either code.
+    // The inner $unionWith parses and validates its own sub-pipeline, so $testFoo is rejected by
+    // $unionWith before the outer $lookup's validator runs.
     assertErrorCode(
         coll,
         [{$lookup: {from: other.getName(), pipeline: unionWithPipeline, as: "joined"}}],
-        [kNotAllowedInUnionWithErrorCode, kNotAllowedInLookupErrorCode],
+        kNotAllowedInUnionWithErrorCode,
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
     );
-    // See comment above: $facet may reject the inner $unionWith via strictness propagation first.
+    // $facet rejects the inner $unionWith via $testFoo's propagated FacetRequirement::kNotAllowed
+    // before $unionWith's own validator fires.
     assertErrorCode(
         coll,
         [{$facet: {facetPipe: unionWithPipeline}}],
-        [kNotAllowedInUnionWithErrorCode, kNotAllowedInFacetErrorCode],
+        kNotAllowedInFacetErrorCode,
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
     );
-    // View creation may validate pre-desugar (lenient) and defer the real rejection to query time.
-    assert.commandWorkedOrFailedWithCode(
+    // View creation validates pre-desugar (lenient) and defers the real rejection to query time.
+    assert.commandWorked(
         db.runCommand({
             create: jsTestName() + "_view",
             viewOn: coll.getName(),
             pipeline: unionWithPipeline,
         }),
-        [
-            kNotAllowedInUnionWithErrorCode,
-            kNotAllowedInLookupErrorCode,
-            kNotAllowedInFacetErrorCode,
-        ],
     );
     db[jsTestName() + "_view"].drop();
     {
@@ -267,7 +242,7 @@ function testLookupOnViewChainRejected(viewSpecs, description) {
     // Test $lookup on a view chain where the base view has an extension.
     testLookupOnViewChainRejected(
         [
-            {name: "nested_base_with_ext", pipeline: [{$testBar: {noop: true}}]},
+            {name: "nested_base_with_ext", pipeline: [{$testFoo: {}}]},
             {name: "nested_top_no_ext", pipeline: [{$addFields: {fromTopView: true}}]},
         ],
         "Using $lookup on view chain where base view has extension should be rejected",
@@ -279,37 +254,26 @@ function testLookupOnViewChainRejected(viewSpecs, description) {
             {name: "chain_level1_no_ext", pipeline: [{$addFields: {level1: true}}]},
             {
                 name: "chain_level2_with_ext",
-                pipeline: [{$testBar: {noop: true}}, {$addFields: {level2: true}}],
+                pipeline: [{$testFoo: {}}, {$addFields: {level2: true}}],
             },
             {name: "chain_level3_no_ext", pipeline: [{$addFields: {level3: true}}]},
         ],
         "Using $lookup on 3-level view chain where middle view has extension should be rejected",
     );
-
-    // TODO SERVER-117259: Re-enable. Desugar-only extensions baked into a view definition expand
-    // away before the $lookup structural ban can fire.
-    /*
-    // Test $lookup on view chain with desugaring extension ($matchTopN).
-    testLookupOnViewChainRejected(
-        [
-            {name: "chain_desugar_base", pipeline: [{$matchTopN: {filter: {}, sort: {_id: 1}, limit: 5}}]},
-            {name: "chain_desugar_top", pipeline: [{$addFields: {top: true}}]},
-        ],
-        "Using $lookup on view chain where base view has desugaring extension should be rejected",
-    );
-    */
 }
 
 // =============================================================================
 // Test cross-stage rejection scenarios
 // =============================================================================
 
-// TODO SERVER-117259: Re-enable. Cross-stage view-resolution recursion does not currently
-// propagate the structural extension ban into nested $lookup sub-pipelines reached via
-// $facet/$unionWith parents.
-/*
 // Helper to test cross-stage rejection with a single extension view.
-function testCrossStageRejection(viewName, viewPipeline, testPipeline, expectedErrorCode, description) {
+function testCrossStageRejection(
+    viewName,
+    viewPipeline,
+    testPipeline,
+    expectedErrorCode,
+    description,
+) {
     assert.commandWorked(db.createView(viewName, other.getName(), viewPipeline));
     assertErrorCode(coll, testPipeline, expectedErrorCode, description);
     db[viewName].drop();
@@ -319,34 +283,58 @@ function testCrossStageRejection(viewName, viewPipeline, testPipeline, expectedE
     // $facet containing $lookup on view with extension.
     testCrossStageRejection(
         "facet_lookup_view_ext",
-        [{$testBar: {noop: true}}],
-        [{$facet: {facetPipe: [{$lookup: {from: "facet_lookup_view_ext", pipeline: [], as: "joined"}}]}}],
-        kNotAllowedInLookupErrorCode,
-        "Using $facet with $lookup on view with extension should be rejected",
+        [{$testFoo: {}}],
+        [
+            {
+                $facet: {
+                    facetPipe: [
+                        {$lookup: {from: "facet_lookup_view_ext", pipeline: [], as: "joined"}},
+                    ],
+                },
+            },
+        ],
+        kNotAllowedInFacetErrorCode,
+        "Using $facet with $lookup on view with $testFoo should be rejected",
     );
 
     // Nested $lookup in $unionWith targeting view with extension.
     testCrossStageRejection(
         "unionwith_nested_lookup_ext",
-        [{$testBar: {noop: true}}],
+        [{$testFoo: {}}],
         [
             {
                 $unionWith: {
                     coll: other.getName(),
-                    pipeline: [{$lookup: {from: "unionwith_nested_lookup_ext", pipeline: [], as: "joined"}}],
+                    pipeline: [
+                        {
+                            $lookup: {
+                                from: "unionwith_nested_lookup_ext",
+                                pipeline: [],
+                                as: "joined",
+                            },
+                        },
+                    ],
                 },
             },
         ],
         kNotAllowedInLookupErrorCode,
-        "Using $unionWith containing $lookup on view with extension should be rejected",
+        "Using $unionWith containing $lookup on view with $testFoo should be rejected",
     );
 
     // $lookup pipeline with $unionWith targeting view with extension.
     testCrossStageRejection(
         "lookup_unionwith_ext_view",
-        [{$testBar: {noop: true}}],
-        [{$lookup: {from: other.getName(), pipeline: [{$unionWith: "lookup_unionwith_ext_view"}], as: "joined"}}],
-        kNotAllowedInLookupErrorCode,
+        [{$testFoo: {}}],
+        [
+            {
+                $lookup: {
+                    from: other.getName(),
+                    pipeline: [{$unionWith: "lookup_unionwith_ext_view"}],
+                    as: "joined",
+                },
+            },
+        ],
+        kNotAllowedInUnionWithErrorCode,
         "Using $lookup pipeline with $unionWith targeting extension view should be rejected",
     );
 
@@ -355,13 +343,15 @@ function testCrossStageRejection(viewName, viewPipeline, testPipeline, expectedE
         const innerViewName = "inner_ext_view";
         const outerViewName = "outer_with_unionwith";
 
-        assert.commandWorked(db.createView(innerViewName, other.getName(), [{$testBar: {noop: true}}]));
-        assert.commandWorked(db.createView(outerViewName, other.getName(), [{$unionWith: innerViewName}]));
+        assert.commandWorked(db.createView(innerViewName, other.getName(), [{$testFoo: {}}]));
+        assert.commandWorked(
+            db.createView(outerViewName, other.getName(), [{$unionWith: innerViewName}]),
+        );
 
         assertErrorCode(
             coll,
             [{$lookup: {from: outerViewName, pipeline: [], as: "joined"}}],
-            kNotAllowedInLookupErrorCode,
+            kNotAllowedInUnionWithErrorCode,
             "Using $lookup on view with $unionWith targeting extension view should be rejected",
         );
 
@@ -369,4 +359,3 @@ function testCrossStageRejection(viewName, viewPipeline, testPipeline, expectedE
         db[innerViewName].drop();
     }
 }
-*/

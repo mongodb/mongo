@@ -21,6 +21,7 @@ import {
     getLegacySearchUsedCount,
     getNumNodes,
     getSearchInHybridSearchKickbackRetryCount,
+    getSearchInLookupKickbackRetryCount,
     getSearchInUnionWithKickbackRetryCount,
     getSearchOnViewKickbackRetryCount,
     kNumShards,
@@ -151,7 +152,13 @@ function runUnionWithOnViewSearchTests(
         shardingTest,
     });
 
-    const expectedInUnionWithKickbackDelta = featureFlagValue ? 1 : 0;
+    // In sharded mode, when a shard throws CommandOnShardedViewNotSupportedOnMongod the router's
+    // onViewError lambda in ClusterAggregate::runAggregate() adds featureFlagSearchExtension to
+    // state.ifrFlagsToDisableOnRetries whenever featureFlagExtensionsInsideHybridSearch is off,
+    // so the retry parses the $unionWith-on-view pipeline with the extension stage already disabled
+    // and bindViewInfo never throws the IFR kickback. In standalone with flag=true the kickback
+    // fires once per query; with flag=false legacy runs from the start - no kickback either way.
+    const expectedOnViewKickbackRetryDelta = !shardingTest && featureFlagValue ? 1 : 0;
     const expectedLegacyDelta = getNumNodes(shardingTest);
 
     const stage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
@@ -164,12 +171,12 @@ function runUnionWithOnViewSearchTests(
 
     runQueriesAndVerifyMetrics({
         conn,
-        getRetryCountFn: getSearchInUnionWithKickbackRetryCount,
-        retryMetricName: "inUnionWithKickbackRetries",
+        getRetryCountFn: getSearchOnViewKickbackRetryCount,
+        retryMetricName: "onViewKickbackRetries",
         getLegacyCountFn: getLegacySearchUsedCount,
         getExtensionCountFn: getExtensionSearchUsedCount,
         featureFlagName: "featureFlagSearchExtension",
-        expectedRetryDelta: expectedInUnionWithKickbackDelta,
+        expectedRetryDelta: expectedOnViewKickbackRetryDelta,
         expectedLegacyDelta,
         queries: [
             () => {
@@ -316,6 +323,51 @@ function runSearchHybridSearchTests(
     });
 }
 
+/**
+ * Runs $search or $searchMeta inside a $lookup sub-pipeline and verifies the in-lookup kickback
+ * metric.
+ */
+function runSearchInLookupKickbackTest(
+    conn,
+    mongotMock,
+    isSearchMeta,
+    featureFlagValue,
+    shardingTest = null,
+) {
+    const {testDb, coll} = createTestView(conn, shardingTest);
+
+    setUpSearchMocks(mongotMock, {
+        coll,
+        testDb,
+        query: kSearchQuery,
+        isSearchMeta,
+        startingCursorId: 400,
+        shardingTest,
+    });
+
+    const expectedInLookupKickbackDelta = featureFlagValue ? 1 : 0;
+    const expectedLegacyDelta = getNumNodes(shardingTest);
+
+    const stage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
+    const lookupStage = {$lookup: {from: coll.getName(), pipeline: [stage], as: "results"}};
+
+    runQueriesAndVerifyMetrics({
+        conn,
+        getRetryCountFn: getSearchInLookupKickbackRetryCount,
+        retryMetricName: "inLookupKickbackRetries",
+        getLegacyCountFn: getLegacySearchUsedCount,
+        getExtensionCountFn: getExtensionSearchUsedCount,
+        featureFlagName: "featureFlagSearchExtension",
+        expectedRetryDelta: expectedInLookupKickbackDelta,
+        expectedLegacyDelta,
+        queries: [
+            () => {
+                coll.aggregate([{$limit: 1}, lookupStage]).toArray();
+            },
+        ],
+    });
+}
+
 function runTests(conn, mongotMock, shardingTest = null) {
     if (shardingTest) {
         // The IFR retry path interleaves planShardedSearch with per-shard search commands
@@ -356,7 +408,13 @@ function runTests(conn, mongotMock, shardingTest = null) {
                 featureFlagValue,
                 shardingTest,
             );
-            // TODO SERVER-117259: Add coverage for the $search/$searchMeta-in-$lookup kickback.
+            runSearchInLookupKickbackTest(
+                conn,
+                mongotMock,
+                isSearchMeta,
+                featureFlagValue,
+                shardingTest,
+            );
         }
     }
     if (shardingTest) {
