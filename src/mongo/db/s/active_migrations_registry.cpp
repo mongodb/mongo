@@ -189,18 +189,25 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const NamespaceString& nss,
     const ChunkRange& chunkRange,
     const ShardId& fromShardId,
-    bool waitForCompletionOfConflictingOps,
+    bool waitForCompletionOfMigrationOps,
     boost::optional<BypassRecoveryWait> bypass) {
     if (!bypass && _recoverable) {
         _recoverable->waitForRecovery(opCtx);
     }
     std::unique_lock<std::mutex> ul(_mutex);
 
-    if (waitForCompletionOfConflictingOps) {
-        opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [this] {
-            return !_migrationsBlocked && !_activeMoveChunkState && !_activeReceiveChunkState;
+    if (waitForCompletionOfMigrationOps) {
+        opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
+            return !_migrationsBlocked && !_activeMoveChunkState && !_activeReceiveChunkState &&
+                !_activeSplitMergeChunkStates.count(nss);
         });
     } else {
+        // Wait for any split/merge of the same namespace to finish before receiving, since both
+        // would take the collection critical section.
+        opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
+            return !_activeSplitMergeChunkStates.count(nss);
+        });
+
         if (_activeReceiveChunkState) {
             return _activeReceiveChunkState->constructErrorStatus();
         }
@@ -235,8 +242,12 @@ StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMerge
     }
     std::unique_lock<std::mutex> ul(_mutex);
 
+    // Wait for any donate, receive, or split/merge of the same namespace to finish before
+    // starting, since they would all take the collection critical section. Operations on other
+    // namespaces do not block this one.
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
         return !(_activeMoveChunkState && _activeMoveChunkState->nss == nss) &&
+            !(_activeReceiveChunkState && _activeReceiveChunkState->nss == nss) &&
             !_activeSplitMergeChunkStates.count(nss);
     });
 

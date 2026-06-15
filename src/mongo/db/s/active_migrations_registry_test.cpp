@@ -169,10 +169,177 @@ TEST_F(MoveChunkRegistration, TestReceiveChunkIsRejectedWhenRegistryIsLocked) {
                   NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfConflictingOps */));
+                  false /* waitForCompletionOfMigrationOps */));
     _registry.unlock("dummy");
 }
 
+TEST_F(MoveChunkRegistration, SplitOrMergeBlocksWhileReceiveInProgressOnSameNss) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    const ChunkRange chunkRange(BSON("Key" << -100), BSON("Key" << 100));
+
+    nolint_promise<void> blockReceive;
+    nolint_promise<void> readyToSplitMerge;
+    nolint_promise<void> inSplitMerge;
+
+    // Receive thread.
+    auto result = std::async(std::launch::async, [&] {
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        // 2. Start a receive so that the split/merge will block when registered.
+        auto scopedReceiveChunk =
+            assertGet(_registry.registerReceiveChunk(opCtxHolder.get(),
+                                                     nss,
+                                                     chunkRange,
+                                                     ShardId("shard0001"),
+                                                     false /* waitForCompletionOfMigrationOps */));
+
+        // 3. Signal the split/merge thread that the receive is registered.
+        readyToSplitMerge.set_value();
+
+        // 4. Wait for the split/merge thread to start blocking because there is an active receive.
+        blockReceive.get_future().wait();
+
+        // 9. Destroy the ScopedReceiveChunk to signal the split/merge thread.
+    });
+
+    // Split/merge thread.
+    auto splitMergeCompleted = std::async(std::launch::async, [&] {
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        auto baton = opCtxHolder->getBaton();
+        baton->schedule([&inSplitMerge](Status) {
+            // 7. This is called when the split/merge is blocking. Let the test method know so it
+            // can tell the receive thread to complete.
+            inSplitMerge.set_value();
+        });
+
+        // 5. This is woken up by the receive thread.
+        readyToSplitMerge.get_future().wait();
+
+        // 6. Attempt to register the split/merge. This blocks until the receive completes and calls
+        // the lambda set on the baton above.
+        auto scopedSplitMergeChunk =
+            _registry.registerSplitOrMergeChunk(opCtxHolder.get(), nss, chunkRange);
+
+        // 10. The split/merge proceeds once the receive has completed.
+        ASSERT_OK(scopedSplitMergeChunk.getStatus());
+    });
+
+    // 1. Wait for the split/merge thread to start blocking.
+    inSplitMerge.get_future().wait();
+
+    // 8. Let the receive complete so that the ScopedReceiveChunk is destroyed. That signals the
+    // split/merge thread to continue.
+    blockReceive.set_value();
+
+    // 11. The split/merge thread has returned and this future is set.
+    splitMergeCompleted.wait();
+}
+
+TEST_F(MoveChunkRegistration, SplitOrMergeAllowedWhileReceivingDifferentNss) {
+    const auto receiveNss = NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl");
+    const auto splitNss = NamespaceString::createNamespaceString_forTest("TestDB", "SplitColl");
+    const ChunkRange chunkRange(BSON("Key" << -100), BSON("Key" << 100));
+
+    // A receive of one namespace does not block a split/merge of a different namespace.
+    auto scopedReceiveChunk =
+        assertGet(_registry.registerReceiveChunk(_opCtx,
+                                                 receiveNss,
+                                                 chunkRange,
+                                                 ShardId("shard0001"),
+                                                 false /* waitForCompletionOfMigrationOps */));
+
+    ASSERT_OK(_registry.registerSplitOrMergeChunk(_opCtx, splitNss, chunkRange).getStatus());
+}
+
+TEST_F(MoveChunkRegistration, ReceiveBlocksWhileSplitOrMergeInProgressOnSameNss) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    const ChunkRange chunkRange(BSON("Key" << -100), BSON("Key" << 100));
+
+    nolint_promise<void> blockSplitMerge;
+    nolint_promise<void> readyToReceive;
+    nolint_promise<void> inReceive;
+
+    // Split/merge thread.
+    auto result = std::async(std::launch::async, [&] {
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        // 2. Start a split/merge so that the receive will block when registered.
+        auto scopedSplitMergeChunk =
+            assertGet(_registry.registerSplitOrMergeChunk(opCtxHolder.get(), nss, chunkRange));
+
+        // 3. Signal the receive thread that the split/merge is registered.
+        readyToReceive.set_value();
+
+        // 4. Wait for the receive thread to start blocking because there is an active split/merge.
+        blockSplitMerge.get_future().wait();
+
+        // 9. Destroy the ScopedSplitMergeChunk to signal the receive thread.
+    });
+
+    // Receive thread.
+    auto receiveCompleted = std::async(std::launch::async, [&] {
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        auto baton = opCtxHolder->getBaton();
+        baton->schedule([&inReceive](Status) {
+            // 7. This is called when the receive is blocking. Let the test method know so it can
+            // tell the split/merge thread to complete.
+            inReceive.set_value();
+        });
+
+        // 5. This is woken up by the split/merge thread.
+        readyToReceive.get_future().wait();
+
+        // 6. Attempt to register the receive. This blocks until the split/merge completes and calls
+        // the lambda set on the baton above.
+        auto scopedReceiveChunk =
+            _registry.registerReceiveChunk(opCtxHolder.get(),
+                                           nss,
+                                           chunkRange,
+                                           ShardId("shard0001"),
+                                           false /* waitForCompletionOfMigrationOps */);
+
+        // 10. The receive proceeds once the split/merge has completed.
+        ASSERT_OK(scopedReceiveChunk.getStatus());
+    });
+
+    // 1. Wait for the receive thread to start blocking.
+    inReceive.get_future().wait();
+
+    // 8. Let the split/merge complete so that the ScopedSplitMergeChunk is destroyed. That signals
+    // the receive thread to continue.
+    blockSplitMerge.set_value();
+
+    // 11. The receive thread has returned and this future is set.
+    receiveCompleted.wait();
+}
+
+TEST_F(MoveChunkRegistration, ReceiveAllowedWhileSplitOrMergeOnDifferentNss) {
+    const auto splitNss = NamespaceString::createNamespaceString_forTest("TestDB", "SplitColl");
+    const auto receiveNss = NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl");
+    const ChunkRange chunkRange(BSON("Key" << -100), BSON("Key" << 100));
+
+    // A split/merge of one namespace does not block a receive of a different namespace.
+    auto scopedSplitMergeChunk =
+        assertGet(_registry.registerSplitOrMergeChunk(_opCtx, splitNss, chunkRange));
+
+    ASSERT_OK(_registry
+                  .registerReceiveChunk(_opCtx,
+                                        receiveNss,
+                                        chunkRange,
+                                        ShardId("shard0001"),
+                                        false /* waitForCompletionOfMigrationOps */)
+                  .getStatus());
+}
 
 TEST_F(MoveChunkRegistration,
        TestReceiveChunkWithWaitForConflictingOpsIsBlockedWhenRegistryIsLocked) {
@@ -222,7 +389,7 @@ TEST_F(MoveChunkRegistration,
             NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
             ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
             ShardId("shard0001"),
-            true /* waitForCompletionOfConflictingOps */);
+            true /* waitForCompletionOfMigrationOps */);
 
         ASSERT_OK(scopedReceiveChunk.getStatus());
 

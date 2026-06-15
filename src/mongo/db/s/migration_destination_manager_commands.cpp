@@ -161,7 +161,7 @@ public:
                 nss,
                 chunkRange,
                 cloneRequest.getFromShardId(),
-                false /* waitForCompletionOfConflictingOps*/)));
+                false /* waitForCompletionOfMigrationOps*/)));
 
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.

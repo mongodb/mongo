@@ -71,13 +71,43 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
  * This class is used to synchronise all the active routing info operations for chunks owned by this
  * shard. There is only one instance of it per ServiceContext.
  *
- * It implements a non-fair lock manager, which provides the following guarantees:
+ * It tracks three kinds of chunk operations running on this shard:
+ *   - Donate (move): this shard is the source of a chunk migration.
+ *   - Receive: this shard is the destination of a chunk migration.
+ *   - Split/Merge: this shard is splitting or merging chunks it owns.
  *
- *   - Move || Move (same chunk): The second move will join the first
- *   - Move || Move (different chunks or collections): The second move will result in a
- *                                                     ConflictingOperationInProgress error
- *   - Move || Split/Merge (same collection): The second operation will block behind the first
- *   - Move/Split/Merge || Split/Merge (for different collections): Can proceed concurrently
+ * Donate and Receive are mutually exclusive shard-wide: a shard performs at most one migration at a
+ * time, as either donor or recipient, regardless of namespace. Split/Merge is tracked per
+ * namespace and coordinates with the other operations only on the same namespace, so unrelated
+ * collections can split/merge concurrently with each other and with a migration.
+ *
+ * When a new operation arrives while another is already running, the outcome is:
+ *
+ *   Legend:
+ *     JOIN       - attaches to the running operation and shares its outcome
+ *     CONFLICT   - fails immediately with ConflictingOperationInProgress
+ *     WAIT       - blocks until the running operation finishes, then proceeds
+ *     CONCURRENT - proceeds immediately; both run at the same time
+ *     WAIT/CONFL - WAIT when registerReceiveChunk() is called with
+ *                  waitForCompletionOfMigrationOps == true (e.g. the step-up recovery path);
+ *                  CONFLICT otherwise.
+ *
+ *   Rows = incoming operation, Columns = operation already running on this shard.
+ *
+ *   incoming \ running | Donate (move)          | Receive               | Split/Merge
+ *   -------------------+------------------------+-----------------------+----------------------
+ *    Donate (move)     | same request: JOIN     | CONFLICT              | same nss:  WAIT
+ *                      | otherwise:    CONFLICT |                       | other nss: CONCURRENT
+ *   -------------------+------------------------+-----------------------+----------------------
+ *    Receive           | WAIT/CONFL             | WAIT/CONFL            | same nss:  WAIT
+ *                      |                        |                       | other nss: CONCURRENT
+ *   -------------------+------------------------+-----------------------+----------------------
+ *    Split/Merge       | same nss:  WAIT        | same nss:  WAIT       | same nss:  WAIT
+ *                      | other nss: CONCURRENT  | other nss: CONCURRENT | other nss: CONCURRENT
+ *
+ * Migrations and Split/Merge of the same namespace wait for each other (whichever starts second
+ * blocks until the first finishes), so the two never hold the collection critical section at the
+ * same time.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT ActiveMigrationsRegistry {
     ActiveMigrationsRegistry(const ActiveMigrationsRegistry&) = delete;
@@ -171,19 +201,21 @@ public:
      * ScopedReceiveChunk. The returned ScopedReceiveChunk object will unregister the migration when
      * it goes out of scope.
      *
-     * In case registerReceiveChunk() is called while other operations (a second migration or a
-     * registry lock()) are already holding resources of the ActiveMigrationsRegistry, the function
-     * will either
+     * A receive always waits for any split/merge of the same namespace to finish before
+     * registering, since both would take the collection critical section.
+     *
+     * For a conflicting migration (a second receive or an active donate) or an explicit registry
+     * lock(), the function will either
      * - wait for such operations to complete and then perform the registration
      * - return a ConflictingOperationInProgress error
-     * based on the value of the waitForCompletionOfConflictingOps parameter
+     * based on the value of the waitForCompletionOfMigrationOps parameter.
      */
     StatusWith<ScopedReceiveChunk> registerReceiveChunk(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkRange& chunkRange,
         const ShardId& fromShardId,
-        bool waitForCompletionOfConflictingOps,
+        bool waitForCompletionOfMigrationOps,
         boost::optional<BypassRecoveryWait> bypass = boost::none);
 
     /**
