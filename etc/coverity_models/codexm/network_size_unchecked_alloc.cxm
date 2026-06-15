@@ -1,0 +1,164 @@
+// MONGO.NETWORK_SIZE_UNCHECKED_ALLOC — CodeXM checker
+//
+// Detects the CVE-2025-14847 vulnerability class: a size/length value derived
+// from a network-supplied wire-protocol field is passed to a heap-allocation
+// function without intervening bounds validation.
+//
+// Broadened scope vs. original:
+//   Sources:
+//     (a) Specific field names: uncompressedSize, compressedSize, originalSize,
+//         messageSize, bodySize, dataSize, headerSize, payloadSize
+//     (b) Type-based: any Size|Length|Len|Count|Num|Limit|Capacity field on a
+//         struct whose type name contains Header|Compressor|Frame|Packet|Compressed
+//   Sinks: allocate, malloc, calloc, realloc, resize, reserve
+//
+// Scoping design (required by CodeXM constraints):
+//   allocCall must be bound in the outer for-loop scope (needed for events).
+//   varDecl is checked inside exists+allCodeIn(fn.body), which is a set (not
+//   globalset), so outer variables (fn, allocCall, vr) are accessible inside.
+//   containsMatch() gives bool existence without needing to bind mr in events.
+//
+// Both checkers fire even on correctly-bounded code — intentional security gate.
+// Mark finding Intentional in Coverity Connect after verifying the bounds check.
+//
+// Usage:
+//   cov-analyze --dir <idir> \
+//     --codexm etc/coverity_models/codexm/network_size_unchecked_alloc.cxm
+
+include `C/C++`;
+
+// ---------------------------------------------------------------------------
+// Named patterns
+// ---------------------------------------------------------------------------
+
+// Source (a): specific field names known to carry wire-protocol sizes
+pattern networkSizeRefByName {
+    memberReference as mr where
+        mr.field.identifier matches Regex("uncompressedSize|compressedSize|originalSize|messageSize|bodySize|dataSize|headerSize|payloadSize")
+};
+
+// Source (b): size/length/count field on a wire-protocol struct type
+pattern networkSizeRefByType {
+    memberReference as mr where
+        mr.objectExpression matches expression as expr
+        && expr.type matches classType as ct
+        && ct.identifier matches Regex("Header|Compressor|Frame|Packet|Compressed|Wire|Protocol")
+        && mr.field.identifier matches Regex("Size|Length|Len|Count|Num|Limit|Capacity")
+};
+
+// Sink: any heap-sizing function call (OR in 'where' clause, not inside { })
+pattern allocationCallPat {
+    functionCall as call where
+        call.calledFunction.identifier == "allocate"
+        || call.calledFunction.identifier == "malloc"
+        || call.calledFunction.identifier == "calloc"
+        || call.calledFunction.identifier == "realloc"
+        || call.calledFunction.identifier == "resize"
+        || call.calledFunction.identifier == "reserve"
+};
+
+// ---------------------------------------------------------------------------
+// Checker 1: intermediate-variable, field-name based
+//
+// Structure: allocCall bound in outer scope (for events); varDecl checked
+// inside allCodeIn(fn.body) exists (set, not globalset) so outer vars accessible.
+// ---------------------------------------------------------------------------
+checker {
+    name = "MONGO.NETWORK_SIZE_UNCHECKED_ALLOC";
+
+    reports =
+        for fn in globalset allFunctionDefinitions
+
+        // Bind allocCall in outer scope so its location is accessible in events
+        where anyMatchingCodeIn(allocationCallPat, fn.body) matches NonNull as allocNode
+        && allocNode matches functionCall as allocCall
+
+        // Check if any size argument is a variable whose declaration contains
+        // a network-size field reference. allCodeIn returns a set (not globalset)
+        // so vr, allocCall, fn from outer scope are all accessible inside.
+        && exists sizeArg in allocCall.argumentList
+           where sizeArg matches variableReference as vr
+           && exists declNode in allCodeIn(fn.body)
+              where declNode matches variableDeclaration as varDecl
+              && varDecl.variable == vr.variable
+              && containsMatch(networkSizeRefByName, varDecl)
+        :
+        {
+            events = [
+                {
+                    description =
+                        "A network-supplied size field (e.g. uncompressedSize) is passed "
+                        + "to a heap-allocation function via an intermediate variable. "
+                        + "Verify that a bounds check exists and is correct before this "
+                        + "allocation; then mark Intentional in Coverity Connect. "
+                        + "(CVE-2025-14847 class)";
+                    location = allocCall.location;
+                }
+            ];
+        };
+};
+
+// ---------------------------------------------------------------------------
+// Checker 2: intermediate-variable, type-based struct detection
+// ---------------------------------------------------------------------------
+checker {
+    name = "MONGO.NETWORK_SIZE_UNCHECKED_ALLOC_TYPED";
+
+    reports =
+        for fn in globalset allFunctionDefinitions
+
+        where anyMatchingCodeIn(allocationCallPat, fn.body) matches NonNull as allocNode
+        && allocNode matches functionCall as allocCall
+
+        && exists sizeArg in allocCall.argumentList
+           where sizeArg matches variableReference as vr
+           && exists declNode in allCodeIn(fn.body)
+              where declNode matches variableDeclaration as varDecl
+              && varDecl.variable == vr.variable
+              && containsMatch(networkSizeRefByType, varDecl)
+        :
+        {
+            events = [
+                {
+                    description =
+                        "A size/length field from a wire-protocol struct type is passed "
+                        + "to a heap-allocation function via an intermediate variable. "
+                        + "Verify bounds validation before this allocation. "
+                        + "(CVE-2025-14847 class — type-based detection)";
+                    location = allocCall.location;
+                }
+            ];
+        };
+};
+
+// ---------------------------------------------------------------------------
+// Checker 3: direct-expression pattern
+//
+//   <allocationCall>((size_t)<networkField> + N);
+// ---------------------------------------------------------------------------
+checker {
+    name = "MONGO.NETWORK_SIZE_UNCHECKED_ALLOC_DIRECT";
+
+    reports =
+        for fn in globalset allFunctionDefinitions
+
+        where anyMatchingCodeIn(allocationCallPat, fn.body) matches NonNull as allocNode
+        && allocNode matches functionCall as allocCall
+
+        && exists sizeArg in allocCall.argumentList
+           where containsMatch(networkSizeRefByName, sizeArg)
+              || containsMatch(networkSizeRefByType, sizeArg)
+        :
+        {
+            events = [
+                {
+                    description =
+                        "A network-supplied size/length field appears directly in the "
+                        + "argument to a heap-allocation function without an intermediate "
+                        + "variable. Verify bounds validation. "
+                        + "(CVE-2025-14847 class — direct expression)";
+                    location = allocCall.location;
+                }
+            ];
+        };
+};

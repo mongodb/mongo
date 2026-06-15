@@ -89,6 +89,9 @@ def main():
     # Run evergreen-lint using module invocation
     run_module("evergreen_lint", ["-c", "./etc/evergreen_lint.yml", "lint"])
 
+    # Validate etc/coverity.yml against the bundled Coverity configuration schema.
+    run_module("buildscripts.coverity_linter", [])
+
     print("YAML linting completed successfully!")
 
 

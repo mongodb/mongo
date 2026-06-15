@@ -565,7 +565,10 @@ py_binary(
 
 py_binary(
     name = "yamllinters",
-    srcs = ["yamllinters.py"],
+    srcs = [
+        "coverity_linter.py",
+        "yamllinters.py",
+    ],
     main = "yamllinters.py",
     visibility = ["//visibility:public"],
     deps = [
@@ -580,6 +583,31 @@ py_binary(
         dependency(
             "evergreen-py",
             group = "testing",
+        ),
+        dependency(
+            "jsonschema",
+            group = "build-metrics",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
+    name = "coverity_linter",
+    srcs = ["coverity_linter.py"],
+    main = "coverity_linter.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "jsonschema",
+            group = "build-metrics",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
         ),
     ],
 )

@@ -1,0 +1,66 @@
+// Coverity Security Directives for MongoDB — C/C++ analysis
+//
+// Passed to cov-analyze via: --directive-file etc/coverity_models/mongo_security_directives.json
+//
+// ============================================================================
+// CURRENT STATUS: PLACEHOLDER — SEE LIMITATION NOTES BELOW
+// ============================================================================
+//
+// Security Directives support for C-like (C/C++/Objective-C) in Coverity
+// 2025.6.0 is severely constrained:
+//
+//   SUPPORTED for C-like (format_version 12):
+//     - dc_checker_name / method_set_for_dc_checker
+//       (deprecated DC.CUSTOM_CHECKER — flags calls to named methods, no
+//        data-flow tracking)
+//
+//   NOT SUPPORTED for C-like (Java-only):
+//     - sink_for_checker      — verified: parse error in C-like context
+//     - simple_entry_point    — taint sources
+//     - method_returns_tainted_data — taint sources
+//     - sensitive_operation   — sink patterns
+//     - All other taint directives
+//
+// CONSEQUENCE FOR CVE-2025-14847 CLASS:
+//   There is no Security Directives mechanism to add custom TAINTED_SCALAR
+//   sources for C/C++. The CompressionHeader constructor (reads from network
+//   wire → sets uncompressedSize) cannot be declared as a taint source via
+//   this file. The sink (SharedBuffer::allocate) also cannot be registered as
+//   a TAINTED_SCALAR sink for C/C++.
+//
+//   Full custom source+sink taint tracking for C/C++ requires CodeXM —
+//   Coverity's Scala-based checker SDK. That is the recommended path for
+//   this class of vulnerability going forward.
+//
+// WHAT THIS FILE PROVIDES:
+//   A minimal valid C-like directive that flags ALL calls to
+//   SharedBuffer::allocate as DC.CUSTOM_UNCHECKED_ALLOC_SIZE findings,
+//   regardless of whether arguments are tainted. This is blunt (catches
+//   safe calls too) but ensures the function at minimum appears in Coverity
+//   findings for manual review when a new callsite is introduced.
+//
+//   Remove or disable this if the DC.CUSTOM_UNCHECKED_ALLOC_SIZE finding
+//   count grows unmanageable; it is a stopgap until CodeXM source tracking
+//   is implemented.
+//
+// References:
+//   src/mongo/util/shared_buffer.h — SharedBuffer::allocate(size_t, Allocator={})
+//   Coverity Security Directives Reference 2025.6.0 — dc_checker_name
+//   Coverity Checker Reference 2025.6.0 — DC.CUSTOM_CHECKER, CodeXM
+{
+  "type": "Coverity analysis configuration",
+  "format_version": 12,
+  "language": "C-like",
+  "directives": [
+    // Define a custom DC checker that fires on any call to SharedBuffer::allocate.
+    // NOTE: This is NOT taint-driven. It fires on ALL calls, not just those
+    // receiving untrusted input. Treat findings as "requires manual review of
+    // bounds checking" rather than confirmed vulnerabilities.
+    { "dc_checker_name": "DC.CUSTOM_UNCHECKED_ALLOC_SIZE" },
+    {
+      "method_set_for_dc_checker": "DC.CUSTOM_UNCHECKED_ALLOC_SIZE",
+      "methods": { "named": "mongo::SharedBuffer::allocate" },
+      "txt_defect_message": "SharedBuffer::allocate() called — verify the size argument is bounds-checked against a trusted maximum before allocation (cf. CVE-2025-14847 class of vulnerability)."
+    }
+  ]
+}

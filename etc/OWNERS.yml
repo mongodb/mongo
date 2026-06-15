@@ -14,7 +14,10 @@ filters:
       - 10gen/devprod-test-infrastructure
       - jbergler
       - mickgraham-mongodb
-  - "coverity.yml":
+  - "coverity*":
+    approvers:
+      - 10gen/server-programmability
+  - "coverity_models/**":
     approvers:
       - 10gen/server-programmability
   - "evergreen_yml_components/variants/coverity.yml":

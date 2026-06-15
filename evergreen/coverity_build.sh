@@ -120,6 +120,10 @@ echo "Setting up clang-tidy IDE files"
 "$BAZEL_BINARY" $bazel_cache run $build_config //:setup_clang_tidy
 
 compiledb_output_base="$("$BAZEL_BINARY" $bazel_cache info output_base)"
+
+echo "Writing Bazel execution root for Coverity path normalization"
+"$BAZEL_BINARY" $bazel_cache info execution_root >"$workdir/coverity_execroot.txt"
+echo "Bazel execution root: $(cat "$workdir/coverity_execroot.txt")"
 repo_python=""
 python_candidates=(
     "$compiledb_output_base/external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
@@ -176,4 +180,16 @@ else
         cat "$covIdir/replay-log.txt"
     fi
     exit $ret
+fi
+
+echo "Compiling user model file into Coverity xmldb format"
+# cov-analyze picks up the xmldb from <covIdir>/config/user_models.xmldb automatically
+# as its default model location, so no --model-file flag is needed in coverity.yml.
+if "$workdir/coverity/bin/cov-make-library" \
+    --output-file "$covIdir/config/user_models.xmldb" \
+    "etc/coverity_models/mongo_models.cpp"; then
+    echo "cov-make-library was successful: $covIdir/config/user_models.xmldb"
+else
+    ret=$?
+    echo "cov-make-library failed with exit code $ret — continuing without user models"
 fi

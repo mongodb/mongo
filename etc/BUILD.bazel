@@ -9,6 +9,7 @@ exports_files([
     "extensions.yml",
     "evergreen_yml_components/copybara/copybara_gen.yml",
     "backports_required_for_multiversion_tests.yml",
+    "coverity_config_schema.json",
 ])
 
 # This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't

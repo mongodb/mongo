@@ -1,0 +1,1471 @@
+{
+  "title": "Configuration",
+  "$id": "https://blackduck.com/coverity/2024-12/configuration-schema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "analyze": {
+      "$ref": "#/$defs/analysis-configuration"
+    },
+    "caching": {
+      "$ref": "#/$defs/caching-configuration"
+    },
+    "capture": {
+      "$ref": "#/$defs/capture-configuration"
+    },
+    "commit": {
+      "$ref": "#/$defs/commit-configuration"
+    },
+    "version": {
+      "default": 1,
+      "description": "Specifies the version of the configuration file in use.",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "commit"
+  ],
+  "type": "object",
+  "$defs": {
+    "analysis-configuration": {
+      "description": "Specifies how the project should be analyzed.",
+      "properties": {
+        "aggressiveness-level": {
+          "default": "low",
+          "description": "Specifies the aggressiveness level for the analysis. The aggressiveness level causes the analysis to make more or less aggressive assumptions during the analysis where the higher the aggressiveness level the more defects are reported.",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "type": "string"
+        },
+        "c-cpp-fnptr": {
+          "default": false,
+          "description": "Enables analysis of calls to function pointers for defects.",
+          "type": "boolean"
+        },
+        "c-cpp-virtual": {
+          "default": false,
+          "description": "Enables full virtual-call resolution for C++.",
+          "type": "boolean"
+        },
+        "callgraph-metrics": {
+          "default": false,
+          "description": "Enables callgraph metrics output in the intermediate directory.",
+          "type": "boolean"
+        },
+        "checkers": {
+          "$ref": "#/$defs/checker-configuration",
+          "description": "If no checker configuration is specified, the CLI will enable a set of checkers based on the files that were captured."
+        },
+        "coding-standards": {
+          "$ref": "#/$defs/coding-standard-configuration",
+          "description": "If specified, the analysis will scan the code for compliance according to the given coding standard configuration. If this configuration is present, the capture \"emit-complementary-info\" flag will be set to true."
+        },
+        "connect": {
+          "$ref": "#/$defs/analyze-connect-configuration",
+          "description": "Coverity Connect configuration to use when performing analysis in Coverity Connect."
+        },
+        "constraint-fpp": {
+          "default": false,
+          "description": "Enables additional filtering of defects by using an additional false-path pruner. If set to true, the constraint FPP is enabled.",
+          "type": "boolean"
+        },
+        "cov-analyze-args": {
+          "description": "Additional arguments to pass to cov-analyze when doing analysis.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "cov-collect-models-args": {
+          "description": "Additional arguments to pass to cov-collect-models following analysis when \"output-model-file\" is specified.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "directives": {
+          "description": "Specifies directives to use for the analysis, including for web application security analysis.",
+          "items": {
+            "$ref": "#/$defs/directives-configuration"
+          },
+          "type": "array"
+        },
+        "files": {
+          "$ref": "#/$defs/analyze-files-configuration",
+          "description": "Specifies which files to analyze when the \"analyze.mode\" setting is \"hfi\". Analysis will be performed for only these files."
+        },
+        "jobs": {
+          "description": "Specifies analysis worker parallelism.",
+          "items": {
+            "$ref": "#/$defs/jobs-configuration"
+          },
+          "type": "array"
+        },
+        "location": {
+          "default": "local",
+          "description": "Specifies whether the analysis should be done locally, in Coverity Connect, or in Software Risk Manager. The possible values are as follows: connect - Run the analysis in the Coverity Connect job farm; srm - Run the analysis in the Software Risk Manager job farm; local - Run the analysis locally",
+          "type": "string",
+          "enum": [
+            "local",
+            "connect",
+            "srm"
+          ]
+        },
+        "mode": {
+          "default": "pfi",
+          "description": "Analysis mode: \"pfi\" (perfect fidelity incremental) for complete analysis; or \"hfi\" (high fidelity incremental) for analysis of only specific files specified by analyze.files settings, omitting any other files which may have been incidentally captured by the build. An \"hfi\" analysis can be faster but may produce results which are incomplete or inconsistent, due to the lack of context, and should be used only when speed is more important than accuracy.",
+          "type": "string",
+          "enum": [
+            "hfi",
+            "pfi"
+          ]
+        },
+        "model-file": {
+          "description": "File containing function models. This overrides models specified in the default location of \"config/user_models.xmldb\".",
+          "type": "string"
+        },
+        "one-tu-per-psf": {
+          "default": true,
+          "description": "If set to to true, only one TU (translation unit) will be analyzed per source file name. If set to false, all translation units will be analyzed.",
+          "type": "boolean"
+        },
+        "output-model-file": {
+          "description": "Output file to which function models for the project should be written following analysis.",
+          "type": "string"
+        },
+        "parse-warnings": {
+          "$ref": "#/$defs/parse-warnings-configuration",
+          "description": "Specifies how parse warnings are handled."
+        },
+        "scan-transparency": {
+          "default": true,
+          "description": "Specifies whether to enable the collection of scan transparency data for analysis. This setting must be enabled if the Coverity Connect instance has 'scan.transparency.enabled=true' in its configuration.",
+          "type": "boolean"
+        },
+        "sigma": {
+          "$ref": "#/$defs/sigma-configuration",
+          "description": "Specifies options for Sigma analysis."
+        },
+        "trust": {
+          "description": "This is a map from trust option name to boolean to indicate whether the particular trust property should be trusted or distrusted. The trust option \"all\" controls whether all trust options should be trusted or distrusted.",
+          "patternProperties": {
+            ".*": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "analyze-files-configuration": {
+      "properties": {
+        "exclude-glob": {
+          "description": "Glob pattern that specifies the set of source files to exclude from analysis. Note that any include glob patterns and regular expressions are processed prior to handling exclude glob patterns and regular expressions.",
+          "type": "string"
+        },
+        "exclude-regex": {
+          "description": "Regular expression that specifies the set of source files to exclude from analysis. Note that any include glob patterns and regular expressions are processed prior to handling exclude glob patterns and regular expressions.",
+          "type": "string"
+        },
+        "include-files": {
+          "description": "Paths of source files to analyze. Include and exclude glob patterns and regular expressions are applied to determine which of these files are actually analyzed.",
+          "type": "string"
+        },
+        "include-glob": {
+          "description": "Glob pattern that specifies the set of source files to analyze.",
+          "type": "string"
+        },
+        "include-list-file": {
+          "description": "File containing the paths of source files to analyze, one per line. Include and exclude glob patterns and regular expressions are applied to determine which of these files are actually analyzed.",
+          "type": "string"
+        },
+        "include-regex": {
+          "description": "Regular expression that specifies the set of source files to analyze.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "analyze-connect-configuration": {
+      "properties": {
+        "auth-key-file": {
+          "description": "The authentication key file to use when authenticating to Coverity Connect to perform analysis. By default, the file located at $HOME/.coverity/ak-<hostname>-<port> is used.",
+          "type": "string"
+        },
+        "ca-certs-file": {
+          "description": "File containing additional certificates to trust in addition to the ones in the system certificate store and the Coverity TFT store. By default system CA certificates are used.",
+          "type": "string"
+        },
+        "proxy-client-cert-file": {
+          "description": "File containing the client certificate in PEM format, that should be presented to the proxy when making a request.",
+          "type": "string"
+        },
+        "proxy-client-key-file": {
+          "description": "File containing the client certificate private key in PEM format, for the proxy-client-cert-file.",
+          "type": "string"
+        },
+        "proxy-url": {
+          "description": "URL for a forward proxy to use when communicating with Coverity Connect.  Must be an https URL.",
+          "type": "string"
+        },
+        "upload-artifacts": {
+          "description": "Artifacts to upload following analysis when the analysis location is Connect.",
+          "enum": ["All", "LogsOnly", "None", "OnFailure"],
+          "default": "All"
+        },
+        "url": {
+          "description": "Absolute URL of where to perform Coverity Connect analysis.",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "build-configuration": {
+      "description": "Specifies that build capture should be used to capture the project and provides the build configuration to use. If not specified and the project directory contains compiled source files then automatic build capture will be used to capture compiled source files in the project directory.",
+      "properties": {
+        "aspnet-compiler": {
+          "default": true,
+          "description": "Specifies whether to enable or disable the automatic invocation of Aspnet_compiler.exe for any ASP.NET 4 and earlier Web applications that are detected in the build. The output of Aspnet_compiler.exe is required by the C# and Visual Basic security checkers.",
+          "type": "boolean"
+        },
+        "bazel": {
+          "default": false,
+          "description": "Specifies whether to enable Bazel capture.",
+          "type": "boolean"
+        },
+        "build-command": {
+          "description": "The build command will be invoked to use build capture to capture the project. A build command specified on the command-line will override this setting.",
+          "type": "string"
+        },
+        "clean-command": {
+          "description": "The clean command will be invoked prior to doing build capture to capture the project.",
+          "type": "string"
+        },
+        "cov-build-args": {
+          "description": "Additional arguments to pass to cov-build when doing build capture.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "defer-decomp": {
+          "default": false,
+          "description": "Specifies whether the build should only record the decompilations of byte code during the build and not attempt to decompile and emit the byte code. During the analysis phase, cov-build will be rerun with --replay-decomp to decompile and emit the byte code.",
+          "type": "boolean"
+        },
+        "instrument": {
+          "default": false,
+          "description": "Specifies whether to use the instrumentation mode instead of the debugger. For certain builds, this configuration can significantly improve build times. This setting is applicable only on Windows.",
+          "type": "boolean"
+        },
+        "parallel-translate": {
+          "$ref": "#/$defs/parallel-translate-configuration",
+          "description": "Specifies how to parallelize translation of C and C++ code."
+        },
+        "scan-transparency": {
+          "default": true,
+          "description": "Specifies whether to enable the collection of scan transparency data for build capture. This setting must be enabled if the Coverity Connect instance has 'scan.transparency.enabled=true' in its configuration.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "build-command"
+      ],
+      "type": "object"
+    },
+    "caching-configuration": {
+      "description": "Specifies how the CLI should handle caching when performing capture/analysis.",
+      "$comment": "The following fields aren't supposed to be added to this schema file: bytecode(bool), tu(bool), wur(bool).",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "A true value indicates caching will be used when performing remote analysis.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "capture-configuration": {
+      "description": "Specifies how the project should be captured.",
+      "properties": {
+        "build": {
+          "$ref": "#/$defs/build-configuration"
+        },
+        "build-command-inference": {
+          "default": true,
+          "description": "Specifies whether to enable or disable build command inference. If build command inference is disabled and no build command is provided then no attempt at build capture will be made.",
+          "type": "boolean"
+        },
+        "compiler-configuration": {
+          "$ref": "#/$defs/compiler-configuration",
+          "description": "Specifies which compilers to configure. By default, template compilers are configured."
+        },
+        "cov-translate": {
+          "$ref": "#/$defs/cov-translate-configuration"
+        },
+        "emit-complementary-info": {
+          "default": false,
+          "description": "Records additional information during the emit process needed for the compliance checkers. If a \"coding-standards\" configuration is present then this flag will automatically be set to true.",
+          "type": "boolean"
+        },
+        "encoding": {
+          "default": "US-ASCII",
+          "description": "Specifies the encoding to use when parsing and emitting the source files.",
+          "type": "string"
+        },
+        "failure-threshold-percent": {
+          "default": 0.0,
+          "description": "Specifies the minimum percentage of files that must be captured in order to proceed with the analysis.",
+          "type": "number"
+        },
+        "files": {
+          "$ref": "#/$defs/files-configuration",
+          "description": "Specifies which non-compiled files to capture. By default, all files are captured."
+        },
+        "force-dependency-resolution": {
+          "default": false,
+          "description": "Force resolution of Maven, Gradle and MSBuild dependencies even if this is not needed based on the detected source languages in the project.",
+          "type": "boolean"
+        },
+        "languages": {
+          "$ref": "#/$defs/languages-configuration",
+          "description": "Specifies which languages to include or exclude for capture. By default, all languages are captured."
+        },
+        "import-scm": {
+          "$ref": "#/$defs/import-scm-configuration",
+          "description": "Specifies how to import data about source file changes from the source control management system."
+        },
+        "minimal-classpath-emit": {
+          "default": false,
+          "description": "Specifies whether to limit the group of emitted JAR files to those needed for compilation of the Java files. The default behavior without this option is to emit all the JAR files in the classpath regardless of whether they are referenced by a Java file in the compilation.",
+          "type": "boolean"
+        },
+        "record-with-source": {
+          "default": false,
+          "description": "Specifies whether to do a complete capture or a record with source capture.",
+          "type": "boolean"
+        },
+        "security-da": {
+          "default": true,
+          "description": "Enables or disables security dynamic analysis. If set to true (the default), security dynamic analysis is run as part of the capture step. If set to false, security dynamic analysis is not run.",
+          "type": "boolean"
+        }
+      },
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "build"
+              ]
+            },
+            {
+              "required": [
+                "cov-translate"
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "build",
+              "cov-translate"
+            ]
+          }
+        }
+      ],
+      "type": "object"
+    },
+    "checker-configuration": {
+      "properties": {
+        "all": {
+          "default": false,
+          "description": "Indicates whether all checkers should be enabled.",
+          "type": "boolean"
+        },
+        "all-security": {
+          "default": false,
+          "description": "Indicates whether all security checkers should be enabled. This includes the Security, Android Security, and Web App Security categories, and other security checkers that require explicit enablement.",
+          "type": "boolean"
+        },
+        "android-security": {
+          "default": true,
+          "description": "If set to true, enables android security checkers.",
+          "type": "boolean"
+        },
+        "audit": {
+          "default": false,
+          "description": "Enables audit checkers.",
+          "type": "boolean"
+        },
+        "brakeman": {
+          "default": true,
+          "description": "Indicates whether the brakeman checkers should be enabled or disabled.",
+          "type": "boolean"
+        },
+        "c-family-security": {
+          "default": false,
+          "description": "Enables C, C++, Objective-C, Objective-C++ security-related checkers that are disabled by default.",
+          "type": "boolean"
+        },
+        "checker-config": {
+          "description": "Map from checker name to configuration for the checker.\nThe configuration indicates whether the checker should be enabled or not and allows users to set options used to configure the checker.",
+          "$ref": "#/$defs/specific-checker-configuration"
+        },
+        "codexm": {
+          "description": "Specifies CodeXM (.cxm) files to use in the analysis.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "concurrency": {
+          "default": false,
+          "description": "Enables C, C++ concurrency checkers that are disabled by default.",
+          "type": "boolean"
+        },
+        "default": {
+          "default": true,
+          "description": "Specifies whether to enable the default set of checkers. If set to true, the default set of checkers is enabled. Set to false to get more control over which checkers are enabled.",
+          "type": "boolean"
+        },
+        "pmd": {
+          "default": true,
+          "description": "Enables or disables PMD for Apex analysis.",
+          "type": "boolean"
+        },
+        "recommended-security-checkers": {
+          "default": true,
+          "description": "Enables or disables recommended security checkers.",
+          "type": "boolean"
+        },
+        "rule": {
+          "default": false,
+          "description": "Enables C, C++ rule checkers.",
+          "type": "boolean"
+        },
+        "webapp-security": {
+          "description": "Specifies how web application security analysis should be done.",
+          "properties": {
+            "aggressiveness-level": {
+              "default": "low",
+              "description": "Sets the web application checkers aggressiveness level.",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            "enabled": {
+              "default":  true,
+              "description": "Enables the checkers that are used for web application security analysis.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "coding-standard-configuration": {
+      "properties": {
+        "autosarcpp14": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables AUTOSAR code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "advisory-only",
+                "required-only"
+              ]
+            }
+          }
+        },
+        "cert-c": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables CERT-C code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "L1-only",
+                "L2-only",
+                "L3-only",
+                "L1-L2",
+                "L1-L3",
+                "L2-L3"
+              ]
+            }
+          }
+        },
+        "cert-c-recommendation": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables CERT-C Recommendation code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations"
+              ]
+            }
+          }
+        },
+        "cert-cpp": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables CERT-CPP code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "L1-only",
+                "L2-only",
+                "L3-only",
+                "L2-L1",
+                "L2-L3",
+                "L3-L1"
+              ]
+            }
+          }
+        },
+        "cert-java": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables CERT-Java code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations"
+              ]
+            }
+          }
+        },
+        "hyundai-c": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables HYUNDAI-C code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations"
+              ]
+            }
+          }
+        },
+        "hyundai-cpp": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables HYUNDAI-CPP code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations"
+              ]
+            }
+          }
+        },
+        "hyundai-java": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables HYUNDAI-Java code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations"
+              ]
+            }
+          }
+        },
+        "ignore-deviated-findings": {
+          "default": false,
+          "description": "If set to true, any defects found in code annotated using the #pragma Coverity compliance directive will not be reported in Coverity Connect. Information about the defects that were suppressed can then be found in two files: deviations.txt deviations-warnings.txt",
+          "type": "boolean"
+        },
+        "iso-ts17961": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables ISO TS 17961 code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations"
+              ]
+            }
+          }
+        },
+        "misrac2004": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables MISRA C 2004 code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "advisory-only",
+                "required-only"
+              ]
+            }
+          }
+        },
+        "misrac2012": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables MISRA C 2012 code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "advisory-only",
+                "mandatory-advisory",
+                "mandatory-only",
+                "mandatory-required",
+                "required-advisory",
+                "required-only"
+              ]
+            }
+          }
+        },
+        "misrac2023": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables MISRA C 2023 code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "mandatory-only",
+                "mandatory-required"
+              ]
+            }
+          }
+        },
+        "misracpp2008": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables MISRA C++ 2008 code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "advisory-only",
+                "required-only"
+              ]
+            }
+          }
+        },
+        "misracpp2023": {
+          "$ref": "#/$defs/specific-coding-standard-configuration",
+          "description": "Enables MISRA C++ 2023 code compliance checking according to the given configuration.",
+          "properties": {
+            "pre-canned": {
+              "enum": [
+                "all",
+                "all-deviations",
+                "mandatory-only",
+                "mandatory-required"
+              ]
+            }
+          }
+        }
+      },
+      "type": "object"
+    },
+    "coding-standard-deviation": {
+      "properties": {
+        "deviation": {
+          "description": "The name of the rule to deviate from.",
+          "type": "string"
+        },
+        "reason": {
+          "description": "The reason that the rule is being deviated from.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "deviation",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "commit-configuration": {
+      "description": "Specifies where the analysis results should be sent.",
+      "properties": {
+        "connect": {
+          "description": "Coverity Connect configuration to use when committing defects to Coverity Connect.",
+          "properties": {
+            "auth-key-file": {
+              "description": "The authentication key file to use when authenticating to Coverity Connect to commit defects. By default, the file located at $HOME/.coverity/ak-<hostname>-<port> is used.",
+              "type": "string"
+            },
+            "ca-certs-file": {
+              "description": "File containing additional certificates to trust in addition to the ones in the system certificate store and the Coverity TFT store. By default system CA certificates are used.",
+              "type": "string"
+            },
+            "comparison-only": {
+              "description": "If true, analysis results will not be committed to Coverity Connect.  Instead, results compared to a reference snapshot may be saved locally as specified by the \"commit.local\" settings.",
+              "type": "boolean"
+            },
+            "comparison-report": {
+              "description": "Output file to which analysis results should be written instead of being committed to Coverity Connect. The output includes a comparison against the latest snapshot for the specified stream.",
+              "type": "string"
+            },
+            "cov-commit-defects-args": {
+              "description": "Additional arguments to pass to \"cov-commit-defects\" during the commit phase.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "description": "A description for the committed snapshot.",
+              "type": "string"
+            },
+            "on-new-cert": {
+              "description": "Indicates whether to trust self-signed certificates presented by Coverity Connect that are not currently trusted.",
+              "enum": [
+                "trust",
+                "distrust"
+              ],
+              "type": "string"
+            },
+            "project": {
+              "description": "The name of the project to use when creating a new stream. Ignored when stream creation is not needed. By default the stream name is used.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "proxy-client-cert-file": {
+              "description": "File containing the client certificate in PEM format, that should be presented to the proxy when making a request.",
+              "type": "string"
+            },
+            "proxy-client-key-file": {
+              "description": "File containing the client certificate private key in PEM format, for the proxy-client-cert-file.",
+              "type": "string"
+            },
+            "proxy-url": {
+              "description": "URL for a forward proxy to use when communicating with Coverity Connect.  Must be an https URL.",
+              "type": "string"
+            },
+            "scm": {
+              "description": "The name of the source control management system.",
+              "enum": [
+                "ads",
+                "clearcase",
+                "cvs",
+                "git",
+                "hg",
+                "perforce",
+                "plastic",
+                "plastic-distributed",
+                "svn",
+                "tfs"
+              ],
+              "type": "string"
+            },
+            "snapshot": {
+              "$ref": "#/$defs/snapshot-configuration",
+              "description": "Specifies how to select a reference snapshot to use for a comparison report."
+            },
+            "stream": {
+              "description": "The name of the stream to commit the results to.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "triage": {
+              "description": "Specifies how new defects should be handled.",
+              "properties":{
+                "new-defect-owner": {
+                  "description": "User to whom any new defects will be assigned. The specified user must already exist in the Coverity Connect database. The default is the current user.",
+                  "type": "string"
+                },
+                "new-defect-owner-limit": {
+                  "description": "Limit on the number of defects to assign to the specified user. If the number of discovered defects is more than the limit, then no assignment is done.",
+                  "type": "integer",
+                  "default": 100
+                },
+                "set-new-defect-owner": {
+                  "description": "If true, the owner for newly detected defects that exist locally is set to the specified user.",
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "type": "object"
+            },
+            "upload-artifacts": {
+              "description": "Artifacts to upload following analysis when the analysis location is Connect.",
+              "enum": ["All", "LogsOnly", "None", "OnFailure"],
+              "default": "All"
+            },
+            "url": {
+              "description": "Absolute URL of where to commit the Coverity Connect results.",
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https?://"
+            },
+            "version": {
+              "description": "A project version for the committed snapshot.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stream",
+            "url"
+          ],
+          "type": "object"
+        },
+        "srm": {
+          "description": "Software Risk Manager configuration to use when storing defects in Software Risk Manager.",
+          "properties": {
+            "branch": {
+              "description": "The name of the branch to associate the analysis results with in Software Risk Manager.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "parent-branch": {
+              "description": "The name of the parent branch of the actual branch.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "project-name": {
+              "description": "The name of the project to associate the analysis results with in Software Risk Manager.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "project-id": {
+              "description": "The ID of the project to associate the analysis results with in Software Risk Manager.",
+              "type": "integer"
+            },
+            "token-file": {
+              "description": "The name of the file to read the Software Risk Manager API key from. By default, the file located at $HOME/.bridge/srm-token.txt is used.",
+              "type": "string"
+            },
+            "url": {
+              "description": "The URL of the Software Risk Manager to use for the analysis (if doing a remote analysis) and the analysis results.",
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https?://"
+            }
+          },
+          "required": [
+            "project",
+            "url"
+          ],
+          "type": "object"
+        },
+        "local": {
+          "description": "Local configuration to use when saving defects to the local file system.",
+          "properties": {
+            "path": {
+              "description": "Directory (for \"html\" format) or file (for \"json\" format) in which to save defects.",
+              "type": "string"
+            },
+            "format": {
+              "description": "Format in which to save defects. Either \"html\" or \"json\".",
+              "enum": ["html", "json"],
+              "default": "html"
+            }
+          },
+          "required": [
+            "path"         
+           ],
+          "type": "object" 
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "connect"
+          ]
+        },
+        {
+          "required": [
+            "srm"
+          ]
+        },
+        {
+          "required": [
+            "local"
+          ]
+        }
+      ],
+      "type": "object"
+    },
+    "compiler-configuration": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "cov-configure"
+              ]
+            },
+            {
+              "required": [
+                "file"
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "cov-configure",
+              "file"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "cov-configure": {
+          "description": "Specifies a list of arguments to pass to \"cov-configure\" to generate the compiler configuration to use during capture. This key is mutually exclusive with the \"file\" key.",
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "file": {
+          "description": "Specifies a pre-generated compiler configuration file to use. This key is mutually exclusive with the \"cov-configure\" key.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "cov-translate-configuration": {
+      "description": "Command to invoke that will invoke \"cov-translate\" to capture the project.",
+      "properties": {
+        "command": {
+          "description": "This key specifies a command to invoke that will invoke \"cov-translate\" in the case where the user is doing a \"cov-translate\" capture.",
+          "type": "string"
+        },
+        "cov-build-args": {
+          "description": "Additional arguments to pass to cov-build when invoking the provided command.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "defer-decomp": {
+          "default": false,
+          "description": "Specifies whether the build should only record the decompilations of byte code during the build and not attempt to decompile and emit the byte code. During the analysis phase, cov-build will be rerun with --replay-decomp to decompile and emit the byte code.",
+          "type": "boolean"
+        },
+        "parallel-translate": {
+          "$ref": "#/$defs/parallel-translate-configuration",
+          "description": "Specifies how to parallelize translation of C and C++ code."
+        },
+        "scan-transparency": {
+          "default": true,
+          "description": "Specifies whether to enable the collection of scan transparency data for cov-translate capture. This setting must be enabled if the Coverity Connect instance has 'scan.transparency.enabled=true' in its configuration.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
+    "directives-configuration": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "config"
+              ]
+            },
+            {
+              "required": [
+                "file"
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "config",
+              "file"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "config": {
+          "description": "Security directives configuration to use during the analysis. This key is mutually exclusive with the \"file\" key and is specified in the case where the user wants to in-line the security directives configuration in the file.",
+          "properties": {
+            "directives": {
+              "description": "Specify a particular analysis behavior.",
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "format_version": {
+              "description": "Version of the directives format.",
+              "default": 12,
+              "type": "integer"
+            },
+            "language": {
+              "description": "Language or language family to which directives apply.",
+              "type": "string"
+            },
+            "type": {
+              "description": "Must be the string \"Coverity analysis configuration\".",
+              "enum": [
+                "Coverity analysis configuration"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "directives"
+          ],
+          "type": "object"
+        },
+        "file": {
+          "description": "File containing security directives to use during the analysis. This key is mutually exclusive with the \"config\" key.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "files-configuration": {
+      "properties": {
+        "emit-minified-js": {
+          "default": false,
+          "description": "Specifies whether to enable capture of minified JavaScript files.",
+          "type": "boolean"
+        },
+        "exclude-glob": {
+          "description": "Glob pattern that specifies the set of source files to exclude from capture. Note that any include glob patterns and regular expressions are processed prior to handling exclude glob patterns and regular expressions.",
+          "type": "string"
+        },
+        "exclude-regex": {
+          "description": "Regular expression that specifies the set of source files to exclude from capture. Note that any include glob patterns and regular expressions are processed prior to handling exclude glob patterns and regular expressions.",
+          "type": "string"
+        },
+        "include-dirs": {
+          "description": "List of directory basenames to include for capture, which would normally have been excluded. By default, directories named \"vendor\" or \"node_modules\" are excluded, as are directories whose names begin with \".\"",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "include-glob": {
+          "description": "Glob pattern that specifies the set of source files to capture.",
+          "type": "string"
+        },
+        "include-list-file": {
+          "description": "File containing the paths of source files to capture, one per line. Include and exclude glob patterns and regular expressions are applied to determine which of these files are actually captured.",
+          "type": "string"
+        },
+        "include-regex": {
+          "description": "Regular expression that specifies the set of source files to capture.",
+          "type": "string"
+        },
+        "java-version": {
+          "description": "Specifies the Java version to use when parsing and emitting Java source files with buildless capture.",
+          "type": "string"
+        },
+        "library-dirs": {
+          "description": "List of directories to look in for dependencies to use during capture.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "library-files": {
+          "description": "List of file dependencies to use during capture.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "webapp-archives": {
+          "description": "Specifies information about which web-application archives should be captured. By default all webapp archives are captured.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/webapp-archive-configuration"
+          }
+        }
+      },
+      "type": "object"
+    },
+    "import-scm-configuration": {
+      "properties": {
+        "cov-import-scm-args": {
+          "description": "Additional arguments to pass to cov-import-scm following capture.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "filename-regex": {
+          "description": "Regular expression that specifies the set of files for which to import change information.",
+          "type": "string"
+        },
+        "ms-delay": {
+          "description": "Delay in milliseconds between calls to the underlying SCM.",
+          "type": "integer"
+        },
+        "scm": {
+          "description": "The name of the source control management system.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "jobs-configuration": {
+      "oneOf": [
+        {
+          "required": [
+            "auto"
+          ]
+        },
+        {
+          "required": [
+            "count"
+          ]
+        },
+        {
+          "required": [
+            "max"
+          ]
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "auto"
+                ]
+              },
+              {
+                "required": [
+                  "count"
+                ]
+              },
+              {
+                "required": [
+                  "max"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "auto": {
+          "default": false,
+          "description": "If true, the number of analysis workers to run in parallel is based on the amount of memory and number of logical processors in the machine. This is the default for a non-Flexnet license. This key is mutually exclusive with the \"count\" and \"max\" keys.",
+          "type": "boolean"
+        },
+        "count": {
+          "description": "Number of analysis workers to run in parallel. This key is mutually exclusive with the \"auto\" and \"max\" keys.",
+          "type": "integer"
+        },
+        "max": {
+          "description": "Maximum number of analysis worker to run in parallel, subject to limits on the amount of memory and number of logical processors in the machine. A value of 8 is the default for a Flexnet license. This key is mutually exclusive with the \"auto\" and \"count\" keys.",
+          "type": "integer"
+        },
+        "override-worker-limit": {
+          "default": false,
+          "description": "Allows the number of analysis workers to exceed the recommended value. This key may only be used with the \"count\" key.",
+          "type": "boolean"
+        }
+      }
+    },
+    "languages-configuration": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "exclude"
+              ]
+            },
+            {
+              "required": [
+                "include"
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "exclude",
+              "include"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "description": "Specifies the languages for which the source code should be excluded in the capture. This key is mutually exclusive with the \"include\" key.",
+          "items": {
+            "enum": [
+              "apex",
+              "c-family",
+              "csharp",
+              "dart",
+              "go",
+              "java",
+              "javascript",
+              "kotlin",
+              "php",
+              "python",
+              "ruby",
+              "swift",
+              "vb",
+              "configuration"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "include": {
+          "description": "Specifies the languages for which the source code should be included in the capture. This key is mutually exclusive with the \"exclude\" key.",
+          "items": {
+            "enum": [
+              "apex",
+              "c-family",
+              "csharp",
+              "dart",
+              "go",
+              "java",
+              "javascript",
+              "kotlin",
+              "php",
+              "python",
+              "ruby",
+              "swift",
+              "vb",
+              "configuration"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "parallel-translate-configuration": {
+      "properties": {
+        "enabled": {
+          "description": "Specifies whether cov-translate parallelization should be enabled.",
+          "type": "boolean"
+        },
+        "processes": {
+          "description": "Specifies the number of cov-emit processes to be run in parallel by cov-translate when multiple files are seen on a single native compiler invocation. A value of 0 will use the number of logical processors in the machine.",
+          "type": "integer"
+        }
+      }
+    },
+    "parse-warnings-configuration": {
+      "properties": {
+        "enabled": {
+          "description": "Enables parse warnings, recovery warnings, and semantic warnings that are produced by the cov-build command so that they appear as defects in Coverity Connect. By default, this is disabled if the aggressiveness level is low, and enabled if the aggressiveness level is medium or high.",
+          "type": "boolean"
+        }
+      }
+    },
+    "resolved-coding-standard-configuration": {
+      "properties": {
+        "deviations": {
+          "description": "List of deviations for this standard.",
+          "items": {
+            "$ref": "#/$defs/coding-standard-deviation"
+          },
+          "type": "array"
+        },
+        "title": {
+          "description": "Name of this code compliance configuration.",
+          "type": "string"
+        },
+        "version": {
+          "default": "2.0",
+          "description": "Version of this code compliance configuration.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    },
+    "sigma-configuration": {
+      "properties": {
+        "enable-check-set": {
+          "description": "List of check sets to enable.",
+          "items": {
+            "enum": [
+              "all",
+              "cis",
+              "default",
+              "empty"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "malicious-url-patterns-file": {
+          "description": "List of files containing malicious URL patterns.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "snapshot-configuration": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "date"
+              ]
+            },
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "reference"
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "date",
+              "id",
+              "reference"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "date": {
+          "description": "Date and time of snapshot to use for comparison report. The value should be of the form \"YYYY-MM-DDThh:mm:ss\" where date and time are separated by a \"T\", optionally followed by a time zone specification consisting of either \"Z\" denoting UTC or a \"+\" or \"-\" character followed by colon-separated hours and minutes east of UTC. Example: \"2023-12-27T13:21:05-08:00\". If no time zone is specified, the local time zone is assumed. This key is mutually exclusive with the \"id\" and \"reference\" keys.",
+          "type": "string"
+        },
+        "id": {
+          "description": "ID of snapshot to use for comparison report. This key is mutually exclusive with the \"date\" and \"reference\" keys.",
+          "type": "integer"
+        },
+        "reference": {
+          "description": "One of \"idir\", \"latest\", or \"scm\". \"idir\" will use the snapshot created closest to, but not after, the creation date of the intermediate directory. \"latest\" will use the snapshot with the latest code-version date in the specified stream. \"scm\" will query the SCM to determine the version that was most recently checked out or updated, and then use the closest snapshot. This key is mutually exclusive with the \"date\" and \"id\" keys.",
+          "items": {
+            "enum": [
+              "idir",
+              "latest",
+              "scm"
+            ],
+            "type": "string"
+          }
+        }
+      }
+    },
+    "specific-checker-configuration": {
+      "patternProperties": {
+        ".*": {
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Indicates whether this checker should be enabled or not.",
+              "type": "boolean"
+            },
+            "options": {
+              "description": "Options to set for each checker. The map key is the name of the checker option and the string value is the setting to use for the option.",
+              "patternProperties": {
+                ".*": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "specific-coding-standard-configuration": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "config"
+              ]
+            },
+            {
+              "required": [
+                "file"
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "required": [
+              "config",
+              "file"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/resolved-coding-standard-configuration",
+          "description": "This key specifies the coding standard configuration for the given coding standard. The actual type of this key is specific to the particular coding standard. This key is mutually exclusive with the \"file\" key. A temporary configuration file will be generated containing the in-line configuration and then passed to \"cov-analyze\" using the \"--coding-standard-config <config_file>\" option."
+        },
+        "file": {
+          "description": "This specifies the filename containing the configuration to use for the corresponding coding standard. This key is mutually exclusive with the \"config\" key.",
+          "type": "string"
+        },
+        "pre-canned": {
+          "description": "This key specifies the name of a \"pre-canned\" coding standard configuration to use. The available pre-canned coding standard configurations depend on the coding standard in question. Refer to Coverity's documentation for details on the \"pre-canned\" configurations.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "webapp-archive-configuration": {
+      "properties": {
+        "path": {
+          "description": "Specifies the path to the web application archive file or path to the directory containing the exploded web application.",
+          "type": "string"
+        },
+        "validate-webapp": {
+          "default": false,
+          "description": "Indicates whether the web-app should be checked to see if it is valid during capture. The validation check checks that there is a \"/WEB-INF/web.xml\" file and that > 20% of classes for the web application were captured.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  }
+}

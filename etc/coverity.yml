@@ -4,59 +4,156 @@ analyze:
     all: true # Enables all checkers except a few which need to be explicitly enabled. See: https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title11
     rule: true # Enables "rule" checkers. See: https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#refsection_dgq_pf2_4qb__list-checkers
     checker-config:
-      # Explicitly disabled checkers
-      # Add any checker that needs to be disabled below
+      # --- Disabled checkers ---
+      # These checkers generate overwhelming noise with near-zero confirmed-bug
+      # yield in MongoDB's codebase. Each has been evaluated against historical
+      # Coverity data before being disabled.
+
+      # Reports deeply recursive or large stack frames. MongoDB's recursive
+      # algorithms are intentional; this produced only false positives.
       STACK_USE:
         enabled: false
+      # Flags places where std::move could be used instead of copy. Performance
+      # hint only — not a correctness issue, and MongoDB's style already uses
+      # move semantics where it matters.
       COPY_INSTEAD_OF_MOVE:
         enabled: false
+      # Enforces the Rule of Zero/Three/Five. MongoDB's class hierarchy
+      # intentionally diverges from this rule in many places; confirmed-bug
+      # yield was near zero.
       RULE_OF_ZERO_THREE_FIVE:
         enabled: false
+      # Reports functions with control-flow paths that have no return statement.
+      # The C++ compiler already enforces this; Coverity produces false positives
+      # on noreturn functions it cannot resolve.
       MISSING_RETURN:
         enabled: false
+      # Flags calls to sleep() in production code. MongoDB uses sleep
+      # intentionally in retry loops and test infrastructure.
       SLEEP:
         enabled: false
+      # Recommends passing large objects by const reference instead of by value.
+      # Performance hint only — not a correctness issue.
       PASS_BY_VALUE:
         enabled: false
+      # Warns about non-trivial initialization order of global/static objects.
+      # MongoDB's initialization patterns are intentional and reviewed; this
+      # produced only noise.
       GLOBAL_INIT_ORDER:
         enabled: false
+      # Flags functions that may propagate exceptions into a noexcept context.
+      # MongoDB uses noexcept extensively and intentionally, but this checker is
+      # too noisy: Coverity conservatively assumes exception propagation through
+      # many idioms that are safe in practice, yielding near-zero confirmed bugs.
       UNCAUGHT_EXCEPT:
         enabled: false
-      # Explicitly enabled checkers
-      # Add any checker that needs to be explicitly enabled below
+      # Reports classes with a copy constructor but no assignment operator (or
+      # vice versa). In C++20 this is almost always intentional. Historical data
+      # showed 9,129 occurrences with zero confirmed bugs.
+      COPY_WITHOUT_ASSIGN:
+        enabled: false
+      # Similar to COPY_WITHOUT_ASSIGN — classes missing one of the Rule of
+      # Three members. Historical data showed 3,384 occurrences, 138 classified
+      # as Intentional, and zero confirmed bugs.
+      MISSING_COPY_OR_ASSIGN:
+        enabled: false
+
+      # --- Explicitly enabled checkers ---
+      # Some checkers are off by default and must be turned on explicitly.
+
+      # Detects reads beyond the end of an array when the overrun direction is
+      # reversed (e.g. negative index). Not enabled by --all; enabled here
+      # because MongoDB has had confirmed bugs of this class.
       REVERSE_OVERRUN:
         enabled: true
-      # Checkers with customized options
+
+      # --- Checkers with customized options ---
+
+      # Fires when an assertion macro contains a side-effectful expression that
+      # is not evaluated in release builds (e.g. assert(++i > 0)). MongoDB's own
+      # always-evaluating assertion macros are excluded via macro_name_lacks:
+      # fassert, iassert, massert, tassert, uassert, and invariant always
+      # evaluate their arguments regardless of build type.
+      # Note: dassert is intentionally NOT excluded — it is a debug-only macro
+      # that expands to nothing in release builds, so side effects inside it
+      # are genuine bugs that this checker should report.
       ASSERT_SIDE_EFFECT:
         enabled: true
-        macro_name_lacks: ^[fimtu]assert
+        options:
+          macro_name_lacks: ^([fimtu]assert|invariant)
+      # Reports callers that ignore a return value that indicates success/failure.
+      # stat_threshold:80 requires 80% of call sites to check the return value
+      # before the checker fires, reducing noise on functions where ignoring the
+      # return is idiomatic.
       CHECKED_RETURN:
         enabled: true
         options:
-          stat_threshold: 80
+          stat_threshold: "80"
+      # Finds unreachable or redundant code paths. no_dead_default suppresses
+      # findings on intentional default cases in switch statements.
+      # report_redundant_tests catches always-true/always-false conditions.
       DEADCODE:
         enabled: true
         options:
-          no_dead_default: true
-          report_redundant_tests: true
+          no_dead_default: "true"
+          report_redundant_tests: "true"
+      # Reports functions that can return null but whose callers dereference the
+      # result without a null check. stat_threshold:50 requires at least 50% of
+      # callers to check for null before firing, balancing sensitivity with noise.
       NULL_RETURNS:
         enabled: true
         options:
-          stat_threshold: 50
-  # Enables additional filtering of potential defects by using an additional false-path pruner (FPP). More details here https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title5
+          stat_threshold: "50"
+    # CodeXM custom checkers. This is the schema-native key for specifying .cxm
+    # files (preferred over the equivalent --codexm flag in cov-analyze-args).
+    # See etc/coverity_models/codexm/CODEXM_LESSONS_LEARNED.md for authoring guidance.
+    codexm:
+      # Detects network-supplied uncompressedSize passed to SharedBuffer::allocate
+      # without bounds validation (CVE-2025-14847 class).
+      # See etc/coverity_models/codexm/network_size_unchecked_alloc.cxm for details.
+      - etc/coverity_models/codexm/network_size_unchecked_alloc.cxm
+  # Runs an additional false-path pruner (FPP) pass after the main analysis.
+  # This eliminates findings that are only reachable via infeasible paths (e.g.
+  # contradictory conditions), at the cost of ~5-10% longer analysis time.
   constraint-fpp: true
-  # Enables function pointer models if the analysis fails to analyze certain function pointers calls. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title9
+  # Builds models for function-pointer call targets that the analysis cannot
+  # resolve statically. Improves precision for callbacks and vtable-heavy code.
   c-cpp-fnptr: true
-  # Enables full, virtual-call resolution. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title9
+  # Resolves virtual function calls to their concrete overrides. Without this,
+  # Coverity treats virtual calls conservatively and misses bugs in overrides.
   c-cpp-virtual: true
-  # Enables call graph matrics. The callgraph-metrics files store information about which functions are analyzed. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title20
+  # Emits per-function callgraph metrics into the idir. Used for transparency
+  # reporting; does not affect which defects are found.
   callgraph-metrics: true
   cov-analyze-args:
-    # Specifies the name for the configuration file, which allows you to change the parse warnings that pass through a warning filter. More details at https://documentation.blackduck.com/bundle/coverity-docs/page/commands/topics/cov-analyze.html#ariaid-title9
+    # Filters parse-phase warnings through a named config file, allowing
+    # specific RW.* and PW.* diagnostics to be suppressed without disabling
+    # the underlying checker. See etc/coverity_parse_warnings.conf for the list.
     - --parse-warnings-config
     - etc/coverity_parse_warnings.conf
+    # User model file teaching Coverity about MongoDB-specific assertion and
+    # initialization patterns. See etc/coverity_models/mongo_models.cpp for details.
+    # coverity_build.sh compiles mongo_models.cpp into xmldb format via cov-make-library
+    # and places it at <covIdir>/config/user_models.xmldb, which is the default location
+    # cov-analyze checks automatically (no --model-file flag required).
+    # Exclude Bazel cache paths that contain external dependencies (e.g. Abseil, gRPC) fetched
+    # to the CI agent's working directory. These are not MongoDB source and produce false positives.
+    - --tu-pattern
+    - "!file('/data/mci/*')"
+    # Exclude findings whose translation unit is the MongoDB toolchain (GCC STL,
+    # libstdc++, etc.). --tu-pattern suppresses *defect reports* in those TUs;
+    # it does NOT prevent Coverity from following them for type and template
+    # resolution. Template instantiations triggered by MongoDB source (e.g.
+    # std::make_unique<Foo>()) are still analysed — only native toolchain-header
+    # defects are filtered out.
+    - --tu-pattern
+    - "!file('/opt/mongodbtoolchain/*')"
 
 commit:
   connect:
+    # url is required by the schema but injected at runtime by the devprod_coverity
+    # module (evergreen/coverity_tasks.yml). This placeholder satisfies schema
+    # validation; it is overridden before cov-commit-defects runs.
+    url: https://placeholder.coverity.invalid
     stream: mongo.master
     project: "MongoDB master"

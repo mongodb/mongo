@@ -2178,6 +2178,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if initializers:
             initializers_str = ": " + ", ".join(initializers)
 
+        if default_init:
+            # Required scalar fields are initialized to preparsedValue<T>() (e.g. -1 for
+            # integers), but Coverity cannot trace through the ADL template dispatch to confirm
+            # this. Optional fields are intentionally left in their default-constructed state.
+            # uninit_ctor suppresses the whole-constructor UNINIT_CTOR finding; uninit_member
+            # suppresses per-field UNINIT findings on the first read of those fields.
+            self._writer.write_line("// coverity[uninit_ctor]")
+            self._writer.write_line("// coverity[uninit_member]")
         with self._block("%s %s {" % (constructor.get_definition(), initializers_str), "}"):
             db_field = None
             for field in _get_required_fields(struct):
@@ -3429,6 +3437,9 @@ return std::move({varname});""")
                             )
 
                     self._gen_server_parameter_deprecated_aliases(param_no, param)
+                    # coverity[resource_leak]: ownership is transferred into the global
+                    # ServerParameterSet registry; the parameter is intentionally not freed.
+                    self._writer.write_line("// coverity[resource_leak]")
                     self._writer.write_line(
                         "registerServerParameter(std::move(scp_%d));" % (param_no)
                     )

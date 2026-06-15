@@ -519,6 +519,11 @@ private:
 
             // Slow path.
 
+            // _data is protected by the atomic _fpInfo ref-count protocol: _modMutex is held
+            // by any writer that wants to modify _data, and the writer clears _kActiveBit and
+            // waits for the ref count to reach zero before proceeding. Because we incremented
+            // the ref count above while _kActiveBit was still set, _data is stable here.
+            // coverity[missing_lock] - _fpInfo ref-count serves as the reader lock here
             if (!pred(_data))
                 return LockHandle{this, false};
 

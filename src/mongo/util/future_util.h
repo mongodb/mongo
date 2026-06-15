@@ -149,6 +149,8 @@ private:
 template <typename BodyCallable, typename ConditionCallable, typename Delay>
 class [[nodiscard]] AsyncTryUntilWithDelay {
 public:
+    // coverity[uninit_ctor]: callable and delay template members are fully initialized via
+    // std::move in the initializer list; Coverity cannot trace through complex template types.
     explicit AsyncTryUntilWithDelay(BodyCallable&& body, ConditionCallable&& condition, Delay delay)
         : _body(std::move(body)), _condition(std::move(condition)), _delay(delay) {}
 
@@ -187,6 +189,8 @@ private:
     class TryUntilLoopWithDelay
         : public std::enable_shared_from_this<TryUntilLoopWithDelay<SleepableExecutor>> {
     public:
+        // coverity[uninit_ctor]: all members initialized via std::move in the initializer
+        // list; Coverity cannot trace initialization through complex executor/callable types.
         TryUntilLoopWithDelay(SleepableExecutor executor,
                               BodyCallable executeLoopBody,
                               ConditionCallable shouldStopIteration,
@@ -302,6 +306,8 @@ private:
 template <typename BodyCallable, typename ConditionCallable>
 class [[nodiscard]] AsyncTryUntil {
 public:
+    // coverity[uninit_ctor]: callable template members are fully initialized via std::move
+    // in the initializer list; Coverity cannot trace through complex callable types.
     explicit AsyncTryUntil(BodyCallable&& body, ConditionCallable&& condition)
         : _body(std::move(body)), _condition(std::move(condition)) {}
 
@@ -388,6 +394,8 @@ private:
      */
     class TryUntilLoop : public std::enable_shared_from_this<TryUntilLoop> {
     public:
+        // coverity[uninit_ctor]: all members initialized via std::move in the initializer
+        // list; Coverity cannot trace initialization through complex executor/callable types.
         TryUntilLoop(ExecutorPtr executor,
                      BodyCallable executeLoopBody,
                      ConditionCallable shouldStopIteration,
