@@ -31,8 +31,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
+#include "mongo/db/version_context.h"
+#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -81,6 +84,23 @@ public:
             // received by a lagging secondary config server node.
             VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
+            boost::optional<FixedFCVRegion> fcvRegion{boost::in_place_init, opCtx};
+
+            const auto accessLevel = sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                VersionContext::getDecoration(opCtx), fcvRegion.get()->acquireFCVSnapshot());
+            tassert(12806400,
+                    "CloneAuthoritativeMetadata invoked on a fully non-authoritative shard",
+                    accessLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed);
+            // If the shard is already authoritative, return OK by idempotency.
+            // Cloning again is unsafe due to concurrent reads, chunk migrations, etc.
+            // Note we can not tassert here; see SERVER-128064 for how this path may be reached.
+            if (accessLevel == AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed) {
+                LOGV2(12806401,
+                      "Skipping CloneAuthoritativeMetadata: shard is already authoritative",
+                      "accessLevel"_attr = idlSerialize(accessLevel));
+                return;
+            }
+
             auto coordinatorDoc = CloneAuthoritativeMetadataCoordinatorDocument();
             coordinatorDoc.setShardingCoordinatorMetadata(
                 {{NamespaceString::kConfigShardCatalogDatabasesNamespace,
@@ -88,8 +108,10 @@ public:
 
             auto service = ShardingCoordinatorService::getService(opCtx);
             auto coordinator = checked_pointer_cast<CloneAuthoritativeMetadataCoordinator>(
-                service->getOrCreateInstance(
-                    opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), *fcvRegion));
+            // Release the FCV region while the coordinator executes
+            fcvRegion.reset();
+
             coordinator->getCompletionFuture().get(opCtx);
         }
 

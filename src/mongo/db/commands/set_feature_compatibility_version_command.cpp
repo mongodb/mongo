@@ -1077,6 +1077,10 @@ private:
 
         _userCollectionsUassertsForUpgrade(opCtx, requestedVersion, originalVersion);
 
+        uassert(ErrorCodes::Error(549180),
+                "Failing upgrade due to 'failUpgrading' failpoint set",
+                !failUpgrading.shouldFail());
+
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         // This helper function is for any user collections creations, changes or deletions that
@@ -1100,10 +1104,6 @@ private:
                 cloneAuthoritativeDatabaseMetadataOnShards(opCtx);
             }
         }
-
-        uassert(ErrorCodes::Error(549180),
-                "Failing upgrade due to 'failUpgrading' failpoint set",
-                !failUpgrading.shouldFail());
     }
 
     // _runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new feature
