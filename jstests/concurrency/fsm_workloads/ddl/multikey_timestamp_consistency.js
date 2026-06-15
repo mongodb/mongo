@@ -908,7 +908,8 @@ export const $config = (function () {
         },
 
         dropAndRecreateColl: function dropAndRecreateColl(db, collName) {
-            // SERVER-126285 only affects fixtures without primary-driven index builds.
+            // Non-primary-driven index builds are known to leak multikey changes on the primary
+            // side in the presence of aborted transactions. See SERVER-126285.
             if (!this.usesPrimaryDrivenIndexBuilds) return;
 
             const myCollName = pickPoolColl();
@@ -929,7 +930,8 @@ export const $config = (function () {
         },
 
         dropAndRecreateIndex: function dropAndRecreateIndex(db, collName) {
-            // SERVER-126285 only affects fixtures without primary-driven index builds.
+            // Non-primary-driven index builds are known to leak multikey changes on the primary
+            // side in the presence of aborted transactions. See SERVER-126285.
             if (!this.usesPrimaryDrivenIndexBuilds) return;
 
             const myCollName = pickPoolColl();
@@ -971,9 +973,9 @@ export const $config = (function () {
         }
         this.secondaryHost = cluster.getSecondaryHost(db.getName());
 
-        // TODO (SERVER-126285): alwasy allow the dropAndRecreate* states. Currently only enabled
-        // for primary-driven index builds, which avoid the IndexBuildInterceptor multikey-path leak
-        // (SERVER-126285) that makes multikeyness inconsistent between primary and secondaries.
+        // Certain transitions are only enabled when using primary-driven index builds, which avoid
+        // the IndexBuildInterceptor multikey-path leak (see SERVER-126285) that makes multikeyness
+        // inconsistent between primary and secondaries.
         this.usesPrimaryDrivenIndexBuilds = PersistenceProviderUtil.allNodesHavePropertyWithValue(
             db,
             "mustUsePrimaryDrivenIndexBuilds",
