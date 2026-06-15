@@ -119,7 +119,7 @@ resmoke_suite_test(
         "//jstests/concurrency/reshard_collection_util:reshard_collection_util.js",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CONCURRENCY_DATA,
-    shard_count = 20,
+    shard_count = 40,
     tags = [
         "ci-release-critical",
         "common",
@@ -215,7 +215,7 @@ resmoke_suite_test(
     name = "replica_sets_lag_oplog_application_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_lag_oplog_application_jscore_passthrough.yml",
     data = CORE_DATA,
-    shard_count = 20,
+    shard_count = 40,
     tags = [
         "ci-release-critical",
         "common",
@@ -237,7 +237,7 @@ resmoke_suite_test(
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 20,
+    shard_count = 48,
     tags = [
         "causally_consistent",
         "ci-release-critical",
@@ -292,7 +292,7 @@ resmoke_suite_test(
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 20,
+    shard_count = 50,
     tags = [
         "ci-release-critical",
         "jscore",
@@ -371,6 +371,7 @@ resmoke_suite_test(
         "large",
         "random_name",
         "repl",
+        "resources:cpu:2",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
@@ -541,7 +542,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "replica_sets_uninitialized_fcv_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:suites/replica_sets_uninitialized_fcv_jscore_passthrough.yml",
-    shard_count = 8,
+    shard_count = 20,
     tags = [
         "ci-default",
         "replica_sets",
@@ -565,6 +566,235 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/session_jscore_passthrough.yml",
     shard_count = 8,
     tags = ["ci-default"],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "bulk_write_causally_consistent_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/bulk_write_causally_consistent_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "bulk_write",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "bulk_write_replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/bulk_write_replica_sets_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "bulk_write",
+        "ci-default",
+        "resources:cpu:2",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "bulk_write_replica_sets_multi_stmt_txn_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/bulk_write_replica_sets_multi_stmt_txn_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "bulk_write",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "bulk_write_sharded_collections_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/bulk_write_sharded_collections_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "bulk_write",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "bulk_write_targeted_override",
+    config = "//buildscripts/resmokeconfig:suites/bulk_write_targeted_override.yml",
+    data = [
+        "//jstests/sharding/updateOne_without_shard_key:all_subpackage_javascript_files",
+    ],
+    shard_count = 50,
+    tags = [
+        "bulk_write",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_initial_sync",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_initial_sync.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "initsync",
+        "large",
+        "requires_replicated_fast_count_recovery",
+        "resources:cpu:2",
+        "sharded",
+        "stepdowns",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "large",
+        "resources:cpu:2",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_stepdown_terminate_kill_primary_with_balancer.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "kill_terminate",
+        "resources:cpu:2",
+        "sharded",
+        "stepdowns",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_fcbis_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_fcbis_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "fcbis",
+        "large",
+        "replica_sets",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_initsync_lagged_sync_source_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_initsync_lagged_sync_source_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "large",
+        "replica_sets",
+        "requires_replicated_fast_count_recovery",
+        "san",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_initsync_static_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_initsync_static_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_multi_stmt_txn_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_multi_stmt_txn_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "large",
+        "replica_sets",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_reconfig_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_reconfig_jscore_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "secondary_reads_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/secondary_reads_passthrough.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+    ],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",
@@ -644,7 +874,7 @@ resmoke_suite_test(
 resmoke_suite_test(
     name = "replica_sets_kill_secondaries_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_kill_secondaries_jscore_passthrough.yml",
-    shard_count = 8,
+    shard_count = 40,
     tags = [
         "ci-default",
         "ignore_on_code_coverage",
