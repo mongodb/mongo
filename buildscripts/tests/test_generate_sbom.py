@@ -11,7 +11,7 @@ import unittest
 
 from buildscripts.sbom.config import get_semver_from_release_version, regex_semver
 from buildscripts.sbom.endorctl_utils import EndorCtl
-from buildscripts.sbom.sbom_utils import is_valid_purl
+from buildscripts.sbom.sbom_utils import is_valid_purl, reconcile_dependency_refs
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -230,6 +230,88 @@ class TestMetadataFile(unittest.TestCase):
                     or all(self.VERSION_TAG not in p for p in properties),
                     f"Component must have version tag '{self.VERSION_TAG}' in all or none of bom-ref, version and purl and/or cpe. {properties})",
                 )
+
+
+class TestReconcileDependencyRefs(unittest.TestCase):
+    """Tests for sbom_utils.reconcile_dependency_refs."""
+
+    def _make_sbom(self, components, meta_component, dependencies):
+        return {
+            "metadata": {"component": meta_component},
+            "components": components,
+            "dependencies": dependencies,
+        }
+
+    def test_adds_stub_for_component_missing_from_dependencies(self):
+        sbom = self._make_sbom(
+            components=[{"bom-ref": "pkg:npm/foo@1.0"}],
+            meta_component={"bom-ref": "pkg:github/org/repo@main"},
+            dependencies=[{"ref": "pkg:github/org/repo@main", "dependsOn": []}],
+        )
+        reconcile_dependency_refs(sbom)
+        refs = {d["ref"] for d in sbom["dependencies"]}
+        self.assertIn("pkg:npm/foo@1.0", refs)
+
+    def test_removes_orphaned_top_level_ref(self):
+        sbom = self._make_sbom(
+            components=[],
+            meta_component={"bom-ref": "pkg:github/org/repo@main"},
+            dependencies=[
+                {"ref": "pkg:github/org/repo@main", "dependsOn": []},
+                {"ref": "pkg:cargo/gone@1.0", "dependsOn": []},
+            ],
+        )
+        reconcile_dependency_refs(sbom)
+        refs = {d["ref"] for d in sbom["dependencies"]}
+        self.assertNotIn("pkg:cargo/gone@1.0", refs)
+
+    def test_orphaned_depends_on_entries_are_not_pruned_by_reconcile(self):
+        """reconcile_dependency_refs removes orphaned top-level refs but not dependsOn entries;
+        that cleanup is done separately in generate_sbom.py before writing the private SBOM."""
+        sbom = self._make_sbom(
+            components=[{"bom-ref": "pkg:npm/foo@1.0"}],
+            meta_component={"bom-ref": "pkg:github/org/repo@main"},
+            dependencies=[
+                {
+                    "ref": "pkg:github/org/repo@main",
+                    "dependsOn": ["pkg:npm/foo@1.0", "pkg:cargo/gone@1.0"],
+                },
+                {"ref": "pkg:npm/foo@1.0", "dependsOn": []},
+            ],
+        )
+        reconcile_dependency_refs(sbom)
+        root_dep = next(d for d in sbom["dependencies"] if d["ref"] == "pkg:github/org/repo@main")
+        # The orphaned dependsOn ref survives reconcile — the caller must prune it.
+        self.assertIn("pkg:cargo/gone@1.0", root_dep["dependsOn"])
+
+    def test_generate_sbom_depends_on_pruning_logic(self):
+        """Simulate the inline pruning in generate_sbom.py that runs before write."""
+        meta_bom = {
+            "metadata": {"component": {"bom-ref": "pkg:github/org/repo@main"}},
+            "components": [{"bom-ref": "pkg:npm/foo@1.0"}],
+            "dependencies": [
+                {
+                    "ref": "pkg:github/org/repo@main",
+                    "dependsOn": ["pkg:npm/foo@1.0", "pkg:cargo/gone@1.0"],
+                },
+                {"ref": "pkg:npm/foo@1.0", "dependsOn": ["pkg:cargo/also-gone@2.0"]},
+            ],
+        }
+
+        final_component_refs = {meta_bom["metadata"]["component"]["bom-ref"]} | {
+            c["bom-ref"] for c in meta_bom["components"]
+        }
+        pruned_count = 0
+        for dep in meta_bom.get("dependencies", []):
+            before = len(dep.get("dependsOn", []))
+            dep["dependsOn"] = [r for r in dep.get("dependsOn", []) if r in final_component_refs]
+            pruned_count += before - len(dep["dependsOn"])
+
+        self.assertEqual(pruned_count, 2)
+        root = next(d for d in meta_bom["dependencies"] if d["ref"] == "pkg:github/org/repo@main")
+        self.assertEqual(root["dependsOn"], ["pkg:npm/foo@1.0"])
+        foo = next(d for d in meta_bom["dependencies"] if d["ref"] == "pkg:npm/foo@1.0")
+        self.assertEqual(foo["dependsOn"], [])
 
 
 if __name__ == "__main__":

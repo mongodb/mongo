@@ -1160,6 +1160,25 @@ def main() -> None:
                     )
                     license_entry["license"]["id"] = new
 
+    # Prune orphaned dependsOn refs before writing. These arise when the endorctl scan
+    # fails or is skipped: components are dropped from the SBOM but stale references to
+    # their BomRefs remain in other components' dependsOn lists, which causes silkbomb
+    # upload validation to reject the SBOM.
+    final_component_refs = {meta_bom["metadata"]["component"]["bom-ref"]} | {
+        c["bom-ref"] for c in meta_bom["components"]
+    }
+    pruned_depends_on_count = 0
+    for dep in meta_bom.get("dependencies", []):
+        before = len(dep.get("dependsOn", []))
+        dep["dependsOn"] = [r for r in dep.get("dependsOn", []) if r in final_component_refs]
+        pruned_depends_on_count += before - len(dep["dependsOn"])
+    if pruned_depends_on_count:
+        logger.warning(
+            "DEPENDENCIES: Pruned %d orphaned dependsOn reference(s) with no matching component. "
+            "This may indicate that a prior endorctl scan failed or was skipped.",
+            pruned_depends_on_count,
+        )
+
     check_components_and_dependencies(meta_bom, sbom_out_internal_path)
     write_sbom_json_file(meta_bom, sbom_out_internal_path)
 

@@ -23,4 +23,9 @@ if [ -n "${RUST_SETUP_DIR}" ]; then
     cd "$(dirname "${RUST_SETUP_DIR}")"
 fi
 
+# endorctl's bundled libgit2 does not recognize the 'partialclone' extension
+# that Evergreen's git.get_project adds when cloning with clone_depth. Remove it
+# so the scan can open the repository.
+git config --unset-all extensions.partialclone 2>/dev/null || true
+
 "${ENDORCTL_PATH:-endorctl}" scan

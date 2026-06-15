@@ -4,6 +4,7 @@ Script that opens a PR using a bot to update SBOM-related files.
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -79,6 +80,53 @@ def read_text_file(path: str) -> str:
         return f"ERROR: An error occurred while reading '{path}': {e}"
 
 
+def summarize_sbom_changes(old_content: str, new_content: str) -> str:
+    """Return a markdown bullet list summarising CycloneDX component changes."""
+    try:
+        old = json.loads(old_content) if old_content else {}
+        new = json.loads(new_content)
+    except (json.JSONDecodeError, ValueError):
+        return "- _(could not parse SBOM JSON)_"
+
+    def by_name(sbom: dict) -> dict:
+        return {c["bom-ref"].split("@")[0]: c for c in sbom.get("components", [])}
+
+    old_comps = by_name(old)
+    new_comps = by_name(new)
+    added = sorted(set(new_comps) - set(old_comps))
+    removed = sorted(set(old_comps) - set(new_comps))
+    changed = sorted(
+        k
+        for k in set(old_comps) & set(new_comps)
+        if old_comps[k].get("version", "") != new_comps[k].get("version", "")
+    )
+
+    def label(comps: dict, keys: list) -> str:
+        parts = []
+        for k in keys:
+            c = comps[k]
+            n = c.get("name", k)
+            v = c.get("version", "")
+            parts.append(f"`{n} {v}`")
+        return ", ".join(parts)
+
+    lines = []
+    if added:
+        lines.append(f"- **Added ({len(added)}):** {label(new_comps, added)}")
+    if removed:
+        lines.append(f"- **Removed ({len(removed)}):** {label(old_comps, removed)}")
+    if changed:
+        diffs = [
+            f"`{old_comps[k].get('name', k)}` "
+            f"{old_comps[k].get('version', '')} → {new_comps[k].get('version', '')}"
+            for k in changed
+        ]
+        lines.append(f"- **Version changed ({len(changed)}):** {', '.join(diffs)}")
+    if not lines:
+        lines.append("- No component changes")
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -136,8 +184,14 @@ if __name__ == "__main__":
     repo = get_repository(args.github_owner, args.github_repo, args.app_id, private_key)
     print("repo: ", repo)
 
+    # Strip the Endor Labs tool version when comparing SBOMs so a version-only bump
+    # does not trigger a new PR commit.
+    PATTERN = r'{"name":"(Endor Labs Inc|EndorLabsInc)","version":"[^"]*"}'
+    REPL = r'{"name":"\1","version":""}'
+
     # Collect all changed files first so we can commit them in a single commit
     changed_files: list[tuple[str, str]] = []
+    original_contents: dict[str, str] = {}  # base-branch content, used for the diff summary
 
     for file_path in SBOM_FILES:
         print(f"Checking file '{file_path}' on '{args.base_branch}' for changes...")
@@ -153,6 +207,8 @@ if __name__ == "__main__":
             else:
                 raise
 
+        original_contents[file_path] = original_content
+
         try:
             with open(file_path, "r", encoding="utf-8") as file:
                 new_content = file.read()
@@ -160,15 +216,17 @@ if __name__ == "__main__":
             print("Error: file '%s' not found.", file_path)
             continue
 
-        # Compare content with removed Endor Labs version to avoid triggering a new SBOM on only that change
-        PATTERN = r'{"name":"EndorLabsInc","version":".*"}'
-        REPL = r'{"name":"EndorLabsInc","version":""}'
         original_content_compare = re.sub(PATTERN, REPL, "".join(original_content.split()))
         new_content_compare = re.sub(PATTERN, REPL, "".join(new_content.split()))
 
         if original_content_compare != new_content_compare:
             print(f"Detected change in '{file_path}'")
             changed_files.append((file_path, new_content))
+
+    # files_to_commit is the subset of changed_files that also differ from the PR branch.
+    # Keeping the two sets separate lets us always maintain the PR when there is a diff
+    # vs. the base branch, while avoiding redundant commits on re-runs.
+    files_to_commit: list[tuple[str, str]] = []
 
     if changed_files:
         # Ensure the branch exists (create if needed)
@@ -177,35 +235,54 @@ if __name__ == "__main__":
         # Small delay to reduce chance of 409s immediately after branch creation
         time.sleep(5)
 
-        # Base commit/tree on the current head of the PR branch
-        branch_ref = repo.get_branch(args.new_branch)
-        base_commit_sha = branch_ref.commit.sha
-        base_commit = repo.get_git_commit(base_commit_sha)
-        base_tree = repo.get_git_tree(base_commit_sha)
+        # Determine which files actually differ from what is already on the PR branch so
+        # we do not push a no-op commit on every nightly re-run while the PR is open.
+        for file_path, new_content in changed_files:
+            try:
+                pr_file = repo.get_contents(file_path, ref=f"refs/heads/{args.new_branch}")
+                pr_content = pr_file.decoded_content.decode()
+            except GithubException as e:
+                if e.status in [403, 404]:
+                    pr_content = ""
+                else:
+                    raise
+            pr_content_compare = re.sub(PATTERN, REPL, "".join(pr_content.split()))
+            new_content_compare = re.sub(PATTERN, REPL, "".join(new_content.split()))
+            if pr_content_compare != new_content_compare:
+                files_to_commit.append((file_path, new_content))
 
-        # Build tree elements for all changed files in one go
-        elements = [
-            InputGitTreeElement(
-                path=path,
-                mode="100644",
-                type="blob",
-                content=content,
+        if files_to_commit:
+            # Base commit/tree on the current head of the PR branch
+            branch_ref = repo.get_branch(args.new_branch)
+            base_commit_sha = branch_ref.commit.sha
+            base_commit = repo.get_git_commit(base_commit_sha)
+            base_tree = repo.get_git_tree(base_commit_sha)
+
+            # Build tree elements for all changed files in one go
+            elements = [
+                InputGitTreeElement(
+                    path=path,
+                    mode="100644",
+                    type="blob",
+                    content=content,
+                )
+                for path, content in files_to_commit
+            ]
+
+            new_tree = repo.create_git_tree(elements, base_tree)
+
+            commit_message = "Update SBOM-related files: " + ", ".join(
+                path for path, _ in files_to_commit
             )
-            for path, content in changed_files
-        ]
+            print("Creating single commit with message:", commit_message)
 
-        new_tree = repo.create_git_tree(elements, base_tree)
+            new_commit = repo.create_git_commit(commit_message, new_tree, [base_commit])
 
-        commit_message = "Update SBOM-related files: " + ", ".join(
-            path for path, _ in changed_files
-        )
-        print("Creating single commit with message:", commit_message)
-
-        new_commit = repo.create_git_commit(commit_message, new_tree, [base_commit])
-
-        # Move branch ref to new commit (single commit containing all file updates)
-        ref = repo.get_git_ref(f"heads/{args.new_branch}")
-        ref.edit(new_commit.sha)
+            # Move branch ref to new commit (single commit containing all file updates)
+            ref = repo.get_git_ref(f"heads/{args.new_branch}")
+            ref.edit(new_commit.sha)
+        else:
+            print("PR branch already has the latest SBOM files. Skipping commit.")
 
     if changed_files:
         # Get open PR or create new PR
@@ -231,10 +308,37 @@ if __name__ == "__main__":
             print("pull_request: ", pull_request)
 
         if args.saved_warnings:
-            pr_comment = "### The following warnings were output by the SBOM generation script:\n"
+            pr_comment = "### SBOM Component Changes\n\n"
+            for file_path, new_content in changed_files:
+                if not file_path.endswith(".json"):
+                    continue
+                pr_comment += f"**{file_path}**\n"
+                pr_comment += summarize_sbom_changes(
+                    original_contents.get(file_path, ""), new_content
+                )
+                pr_comment += "\n\n"
+            pr_comment += "---\n\n"
+            pr_comment += "### The following warnings were output by the SBOM generation script:\n"
             if os.path.isfile(args.saved_warnings):
                 pr_comment += read_text_file(args.saved_warnings)
-            comment = pull_request.create_issue_comment(pr_comment)
-            print("Added PR comment: ", comment)
+
+            # Edit the bot's existing comment rather than adding a new one each run,
+            # which would clutter long-lived PRs.
+            BOT_LOGIN = "mongo-pr-bot[bot]"
+            existing_comment = next(
+                (
+                    c
+                    for c in pull_request.get_issue_comments()
+                    if c.user.login == BOT_LOGIN
+                    and "The following warnings were output by the SBOM generation script" in c.body
+                ),
+                None,
+            )
+            if existing_comment:
+                existing_comment.edit(pr_comment)
+                print("Updated existing PR comment: ", existing_comment)
+            else:
+                comment = pull_request.create_issue_comment(pr_comment)
+                print("Added PR comment: ", comment)
     else:
         print(f"Files '{SBOM_FILES}' have not changed. Skipping PR.")
