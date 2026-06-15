@@ -71,26 +71,17 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const BSONObj& userCmd) {
     // Create the RemoteCommandRequest.
     auto request = createManageSearchIndexRemoteCommandRequest(opCtx, nss, uuid, userCmd);
-    auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
-    auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
-        std::move(promise));
 
     // Schedule and run the RemoteCommandRequest on the TaskExecutor.
     auto taskExecutor = executor::getSearchIndexManagementTaskExecutor(opCtx->getServiceContext());
-    auto scheduleResult = taskExecutor->scheduleRemoteCommand(
-        std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
-    if (!scheduleResult.isOK()) {
-        // Since the command failed to be scheduled, the callback above did not and will not run.
-        // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
-        // with the executor's thread.
-        promisePtr->setError(scheduleResult.getStatus());
-    }
+    auto future =
+        taskExecutor->scheduleRemoteCommand(std::move(request), CancellationToken::uncancelable());
 
     auto response = future.getNoThrow(opCtx);
     try {
         // Pull out the command response. Throw if the command did not reach the remote server.
         uassertStatusOK(response.getStatus());
-        uassertStatusOK(response.getValue().response.status);
+        uassertStatusOK(response.getValue().status);
     } catch (const ExceptionFor<ErrorCodes::HostUnreachable>&) {
         // Don't expose the remote server host-and-port information to clients.
         // Also, change the error code to a non-retryable error code. A remote search index
@@ -100,7 +91,7 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
         uasserted(ErrorCodes::CommandFailed,
                   "Error connecting to Search Index Management service.");
     }
-    BSONObj responseData = response.getValue().response.data;
+    BSONObj responseData = response.getValue().data;
 
     // Check the command response for an error and throw if there is one.
     uassertStatusOK(getStatusFromCommandResult(responseData));

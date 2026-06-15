@@ -210,21 +210,12 @@ std::vector<executor::TaskExecutorCursor> establishCursorsForSearchMetaStage(
 BSONObj getExplainResponse(const ExpressionContext* expCtx,
                            const executor::RemoteCommandRequest& request,
                            executor::TaskExecutor* taskExecutor) {
-    auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
-    auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
-        std::move(promise));
-    auto scheduleResult = taskExecutor->scheduleRemoteCommand(
-        std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
-    if (!scheduleResult.isOK()) {
-        // Since the command failed to be scheduled, the callback above did not and will not run.
-        // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
-        // with the executor's thread.
-        promisePtr->setError(scheduleResult.getStatus());
-    }
+    auto future =
+        taskExecutor->scheduleRemoteCommand(std::move(request), CancellationToken::uncancelable());
     auto response = future.getNoThrow(expCtx->opCtx);
     uassertStatusOK(response.getStatus());
-    uassertStatusOK(response.getValue().response.status);
-    BSONObj responseData = response.getValue().response.data;
+    uassertStatusOK(response.getValue().status);
+    BSONObj responseData = response.getValue().data;
     uassertStatusOK(getStatusFromCommandResult(responseData));
     auto explain = responseData["explain"];
     uassert(4895000,

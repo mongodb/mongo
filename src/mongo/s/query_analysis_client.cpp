@@ -124,23 +124,14 @@ BSONObj QueryAnalysisClient::_executeCommandOnPrimaryRemote(
     invariant(executor, "Failed to run command since the executor has not been initialized");
 
     executor::RemoteCommandRequest request(std::move(hostAndPort), dbName, cmdObj, opCtx);
-    auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
-    auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
-        std::move(promise));
 
-    auto scheduleResult = executor->scheduleRemoteCommand(
-        std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
-    if (!scheduleResult.isOK()) {
-        // Since the command failed to be scheduled, the callback above did not and will not run.
-        // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
-        // with the executor's thread.
-        promisePtr->setError(scheduleResult.getStatus());
-    }
+    auto future =
+        executor->scheduleRemoteCommand(std::move(request), CancellationToken::uncancelable());
 
-    auto rcr = uassertStatusOK(future.getNoThrow(opCtx));
-    uassertStatusOK(rcr.response.status);
-    uassertCmdStatusFn(rcr.response.data);
-    return rcr.response.data;
+    auto response = uassertStatusOK(future.getNoThrow(opCtx));
+    uassertStatusOK(response.status);
+    uassertCmdStatusFn(response.data);
+    return response.data;
 }
 
 BSONObj QueryAnalysisClient::executeCommandOnPrimary(

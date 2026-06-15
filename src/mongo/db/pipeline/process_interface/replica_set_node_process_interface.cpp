@@ -251,28 +251,19 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     }
 
     executor::RemoteCommandRequest request(std::move(hostAndPort), ns.dbName(), cmd.obj(), opCtx);
-    auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
-    auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
-        std::move(promise));
-    auto scheduleResult = taskExecutor->scheduleRemoteCommand(
-        std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
-    if (!scheduleResult.isOK()) {
-        // Since the command failed to be scheduled, the callback above did not and will not run.
-        // Thus, it is safe to fulfill the promise here without worrying about synchronizing access
-        // with the executor's thread.
-        promisePtr->setError(scheduleResult.getStatus());
+    auto future =
+        taskExecutor->scheduleRemoteCommand(std::move(request), CancellationToken::uncancelable());
+
+    auto swResponse = future.getNoThrow(opCtx);
+    if (!swResponse.isOK()) {
+        return swResponse.getStatus();
     }
 
-    auto response = future.getNoThrow(opCtx);
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-
-    auto rcr = std::move(response.getValue());
+    mongo::executor::RemoteCommandResponse response = std::move(swResponse.getValue());
 
     // Update the OperationTimeTracker associated with 'opCtx' with the operation time from the
     // primary's response.
-    auto operationTime = rcr.response.data[kOperationTimeFieldName];
+    auto operationTime = response.data[kOperationTimeFieldName];
     if (operationTime) {
         invariant(operationTime.type() == BSONType::bsonTimestamp);
         LogicalTime logicalTime(operationTime.timestamp());
@@ -280,26 +271,26 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
         operationTimeTracker->updateOperationTime(logicalTime);
     }
 
-    if (!rcr.response.status.isOK()) {
-        return rcr.response.status;
+    if (!response.status.isOK()) {
+        return response.status;
     }
 
-    auto commandStatus = getStatusFromCommandResult(rcr.response.data);
+    auto commandStatus = getStatusFromCommandResult(response.data);
     if (!commandStatus.isOK()) {
         return commandStatus;
     }
 
-    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(rcr.response.data);
+    auto writeConcernStatus = getWriteConcernStatusFromCommandResult(response.data);
     if (!writeConcernStatus.isOK()) {
         return writeConcernStatus;
     }
 
-    auto writeStatus = getFirstWriteErrorStatusFromCommandResult(rcr.response.data);
+    auto writeStatus = getFirstWriteErrorStatusFromCommandResult(response.data);
     if (!writeStatus.isOK()) {
         return writeStatus;
     }
 
-    return rcr.response.data;
+    return response.data;
 }
 
 void ReplicaSetNodeProcessInterface::_attachGenericCommandArgs(OperationContext* opCtx,
