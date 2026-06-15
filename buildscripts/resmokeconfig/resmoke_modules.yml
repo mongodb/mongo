@@ -1,6 +1,9 @@
 enterprise:
   jstest_dirs:
     - src/mongo/db/modules/enterprise/jstests
+streams:
+  suite_dirs:
+    - buildscripts/modules/streams/suites
 atlas:
   fixture_dirs:
     - buildscripts/modules/atlas/fixtures

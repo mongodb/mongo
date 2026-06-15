@@ -827,7 +827,7 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         print("No errors found in evergreen yaml")
 
     if lint_all or any(
-        "jstests/streams" in file or "resmokeconfig/suites/streams" in file
+        "jstests/streams" in file or "modules/streams/suites/streams" in file
         for file in files_to_lint
     ):
         lr.run_bazel("//buildscripts:streams_suite_coverage_linter")

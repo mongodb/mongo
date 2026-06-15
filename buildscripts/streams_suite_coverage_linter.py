@@ -24,7 +24,7 @@ JSTESTS_DIRS = [
     ENTERPRISE_MODULE / "jstests" / "streams_kafka",
 ]
 
-SUITE_DIR = REPO_ROOT / "buildscripts" / "resmokeconfig" / "suites"
+SUITE_DIR = REPO_ROOT / "buildscripts" / "modules" / "streams" / "suites"
 
 SUITE_GLOB = "streams*.yml"
 
@@ -159,7 +159,7 @@ def main() -> int:
             print(f"  {f}")
         print(
             "\nPlease add each test to the appropriate streams*.yml suite config in\n"
-            "buildscripts/resmokeconfig/suites/\n"
+            "buildscripts/modules/streams/suites/\n"
             "\n"
             "If a file is not a standalone test (e.g. a utility loaded by other tests),\n"
             "add its filename pattern to NON_TEST_PATTERNS or NON_TEST_DIRS in\n"
