@@ -5,6 +5,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   requires_majority_read_concern,
+ *   requires_profiling,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
