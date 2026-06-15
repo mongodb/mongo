@@ -87,22 +87,6 @@ mongo_cc_library(
     ],
 )
 
-# Standalone library for the concrete host query execution context. Kept separate (and free of
-# host_adapters / aggregation_stage deps) so lower layers such as host/aggregation_stage can build a
-# MongoExtensionQueryExecutionContext from an ExpressionContext without a dependency cycle.
-mongo_cc_library(
-    name = "query_execution_context",
-    hdrs = [
-        "query_execution_context.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:commands",
-        "//src/mongo/db/extension/host_connector/adapter:query_execution_context_adapter",
-        "//src/mongo/db/pipeline",
-    ],
-)
-
 mongo_cc_library(
     name = "extension_host",
     srcs = [
@@ -114,7 +98,6 @@ mongo_cc_library(
         ":extension_host_utils",
         ":extension_mongot_server_status",
         ":extension_operation_metrics_registry",
-        ":query_execution_context",
         "//src/mongo:base",
         "//src/mongo/db:commands",
         "//src/mongo/db:shard_role_api",

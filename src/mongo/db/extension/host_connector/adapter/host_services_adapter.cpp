@@ -30,6 +30,8 @@
 
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/host/query_execution_context.h"
+#include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/public/extension_error_types_gen.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -133,10 +135,27 @@ void uassertWellFormedStageSpec(const BSONObj& specObj,
     return wrapCXXAndConvertExceptionToStatus([&]() {
         *node = nullptr;
 
-        // Take ownership of the DPL callback's userData/destroy hook up front, before anything that
-        // can throw, so the destroy hook runs exactly once even when stage-spec parsing or
+        // Wrap the raw C callback and destroy hook into std::function up front, before anything
+        // that can throw, so the deleter runs exactly once even when stage-spec parsing or
         // validation below fails (otherwise a malformed bsonSpec would leak userData).
-        host::DPLCallbackOwner dplOwner{dplCallback, dplCallbackUserData, dplCallbackDestroy};
+        host::DPLCallbackOwner::CallbackInvoker invoker;
+        if (dplCallback) {
+            invoker = [dplCallback, dplCallbackUserData](
+                          ExpressionContext* expCtx,
+                          ::MongoExtensionByteBuf** rawSort,
+                          ::MongoExtensionByteBuf** rawMerge) -> ::MongoExtensionStatus* {
+                auto wrappedCtx = std::make_unique<host::QueryExecutionContext>(expCtx);
+                QueryExecutionContextAdapter execCtxAdapter(std::move(wrappedCtx));
+                return dplCallback(dplCallbackUserData, &execCtxAdapter, rawSort, rawMerge);
+            };
+        }
+        std::function<void()> deleter;
+        if (dplCallbackDestroy) {
+            deleter = [dplCallbackDestroy, dplCallbackUserData]() {
+                dplCallbackDestroy(dplCallbackUserData);
+            };
+        }
+        host::DPLCallbackOwner dplOwner(std::move(invoker), std::move(deleter));
 
         // The DocumentResultsAndMetadataAstNode constructor takes its own owned copy, so the view
         // here does not need to be owned.

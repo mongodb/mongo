@@ -65,6 +65,17 @@ std::unique_ptr<host::AggStageAstNode> makeDRMAstNode(host::DPLCallbackOwner dpl
                                                                      std::move(dplOwner));
 }
 
+// Wraps a raw C DPL callback + userData into a CallbackInvoker for test use. The tests don't need a
+// real QueryExecutionContext, so the wrapper passes nullptr for that parameter.
+host::DPLCallbackOwner::CallbackInvoker makeTestInvoker(
+    ::MongoExtensionDocResultsDPLCallback callback, void* userData = nullptr) {
+    return [callback, userData](ExpressionContext*,
+                                ::MongoExtensionByteBuf** rawSort,
+                                ::MongoExtensionByteBuf** rawMerge) -> ::MongoExtensionStatus* {
+        return callback(userData, /*execCtx*/ nullptr, rawSort, rawMerge);
+    };
+}
+
 // Minimal DPL callback: emits a {score: -1} merge-sort pattern and no metadata merge pipeline.
 ::MongoExtensionStatus* scoreSortNoMergeDplCallback(void*,
                                                     ::MongoExtensionQueryExecutionContext*,
@@ -260,11 +271,11 @@ TEST(HostAstNodeCloneTest, CloneDRMNodeViaAdapterPreservesName) {
 }
 
 TEST(HostAstNodeCloneTest, CloneDRMNodePreservesDPLCallback) {
-    // The DPL callback owner is single-use: its destroy hook must run exactly once across all
-    // shared copies. clone() must SHARE the owner with the clone - neither dropping it (which would
-    // run destroy when the original alone is destroyed) nor giving the clone an independent owner
-    // (which would run destroy a second time). 'userData' points at a counter the destroy hook
-    // increments, so we can observe both failure modes through a clone.
+    // The DPL callback owner is single-use: its deleter must run exactly once across all shared
+    // copies. clone() must SHARE the owner with the clone - neither dropping it (which would run
+    // the deleter when the original alone is destroyed) nor giving the clone an independent owner
+    // (which would run the deleter a second time). The deleter increments a counter so we can
+    // observe both failure modes through a clone.
     int destroyCount = 0;
     ::MongoExtensionDocResultsDPLCallback callback =
         [](void*,
@@ -273,12 +284,11 @@ TEST(HostAstNodeCloneTest, CloneDRMNodePreservesDPLCallback) {
            ::MongoExtensionByteBuf**) -> ::MongoExtensionStatus* {
         return nullptr;
     };
-    void (*destroyFn)(void*) = [](void* userData) {
-        ++*static_cast<int*>(userData);
-    };
-
     {
-        host::DPLCallbackOwner dplOwner{callback, &destroyCount, destroyFn};
+        host::DPLCallbackOwner dplOwner{makeTestInvoker(callback, &destroyCount),
+                                        [&destroyCount]() {
+                                            ++destroyCount;
+                                        }};
         ASSERT_TRUE(dplOwner.hasCallback());
 
         auto drm = makeDRMAstNode(std::move(dplOwner));
@@ -296,6 +306,14 @@ TEST(HostAstNodeCloneTest, CloneDRMNodePreservesDPLCallback) {
     ASSERT_EQ(destroyCount, 1);
 }
 
+TEST(HostAstNodeDplTest, NullInvokerHasCallbackReturnsFalse) {
+    host::DPLCallbackOwner owner;
+    ASSERT_FALSE(owner.hasCallback());
+
+    host::DPLCallbackOwner ownerWithEmptyInvoker(host::DPLCallbackOwner::CallbackInvoker{});
+    ASSERT_FALSE(ownerWithEmptyInvoker.hasCallback());
+}
+
 // getOrInvoke() is the bridge logic: it invokes the extension's single-use C callback, takes
 // ownership of the returned buffers, and parses them into a ShardedPlanSpec.
 TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeParsesSortAndMergePipeline) {
@@ -307,7 +325,7 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeParsesSortAndMergePipeline) {
         *mergeOut = new ByteBuf(BSON_ARRAY(BSON("$limit" << 1) << BSON("$skip" << 2)));
         return &ExtensionStatusOK::getInstance();
     };
-    host::DPLCallbackOwner owner{callback, /*userData*/ nullptr, /*destroyFn*/ nullptr};
+    host::DPLCallbackOwner owner{makeTestInvoker(callback)};
     ASSERT_TRUE(owner.hasCallback());
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -319,7 +337,7 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeParsesSortAndMergePipeline) {
 }
 
 TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeHandlesNullMergePipeline) {
-    host::DPLCallbackOwner owner{scoreSortNoMergeDplCallback, nullptr, nullptr};
+    host::DPLCallbackOwner owner{makeTestInvoker(scoreSortNoMergeDplCallback)};
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto& result = owner.getOrInvoke(expCtx.get());
@@ -341,7 +359,7 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeInvokesAtMostOnce) {
         *mergeOut = nullptr;
         return &ExtensionStatusOK::getInstance();
     };
-    host::DPLCallbackOwner owner{callback, &callCount, nullptr};
+    host::DPLCallbackOwner owner{makeTestInvoker(callback, &callCount)};
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto& first = owner.getOrInvoke(expCtx.get());
@@ -356,7 +374,7 @@ TEST(HostAstNodeDplTest, DplCallbackGetOrInvokeInvokesAtMostOnce) {
 // SERVER-126255) produces the merge sort pattern from the callback.
 TEST(HostAstNodeDplBridgeTest, ExpandWiresCallbackIntoDistributedPlanLogic) {
     auto drmNode =
-        makeDRMAstNode(host::DPLCallbackOwner{scoreSortNoMergeDplCallback, nullptr, nullptr});
+        makeDRMAstNode(host::DPLCallbackOwner{makeTestInvoker(scoreSortNoMergeDplCallback)});
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto stages = drmNode->expandToDocumentSource(expCtx);

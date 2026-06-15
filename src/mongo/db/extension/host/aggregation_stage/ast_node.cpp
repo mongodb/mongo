@@ -30,8 +30,6 @@
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 
 #include "mongo/bson/bson_validate.h"
-#include "mongo/db/extension/host/query_execution_context.h"
-#include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -42,37 +40,31 @@
 
 namespace mongo::extension::host {
 
-// Shared control block for DPLCallbackOwner. Owns the extension callback's lifecycle (running the
-// destroy hook exactly once when the last shared copy is destroyed) and caches the single
-// invocation's parsed output.
+// Shared control block for DPLCallbackOwner. Runs the deleter exactly once when the last shared
+// copy is destroyed, and caches the single invocation's parsed output.
 struct DPLCallbackOwner::State {
-    State(::MongoExtensionDocResultsDPLCallback callback, void* userData, void (*destroyFn)(void*))
-        : callback(callback), userData(userData), destroyFn(destroyFn) {}
+    State(CallbackInvoker invoker, std::function<void()> deleter)
+        : invoker(std::move(invoker)), deleter(std::move(deleter)) {}
     State(const State&) = delete;
     State& operator=(const State&) = delete;
     ~State() {
-        if (destroyFn) {
-            destroyFn(userData);
+        if (deleter) {
+            deleter();
         }
     }
 
-    ::MongoExtensionDocResultsDPLCallback callback;
-    void* userData;
-    void (*destroyFn)(void*);
+    CallbackInvoker invoker;
+    std::function<void()> deleter;
     bool invoked = false;
     DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec result;
 };
 
-DPLCallbackOwner::DPLCallbackOwner(::MongoExtensionDocResultsDPLCallback callback,
-                                   void* userData,
-                                   void (*destroyFn)(void*))
-    // Allocate the control block whenever there is anything to manage (a callback to carry and/or a
-    // destroy hook to run), so the destroy hook still runs for a cleanup-only owner.
-    : _state((callback || destroyFn) ? std::make_shared<State>(callback, userData, destroyFn)
-                                     : nullptr) {}
+DPLCallbackOwner::DPLCallbackOwner(CallbackInvoker invoker, std::function<void()> deleter)
+    : _state((invoker || deleter) ? std::make_shared<State>(std::move(invoker), std::move(deleter))
+                                  : nullptr) {}
 
 bool DPLCallbackOwner::hasCallback() const {
-    return _state && _state->callback;
+    return _state && _state->invoker;
 }
 
 const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec&
@@ -87,12 +79,6 @@ DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     // call or a later validation step throws.
     state.invoked = true;
 
-    // Expose the host execution context (opCtx, namespace) to the extension callback, which it may
-    // need to reach the host while computing the sharded plan (e.g. $search's network call to
-    // mongot). The adapter is host-owned and only valid for the duration of the call.
-    auto wrappedCtx = std::make_unique<QueryExecutionContext>(expCtx);
-    host_connector::QueryExecutionContextAdapter execCtxAdapter(std::move(wrappedCtx));
-
     ::MongoExtensionByteBuf* rawSort = nullptr;
     ::MongoExtensionByteBuf* rawMerge = nullptr;
     // Declared before the invocation so the output buffers are owned (and freed) even if status
@@ -100,7 +86,7 @@ DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     ExtensionByteBufHandle sortHandle(nullptr);
     ExtensionByteBufHandle mergeHandle(nullptr);
     invokeCAndConvertStatusToException([&] {
-        auto* status = state.callback(state.userData, &execCtxAdapter, &rawSort, &rawMerge);
+        auto* status = state.invoker(expCtx, &rawSort, &rawMerge);
         sortHandle = ExtensionByteBufHandle(rawSort);
         mergeHandle = ExtensionByteBufHandle(rawMerge);
         return status;
