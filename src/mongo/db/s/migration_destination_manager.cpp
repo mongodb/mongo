@@ -107,6 +107,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -516,6 +517,9 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
                                           ScopedReceiveChunk scopedReceiveChunk,
                                           const StartChunkCloneRequest& cloneRequest,
                                           const WriteConcernOptions& writeConcern) {
+    // Reject the operation if the replica set write block is enabled.
+    ReplicaSetWriteBlockState::get(opCtx)->checkIfIncomingMigrationAllowedToStart(opCtx);
+
     boost::optional<UUID> migrationId;
     stdx::thread migrateThreadHandle;
     std::unique_ptr<SessionCatalogMigrationDestination> sessionMigration;

@@ -154,6 +154,16 @@ bool ReplicaSetWriteBlockState::isReplicaSetDeletionsBlockingEnabled_forTest() c
     return _deletionsBlocked.load();
 }
 
+void ReplicaSetWriteBlockState::checkIfIncomingMigrationAllowedToStart(
+    OperationContext* opCtx) const {
+    const auto info = _writeBlockInfo.load();
+    uassert(
+        ErrorCodes::ReplicaSetWritesBlocked,
+        fmt::format("Chunk migrations blocked because replica set writes are blocked, reason: {}",
+                    idl::serialize(info.reason)),
+        !info.blocked || ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
+}
+
 void ReplicaSetWriteBlockState::appendReplicaSetWritesBlockCounters(BSONObjBuilder& bob) const {
     BSONObjBuilder result(bob.subobjStart("replicaSetWritesBlockCounters"));
     for (size_t reasonIdx = 0; reasonIdx < idlEnumCount<ReplicaSetWritesBlockReasonEnum>;

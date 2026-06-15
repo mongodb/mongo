@@ -773,4 +773,63 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             },
         );
     });
+
+    it("Test that a new incoming chunk migration is rejected when blockReplicaSetWrites is enabled", function () {
+        // Shard the collection and move the chunk containing {x: 1} to shard1, so it can be
+        // migrated back to shard0 (the to-be-blocked recipient).
+        assert.commandWorked(this.testDB.createCollection(this.shardedCollName));
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: this.nns, key: {x: 1}}));
+        assert.commandWorked(this.testShardedColl.insert({x: -1}));
+        assert.commandWorked(this.testShardedColl.insert({x: 1}));
+        assert.commandWorked(this.st.s.adminCommand({split: this.nns, middle: {x: 0}}));
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveChunk: this.nns,
+                find: {x: 1},
+                to: this.st.shard1.shardName,
+                _waitForDelete: true,
+            }),
+        );
+
+        // Enable replica set write blocking on shard0, the destination of the migration below.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // A new incoming chunk migration to shard0 must be rejected while the block is enabled.
+        assert.commandFailedWithCode(
+            this.st.s.adminCommand({
+                moveChunk: this.nns,
+                find: {x: 1},
+                to: this.st.shard0.shardName,
+            }),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+        assert.eq(
+            1,
+            this.st.shard1.getDB(this.testDBName)[this.shardedCollName].find({x: 1}).itcount(),
+            "Expected {x: 1} to be on shard1 after failed migration following write block is enabled",
+        );
+
+        // Disable replica set write blocking and verify that incoming chunk migrations to shard0 succeed again.
+        disableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                moveChunk: this.nns,
+                find: {x: 1},
+                to: this.st.shard0.shardName,
+                _waitForDelete: true,
+            }),
+        );
+        assert.eq(
+            1,
+            this.st.shard0.getDB(this.testDBName)[this.shardedCollName].find({x: 1}).itcount(),
+            "Expected {x: 1} to be on shard0 after migration following write block disable",
+        );
+    });
 });

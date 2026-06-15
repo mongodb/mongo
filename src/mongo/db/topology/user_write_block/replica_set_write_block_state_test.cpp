@@ -494,5 +494,47 @@ TEST_F(ReplicaSetWriteBlockStateTest, ConvertToCappedAllowedWhenBypassEnabled) {
     ASSERT_OK(state->checkIfConvertToCappedAllowedToStart(opCtx.get(), nss));
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingMigrationAllowedWhenWriteBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    ASSERT_DOES_NOT_THROW(state->checkIfIncomingMigrationAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingMigrationBlockedWhenWriteBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    ASSERT_THROWS_CODE(state->checkIfIncomingMigrationAllowedToStart(opCtx.get()),
+                       AssertionException,
+                       ErrorCodes::ReplicaSetWritesBlocked);
+
+    state->disableReplicaSetWriteBlocking();
+    ASSERT_DOES_NOT_THROW(state->checkIfIncomingMigrationAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, IncomingMigrationAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    ASSERT_DOES_NOT_THROW(state->checkIfIncomingMigrationAllowedToStart(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo

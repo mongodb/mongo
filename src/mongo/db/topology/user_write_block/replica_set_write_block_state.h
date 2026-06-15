@@ -118,6 +118,12 @@ public:
     void checkReplicaSetDeletionsAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
+     * Checks that an incoming chunk migration is allowed to start on this replica set. Throws
+     * ReplicaSetWritesBlocked if incoming migrations are disallowed.
+     */
+    void checkIfIncomingMigrationAllowedToStart(OperationContext* opCtx) const;
+
+    /**
      * Returns whether replica set deletions blocking is enabled, disregarding a specific namespace
      * and the state of WriteBlockBypass. Used for serverStatus.
      */

@@ -305,6 +305,9 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
               false /* fromMigrate */,
               true /* shouldSucceed */);
 
+    // Migration-sourced inserts/updates, e.g., chunk migration, bypass write blocking.
+    runInsertAndUpdate(opCtx.get(), userColl, true /* fromMigrate */, true /* shouldSucceed */);
+
     // admin/local/config: exempt from replica set write blocking; insert/update/delete allowed.
     runInsertAndUpdate(opCtx.get(),
                        NamespaceString::createNamespaceString_forTest("admin.coll"),

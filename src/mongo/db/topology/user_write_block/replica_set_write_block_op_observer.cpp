@@ -59,9 +59,8 @@ void ReplicaSetWriteBlockOpObserver::_checkReplicaSetWriteAllowed(
     if (!_isReplSetAndCanAcceptWritesForNamespace(opCtx, nss)) {
         return;
     }
-    auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
     if (!fromMigrate) {
-        replicaSetWriteBlockState->checkReplicaSetWritesAllowed(opCtx, nss, opType);
+        ReplicaSetWriteBlockState::get(opCtx)->checkReplicaSetWritesAllowed(opCtx, nss, opType);
     }
 }
 
