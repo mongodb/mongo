@@ -43,10 +43,8 @@ namespace {
 
 using mongo::unittest::match::BSONObjUnorderedEQ;
 using mongo::unittest::match::IsBSONElement;
-using mongo::unittest::match::StatusIs;
 using mongo::unittest::match::StatusIsOK;
 using ::testing::ElementsAre;
-using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::Matcher;
 using ::testing::Not;
@@ -70,49 +68,75 @@ public:
         auto storage = BSON("v" << doc);
         return headers.set(storage.firstElement(), /*tenantId=*/boost::none);
     }
+
+    Status setHeaders(int v) {
+        auto storage = BSON("v" << v);
+        return headers.set(storage.firstElement(), /*tenantId=*/boost::none);
+    }
 };
 
-TEST_F(HttpHeadersTest, HttpExportHeadersSetFromBson) {
-    // Verify headers can be set and are stored
-    ASSERT_OK(setHeaders(BSON("Authorization" << "Bearer tok")));
-    EXPECT_THAT(getTracingHttpExportHeaders(), SizeIs(1));
+TEST_F(HttpHeadersTest, EmptyDocumentClearsHeaders) {
+    // First populate headers, then set empty doc to verify replacement.
+    ASSERT_OK(setHeaders(BSON("X-Foo" << "bar")));
+    EXPECT_THAT(getTracingHttpExportHeaders(), SizeIs(1u));
 
-    // Verify headers can be updated
-    ASSERT_OK(setHeaders(
-        BSON("Authorization" << "Bearer tok" << "X-Tenant-ID" << "acme" << "X-Empty-Value" << "")));
-    EXPECT_THAT(getTracingHttpExportHeaders(), SizeIs(3));
-
-    // Verify that an empty object causes headers to be cleared
     ASSERT_OK(setHeaders(BSONObj{}));
     EXPECT_THAT(getTracingHttpExportHeaders(), IsEmpty());
 }
 
-TEST_F(HttpHeadersTest, HttpExportHeadersSetFromString) {
-    // Verify setFromString behavior
-    ASSERT_OK(headers.setFromString("{\"Authorization\": \"Bearer tok\"}", boost::none));
-    EXPECT_THAT(getTracingHttpExportHeaders(), SizeIs(1));
-    EXPECT_THAT(getTracingHttpExportHeaders(),
-                ElementsAre(Pair("Authorization", ElementsAre("Bearer tok"))));
+TEST_F(HttpHeadersTest, SecondSetReplacesFirstCompletely) {
+    ASSERT_OK(setHeaders(BSON("X-First" << "one")));
+    ASSERT_OK(setHeaders(BSON("X-Second" << "two")));
 
-    EXPECT_THAT(headers.setFromString("{\"BadBson\":", boost::none),
-                StatusIs(ErrorCodes::BadValue, HasSubstr("convert string to BSON")));
+    const auto& result = getTracingHttpExportHeaders();
+    EXPECT_THAT(result, ElementsAre(Pair("X-Second", ElementsAre("two"))));
 }
 
-TEST_F(HttpHeadersTest, HttpExportHeadersFailurePreservesPreviousValue) {
-    ASSERT_OK(setHeaders(BSON("Authorization" << "Bearer tok")));
-    EXPECT_THAT(getTracingHttpExportHeaders(),
-                ElementsAre(Pair("Authorization", ElementsAre("Bearer tok"))));
+TEST_F(HttpHeadersTest, NonObjectElementFails) {
+    EXPECT_THAT(setHeaders(42), Not(StatusIsOK()));
+}
 
-    // BSON allows empty field names; the parameter must reject them.
-    EXPECT_THAT(setHeaders(BSON("" << "value")),
-                StatusIs(ErrorCodes::BadValue, HasSubstr("empty key")));
-    // BSON allows duplicate field names; the parameter must reject them.
-    EXPECT_THAT(setHeaders(BSON("X-Same" << "first" << "X-Same" << "second")),
-                StatusIs(ErrorCodes::BadValue, HasSubstr("duplicate key")));
+TEST_F(HttpHeadersTest, NonStringValueFails) {
+    EXPECT_THAT(setHeaders(BSON("X-Foo" << 123)), Not(StatusIsOK()));
 
     // Backing store must be unchanged after a failed set().
+    EXPECT_THAT(getTracingHttpExportHeaders(), IsEmpty());
+}
+
+TEST_F(HttpHeadersTest, ArrayValue) {
+    ASSERT_OK(setHeaders(BSON("X-Multi" << BSON_ARRAY("first" << "second"))));
+
     EXPECT_THAT(getTracingHttpExportHeaders(),
-                ElementsAre(Pair("Authorization", ElementsAre("Bearer tok"))));
+                ElementsAre(Pair("X-Multi", ElementsAre("first", "second"))));
+}
+
+TEST_F(HttpHeadersTest, ArrayWithNonStringElementFails) {
+    EXPECT_THAT(setHeaders(BSON("X-Bad" << BSON_ARRAY("good" << 42))), Not(StatusIsOK()));
+
+    // Backing store must be unchanged after a failed set().
+    EXPECT_THAT(getTracingHttpExportHeaders(), IsEmpty());
+}
+
+TEST_F(HttpHeadersTest, DuplicateKeyFails) {
+    // BSON allows duplicate field names; the parameter must reject them.
+    EXPECT_THAT(setHeaders(BSON("X-Foo" << "first" << "X-Foo" << "second")), Not(StatusIsOK()));
+
+    // Backing store must be unchanged after a failed set().
+    EXPECT_THAT(getTracingHttpExportHeaders(), IsEmpty());
+}
+
+TEST_F(HttpHeadersTest, SetFromStringFails) {
+    EXPECT_THAT(headers.setFromString("{\"X-Foo\": \"bar\"}", /*tenantId=*/boost::none),
+                Not(StatusIsOK()));
+}
+
+TEST_F(HttpHeadersTest, AppendRedacts) {
+    // openTelemetryTracingHttpExportHeaders has redact:true, so append always outputs "###".
+    ASSERT_OK(setHeaders(BSON("Authorization" << "Bearer tok")));
+
+    BSONObjBuilder out;
+    headers.append(nullptr, &out, "headers"_sd, /*tenantId=*/boost::none);
+    EXPECT_EQ(out.obj()["headers"].str(), "###");
 }
 
 class ResourceAttributesTest : public unittest::Test {

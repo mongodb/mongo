@@ -50,15 +50,9 @@ server_parameters:
         redact: false
     openTelemetryTracingHttpExportHeaders:
         description: >-
-            A BSON document containing custom headers to send when exporting traces.
-            The field name is the header name and the value is either a string or an array of
-            strings, representing the header value(s).
-            Translates W3C Baggage literals to avoid parsing conflicts on the command line;
-            for example, '{MyCommaValue: the%2Cvalue}' will be decoded as 'the,value'.
-            See https://www.w3.org/TR/baggage/ for more information.
-            Only applies to the HTTP exporter; ignored for file and Prometheus exporters.
-            These headers are merged with any headers already configured via the
-            OTEL_EXPORTER_OTLP_HEADERS or OTEL_EXPORTER_OTLP_TRACES_HEADERS environment variables.
+            A BSON document of to include as HTTP headers when exporting traces. The field name is
+            the header name and the value is either a string or an array of strings, representing
+            the header value(s). Only applies to the HTTP exporter.
         set_at: startup
         cpp_class:
             name: OpenTelemetryTracingHttpExportHeaders

@@ -31,12 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/config.h"
-#include "mongo/otel/utils/bson_to_http_headers.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 
 #include <string>
-#include <vector>
 
 namespace mongo::otel::metrics {
 /**
@@ -51,10 +48,4 @@ MONGO_MOD_PUBLIC Status initialize();
  * NoopMeterProvider. This is not thread-safe.
  */
 MONGO_MOD_PUBLIC void shutdown();
-
-/**
- * Returns the HTTP export headers parsed from openTelemetryMetricsHttpExportHeaders.
- * Each key maps to a list of values to support duplicate header names.
- */
-[[nodiscard]] const HttpHeaderMap& getMetricsHttpExportHeaders();
 }  // namespace mongo::otel::metrics
