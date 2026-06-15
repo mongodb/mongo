@@ -8,6 +8,12 @@ Two invocation modes:
      one of clang_pgo / gcc_pgo to be populated so only one is updated at a time.
   2. CSPGO (--cspgo_url): updates only the CSPGO URL + checksum. Orthogonal to the PGO/BOLT
      flow;
+
+The PGO + BOLT mode runs once per architecture (--arch). All invocations for the same base
+revision share a bot branch (the branch name is derived from the revision), each updating
+only its own architecture's BOLT entries, so concurrent arm64 and x86_64 upload tasks
+converge on a single PR. PGO entries are shared across architectures and only updated by
+the aarch64 invocation.
 """
 
 import argparse
@@ -31,6 +37,10 @@ REPO_NAME = "mongo"
 PROFILE_DATA_FILE_PATH = "bazel/repository_rules/profiling_data.bzl"
 JIRA_SERVER = "https://jira.mongodb.org"
 PROFILE_DATA_OWNING_TEAM = "Product Performance"
+ARCH_TO_BOLT_SUFFIX = {
+    "aarch64": "ARM64",
+    "x86_64": "X86_64",
+}
 
 
 def get_mongo_repository(app_id, private_key):
@@ -72,20 +82,27 @@ def replace_quoted_text_in_tagged_line(text: str, tag: str, new_text: str) -> st
     """
     Replace the text between quotes in a line that starts with a specific tag
     eg. FOO = "replace_this" -> FOO = "new_text"
+
+    The match is anchored to the whole tag at the start of a line so that tags which are
+    prefixes of other tags (eg. ..._URL vs ..._URL_X86_64) cannot collide, and empty
+    current values are replaced correctly.
     """
-    if tag not in text:
+    pattern = rf'^({re.escape(tag)}\s*=\s*")[^"]*(")'
+    replaced, count = re.subn(
+        pattern, lambda match: match.group(1) + new_text + match.group(2), text, flags=re.M
+    )
+    if count == 0:
         print(f"Tag: {tag} did not exist in the file.", file=sys.stderr)
         sys.exit(1)
-    pattern = rf'({tag}.*?"(.*?)")'
-    return re.sub(pattern, lambda match: match.group(0).replace(match.group(2), new_text), text)
+    return replaced
 
 
-def update_bolt_info(file_content: str, new_url: str, new_checksum: str) -> str:
+def update_bolt_info(file_content: str, new_url: str, new_checksum: str, arch_suffix: str) -> str:
     """
-    Updates the bolt url and checksum lines in a file
+    Updates the bolt url and checksum lines for one architecture in a file
     """
-    bolt_url_tag = "DEFAULT_BOLT_DATA_URL"
-    bolt_checksum_tag = "DEFAULT_BOLT_DATA_CHECKSUM"
+    bolt_url_tag = f"DEFAULT_BOLT_DATA_URL_{arch_suffix}"
+    bolt_checksum_tag = f"DEFAULT_BOLT_DATA_CHECKSUM_{arch_suffix}"
     updated_text = replace_quoted_text_in_tagged_line(file_content, bolt_url_tag, new_url)
     return replace_quoted_text_in_tagged_line(updated_text, bolt_checksum_tag, new_checksum)
 
@@ -155,20 +172,71 @@ def create_backport_ticket(version: str):
     return server_issue
 
 
-def create_pr(target_branch: str, new_branch: str, original_file, new_content: str):
+def ensure_branch(repo, target_branch: str, new_branch: str):
     """
-    Opens up a pr for a single file with new contents
+    Ensure the shared bot branch exists, tolerating concurrent creation by another
+    architecture's upload task.
     """
-    target_repo_branch = repo.get_branch(target_branch)
-    ref = f"refs/heads/{new_branch}"
     try:
         repo.get_branch(branch=new_branch)
+        return
     except GithubException as e:
-        if e.status == 404:
-            print(f"Branch doesn't exist, creating branch {new_branch}.")
-            repo.create_git_ref(ref=ref, sha=target_repo_branch.commit.sha)
-        else:
+        if e.status != 404:
             raise
+    try:
+        print(f"Branch doesn't exist, creating branch {new_branch}.")
+        target_repo_branch = repo.get_branch(target_branch)
+        repo.create_git_ref(ref=f"refs/heads/{new_branch}", sha=target_repo_branch.commit.sha)
+    except GithubException as e:
+        # 422: another task created the ref between our check and our create.
+        if e.status != 422:
+            raise
+        print(f"Branch {new_branch} was created concurrently, using it.")
+
+
+def commit_file_update(repo, new_branch: str, apply_edits, max_attempts: int = 3):
+    """
+    Commit the result of apply_edits(content) to new_branch via the contents API.
+
+    The contents API is a compare-and-swap on the file's blob sha, so a concurrent commit
+    from another architecture's task surfaces as a 409. The architectures edit disjoint
+    tagged lines, so refetching and reapplying our edits on top always merges cleanly.
+    """
+    for attempt in range(max_attempts):
+        branch_file = repo.get_contents(PROFILE_DATA_FILE_PATH, ref=f"refs/heads/{new_branch}")
+        new_content = apply_edits(branch_file.decoded_content.decode())
+        try:
+            repo.update_file(
+                path=PROFILE_DATA_FILE_PATH,
+                content=new_content,
+                branch=new_branch,
+                message="Updating profile files.",
+                sha=branch_file.sha,
+            )
+            return
+        except GithubException as e:
+            if e.status != 409 or attempt == max_attempts - 1:
+                raise
+            print(f"Concurrent update to {new_branch} detected, retrying.")
+
+
+def ensure_pr(repo, target_branch: str, new_branch: str):
+    """
+    Ensure an open PR exists for the bot branch.
+
+    create_pull is the atomic guard against concurrent tasks: it fails with 422 when an
+    open PR for this head already exists, so exactly one task creates the PR. The
+    get_pulls pre-check just avoids filing duplicate backport tickets in the common
+    (non-racing) case.
+    """
+    if (
+        repo.get_pulls(
+            state="open", base=target_branch, head=f"{OWNER_NAME}:{new_branch}"
+        ).totalCount
+        > 0
+    ):
+        print(f"An open PR for {new_branch} already exists, not creating another.")
+        return
 
     jira_ticket = "SERVER-110427"
     # This is a versioned backport branch if it stats with v
@@ -181,70 +249,80 @@ def create_pr(target_branch: str, new_branch: str, original_file, new_content: s
         else:
             jira_ticket = "[Jira Ticket Creation Broken]"
 
-    repo.update_file(
-        path=PROFILE_DATA_FILE_PATH,
-        content=new_content,
-        branch=new_branch,
-        message="Updating profile files.",
-        sha=original_file.sha,
-    )
-    repo.create_pull(
-        base=target_branch,
-        head=new_branch,
-        title=f"{jira_ticket} Update profiling data",
-        body="Automated PR updating the profiling data.",
-    )
+    try:
+        repo.create_pull(
+            base=target_branch,
+            head=new_branch,
+            title=f"{jira_ticket} Update profiling data",
+            body="Automated PR updating the profiling data.",
+        )
+    except GithubException as e:
+        message = str(e.data)
+        if e.status == 422 and "pull request already exists" in message:
+            print(f"PR for {new_branch} was created concurrently, nothing to do.")
+        elif e.status == 422 and "No commits between" in message:
+            print(
+                f"{new_branch} has no diff against {target_branch}; profile data is already up to date."
+            )
+        else:
+            raise
 
 
 def create_profile_data_pr(repo, args, target_branch, new_branch):
     """
-    Get the new text needed and create a pr for updating the profiling_data.bzl
+    Apply this architecture's profile updates to the shared bot branch and ensure a PR
+    exists for it. Concurrent invocations for other architectures share the branch and
+    the PR; each edits only its own architecture's lines.
     """
+    arch_suffix = ARCH_TO_BOLT_SUFFIX[args.arch]
     temp_dir = tempfile.mkdtemp()
     bolt_file = os.path.join(temp_dir, "bolt.fdata")
-    clang_pgo_file = os.path.join(temp_dir, "clang_pgo.profdata")
-    gcc_pgo_file = os.path.join(temp_dir, "gcc_pgo.tgz")
 
-    bolt_file_exists = download_file(args.bolt_url, bolt_file)
-    clang_pgo_file_exists = download_file(args.clang_pgo_url, clang_pgo_file)
-    gcc_pgo_file_exists = download_file(args.gcc_pgo_url, gcc_pgo_file)
-
-    # These are not errors because the script can run when no files were meant to be updated.
-    if not bolt_file_exists:
+    # This is not an error because the script can run when no files were meant to be updated.
+    if not download_file(args.bolt_url, bolt_file):
         print(f"Bolt file did not exist at {args.bolt_url}. Not creating PR.")
         sys.exit(0)
+    bolt_checksum = compute_sha256(bolt_file)
 
-    if clang_pgo_file_exists and gcc_pgo_file_exists:
-        print(
-            f"Both clang and gcc had pgo files that existed. Clang: {args.clang_pgo_url} GCC: {args.gcc_pgo_url}. Only one should be updated at a time. Not creating PR."
-        )
-        sys.exit(1)
+    # PGO profiles are IR-level and shared across architectures; only the aarch64
+    # invocation updates them. Other architectures consume the same profile, so
+    # re-uploading it under their own URL would just churn the shared entries.
+    clang_pgo_update = None
+    gcc_pgo_update = None
+    if args.arch == "aarch64":
+        clang_pgo_file = os.path.join(temp_dir, "clang_pgo.profdata")
+        gcc_pgo_file = os.path.join(temp_dir, "gcc_pgo.tgz")
+        clang_pgo_file_exists = download_file(args.clang_pgo_url, clang_pgo_file)
+        gcc_pgo_file_exists = download_file(args.gcc_pgo_url, gcc_pgo_file)
 
-    if not clang_pgo_file_exists and not gcc_pgo_file_exists:
-        print(
-            f"Neither clang nor gcc had pgo files that existed at either {args.clang_pgo_url} or {args.gcc_pgo_url}. Not creating PR."
-        )
-        sys.exit(0)
+        if clang_pgo_file_exists and gcc_pgo_file_exists:
+            print(
+                f"Both clang and gcc had pgo files that existed. Clang: {args.clang_pgo_url} GCC: {args.gcc_pgo_url}. Only one should be updated at a time. Not creating PR."
+            )
+            sys.exit(1)
 
-    profiling_data_file = repo.get_contents(
-        PROFILE_DATA_FILE_PATH, ref=f"refs/heads/{target_branch}"
-    )
-    profiling_data_file_content = profiling_data_file.decoded_content.decode()
+        if not clang_pgo_file_exists and not gcc_pgo_file_exists:
+            print(
+                f"Neither clang nor gcc had pgo files that existed at either {args.clang_pgo_url} or {args.gcc_pgo_url}. Not creating PR."
+            )
+            sys.exit(0)
 
-    profiling_file_updated_text = update_bolt_info(
-        profiling_data_file_content, args.bolt_url, compute_sha256(bolt_file)
-    )
+        if clang_pgo_file_exists:
+            clang_pgo_update = (args.clang_pgo_url, compute_sha256(clang_pgo_file))
+        else:
+            gcc_pgo_update = (args.gcc_pgo_url, compute_sha256(gcc_pgo_file))
 
-    if clang_pgo_file_exists:
-        profiling_file_updated_text = update_clang_pgo_info(
-            profiling_file_updated_text, args.clang_pgo_url, compute_sha256(clang_pgo_file)
-        )
-    else:
-        profiling_file_updated_text = update_gcc_pgo_info(
-            profiling_file_updated_text, args.gcc_pgo_url, compute_sha256(gcc_pgo_file)
-        )
+    def apply_edits(content: str) -> str:
+        content = update_bolt_info(content, args.bolt_url, bolt_checksum, arch_suffix)
+        if clang_pgo_update:
+            content = update_clang_pgo_info(content, *clang_pgo_update)
+        if gcc_pgo_update:
+            content = update_gcc_pgo_info(content, *gcc_pgo_update)
+        return content
 
-    create_pr(target_branch, new_branch, profiling_data_file, profiling_file_updated_text)
+    ensure_branch(repo, target_branch, new_branch)
+    commit_file_update(repo, new_branch, apply_edits)
+    ensure_pr(repo, target_branch, new_branch)
 
 
 def create_cspgo_pr(repo, cspgo_url: str, target_branch: str, new_branch: str):
@@ -258,17 +336,14 @@ def create_cspgo_pr(repo, cspgo_url: str, target_branch: str, new_branch: str):
     if not download_file(cspgo_url, cspgo_file):
         print(f"CSPGO file did not exist at {cspgo_url}. Not creating PR.")
         sys.exit(0)
+    cspgo_checksum = compute_sha256(cspgo_file)
 
-    profiling_data_file = repo.get_contents(
-        PROFILE_DATA_FILE_PATH, ref=f"refs/heads/{target_branch}"
-    )
-    profiling_data_file_content = profiling_data_file.decoded_content.decode()
+    def apply_edits(content: str) -> str:
+        return update_clang_cspgo_info(content, cspgo_url, cspgo_checksum)
 
-    profiling_file_updated_text = update_clang_cspgo_info(
-        profiling_data_file_content, cspgo_url, compute_sha256(cspgo_file)
-    )
-
-    create_pr(target_branch, new_branch, profiling_data_file, profiling_file_updated_text)
+    ensure_branch(repo, target_branch, new_branch)
+    commit_file_update(repo, new_branch, apply_edits)
+    ensure_pr(repo, target_branch, new_branch)
 
 
 if __name__ == "__main__":
@@ -290,6 +365,12 @@ if __name__ == "__main__":
         "--cspgo_url",
         help="URL that clang cspgo data was uploaded to. When set, only the CSPGO entries are updated.",
         default=None,
+    )
+    parser.add_argument(
+        "--arch",
+        choices=sorted(ARCH_TO_BOLT_SUFFIX),
+        default="aarch64",
+        help="Architecture whose BOLT entries should be updated. PGO entries are shared across architectures and only updated when this is aarch64.",
     )
     parser.add_argument(
         "--app_id", help="App ID used for authentication.", default=os.getenv("MONGO_PR_BOT_APP_ID")

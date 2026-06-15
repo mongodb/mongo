@@ -1,5 +1,19 @@
+load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP")
 load("//bazel/repository_rules:pgo_data.bzl", "get_all_files")
-load("//bazel/repository_rules:profiling_data.bzl", "DEFAULT_BOLT_DATA_CHECKSUM", "DEFAULT_BOLT_DATA_URL")
+load(
+    "//bazel/repository_rules:profiling_data.bzl",
+    "DEFAULT_BOLT_DATA_CHECKSUM_ARM64",
+    "DEFAULT_BOLT_DATA_CHECKSUM_X86_64",
+    "DEFAULT_BOLT_DATA_URL_ARM64",
+    "DEFAULT_BOLT_DATA_URL_X86_64",
+)
+
+# BOLT fdata is tied to the binary layout of one architecture, so the default profile is
+# selected by host arch (BOLT builds compile natively, so host arch matches target arch).
+DEFAULT_BOLT_DATA_BY_ARCH = {
+    "aarch64": (DEFAULT_BOLT_DATA_URL_ARM64, DEFAULT_BOLT_DATA_CHECKSUM_ARM64),
+    "x86_64": (DEFAULT_BOLT_DATA_URL_X86_64, DEFAULT_BOLT_DATA_CHECKSUM_X86_64),
+}
 
 # This is used so we can tell when the build created new bolt files vs. using ones from stored url
 CREATED_FILEGROUP = """
@@ -40,7 +54,13 @@ def _setup_bolt_data(repository_ctx):
 
     # We should be using the default bolt data because we are not being passed bolt data
     if bolt_profile_urls_env == None and bolt_binary_env == None:
-        repository_ctx.download(DEFAULT_BOLT_DATA_URL, bolt_fdata_filename, sha256 = DEFAULT_BOLT_DATA_CHECKSUM)
+        arch = ARCH_NORMALIZE_MAP.get(repository_ctx.os.arch)
+        default_url, default_checksum = DEFAULT_BOLT_DATA_BY_ARCH.get(arch, ("", ""))
+        if default_url == "":
+            fail("No default BOLT profile data is available for host architecture '" +
+                 repository_ctx.os.arch + "'. Populate the matching DEFAULT_BOLT_DATA_URL_* in " +
+                 "profiling_data.bzl or pass --repo_env=bolt_profile_url=...")
+        repository_ctx.download(default_url, bolt_fdata_filename, sha256 = default_checksum)
 
         # This is mainly used for the bolt training pipeline
     else:
