@@ -62,6 +62,10 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}
 
+    bool isUnexpandedDesugarPlaceholder() const override {
+        return true;
+    }
+
     StageConstraints constraints(PipelineSplitState pipeState) const override;
 
     Value serialize(const query_shape::SerializationOptions& opts) const override;

@@ -82,6 +82,25 @@ bool isExtensionSearchWrappedInDocResAndMetadata(
     return false;
 }
 
+// Returns true if 'source' is an extension stage that can set $$SEARCH_META. Two cases apply:
+//
+//  1. $_internalDocumentResultsAndMetadata with its metadata spec populated: the post-desugar host
+//     stage that will bind $$SEARCH_META via $setVariableFromSubPipeline at execution time. If a
+//     metadata spec is not present, this stage cannot set $$SEARCH_META.
+//
+//  2. An unexpanded desugar placeholder (i.e. DocumentSourceExtensionForQueryShape). We can't
+//     inspect the pre-desugar stage's output, so we conservatively treat every placeholder as a
+//     potential setter. The post-desugar re-validation pass on the fully expanded pipeline is
+//     authoritative. TODO SPM-4488: remove the placeholder branch once query shapes are generated
+//     at LiteParsed time and desugar placeholders are no longer present during this validation.
+bool extensionCanSetSearchMeta(const boost::intrusive_ptr<DocumentSource>& source) {
+    if (const auto* drm =
+            dynamic_cast<const DocumentSourceInternalDocumentResultsAndMetadata*>(source.get())) {
+        return drm->getMetadata().has_value();
+    }
+    return source->isUnexpandedDesugarPlaceholder();
+}
+
 // Asserts that $$SEARCH_META is accessed correctly, that is, it is set by a prior stage, and is
 // not accessed in a subpipline. It is assumed that if there is a
 // 'DocumentSourceInternalSearchMongotRemote' then '$$SEARCH_META' will be set at some point in the
@@ -102,7 +121,7 @@ void assertSearchMetaAccessValidHelper(
             auto stageName = StringData(source->getSourceName());
             if (stageName == DocumentSourceInternalSearchMongotRemote::kStageName ||
                 stageName == DocumentSourceSearch::kStageName || stageName == kSetVarName ||
-                isExtensionSearchWrappedInDocResAndMetadata(source)) {
+                extensionCanSetSearchMeta(source)) {
                 searchMetaSet = true;
                 if (stageName == kSetVarName) {
                     tassert(6448003,

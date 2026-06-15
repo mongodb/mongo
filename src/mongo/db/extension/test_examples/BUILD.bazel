@@ -69,6 +69,7 @@ extensions_with_config(
         ":modify_for_log_mongo_extension_signed_lib",
         ":shard_id_mongo_extension_signed_lib",
         ":track_deps_mongo_extension_signed_lib",
+        ":multi_stream_mongo_extension_signed_lib",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -144,6 +145,7 @@ pkg_name = "//" + package_name() + "/"
         "view_pipeline_validator",
         "shard_id",
         "track_deps",
+        "multi_stream",
     ]
 ]
 

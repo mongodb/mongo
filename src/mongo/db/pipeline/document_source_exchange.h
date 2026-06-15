@@ -77,6 +77,10 @@ public:
         // number of documents remains the same.
         constraints.preservesCardinality = true;
         constraints.outputDependsOnSingleInput = true;
+        // Exchange consumers read from a buffer filled by the inner pipeline rather than a
+        // preceding pSource.
+        constraints.requiresInputDocSource = false;
+        constraints.consumesLogicalCollectionData = false;
         return constraints;
     }
 

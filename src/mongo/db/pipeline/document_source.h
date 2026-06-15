@@ -644,6 +644,17 @@ public:
     virtual void reattachSourceToOperationContext(OperationContext* opCtx) {}
 
     /**
+     * Returns true if this DocumentSource is a pre-desugar placeholder that will be replaced by
+     * its desugared form before execution. Validators that perform semantic checks (e.g. variable
+     * scoping) may treat the placeholder as a permissive stand-in; the post-desugar validation
+     * pass on the fully expanded pipeline is authoritative.
+     * TODO SPM-4488: Remove this function when query shapes are generated at LiteParsed time.
+     */
+    virtual bool isUnexpandedDesugarPlaceholder() const {
+        return false;
+    }
+
+    /**
      * Validate that all operation contexts associated with this document source, including any
      * subpipelines, match the argument.
      */

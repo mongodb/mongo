@@ -80,22 +80,21 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
     auto expCtx = docResultsAndMeta.getExpCtx();
     const bool hasMeta = docResultsAndMeta.getMetadata().has_value();
 
-    // Following the pattern from createExchangePipelinesIfNeeded: each consumer gets a fresh
-    // ExpressionContext. Create the copy before Exchange construction, Exchange ctor calls
-    // detachFromOperationContext() on its inner pipelines, which nulls expCtx->_operationContext,
-    // and Pipeline::create for the meta pipeline needs a live opCtx.
+    // Give the inner source and meta pipelines their own expCtx copies. The Exchange detaches its
+    // inner pipeline on every getNext, which nulls that expCtx's opCtx. Sharing the outer expCtx
+    // would leak that null to the outer consumer stages.
+    auto* const opCtx = expCtx->getOperationContext();
+    const auto docExpCtx =
+        makeCopyFromExpressionContext(expCtx, expCtx->getNamespaceString(), expCtx->getUUID());
     const auto metaExpCtx = hasMeta
         ? makeCopyFromExpressionContext(expCtx, expCtx->getNamespaceString(), expCtx->getUUID())
         : boost::intrusive_ptr<ExpressionContext>{};
 
-    // Exchange ctor detaches expCtx->opCtx (nulls it) as part of detaching its inner pipeline.
-    // Restore it on scope exit so the outer consumer stages sharing this expCtx have a live opCtx.
-    auto* const opCtx = expCtx->getOperationContext();
-    ON_BLOCK_EXIT([&] { expCtx->setOperationContext(opCtx); });
     auto exchange = make_intrusive<exec::agg::Exchange>(
         opCtx,
         buildStreamRoutingSpec(hasMeta),
-        Pipeline::create({docResultsAndMeta.getSourceStage()}, expCtx));
+        // Clone the source onto docExpCtx so the stage's expCtx matches the inner pipeline's.
+        Pipeline::create({docResultsAndMeta.getSourceStage()->clone(docExpCtx)}, docExpCtx));
 
     auto makeReplaceRootDs = [](const boost::intrusive_ptr<ExpressionContext>& ctx)
         -> boost::intrusive_ptr<DocumentSource> {
