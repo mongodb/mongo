@@ -3375,7 +3375,6 @@ mongo_cc_unit_test(
         ":service_context_d_test_fixture",
         ":service_context_test_fixture",
         "//src/mongo/db/repl:replmocks",
-        "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/stats:counters",

@@ -63,7 +63,6 @@ VersionContext& VersionContext::operator=(const VersionContext& other) {
         _metadataOrTag = other._metadataOrTag;
     }
     _canPropagateAcrossShards = other._canPropagateAcrossShards;
-    _isLongRunningOperation = other._isLongRunningOperation;
     return *this;
 }
 
@@ -83,7 +82,6 @@ void VersionContext::resetToOperationWithoutOFCV() {
     invariant(hasOperationFCV());
     _metadataOrTag = OperationWithoutOFCVTag{};
     _canPropagateAcrossShards = false;
-    _isLongRunningOperation = false;
 }
 
 BSONObj VersionContext::toBSON() const {

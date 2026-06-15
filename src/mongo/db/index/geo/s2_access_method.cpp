@@ -169,18 +169,11 @@ StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
 }
 
 StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
-    const BSONObj& specObj,
-    const VersionContext& versionContext,
-    boost::optional<std::set<long long>> allowedVersions) {
+    const BSONObj& specObj, boost::optional<std::set<long long>> allowedVersions) {
     // If the spec object doesn't have field "2dsphereIndexVersion", add the default version
-    // based on the feature flag. Consult 'versionContext' so that an in-flight createIndex
-    // command with a pinned Operation FCV evaluates the flag against its captured FCV instead
-    // of the live FCV. Without this, a concurrent setFCV transition could change the live FCV
-    // between primary spec validation and oplog application on a secondary, causing the
-    // secondary to fatal-assert on a v4 spec it should accept (SERVER-125400).
+    // based on the feature flag.
     BSONElement indexVersionElt = specObj[kIndexVersionFieldName];
-    long long defaultVersion =
-        static_cast<long long>(index2dsphere::getDefaultS2IndexVersion(versionContext));
+    long long defaultVersion = static_cast<long long>(index2dsphere::getDefaultS2IndexVersion());
     if (indexVersionElt.eoo()) {
         // Validate the default version against allowed versions if provided.
         if (allowedVersions && !allowedVersions->contains(defaultVersion)) {
@@ -221,9 +214,8 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
             case S2_INDEX_VERSION_3:
                 break;
             case S2_INDEX_VERSION_4: {
-                // Gate version 4 behind feature flag, consulting 'versionContext' so a
-                // captured Operation FCV (if any) is honored.
-                if (index2dsphere::getDefaultS2IndexVersion(versionContext) != S2_INDEX_VERSION_4) {
+                // Gate version 4 behind feature flag.
+                if (index2dsphere::getDefaultS2IndexVersion() != S2_INDEX_VERSION_4) {
                     return Status(ErrorCodes::CannotCreateIndex,
                                   "2dsphereIndexVersion 4 requires feature flag "
                                   "'featureFlag2dsphereIndexVersion4' to be enabled");
@@ -238,9 +230,8 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
 }
 
 // static
-StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj,
-                                            const VersionContext& versionContext) {
-    return S2AccessMethod::_fixSpecHelper(specObj, versionContext);
+StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
+    return S2AccessMethod::_fixSpecHelper(specObj);
 }
 
 // static

@@ -56,10 +56,9 @@ public:
      *
      * Returns a non-OK status if 'specObj' is invalid.
      */
-    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj,
-                                       const VersionContext& versionContext) {
+    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj) {
         std::set<long long> allowedVersions = {S2_INDEX_VERSION_4, S2_INDEX_VERSION_3};
-        return S2AccessMethod::_fixSpecHelper(specObj, versionContext, allowedVersions);
+        return S2AccessMethod::_fixSpecHelper(specObj, allowedVersions);
     }
 };
 

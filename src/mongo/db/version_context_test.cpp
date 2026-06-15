@@ -297,15 +297,4 @@ TEST_F(VersionContextTest, PropagationAcrossShardsFlag) {
     ASSERT_FALSE(VersionContext{vCtxWithPropagation.toBSON()}.canPropagateAcrossShards());
 }
 
-// Tests that isLongRunningOperation() defaults to false on all VersionContext variants.
-// The full contract (copy/reset/equality/toBSON) is tested via the decoration mechanism
-// in version_context_decoration_test.cpp.
-TEST_F(VersionContextTest, LongRunningOperationFlagDefaultsFalse) {
-    // (Generic FCV reference): used for testing, should exist across LTS binary versions
-    ASSERT_FALSE(VersionContext().isLongRunningOperation());
-    ASSERT_FALSE(VersionContext(GenericFCV::kLatest).isLongRunningOperation());
-    ASSERT_FALSE(kNoVersionContext.isLongRunningOperation());
-    ASSERT_FALSE(kVersionContextIgnored_UNSAFE.isLongRunningOperation());
-}
-
 }  // namespace mongo

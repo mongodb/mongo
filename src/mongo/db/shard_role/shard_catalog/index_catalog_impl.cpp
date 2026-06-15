@@ -861,8 +861,7 @@ Status _checkValidFilterExpressions(const MatchExpression* expression, int level
  * GEO_2DSPHERE provide additional validation on the index spec, and tweak the index spec
  * object to conform to their expected format.
  */
-StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj,
-                                          const VersionContext& versionContext) {
+StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj) {
     std::string pluginName = IndexNames::findPluginName(obj.getObjectField("key"));
 
     if (IndexNames::TEXT == pluginName) {
@@ -870,11 +869,11 @@ StatusWith<BSONObj> adjustIndexSpecObject(const BSONObj& obj,
     }
 
     if (IndexNames::GEO_2DSPHERE == pluginName) {
-        return S2AccessMethod::fixSpec(obj, versionContext);
+        return S2AccessMethod::fixSpec(obj);
     }
 
     if (IndexNames::GEO_2DSPHERE_BUCKET == pluginName) {
-        return S2BucketAccessMethod::fixSpec(obj, versionContext);
+        return S2BucketAccessMethod::fixSpec(obj);
     }
 
     return obj;
@@ -2190,7 +2189,7 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
 StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
                                                     const CollectionPtr& collection,
                                                     const BSONObj& spec) const {
-    auto statusWithSpec = adjustIndexSpecObject(spec, VersionContext::getDecoration(opCtx));
+    auto statusWithSpec = adjustIndexSpecObject(spec);
     if (!statusWithSpec.isOK()) {
         return statusWithSpec;
     }
