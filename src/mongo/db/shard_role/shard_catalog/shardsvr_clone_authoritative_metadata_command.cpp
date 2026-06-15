@@ -32,6 +32,7 @@
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/version_context.h"
@@ -134,7 +135,9 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrCloneAuthoritativeMetadataCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrCloneAuthoritativeMetadataCommand)
+    .requiresFeatureFlag(feature_flags::gAuthoritativeShardsDDL)
+    .forShard();
 
 }  // namespace
 }  // namespace mongo
