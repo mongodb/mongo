@@ -181,7 +181,7 @@ export class MockMalformedStapleServer {
     }
 
     start() {
-        jsTest.log.info("Mock malformed staple TLS server will listen on port: " + this.port);
+        print("Mock malformed staple TLS server will listen on port: " + this.port);
         const args = [
             this.python,
             "-u",
@@ -195,9 +195,10 @@ export class MockMalformedStapleServer {
         const pid = _startMongoProgram({args: args});
         assert(checkProgram(pid).alive);
 
-        assert.soon(function () {
+        assert.soon(function() {
             const output = rawMongoProgramOutput(".*");
-            assert.eq(output.search("Address already in use"), -1, "Mock staple server port in use");
+            assert.eq(
+                output.search("Address already in use"), -1, "Mock staple server port in use");
             return output.search("Malformed staple TLS server listening on") !== -1;
         }, "Mock malformed staple TLS server failed to start");
 
@@ -218,17 +219,17 @@ export class MockMalformedStapleServer {
      */
     stop() {
         if (!this.pid) {
-            jsTest.log.warning("Not stopping Mock malformed staple TLS server, it was never started");
+            print("Not stopping Mock malformed staple TLS server, it was never started");
             return;
         }
 
-        jsTest.log.info("Stopping Mock malformed staple TLS server");
+        print("Stopping Mock malformed staple TLS server");
         const kSIGINT = 2;
         stopMongoProgramByPid(this.pid, kSIGINT);
 
         for (let i = 0; i < 50; i++) {
             if (!checkProgram(this.pid).alive) {
-                jsTest.log.info("Mock malformed staple TLS server stop complete");
+                print("Mock malformed staple TLS server stop complete");
                 return;
             }
             sleep(100);
@@ -236,6 +237,6 @@ export class MockMalformedStapleServer {
 
         const kSIGKILL = 9;
         stopMongoProgramByPid(this.pid, kSIGKILL);
-        jsTest.log.info("Mock malformed staple TLS server stop complete");
+        print("Mock malformed staple TLS server stop complete");
     }
 }
