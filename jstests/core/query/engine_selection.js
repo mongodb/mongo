@@ -2,7 +2,6 @@
  * Asserts behavior of engine selection given the feature flags and query knobs that are set.
  * Also asserts on which stages are pushed down to SBE, and which remain as document sources.
  *
- * TODO SERVER-120734 extend this test for time-series collections.
  * @tags: [
  *   # Different versions may have different SBE components enabled.
  *   multiversion_incompatible,

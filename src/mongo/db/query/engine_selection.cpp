@@ -157,7 +157,6 @@ EngineSelectionResult shouldUseRegularSbeDeferredEngineSelection(
     const QuerySolution* solution,
     const std::function<void()>& extendSolutionWithPipelineFn) {
     if (mainCollection && mainCollection->isTimeseriesCollection()) {
-        // TODO SERVER-120734 decide engine selection logic for TS collections.
         // TS queries only use SBE when there's a pipeline.
         return {cq.cqPipeline().empty() ? EngineChoice::kClassic : EngineChoice::kSbe, nullptr};
     }
