@@ -1,6 +1,7 @@
 /**
  * Verifies structured GeoKeyExtractionFailureInfo on the insert path for a 2dsphere index: the
- * writeError wire shape (failingPath, underlyingCode, underlyingReason, failingElement).
+ * writeError wire shape, with the structured fields (failingPath, underlyingCode, underlyingReason,
+ * failingElement) nested under errInfo so drivers surface them to users as details.
  *
  * @tags: [
  *   # The structured writeError fields are new in this version.
@@ -33,8 +34,12 @@ function assertWriteError(we, opts) {
 
     assert.eq(we.code, code, "writeError code mismatch", {we});
 
+    // Structured fields are nested under errInfo so drivers surface them to users as details.
+    const errInfo = we.errInfo;
+    assert.neq(errInfo, undefined, "expected errInfo on writeError", {we});
+
     if (failingPath !== undefined) {
-        assert.eq(we.failingPath, failingPath, "failingPath mismatch", {we});
+        assert.eq(errInfo.failingPath, failingPath, "failingPath mismatch", {we});
     }
 
     assert(we.errmsg.length < maxErrmsgLength, "errmsg over limit", {
@@ -57,37 +62,41 @@ function assertWriteError(we, opts) {
     }
 
     for (const fragment of [].concat(underlyingReasonContains)) {
-        assert(we.underlyingReason.includes(fragment), "expected fragment in underlyingReason", {
-            fragment,
-            underlyingReason: we.underlyingReason,
-        });
+        assert(
+            errInfo.underlyingReason.includes(fragment),
+            "expected fragment in underlyingReason",
+            {
+                fragment,
+                underlyingReason: errInfo.underlyingReason,
+            },
+        );
     }
 
     if (underlyingReasonEndsWith !== undefined) {
         assert(
-            we.underlyingReason.endsWith(underlyingReasonEndsWith),
+            errInfo.underlyingReason.endsWith(underlyingReasonEndsWith),
             "underlyingReason should end with marker",
             {
-                underlyingReason: we.underlyingReason,
+                underlyingReason: errInfo.underlyingReason,
             },
         );
     }
 
     if (maxUnderlyingReasonLength !== undefined) {
         assert(
-            we.underlyingReason.length < maxUnderlyingReasonLength,
+            errInfo.underlyingReason.length < maxUnderlyingReasonLength,
             "underlyingReason over limit",
             {
-                underlyingReasonLength: we.underlyingReason.length,
-                underlyingReason: we.underlyingReason,
+                underlyingReasonLength: errInfo.underlyingReason.length,
+                underlyingReason: errInfo.underlyingReason,
             },
         );
     }
 
     if (failingElement !== undefined) {
         for (const [key, value] of Object.entries(failingElement)) {
-            assert.eq(we.failingElement[key], value, `failingElement.${key} mismatch`, {
-                failingElement: we.failingElement,
+            assert.eq(errInfo.failingElement[key], value, `failingElement.${key} mismatch`, {
+                failingElement: errInfo.failingElement,
             });
         }
     }
@@ -112,8 +121,8 @@ describe("Geo key-extraction structured ExtraInfo (insert path)", function () {
             errmsgForbids: ["Can't extract geo keys", "coordinates"],
             failingElement: {type: "Point", coordinates: ["bad", 0]},
         });
-        assert.gt(we.underlyingCode, 0, "underlyingCode populated", {we});
-        assert.gt(we.underlyingReason.length, 0, "underlyingReason populated", {we});
+        assert.gt(we.errInfo.underlyingCode, 0, "underlyingCode populated", {we});
+        assert.gt(we.errInfo.underlyingReason.length, 0, "underlyingReason populated", {we});
     });
 
     it("multikey expansion isolates the failing leaf", function () {
@@ -144,11 +153,11 @@ describe("Geo key-extraction structured ExtraInfo (insert path)", function () {
             failingElement: {type: "Polygon"},
         });
         assert.eq(
-            we.failingElement.coordinates[0].length,
+            we.errInfo.failingElement.coordinates[0].length,
             500,
             "failingElement should carry full coords",
             {
-                coordLength: we.failingElement.coordinates[0].length,
+                coordLength: we.errInfo.failingElement.coordinates[0].length,
             },
         );
     });

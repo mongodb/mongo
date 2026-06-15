@@ -32,6 +32,7 @@ mongo_cc_unit_test(
     name = "geo_index_test",
     srcs = [
         "2d_key_generator_test.cpp",
+        "geo_key_extraction_failure_info_test.cpp",
         "s2_bucket_key_generator_test.cpp",
         "s2_key_generator_test.cpp",
         "s2_validate_missing_entry_heuristic_test.cpp",

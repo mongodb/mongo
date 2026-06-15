@@ -41,12 +41,15 @@ describe("Geo key-extraction structured ExtraInfo (timeseries insert path)", fun
             "writeError code mismatch",
             {we},
         );
+        // Structured fields are nested under errInfo so drivers surface them to users as details.
+        const errInfo = we.errInfo;
+        assert.neq(errInfo, undefined, "expected errInfo on writeError", {we});
         // On timeseries, failingPath reflects the bucket schema the index operates on
         // (data.<measurement>), not the user-facing measurement name.
-        assert.eq(we.failingPath, "data.loc", "failingPath mismatch", {we});
-        assert.eq(we.failingElement.type, "Point", "failingElement.type mismatch", {we});
-        assert.gt(we.underlyingCode, 0, "underlyingCode populated", {we});
-        assert.gt(we.underlyingReason.length, 0, "underlyingReason populated", {we});
+        assert.eq(errInfo.failingPath, "data.loc", "failingPath mismatch", {we});
+        assert.eq(errInfo.failingElement.type, "Point", "failingElement.type mismatch", {we});
+        assert.gt(errInfo.underlyingCode, 0, "underlyingCode populated", {we});
+        assert.gt(errInfo.underlyingReason.length, 0, "underlyingReason populated", {we});
     });
 
     it("reports a non-point geo measurement", function () {
@@ -68,8 +71,12 @@ describe("Geo key-extraction structured ExtraInfo (timeseries insert path)", fun
             "writeError code mismatch",
             {we},
         );
-        assert.eq(we.failingPath, "data.loc", "failingPath mismatch", {we});
-        assert(we.underlyingReason.includes("only support point data"), "expected reason", {we});
-        assert.eq(we.failingElement.type, "LineString", "failingElement.type mismatch", {we});
+        const errInfo = we.errInfo;
+        assert.neq(errInfo, undefined, "expected errInfo on writeError", {we});
+        assert.eq(errInfo.failingPath, "data.loc", "failingPath mismatch", {we});
+        assert(errInfo.underlyingReason.includes("only support point data"), "expected reason", {
+            we,
+        });
+        assert.eq(errInfo.failingElement.type, "LineString", "failingElement.type mismatch", {we});
     });
 });

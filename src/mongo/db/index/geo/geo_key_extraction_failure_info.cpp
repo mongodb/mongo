@@ -40,6 +40,9 @@
 namespace mongo {
 namespace {
 
+// Nested under errInfo so drivers surface these fields to users as details; fields placed
+// elsewhere on the writeError are dropped before reaching the user.
+constexpr auto kErrInfoFieldName = "errInfo"_sd;
 constexpr auto kFailingPathFieldName = "failingPath"_sd;
 constexpr auto kUnderlyingCodeFieldName = "underlyingCode"_sd;
 constexpr auto kUnderlyingReasonFieldName = "underlyingReason"_sd;
@@ -49,15 +52,22 @@ constexpr auto kFailingElementFieldName = "failingElement"_sd;
 
 template <class Derived, ErrorCodes::Error Code>
 void GeoKeyExtractionFailureInfoBase<Derived, Code>::serialize(BSONObjBuilder* builder) const {
-    builder->append(kFailingPathFieldName, _failingPath);
-    builder->append(kUnderlyingCodeFieldName, static_cast<int>(_underlyingStatus.code()));
-    builder->append(kUnderlyingReasonFieldName, _underlyingStatus.reason());
-    builder->append(kFailingElementFieldName, _failingElement);
+    BSONObjBuilder errInfo(builder->subobjStart(kErrInfoFieldName));
+    errInfo.append(kFailingPathFieldName, _failingPath);
+    errInfo.append(kUnderlyingCodeFieldName, static_cast<int>(_underlyingStatus.code()));
+    errInfo.append(kUnderlyingReasonFieldName, _underlyingStatus.reason());
+    errInfo.append(kFailingElementFieldName, _failingElement);
 }
 
 template <class Derived, ErrorCodes::Error Code>
 std::shared_ptr<const ErrorExtraInfo> GeoKeyExtractionFailureInfoBase<Derived, Code>::parse(
-    const BSONObj& obj) {
+    const BSONObj& outer) {
+    // Read from errInfo to match serialize(). This runs while rebuilding a Status from the wire,
+    // where a throw would crash the receiving process, so fall back to an empty object instead of
+    // failing on a missing or malformed errInfo.
+    const auto errInfoElem = outer[kErrInfoFieldName];
+    const auto obj = errInfoElem.isABSONObj() ? errInfoElem.Obj() : BSONObj{};
+
     auto failingPath = obj[kFailingPathFieldName].str();
     auto code = static_cast<ErrorCodes::Error>(obj[kUnderlyingCodeFieldName].safeNumberInt());
     auto reason = obj[kUnderlyingReasonFieldName].str();
