@@ -23,6 +23,7 @@ mongo_cc_library(
     deps = [
         ":otel_metrics_service",
         "//src/mongo/db:server_base",
+        "//src/mongo/otel/utils:bson_to_http_headers",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [

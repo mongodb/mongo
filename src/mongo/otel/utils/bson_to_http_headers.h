@@ -27,25 +27,22 @@
  *    it in the license file.
  */
 
+
 #pragma once
 
-#include "mongo/otel/utils/bson_to_http_headers.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/stdx/unordered_map.h"
 
 #include <string>
 #include <vector>
 
-namespace mongo::otel::traces {
+namespace mongo::otel {
+using HttpHeaderMap = stdx::unordered_map<std::string, std::vector<std::string>>;
 
 /**
- * Returns the HTTP export headers parsed from openTelemetryTracingHttpExportHeaders.
- * Each key maps to a list of values to support duplicate header names.
+ * Tries to parse the provided BSON element into a map of HTTP header keys to arrays of values.
+ * Each key holds an unordered vector of values, since each HTTP header may have multiple values
+ * associated with it.
  */
-[[nodiscard]] const HttpHeaderMap& getTracingHttpExportHeaders();
-
-/**
- * Returns the OTel resource attributes applied to all exported spans.
- */
-[[nodiscard]] const stdx::unordered_map<std::string, std::string>& getTracingResourceAttributes();
-
-}  // namespace mongo::otel::traces
+[[nodiscard]] StatusWith<HttpHeaderMap> parseHttpHeadersFromBson(const BSONElement& headerDocument);
+}  // namespace mongo::otel

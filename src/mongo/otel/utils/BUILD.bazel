@@ -1,0 +1,36 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//src/mongo/otel:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "bson_to_http_headers",
+    srcs = [
+        "bson_to_http_headers.cpp",
+    ],
+    hdrs = [
+        "bson_to_http_headers.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "bson_to_http_headers_test",
+    srcs = [
+        "bson_to_http_headers_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":bson_to_http_headers",
+    ],
+)
+
+test_suite(
+    name = "otel_utils_tests",
+    tests = [
+        ":bson_to_http_headers_test",
+    ],
+)

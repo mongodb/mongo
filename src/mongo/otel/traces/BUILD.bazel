@@ -35,6 +35,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/otel/utils:bson_to_http_headers",
     ],
 )
 

@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo::otel::metrics"
+    cpp_includes:
+        - "mongo/otel/metrics/metrics_initialization.h"
 
 server_parameters:
     openTelemetryMetricsDirectory:
@@ -55,6 +57,22 @@ server_parameters:
         cpp_vartype: std::string
         redact: false
         default: none
+    openTelemetryMetricsHttpExportHeaders:
+        description: >-
+            A BSON document containing custom headers to send with each metrics export request.
+            The field name is the header name and the value is either a string or an array of
+            strings, representing the header value(s).
+            Translates W3C Baggage literals to avoid parsing conflicts on the command line;
+            for example, '{MyCommaValue: the%2Cvalue}' will be decoded as 'the,value'.
+            See https://www.w3.org/TR/baggage/ for more information.
+            Only applies to the HTTP exporter; ignored for file and Prometheus exporters.
+            These headers are merged with any headers already configured via the
+            OTEL_EXPORTER_OTLP_HEADERS or OTEL_EXPORTER_OTLP_METRICS_HEADERS environment variables.
+        set_at: startup
+        cpp_class:
+            name: OpenTelemetryMetricsHttpExportHeaders
+            override_set: true
+        redact: true
     openTelemetryPrometheusMetricsPath:
         description: >-
             Enable OpenTelemetry with metrics exported in prometheus format to the provided file
