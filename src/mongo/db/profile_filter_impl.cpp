@@ -78,6 +78,8 @@ ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
     _makeBSON = OpDebug::appendStaged(
         parserExpCtx->getOperationContext(), _dependencies, _needWholeDocument);
 
+    parserExpCtx->setIsProfileFilter(true);
+
     // The operation context is necessary for parsing, but should not be used for the rest of the
     // lifetime of the filter, since the filter exists for longer than a single operation.
     parserExpCtx->setOperationContext(nullptr);

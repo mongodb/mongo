@@ -1000,7 +1000,7 @@ private:
                                               ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
         if (!feature_flags::gFeatureFlagConvertBinDataVectors.isEnabled(
-                VersionContext::getDecoration(expCtx->getOperationContext()),
+                expCtx->versionContextForFeatureFlagCheck(),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uasserted(10506607, "$convert from BinData vector to BSON array is not enabled");
         }
@@ -1020,7 +1020,7 @@ private:
                                               ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
         if (!feature_flags::gFeatureFlagConvertBinDataVectors.isEnabled(
-                VersionContext::getDecoration(expCtx->getOperationContext()),
+                expCtx->versionContextForFeatureFlagCheck(),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uasserted(10506608, "$convert from BSON array to BinData vector is not enabled");
         }
@@ -1209,7 +1209,7 @@ private:
                                                Value inputValue,
                                                SubtypeArg subtypeValue) {
         if (!feature_flags::gFeatureFlagConvertObjectToBinData.isEnabled(
-                VersionContext::getDecoration(expCtx->getOperationContext()),
+                expCtx->versionContextForFeatureFlagCheck(),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uasserted(ErrorCodes::ConversionFailure,
                       "$convert from Object to BinData is not enabled");

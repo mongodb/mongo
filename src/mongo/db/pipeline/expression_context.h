@@ -719,6 +719,14 @@ public:
         _params.isParsingCollectionValidator = isParsingCollectionValidator;
     }
 
+    bool getIsProfileFilter() const {
+        return _params.isProfileFilter;
+    }
+
+    void setIsProfileFilter(bool isProfileFilter) {
+        _params.isProfileFilter = isProfileFilter;
+    }
+
     bool getExprUnstableForApiV1() const {
         return _params.exprUnstableForApiV1;
     }
@@ -897,8 +905,7 @@ public:
     }
 
     bool isFeatureFlagMongotIndexedViewsEnabled() const {
-        return _featureFlagMongotIndexedViews.get(
-            VersionContext::getDecoration(getOperationContext()));
+        return _featureFlagMongotIndexedViews.get(versionContextForFeatureFlagCheck());
     }
 
     void setView(boost::optional<ViewInfo> view) {
@@ -924,6 +931,18 @@ public:
     // TODO SERVER-108400: reconsider API for accessing QuerySettings instance.
     const boost::optional<query_settings::QuerySettings>& getOptionalQuerySettings() const {
         return _querySettings;
+    }
+
+    // Resolves the VersionContext for a feature-flag check on this ExpressionContext.
+    const VersionContext& versionContextForFeatureFlagCheck() const {
+        if (auto* opCtx = getOperationContext()) {
+            return VersionContext::getDecoration(opCtx);
+        }
+        tassert(12855801,
+                "ExpressionContext has no OperationContext for a feature flag check outside of a "
+                "collection validator or profile filter",
+                getIsParsingCollectionValidator() || getIsProfileFilter());
+        return kNoVersionContext;
     }
 
     /**
@@ -965,8 +984,7 @@ public:
     }
 
     bool isFeatureFlagShardFilteringDistinctScanEnabled() const {
-        return _featureFlagShardFilteringDistinctScan.get(
-            VersionContext::getDecoration(getOperationContext()));
+        return _featureFlagShardFilteringDistinctScan.get(versionContextForFeatureFlagCheck());
     }
 
     /**
@@ -1004,8 +1022,7 @@ public:
     }
 
     bool isBasicRankFusionFeatureFlagEnabled() const {
-        return _featureFlagRankFusionBasic.get(
-            VersionContext::getDecoration(getOperationContext()));
+        return _featureFlagRankFusionBasic.get(versionContextForFeatureFlagCheck());
     }
 
     bool shouldParserAllowStreams() const {
@@ -1042,7 +1059,7 @@ public:
     }
 
     bool isFeatureFlagMqlJsEngineGapEnabled() const {
-        return _featureFlagMqlJsEngineGap.get(VersionContext::getDecoration(getOperationContext()));
+        return _featureFlagMqlJsEngineGap.get(versionContextForFeatureFlagCheck());
     }
 
     void setPathArraynessForNss(const NamespaceString& nss,
@@ -1200,6 +1217,9 @@ protected:
         bool isParsingViewDefinition = false;
         // True if this ExpressionContext is used to parse a collection validator expression.
         bool isParsingCollectionValidator = false;
+        // True if this ExpressionContext belongs to a profile filter. Like a collection validator,
+        // a profile filter outlives the OperationContext it was parsed under.
+        bool isProfileFilter = false;
         // These fields can be used in a context when API version validations were not enforced
         // during parse time (Example creating a view or validator), but needs to be enforce while
         // querying later.
