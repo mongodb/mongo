@@ -480,6 +480,53 @@ TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupBindViewInfoNoOpForNo
     ASSERT_TRUE(liteParsed->getMutableSubPipelines()->empty());
 }
 
+TEST_F(DocumentSourceGraphLookUpTest,
+       LiteParsedGraphLookupPopulatesSubPipelineFromInternalFromPipeline) {
+    auto spec =
+        BSON("$graphLookup" << BSON("from" << "foreign"
+                                           << "startWith" << "$a"
+                                           << "connectFromField" << "b"
+                                           << "connectToField" << "c"
+                                           << "as" << "d"
+                                           << "$_internalFromPipeline"
+                                           << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))));
+    auto liteParsed = LiteParsedGraphLookUp::parse(
+        getExpCtx()->getNamespaceString(), spec.firstElement(), LiteParserOptions{});
+    ASSERT_EQ(1ul, liteParsed->getMutableSubPipelines()->size());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupRejectsNonArrayInternalFromPipeline) {
+    auto spec = BSON("$graphLookup" << BSON("from" << "foreign"
+                                                   << "startWith" << "$a"
+                                                   << "connectFromField" << "b"
+                                                   << "connectToField" << "c"
+                                                   << "as" << "d"
+                                                   << "$_internalFromPipeline" << "notAnArray"));
+    ASSERT_THROWS_CODE(LiteParsedGraphLookUp::parse(getExpCtx()->getNamespaceString(),
+                                                    spec.firstElement(),
+                                                    LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupRejectsDuplicateInternalFromPipeline) {
+    auto spec =
+        BSON("$graphLookup" << BSON("from" << "foreign"
+                                           << "startWith" << "$a"
+                                           << "connectFromField" << "b"
+                                           << "connectToField" << "c"
+                                           << "as" << "d"
+                                           << "$_internalFromPipeline"
+                                           << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                           << "$_internalFromPipeline"
+                                           << BSON_ARRAY(BSON("$match" << BSON("y" << 2)))));
+    ASSERT_THROWS_CODE(LiteParsedGraphLookUp::parse(getExpCtx()->getNamespaceString(),
+                                                    spec.firstElement(),
+                                                    LiteParserOptions{}),
+                       AssertionException,
+                       ErrorCodes::IDLDuplicateField);
+}
+
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookUpStageParamsCarriesPipelineFromSubpipeline) {
     auto liteParsed = parseLiteGraphLookup(getExpCtx());
 

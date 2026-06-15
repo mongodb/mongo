@@ -36,6 +36,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/pipeline/document_source_graph_lookup_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -282,7 +283,8 @@ void DocumentSourceGraphLookUp::serializeToArray(
             for (const auto& stage : pipeline->getSources()) {
                 stage->serializeToArray(pipelineVals, opts);
             }
-            spec["$_internalFromPipeline"] = Value(std::move(pipelineVals));
+            spec[DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName] =
+                Value(std::move(pipelineVals));
         }
     }
 
@@ -508,12 +510,13 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             continue;
         }
 
-        if (argName == "$_internalFromPipeline"_sd) {
+        if (argName == DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName) {
             // This internal field is consumed at lite-parse time (LiteParsedGraphLookUp::parse).
             // Reject it from external clients and ignore it on the legacy createFromBson path.
-            assertAllowedInternalIfRequired(expCtx->getOperationContext(),
-                                            "$_internalFromPipeline"_sd,
-                                            AllowedWithClientType::kInternal);
+            assertAllowedInternalIfRequired(
+                expCtx->getOperationContext(),
+                DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName,
+                AllowedWithClientType::kInternal);
             continue;
         }
 
