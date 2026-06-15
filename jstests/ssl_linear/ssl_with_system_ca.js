@@ -1,41 +1,58 @@
-// On OSX this test assumes that jstests/libs/trusted-ca.pem has been added as a trusted
-// certificate to the login keychain of the evergreen user. See,
-// https://github.com/10gen/buildslave-cookbooks/commit/af7cabe5b6e0885902ebd4902f7f974b64cc8961
+// On MacOS this test assumes that certificates exist at
+// /opt/x509/macos-trusted-[ca|server|client].pem, and that /opt/x509/macos-trusted-ca.pem has
+// been added as a trusted certificate to the login keychain of the evergreen user. See,
+// https://github.com/10gen/buildhost-configuration/blob/1c1fcb51924cd4f1bc9eaf5db23f6e4365d6ba17/roles/macos/tasks/keychains.yml#L58-L87
 // for details.
-// To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
-//   security add-trusted-cert -d jstests/libs/trusted-ca.pem
+// To install certificates for local testing on OSX, invoke the following at a console:
+//   mkdir /opt/x509
+//   python x509/mkcert.py x509/apple_certs.json -o /opt/x509
+//   security add-trusted-cert -d /opt/x509/macos-trusted-ca.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-server.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-client.pem
 
 import {getPython3Binary} from "jstests/libs/python.js";
 
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);
 
+let trustedCA = "jstests/libs/trusted-ca.pem";
+let trustedServer = "jstests/libs/trusted-server.pem";
+let trustedClient = "jstests/libs/trusted-client.pem";
+
 if (HOST_TYPE == "macOS") {
-    // Ensure trusted-ca.pem is properly installed on MacOS hosts.
+    trustedCA = "/opt/x509/macos-trusted-ca.pem";
+    trustedServer = "/opt/x509/macos-trusted-server.pem";
+    trustedClient = "/opt/x509/macos-trusted-client.pem";
+    // Ensure trustedCA is properly installed on MacOS hosts.
     // (MacOS is the only OS where it is installed outside of this test)
-    let exitCode = runProgram("security", "verify-cert", "-c", "./jstests/libs/trusted-client.pem");
+    let exitCode = runProgram("security", "verify-cert", "-c", trustedClient);
     assert.eq(0, exitCode, 'Check for proper installation of Trusted CA on MacOS host');
 }
 if (HOST_TYPE == "windows") {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
 
     // OpenSSL backed imports Root CA and intermediate CA
-    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
+    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", trustedCA);
 
     // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
     // Current User.
-    runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
+    runProgram("certutil.exe", "-addstore", "-f", "Root", trustedCA);
 }
 
 function testWithCerts(prefix) {
     jsTest.log("Starting mongod blindly...");
+    // The trusted certificates come from the system certificate store (on MacOS, these are the
+    // provision-time generated certs); the untrusted control certs always come from jstests/libs.
+    const isTrusted = prefix === 'trusted-';
+    const serverCert = isTrusted ? trustedServer : 'jstests/libs/' + prefix + 'server.pem';
+    const clientCert = isTrusted ? trustedClient : 'jstests/libs/' + prefix + 'client.pem';
     // allowTLS to get a non-TLS control connection.
     var opts = {
         tlsMode: 'preferTLS',
-        tlsCertificateKeyFile: 'jstests/libs/' + prefix + 'server.pem',
+        tlsCertificateKeyFile: serverCert,
         waitForConnect: false,
         setParameter: {tlsUseSystemCA: true},
-        env: {"SSL_CERT_FILE": "jstests/libs/trusted-ca.pem"},
+        env: {"SSL_CERT_FILE": trustedCA},
     };
     const conn = MongoRunner.runMongod(opts);
 
@@ -47,14 +64,14 @@ function testWithCerts(prefix) {
         return 0 == exitCode;
     });
 
-    jsTest.log("Testing connection with " + prefix + "client.pem ...");
+    jsTest.log("Testing connection with " + clientCert + " ...");
     argv = [
         'mongo',
         '--tls',
         '--port',
         conn.port,
         '--tlsCertificateKeyFile',
-        'jstests/libs/' + prefix + 'client.pem',
+        clientCert,
         '--eval',
         ';'
     ];
@@ -62,7 +79,7 @@ function testWithCerts(prefix) {
     if (HOST_TYPE == "linux") {
         // On Linux we override the default path to the system CA store to point to our
         // "trusted" CA. On Windows, this CA will have been added to the user's trusted CA list
-        argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
+        argv.unshift("env", "SSL_CERT_FILE=" + trustedCA);
     }
 
     let exitCode = runMongoProgram.apply(null, argv);

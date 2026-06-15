@@ -1,0 +1,23 @@
+test_kind: js_test
+
+# Runs the `ssl_linear` suite but uses the certificates generated at MacOS provision time,
+# which are in the system certificate store. Only runs on MacOS.
+selector:
+  roots:
+    - jstests/ssl_linear/*.js
+
+# ssl tests start their own mongod's.
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      ssl: ""
+      sslAllowInvalidCertificates: ""
+      sslCAFile: /opt/x509/macos-trusted-ca.pem
+      sslPEMKeyFile: /opt/x509/macos-trusted-ca.pem
+      global_vars:
+        TestData:
+          setParameters:
+            logComponentVerbosity: "{network:2}"
+          setParametersMongos:
+            logComponentVerbosity: "{network:2}"
