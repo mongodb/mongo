@@ -59,7 +59,7 @@ StaleShardCollectionMetadataHandlerImpl::handleStaleShardVersionException(
     resharding_metrics::onCriticalSectionError(opCtx, sci);
 
     // Recover or refresh the shard metadata.
-    uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+    uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
         opCtx, sci.getNss(), sci.getVersionReceived().placementVersion()));
 
     // Get the new installed shard metadata version and return it.

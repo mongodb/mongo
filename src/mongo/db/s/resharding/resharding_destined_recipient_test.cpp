@@ -330,7 +330,7 @@ protected:
         // Refresh the filtering metadata for the nss.
         ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
             opCtx, kNss.dbName()));
-        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, kNss);
+        FilteringMetadataCache::get(opCtx)->forceCollectionMetadataRefresh_DEPRECATED(opCtx, kNss);
 
         // Also refresh the routing information.
         const auto catalogCache = Grid::get(opCtx)->catalogCache();
@@ -338,7 +338,8 @@ protected:
         (void)catalogCache->getCollectionRoutingInfo(opCtx, kNss);
 
         if (refreshTempNss) {
-            FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, env.tempNss);
+            FilteringMetadataCache::get(opCtx)->forceCollectionMetadataRefresh_DEPRECATED(
+                opCtx, env.tempNss);
             catalogCache->onStaleCollectionVersion(env.tempNss, boost::none);
             (void)catalogCache->getCollectionRoutingInfo(opCtx, env.tempNss);
         }

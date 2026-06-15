@@ -184,7 +184,7 @@ void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
     const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), kMyShardName);
 
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
+        ->setCollectionMetadata(opCtx, collectionMetadata);
 }
 
 TEST_F(MultipleCollectionAccessorTest, mainCollectionViaAcquisition) {

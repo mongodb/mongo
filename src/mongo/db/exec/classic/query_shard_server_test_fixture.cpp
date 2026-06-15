@@ -151,8 +151,7 @@ CollectionMetadata QueryShardServerTestFixture::prepareTestData(
 
     {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), _testNss);
-        scopedCsr->setFilteringMetadata_nonAuthoritative(operationContext(),
-                                                         CollectionMetadata(cm, curShard));
+        scopedCsr->setCollectionMetadata(operationContext(), CollectionMetadata(cm, curShard));
     }
 
     _manager = std::make_shared<MetadataManager>(

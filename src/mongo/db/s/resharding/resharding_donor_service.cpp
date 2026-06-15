@@ -225,13 +225,13 @@ public:
 
     void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                         const NamespaceString& sourceNss) override {
-        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
             opCtx, sourceNss, boost::none));
     }
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
-    getOnReleaseCriticalSectionCustomAction(bool mustClearFilteringMetadata) override {
-        if (!mustClearFilteringMetadata) {
+    getOnReleaseCriticalSectionCustomAction(bool mustClearCollectionMetadata) override {
+        if (!mustClearCollectionMetadata) {
             return std::make_unique<ShardingRecoveryService::NoCustomAction>();
         } else {
             return std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
@@ -504,7 +504,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 if (mustClearMetadata) {
                     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
                         opCtx.get(), _metadata.getTempReshardingNss());
-                    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx.get());
+                    scopedCsr->clearCollectionMetadata(opCtx.get());
+                    // TODO (SERVER-128449): Remove this once resharding is made authoritative.
+                    scopedCsr->setNonAuthoritative();
                 }
 
                 const auto onReleaseCriticalSectionAction =

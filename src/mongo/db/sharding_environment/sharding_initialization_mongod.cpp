@@ -766,7 +766,7 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
             migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 
             const bool scheduleAsyncRefresh = true;
-            resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+            resharding::clearCollectionMetadata(opCtx, scheduleAsyncRefresh);
 
             // Schedule a drop of the temporary collections used by aggregations ($out
             // specifically).

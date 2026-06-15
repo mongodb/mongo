@@ -552,19 +552,19 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     if (!_isAlsoDonor) {
                         auto opCtx = _makeOperationContext(factory);
 
-                        bool mustClearFilteringMetadata =
+                        bool mustClearCollectionMetadata =
                             _metadata.getAuthoritativeMetadataAccessLevel() ==
                             ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
 
-                        if (mustClearFilteringMetadata) {
-                            _externalState->clearFilteringMetadataOnTempReshardingCollection(
+                        if (mustClearCollectionMetadata) {
+                            _externalState->clearCollectionMetadataOnTempReshardingCollection(
                                 opCtx.get(), _metadata.getTempReshardingNss());
                         }
 
                         auto customAction =
                             [&]() -> std::unique_ptr<
                                       ShardingRecoveryService::BeforeReleasingCustomAction> {
-                            if (mustClearFilteringMetadata) {
+                            if (mustClearCollectionMetadata) {
                                 return std::make_unique<
                                     ShardingRecoveryService::FilteringMetadataClearer>();
                             } else {

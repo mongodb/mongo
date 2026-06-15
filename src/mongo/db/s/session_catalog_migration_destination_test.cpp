@@ -452,8 +452,7 @@ public:
 
     void setUntrackedFilteringMetadata(const NamespaceString& nss) {
         CollectionShardingRuntime::acquireExclusive(operationContext(), nss)
-            ->setFilteringMetadata_nonAuthoritative(operationContext(),
-                                                    CollectionMetadata::UNTRACKED());
+            ->setCollectionMetadata(operationContext(), CollectionMetadata::UNTRACKED());
     }
 
     CancellationSource _cancellationSource;

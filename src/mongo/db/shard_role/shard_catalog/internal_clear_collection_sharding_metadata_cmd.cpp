@@ -77,13 +77,15 @@ public:
                 LOGV2_INFO(12170301,
                            "Clearing metadata authoritatively",
                            "previousAuthoritativeState"_attr = previousState);
-                scopedCsr->clearFilteringMetadata_authoritative(opCtx);
+                scopedCsr->setAuthoritative();
+
             } else {
                 LOGV2_INFO(12170300,
                            "Clearing metadata non-authoritatively",
                            "previousAuthoritativeState"_attr = previousState);
-                scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+                scopedCsr->setNonAuthoritative();
             }
+            scopedCsr->clearCollectionMetadata(opCtx);
         }
 
     private:

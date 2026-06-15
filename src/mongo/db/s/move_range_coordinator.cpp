@@ -270,8 +270,10 @@ ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
             // Clearing the metadata forces _recoverMigrationCoordinations to run during the
             // refresh below (via the non-authoritative CSR state), which drives completeMigration
             // on the migrationCoordinators document and installs fresh filtering metadata.
-            CollectionShardingRuntime::acquireExclusive(opCtx.get(), nss())
-                ->clearFilteringMetadata_nonAuthoritative(opCtx.get());
+            auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx.get(), nss());
+            scopedCsr->clearCollectionMetadata(opCtx.get());
+            // TODO (SERVER-127444): Remove this and tassert with the feature flag.
+            scopedCsr->setNonAuthoritative();
         })
         .then([this, anchor = shared_from_this(), executor, token] {
             // migrationutil::refreshFilteringMetadataUntilSuccess doesn't play nicely with
@@ -280,9 +282,9 @@ ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
             return AsyncTry([this, anchor = shared_from_this()] {
                        auto opCtx = makeOperationContext(/*deprioritizable=*/true);
                        try {
-                           uassertStatusOK(FilteringMetadataCache::get(opCtx.get())
-                                               ->onCollectionPlacementVersionMismatch(
-                                                   opCtx.get(), nss(), boost::none));
+                           uassertStatusOK(
+                               FilteringMetadataCache::get(opCtx.get())
+                                   ->onShardVersionMismatch(opCtx.get(), nss(), boost::none));
                        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                            // Can throw NamespaceNotFound if the collection/database was dropped.
                        }

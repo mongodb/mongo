@@ -112,10 +112,13 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nssBeingReleased);
     if (_includeStepsForNamespaceDropped) {
-        scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
     } else {
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx);
     }
+    // TODO (SERVER-128176): Remove this `setNonAuthoritative` once all DDL operations are made
+    // shard-authoritative and all DDL operations do not clear collection metadata at release.
+    scopedCsr->setNonAuthoritative();
 }
 
 ShardingRecoveryService* ShardingRecoveryService::get(ServiceContext* serviceContext) {
@@ -668,7 +671,7 @@ void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         scopedCsr->exitCriticalSectionNoChecks(opCtx);
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx);
     }
 
     // ShardingRecoveryService can bypass the critical section to recover database metadata as there

@@ -169,8 +169,7 @@ protected:
             // what we want. Specifically the reshardingFields are what we use. Its specified by
             // the chunkManager.
             CollectionShardingRuntime::acquireExclusive(opCtx, kNss)
-                ->setFilteringMetadata_nonAuthoritative(
-                    opCtx, CollectionMetadata(chunkManager, originatorShardId));
+                ->setCollectionMetadata(opCtx, CollectionMetadata(chunkManager, originatorShardId));
 
             // Setup the CatalogCacheMock for the temp resharding ns.
             const auto reshardingTempNs =

@@ -2195,7 +2195,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
             uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
         }
 
-        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, _nss);
+        FilteringMetadataCache::get(opCtx)->forceCollectionMetadataRefresh_DEPRECATED(opCtx, _nss);
         FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, _nss);
     } catch (const DBException& ex) {
         LOGV2_DEBUG(5899103,
@@ -2209,7 +2209,12 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
 
     if (refreshFailed) {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx);
+        // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature flag.
+        // Migrations are a non-authoritative path, so the CSR must be reset to non-authoritative to
+        // avoid a stale authoritative state forcing the recovery refresh onto the authoritative
+        // path.
+        scopedCsr->setNonAuthoritative();
     }
 
     // Release the critical section

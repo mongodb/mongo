@@ -113,7 +113,9 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     } else {
         auto scopedCsr =
             CollectionShardingRuntime::acquireExclusive(opCtx, metadata.getTempReshardingNss());
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx);
+        // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
+        scopedCsr->setNonAuthoritative();
     }
 }
 
@@ -234,10 +236,11 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
     }
 }
 
-void RecipientStateMachineExternalStateImpl::clearFilteringMetadataOnTempReshardingCollection(
+void RecipientStateMachineExternalStateImpl::clearCollectionMetadataOnTempReshardingCollection(
     OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
     stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
-    resharding::clearFilteringMetadata(opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+    resharding::clearCollectionMetadata(
+        opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
 }
 
 void RecipientStateMachineExternalStateImpl::ensureReshardingStashCollectionsEmpty(

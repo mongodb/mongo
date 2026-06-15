@@ -277,7 +277,7 @@ public:
                 }
 
                 FilteringMetadataCache::get(opCtx)
-                    ->onCollectionPlacementVersionMismatch(opCtx, nss, boost::none)
+                    ->onShardVersionMismatch(opCtx, nss, boost::none)
                     .ignore();
             }
 

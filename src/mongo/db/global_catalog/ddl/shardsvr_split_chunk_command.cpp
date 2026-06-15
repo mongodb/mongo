@@ -163,9 +163,8 @@ public:
             uassertStatusOK(ChunkRange::validate(chunkRange));
 
             {
-                uassertStatusOK(
-                    FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                        opCtx, nss, boost::none));
+                uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
+                    opCtx, nss, boost::none));
                 const auto metadata =
                     checkCollectionIdentity(opCtx, nss, req.getEpoch(), req.getTimestamp());
                 checkShardKeyPattern(opCtx, nss, metadata, chunkRange);

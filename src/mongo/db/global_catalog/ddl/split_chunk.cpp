@@ -181,9 +181,10 @@ Status splitChunk_nonAuth(OperationContext* opCtx,
     // durable shard catalog and keep the CSR pinned to the pre-split version.
     // This must be done before starting the operation to ensure the CSR is left as
     // kNonAuthoritative in case of an unexpected failure.
+    // TODO (SERVER-127444): Remove this and tassert with the feature flag.
     {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCsr->setNonAuthoritative();
     }
 
     // Commit the split to the config server.
@@ -220,7 +221,7 @@ Status splitChunk_nonAuth(OperationContext* opCtx,
     }();
 
     // Update the shard catalog filtering metadata to reflect the new shard version.
-    uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+    uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
         opCtx, nss, chunkVersionReceived));
 
     // Check commandStatus and writeConcernStatus

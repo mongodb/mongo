@@ -252,7 +252,7 @@ public:
             CollectionMetadata(CurrentChunkManager(rtHandle), shardName);
 
         CollectionShardingRuntime::acquireExclusive(_opCtx, _nss)
-            ->setFilteringMetadata_nonAuthoritative(_opCtx, collectionMetadata);
+            ->setCollectionMetadata(_opCtx, collectionMetadata);
     }
 
 protected:

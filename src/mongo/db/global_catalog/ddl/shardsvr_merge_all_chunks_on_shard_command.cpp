@@ -216,9 +216,10 @@ public:
             // durable shard catalog and keep the CSR pinned to the pre-mergeAllChunks version.
             // This must be done before starting the operation to ensure the CSR is left as
             // kNonAuthoritative in case of an unexpected failure.
+            // TODO (SERVER-127444): Remove this and tassert with the feature flag.
             {
-                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, ns());
-                scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+                auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+                scopedCsr->setNonAuthoritative();
             }
 
             // Legacy path: forward directly to the config server.
@@ -247,9 +248,8 @@ public:
 
             // Update the shard catalog filtering metadata to reflect the new shard
             // version produced by the config server merge.
-            uassertStatusOK(
-                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    opCtx, ns(), res.getShardVersion()));
+            uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
+                opCtx, ns(), res.getShardVersion()));
 
             return res;
         }

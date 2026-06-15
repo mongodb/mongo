@@ -154,14 +154,13 @@ public:
                         CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
                         // This command is used as part of non-authoritative DDLs which means we're
                         // flipping from authoritative to non-authoritative.
-                        // TODO SERVER-122394: Remove this once all DDLs are authoritative
+                        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
                         scopedCsr->setNonAuthoritative();
                     }
                 }
                 LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
-                uassertStatusOK(
-                    FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                        opCtx, ns(), boost::none));
+                uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
+                    opCtx, ns(), boost::none));
             }
 
             FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, ns());

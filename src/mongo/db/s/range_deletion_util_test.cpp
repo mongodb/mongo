@@ -136,8 +136,8 @@ public:
                        ShardId("dummyShardId")}});
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         CollectionShardingRuntime::acquireExclusive(_opCtx, kNss)
-            ->setFilteringMetadata_nonAuthoritative(
-                _opCtx, CollectionMetadata(std::move(cm), ShardId("dummyShardId")));
+            ->setCollectionMetadata(_opCtx,
+                                    CollectionMetadata(std::move(cm), ShardId("dummyShardId")));
     }
 
     UUID uuid() const {

@@ -170,10 +170,9 @@ public:
             }
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), _outputNss)
-                ->setFilteringMetadata_nonAuthoritative(
-                    opCtx.get(),
-                    CollectionMetadata(makeChunkManagerForOutputCollection(),
-                                       _myDonorHandle.name()));
+                ->setCollectionMetadata(opCtx.get(),
+                                        CollectionMetadata(makeChunkManagerForOutputCollection(),
+                                                           _myDonorHandle.name()));
 
             _metrics =
                 ReshardingMetrics::makeInstance_forTest(_sourceUUID,

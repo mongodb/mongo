@@ -63,7 +63,7 @@ const std::string kPattern = "_id";
 
 void setUntrackedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+        ->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
 }
 
 class SplitVectorTest : public ShardServerTestFixture {

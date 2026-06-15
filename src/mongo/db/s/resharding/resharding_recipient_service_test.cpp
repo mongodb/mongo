@@ -65,6 +65,7 @@
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
@@ -316,8 +317,12 @@ public:
         Helpers::update(opCtx, coll, query, update);
     }
 
-    void clearFilteringMetadataOnTempReshardingCollection(
-        OperationContext* opCtx, const NamespaceString& tempReshardingNss) {}
+    void clearCollectionMetadataOnTempReshardingCollection(
+        OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
+        stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
+        resharding::clearCollectionMetadata(
+            opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+    }
 
     void ensureReshardingStashCollectionsEmpty(
         OperationContext* opCtx,
@@ -481,7 +486,7 @@ public:
         _impl->updateCoordinatorDocument(opCtx, query, update);
     }
 
-    void clearFilteringMetadataOnTempReshardingCollection(
+    void clearCollectionMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) override {}
 
     void ensureReshardingStashCollectionsEmpty(

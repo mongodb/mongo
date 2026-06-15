@@ -193,7 +193,7 @@ int MetadataManager::numberOfEmptyMetadataSnapshots() const {
     return emptyMetadataSnapshots;
 }
 
-void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
+void MetadataManager::setCollectionMetadata(CollectionMetadata remoteMetadata) {
     std::lock_guard<std::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
     // The active metadata should always be available (not boost::none)

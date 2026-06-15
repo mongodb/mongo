@@ -157,8 +157,9 @@ protected:
         const auto collectionMetadata =
             CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardHandle.name());
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(_opCtx, kTestNs);
-        scopedCSR->setFilteringMetadata_authoritative(
+        scopedCSR->setCollectionMetadata(
             _opCtx, collectionMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+        scopedCSR->setAuthoritative();
     }
 
     MergeChunksCoordinatorDocument makeMergeChunksCoordinatorDoc(std::vector<BSONObj> bounds,

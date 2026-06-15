@@ -234,7 +234,7 @@ void ShardRoleTest::setUp() {
 void ShardRoleTest::installUntrackedCollectionMetadata(OperationContext* opCtx,
                                                        const NamespaceString& nss) {
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+        ->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
 }
 
 void ShardRoleTest::installShardedCollectionMetadata(
@@ -276,7 +276,7 @@ void ShardRoleTest::installShardedCollectionMetadata(
     const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), kMyShardName);
 
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
+        ->setCollectionMetadata(opCtx, collectionMetadata);
 }
 
 void ShardRoleTest::withNewOpCtx(std::function<void(OperationContext*)> callback) {
@@ -969,7 +969,7 @@ TEST_P(ShardRoleUniqueShardIdentifiersTest,
     {
         // Clear the collection filtering metadata on the shard.
         CollectionShardingRuntime::acquireExclusive(operationContext(), nssShardedCollection1)
-            ->clearFilteringMetadata_nonAuthoritative(operationContext());
+            ->clearCollectionMetadata(operationContext());
     }
 
     PlacementConcern placementConcern{{}, shardVersionShardedCollection1};

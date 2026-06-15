@@ -821,7 +821,7 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
     // filtering information.
     {
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        scopedCSR->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCSR->clearCollectionMetadata(opCtx);
     }
     inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
         opCtx,
@@ -870,7 +870,7 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
 
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        scopedCSR->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
+        scopedCSR->setCollectionMetadata(opCtx, collectionMetadata);
     }
 
     auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
@@ -892,7 +892,7 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
     // filtering information.
     {
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        scopedCSR->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCSR->clearCollectionMetadata(opCtx);
     }
     inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
         opCtx,
@@ -1296,10 +1296,10 @@ protected:
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->setFilteringMetadata_authoritative(
-            operationContext(),
-            collectionMetadata,
-            CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+        scopedCSR->setCollectionMetadata(operationContext(),
+                                         collectionMetadata,
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+        scopedCSR->setAuthoritative();
     }
 
     void setShardCatalogMetadata(const UUID& uuid,
@@ -1323,7 +1323,7 @@ protected:
             ComparableChunkVersion::makeComparableChunkVersion(version));
         const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), _shardId);
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->setFilteringMetadata_nonAuthoritative(operationContext(), collectionMetadata);
+        scopedCSR->setCollectionMetadata(operationContext(), collectionMetadata);
     }
 
     std::vector<MetadataInconsistencyItem> checkConsistency(
@@ -1394,21 +1394,23 @@ protected:
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
         auto metadata = scopedCSR->getCurrentMetadataIfKnown();
         if (metadata) {
-            scopedCSR->setFilteringMetadata_authoritative(
+            scopedCSR->setCollectionMetadata(
                 operationContext(),
                 *metadata,
                 CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+            scopedCSR->setAuthoritative();
         } else {
-            scopedCSR->clearFilteringMetadata_authoritative(operationContext());
+            scopedCSR->clearCollectionMetadata(operationContext());
+            scopedCSR->setAuthoritative();
         }
     }
 
     void setCSRUnowned() {
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->setFilteringMetadata_authoritative(
-            operationContext(),
-            CollectionMetadata::UNTRACKED(),
-            CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
+        scopedCSR->setAuthoritative();
+        scopedCSR->setCollectionMetadata(operationContext(),
+                                         CollectionMetadata::UNTRACKED(),
+                                         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
     }
 
     void insertDurableShardCatalogCollection(const CollectionType& coll) {
@@ -1751,7 +1753,7 @@ TEST_F(MetadataConsistencyShardCatalogTest, ValidateCollectionMetadata_SkipsWhen
 
     {
         auto scopedCSR = CollectionShardingRuntime::acquireExclusive(operationContext(), _nss);
-        scopedCSR->clearFilteringMetadata_nonAuthoritative(operationContext());
+        scopedCSR->clearCollectionMetadata(operationContext());
     }
 
     _catalogClient->setChunksToReturn({chunk});

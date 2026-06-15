@@ -1118,11 +1118,11 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         ? originalNss.getTimeseriesViewNamespace()
         : originalNss;
 
-    const bool clearFilteringMetadata =
+    const bool clearCollectionMetadata =
         metadataAccessLevel == AuthoritativeMetadataAccessLevelEnum::kNone;
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
-    if (clearFilteringMetadata) {
+    if (clearCollectionMetadata) {
         actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
     } else {
         actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();

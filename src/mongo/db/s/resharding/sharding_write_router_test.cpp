@@ -137,8 +137,8 @@ public:
                 opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
-                ->setFilteringMetadata_nonAuthoritative(
-                    opCtx.get(), CollectionMetadata(chunkManager, kDonorShardHandle.name()));
+                ->setCollectionMetadata(opCtx.get(),
+                                        CollectionMetadata(chunkManager, kDonorShardHandle.name()));
         }
 
         {
@@ -334,7 +334,7 @@ TEST_F(ShardingWriteRouterRegistryTest, CollDescHasNoRoutingTableReturnsNone) {
         const auto client = _serviceContext->getService()->makeClient("test-setup-unsharded");
         const auto opCtx = client->makeOperationContext();
         CollectionShardingRuntime::acquireExclusive(opCtx.get(), untrackedNss)
-            ->setFilteringMetadata_nonAuthoritative(opCtx.get(), CollectionMetadata());
+            ->setCollectionMetadata(opCtx.get(), CollectionMetadata());
     }
 
     const auto client = _serviceContext->getService()->makeClient("test-unsharded-router");

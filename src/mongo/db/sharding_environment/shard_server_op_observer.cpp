@@ -97,10 +97,9 @@ public:
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
         auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, _nss);
-        if (_droppingCollection)
-            scopedCss->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
-        else
-            scopedCss->clearFilteringMetadata_nonAuthoritative(opCtx);
+        // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature flag.
+        scopedCss->setNonAuthoritative();
+        scopedCss->clearCollectionMetadata(opCtx, _droppingCollection);
     }
 
     void rollback(OperationContext* opCtx) noexcept override {}
@@ -319,7 +318,10 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             // can synchronize with any work happening on the primary (e.g., migration critical
             // section).
             auto scopedCss = CollectionShardingRuntime::acquireExclusive(opCtx, updatedNss);
-            scopedCss->clearFilteringMetadata_nonAuthoritative(opCtx);
+            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
+            // flag.
+            scopedCss->setNonAuthoritative();
+            scopedCss->clearCollectionMetadata(opCtx);
         }
     }
 
@@ -463,7 +465,11 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     // Secondaries that are in oplog application must clear the collection
                     // filtering metadata before releasing the in-memory critical section.
                     if (!opCtx->isEnforcingConstraints() && clearCollMetadata) {
-                        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+                        scopedCsr->clearCollectionMetadata(opCtx);
+                        // TODO (SERVER-128176): Remove this `setNonAuthoritative` once all DDL
+                        // operations are made shard-authoritative and all DDL operations do not
+                        // clear collection metadata at release.
+                        scopedCsr->setNonAuthoritative();
                     }
 
                     scopedCsr->exitCriticalSection(opCtx, reason);
@@ -527,7 +533,7 @@ void ShardServerOpObserver::onCreateCollection(
         // by a movePrimary to the current shard.
         if (ShardingState::get(opCtx)->enabled()) {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, collectionName);
-            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+            scopedCsr->clearCollectionMetadata(opCtx);
         }
 
         return;
@@ -542,7 +548,7 @@ void ShardServerOpObserver::onCreateCollection(
     // Temp collections are always UNTRACKED
     if (options.temp) {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, collectionName);
-        scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+        scopedCsr->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
         return;
     }
 
@@ -559,10 +565,9 @@ void ShardServerOpObserver::onCreateCollection(
     // that the caller will be responsible to eventually set the proper placement version.
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, collectionName);
     if (oss._implicitCreationInfo._forceCSRAsUnknownAfterCollectionCreation) {
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
-
+        scopedCsr->clearCollectionMetadata(opCtx);
     } else if (!scopedCsr->getCurrentMetadataIfKnown()) {
-        scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+        scopedCsr->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
     }
 }
 
@@ -594,7 +599,7 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
     // Clear the CSR authoritative state once we drop shard.catalog.collections on FCV downgrade.
     // Otherwise, a follow up FCV upgrade can see Auth. Shards enabled & an authoritative CSR,
     // but the corresponding persisted authoritative metadata would already be gone from disk.
-    // TODO(SERVER-127444): Remove once the authoritativeState flag is removed from the CSR.
+    // TODO (SERVER-127444): Remove once the authoritativeState flag is removed from the CSR.
     if (collectionName == NamespaceString::kConfigShardCatalogCollectionsNamespace) {
         for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
@@ -603,7 +608,8 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
                 LOGV2(12494600,
                       "Clearing CSR authoritative state on shard.catalog.collections drop",
                       logAttrs(nss));
-                scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+                scopedCsr->clearCollectionMetadata(opCtx);
+                scopedCsr->setNonAuthoritative();
             }
         }
     }
@@ -759,17 +765,13 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
         recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
     } else {
-        const auto collectionUuid = *op.getUuid();
-        if (entry.getForDroppedCollection() && entry.getNonAuth()) {
-            scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
-        } else if (entry.getForDroppedCollection()) {
-            scopedCsr->clearFilteringMetadataForDroppedCollection_authoritative(opCtx,
-                                                                                collectionUuid);
-        } else if (entry.getNonAuth()) {
-            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
-        } else {
-            scopedCsr->clearFilteringMetadata_authoritative(opCtx, collectionUuid);
-        }
+        // TODO (SERVER-127444): Remove this `setNonAuthoritative` and `getNonAuth`.
+        if (entry.getNonAuth())
+            scopedCsr->setNonAuthoritative();
+        else
+            scopedCsr->setAuthoritative();
+
+        scopedCsr->clearCollectionMetadata(opCtx, entry.getForDroppedCollection());
     }
 }
 

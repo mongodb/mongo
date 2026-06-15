@@ -185,7 +185,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
         // Force the refresh of the filtering metadata cache to purge outdated information.
         // The logic below will cause config.cache.collections.<nss> to be dropped and secondary
         // nodes to clean their filtering metadata (once the flushed data get replicated).
-        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss);
+        FilteringMetadataCache::get(opCtx)->forceCollectionMetadataRefresh_DEPRECATED(opCtx, nss);
         FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
     }
 

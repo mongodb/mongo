@@ -129,7 +129,7 @@ protected:
 void installUntrackedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, untrackedCollectionMetadata);
+        ->setCollectionMetadata(opCtx, untrackedCollectionMetadata);
 }
 
 void installShardedCollectionMetadata(OperationContext* opCtx,
@@ -169,7 +169,7 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
     const auto collectionMetadata = CollectionMetadata(CurrentChunkManager(rtHandle), thisShardId);
 
     CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
+        ->setCollectionMetadata(opCtx, collectionMetadata);
 }
 
 

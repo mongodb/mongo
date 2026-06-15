@@ -263,7 +263,7 @@ void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid) {
     NamespaceString nss = RangeDeleterServiceTest::nssWithUuid[uuid];
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    scopedCsr->clearCollectionMetadata(opCtx);
 }
 
 }  // namespace mongo

@@ -204,8 +204,8 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
 
     // Make sure the latest placement version is recovered as of the time of the invocation of the
     // command.
-    uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-        opCtx, nss, boost::none));
+    uassertStatusOK(
+        FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(opCtx, nss, boost::none));
 
     // Complete any unfinished migration pending recovery
     {
@@ -704,7 +704,12 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         {
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
-                scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
+                scopedCsr->clearCollectionMetadata(_opCtx);
+                // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the
+                // feature flag. Migrations are a non-authoritative path, so the CSR must be reset
+                // to non-authoritative to avoid a stale authoritative state forcing the recovery
+                // refresh onto the authoritative path.
+                scopedCsr->setNonAuthoritative();
             });
         }
         scopedGuard.dismiss();
@@ -728,7 +733,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             logAttrs(nss()),
                             "migrationId"_attr = _coordinator->getMigrationId());
 
-        FilteringMetadataCache::get(_opCtx)->forceCollectionPlacementRefresh(_opCtx, nss());
+        FilteringMetadataCache::get(_opCtx)->forceCollectionMetadataRefresh_DEPRECATED(_opCtx,
+                                                                                       nss());
         FilteringMetadataCache::get(_opCtx)->waitForCollectionFlush(_opCtx, nss());
 
         LOGV2_DEBUG_OPTIONS(4817405,
@@ -748,7 +754,12 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         {
             withChangelogErrMsg("Failed to acquire exclusive lock", [&] {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
-                scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
+                scopedCsr->clearCollectionMetadata(_opCtx);
+                // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the
+                // feature flag. Migrations are a non-authoritative path, so the CSR must be reset
+                // to non-authoritative to avoid a stale authoritative state forcing the recovery
+                // refresh onto the authoritative path.
+                scopedCsr->setNonAuthoritative();
             });
         }
         scopedGuard.dismiss();
@@ -984,7 +995,12 @@ Status MigrationSourceManager::_cleanup(bool completeMigration) {
             // Something went really wrong when completing the migration just unset the metadata and
             // let the next op to recover.
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, nss());
-            scopedCsr->clearFilteringMetadata_nonAuthoritative(_opCtx);
+            scopedCsr->clearCollectionMetadata(_opCtx);
+            // TODO (SERVER-127444): Remove this `setNonAuthoritative` to assert with the feature
+            // flag. Migrations are a non-authoritative path, so the CSR must be reset to
+            // non-authoritative to avoid a stale authoritative state forcing the recovery refresh
+            // onto the authoritative path.
+            scopedCsr->setNonAuthoritative();
         }
         return ex.toStatus();
     }

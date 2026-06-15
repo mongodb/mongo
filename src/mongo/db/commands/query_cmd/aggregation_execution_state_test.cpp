@@ -79,7 +79,7 @@ protected:
         }
 
         CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-            ->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+            ->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
         PointInTimeChunkManager cm(RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
                                    _dbVersion.getTimestamp());
         getCatalogCacheMock()->setCollectionReturnValue(
@@ -143,7 +143,7 @@ protected:
         }
 
         CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-            ->setFilteringMetadata_nonAuthoritative(opCtx, collectionMetadata);
+            ->setCollectionMetadata(opCtx, collectionMetadata);
 
         getCatalogCacheMock()->setCollectionReturnValue(
             nss,

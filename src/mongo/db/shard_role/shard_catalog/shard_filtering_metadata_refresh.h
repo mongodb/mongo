@@ -136,18 +136,18 @@ public:
      * execution state in the response. This is specifically problematic for write commands, which
      * are expected to return the set of write batch entries that succeeded.
      */
-    Status onCollectionPlacementVersionMismatch(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        boost::optional<ChunkVersion> chunkVersionReceived) noexcept;
+    Status onShardVersionMismatch(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  boost::optional<ChunkVersion> chunkVersionReceived) noexcept;
 
     /**
-     * Unconditionally causes the collection placement to be refreshed from the config server.
+     * Unconditionally causes the collection metadata to be refreshed from the config server.
      *
      * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must
      * not be called with a lock.
      */
-    void forceCollectionPlacementRefresh(OperationContext* opCtx, const NamespaceString& nss);
+    void forceCollectionMetadataRefresh_DEPRECATED(OperationContext* opCtx,
+                                                   const NamespaceString& nss);
 
     /**
      * Should be called when any client request on this shard generates a StaleDbVersion exception.
@@ -270,14 +270,13 @@ private:
         bool runRecover,
         CancellationToken cancellationToken);
 
-    void _onCollectionPlacementVersionMismatch(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               boost::optional<ChunkVersion> chunkVersionReceived);
+    void _onShardVersionMismatch(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 boost::optional<ChunkVersion> chunkVersionReceived);
 
-    void _onCollectionPlacementVersionMismatchAuthoritative(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        boost::optional<ChunkVersion> receivedShardVersion);
+    void _onShardVersionMismatchAuthoritative(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              boost::optional<ChunkVersion> receivedShardVersion);
 
     // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
     // If _cache is set, it will be used only for filtering; otherwise, the Grid's CatalogCache will

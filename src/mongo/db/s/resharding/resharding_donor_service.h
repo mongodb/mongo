@@ -459,7 +459,7 @@ public:
                                            const BSONObj& update) = 0;
 
     virtual std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
-    getOnReleaseCriticalSectionCustomAction(bool mustClearFilteringMetadata) = 0;
+    getOnReleaseCriticalSectionCustomAction(bool mustClearCollectionMetadata) = 0;
 
     virtual void refreshCollectionPlacementInfo(OperationContext* opCtx,
                                                 const NamespaceString& sourceNss) = 0;

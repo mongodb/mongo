@@ -356,7 +356,7 @@ protected:
             boost::none /* databaseVersion */};
 
         CollectionShardingRuntime::acquireExclusive(opCtx, sourceNss)
-            ->setFilteringMetadata_nonAuthoritative(opCtx, metadata);
+            ->setCollectionMetadata(opCtx, metadata);
     }
 
 private:
@@ -1143,7 +1143,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
         // Prior to adding a resharding document, assert that attempting to clear filtering does
         // nothing.
-        resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+        resharding::clearCollectionMetadata(opCtx, scheduleAsyncRefresh);
 
         for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
             const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
@@ -1161,7 +1161,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
     ReshardingDonorService::DonorStateMachine::insertStateDocument(opCtx, donorDoc);
 
     // Clear the filtering metadata (without scheduling a refresh) and assert the metadata is gone.
-    resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+    resharding::clearCollectionMetadata(opCtx, scheduleAsyncRefresh);
 
     for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
         const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
@@ -1174,7 +1174,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
     ReshardingRecipientService::RecipientStateMachine::insertStateDocument(opCtx, recipDoc);
 
     // Clear the filtering metadata (without scheduling a refresh) and assert the metadata is gone.
-    resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+    resharding::clearCollectionMetadata(opCtx, scheduleAsyncRefresh);
 
     for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
         const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);
@@ -1210,7 +1210,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
     // Clear the filtering metadata (without scheduling a refresh) for only on single operation
     // related namespaces
-    resharding::clearFilteringMetadata(opCtx, {sourceNss1, tempReshardingNss1}, false);
+    resharding::clearCollectionMetadata(opCtx, {sourceNss1, tempReshardingNss1}, false);
 
     for (auto const& nss : {sourceNss1, tempReshardingNss1}) {
         const auto csr = CollectionShardingRuntime::acquireShared(opCtx, nss);

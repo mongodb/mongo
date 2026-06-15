@@ -449,7 +449,7 @@ protected:
 
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
-            scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, metadata);
+            scopedCsr->setCollectionMetadata(opCtx, metadata);
         }
 
         return metadata;

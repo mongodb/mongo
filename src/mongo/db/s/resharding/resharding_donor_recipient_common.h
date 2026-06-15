@@ -137,9 +137,9 @@ MONGO_MOD_PUBLIC void processReshardingFieldsForCollection(
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
 
-MONGO_MOD_PUBLIC void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
+MONGO_MOD_PUBLIC void clearCollectionMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
 
-MONGO_MOD_PUBLIC void clearFilteringMetadata(
+MONGO_MOD_PUBLIC void clearCollectionMetadata(
     OperationContext* opCtx,
     stdx::unordered_set<NamespaceString> namespacesToRefresh,
     bool scheduleAsyncRefresh);

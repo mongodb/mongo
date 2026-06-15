@@ -71,7 +71,7 @@ void dropShardCatalogMetadata(OperationContext* opCtx) {
 
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx);
     }
 
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {

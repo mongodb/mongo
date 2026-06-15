@@ -102,7 +102,7 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
     auto service = ShardingRecoveryService::get(opCtx);
     const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
         AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-    const bool clearFilteringMetadata = !isAuthoritative;
+    const bool clearCollectionMetadata = !isAuthoritative;
 
     // The critical-section document controls what secondaries do when they observe the release.
     // With shard-authoritative collection metadata, the commit phase removes the shard catalog
@@ -114,7 +114,7 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
         _critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
         false /* clearDbMetadata: untrack only changes collection metadata */,
-        clearFilteringMetadata);
+        clearCollectionMetadata);
     service->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         nss(),
@@ -210,7 +210,7 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     if (!isAuthoritative) {
         // Legacy readers rely on the filtering metadata refresh to clear the cached state on the
         // primary and to replicate the invalidate to secondaries.
-        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss());
+        FilteringMetadataCache::get(opCtx)->forceCollectionMetadataRefresh_DEPRECATED(opCtx, nss());
         FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss());
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     }

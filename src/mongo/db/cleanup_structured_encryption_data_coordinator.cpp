@@ -226,7 +226,7 @@ void doAnchorCleanupWithUpdatedCollectionState(OperationContext* opCtx,
                               << " is expected to be unsharded, but is sharded",
                 !innerCri.isSharded());
 
-        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+        uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
             opCtx, escNss, ChunkVersion::UNTRACKED()));
         ScopedSetShardRole escShardRole(
             opCtx, escNss, ShardVersion::UNTRACKED(), innerCri.getDbVersion());

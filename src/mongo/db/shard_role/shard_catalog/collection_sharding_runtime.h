@@ -208,18 +208,12 @@ public:
     };
 
     /**
-     * Updates the collection's filtering metadata based on changes received from the config server
-     * and also resolves the pending receives map in case some of these pending receives have
-     * committed on the config server or have been abandoned by the donor shard.
-     *
-     * This method must be called with an exclusive collection lock and it does not acquire any
-     * locks itself.
+     * Updates the collection's filtering metadata without changing whether the CSR is currently
+     * authoritative or non-authoritative.
      */
-    void setFilteringMetadata_nonAuthoritative(OperationContext* opCtx,
-                                               CollectionMetadata newMetadata);
-    void setFilteringMetadata_authoritative(OperationContext* opCtx,
-                                            CollectionMetadata newMetadata,
-                                            NoRoutingTableAs noRoutingTableAs);
+    void setCollectionMetadata(OperationContext* opCtx,
+                               CollectionMetadata newMetadata,
+                               NoRoutingTableAs noRoutingTableAs = NoRoutingTableAs::kUntracked);
 
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
@@ -228,22 +222,9 @@ public:
      * Interrupts any ongoing shard metadata refresh.
      *
      * It is safe to call this method with only an intent lock on the collection (as opposed to
-     * setFilteringMetadata which requires exclusive).
+     * setCollectionMetadata which requires exclusive).
      */
-    void clearFilteringMetadata_nonAuthoritative(OperationContext* opCtx);
-    void clearFilteringMetadata_authoritative(OperationContext* opCtx, const UUID& collectionUuid);
-    void clearFilteringMetadata_authoritative(OperationContext* opCtx);
-
-    /**
-     * Calls to clearFilteringMetadata + clears the _metadataManager object.
-     */
-    void clearFilteringMetadataForDroppedCollection_nonAuthoritative(OperationContext* opCtx);
-    /**
-     * Calls to clearFilteringMetadata + clears the _metadataManager object. Also resets the
-     * _allowChunkOperations flag (i.e. sets it to `true`).
-     */
-    void clearFilteringMetadataForDroppedCollection_authoritative(OperationContext* opCtx,
-                                                                  const UUID& collectionUuid);
+    void clearCollectionMetadata(OperationContext* opCtx, bool collIsDropped = false);
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called
@@ -355,6 +336,7 @@ public:
     };
     AuthoritativeState getAuthoritativeState() const;
     void setNonAuthoritative();
+    void setAuthoritative();
 
     void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
     std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;
@@ -398,20 +380,6 @@ private:
         bool supportNonVersionedOperations = false) const;
 
     /**
-     * Auxiliary function used to implement the different flavours of clearFilteringMetadata.
-     */
-    void _clearFilteringMetadata(OperationContext* opCtx, bool collIsDropped);
-
-    /**
-     * Auxiliary function used to implement the various setFilteringMetadata flavours.
-     * See `NoRoutingTableAs` for the semantics of `noRoutingTableAs` when `newMetadata` carries no
-     * routing table.
-     */
-    void _setFilteringMetadata(OperationContext* opCtx,
-                               CollectionMetadata newMetadata,
-                               NoRoutingTableAs noRoutingTableAs);
-
-    /**
      * This function cleans up some state associated with the current sharded metadata before it's
      * replaced by the new metadata.
      */
@@ -445,7 +413,7 @@ private:
     // If the collection state is unknown:
     // - If the metadata had never been set yet, this will be nullptr.
     // - If the collection state was known and was sharded, this contains the metadata that
-    // were known for the collection before the last invocation of clearFilteringMetadata().
+    // were known for the collection before the last invocation of clearCollectionMetadata().
     //
     // The following matrix enumerates the valid (Y) and invalid (X) scenarios.
     //                          ______________________________________________

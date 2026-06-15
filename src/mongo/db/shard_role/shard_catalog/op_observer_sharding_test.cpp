@@ -92,7 +92,7 @@ const NamespaceString kUnshardedNss =
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss)
-        ->setFilteringMetadata_nonAuthoritative(opCtx, std::move(metadata));
+        ->setCollectionMetadata(opCtx, std::move(metadata));
 }
 
 class DocumentKeyStateTest : public ShardServerTestFixture {

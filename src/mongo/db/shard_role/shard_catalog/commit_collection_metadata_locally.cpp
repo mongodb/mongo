@@ -338,9 +338,8 @@ void updateShardCatalogCache(OperationContext* opCtx,
     CollectionMetadata ownedMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardId);
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-
-    scopedCsr->setFilteringMetadata_authoritative(
-        opCtx, std::move(ownedMetadata), CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+    scopedCsr->setAuthoritative();
+    scopedCsr->setCollectionMetadata(opCtx, std::move(ownedMetadata));
 
     // Update allowChunkOperations and write an oplog 'c' entry to send the new allowChunkOperations
     // value to secondaries, since its value could have potentially changed.
@@ -351,11 +350,10 @@ void updateShardCatalogCache(OperationContext* opCtx,
 }
 
 void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const UUID& uuid) {
+                                                const NamespaceString& nss) {
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-
-    scopedCsr->clearFilteringMetadataForDroppedCollection_authoritative(opCtx, uuid);
+    scopedCsr->setAuthoritative();
+    scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
 }
 
 }  // namespace
@@ -376,7 +374,7 @@ void commitDropCollectionLocally(OperationContext* opCtx,
     invalidateCollectionMetadataOnSecondaries(opCtx, nss, uuid, true /* forDroppedCollection */);
 
     // Clear this node collection metadata from CSR.
-    clearShardCatalogCacheForDroppedCollection(opCtx, nss, uuid);
+    clearShardCatalogCacheForDroppedCollection(opCtx, nss);
 }
 
 void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid) {
@@ -406,7 +404,7 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
             invalidateCollectionMetadataOnSecondaries(
                 opCtx, fromNss, *fromUUID, true /* forDroppedCollection */);
 
-            clearShardCatalogCacheForDroppedCollection(opCtx, fromNss, *fromUUID);
+            clearShardCatalogCacheForDroppedCollection(opCtx, fromNss);
         }
 
         if (clearToNss && targetUUID) {
@@ -414,7 +412,7 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
             invalidateCollectionMetadataOnSecondaries(
                 opCtx, toNss, *targetUUID, true /* forDroppedCollection */);
 
-            clearShardCatalogCacheForDroppedCollection(opCtx, toNss, *targetUUID);
+            clearShardCatalogCacheForDroppedCollection(opCtx, toNss);
         }
     };
 
@@ -522,7 +520,7 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
         // about the collection. Make sure to delete any existing collection entry as well and clear
         // the CSR.
         deleteCollectionEntryLocally(opCtx, nss);
-        clearShardCatalogCacheForDroppedCollection(opCtx, nss, coll.getUuid());
+        clearShardCatalogCacheForDroppedCollection(opCtx, nss);
     }
 
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
@@ -549,12 +547,10 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
 
     const auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
     const auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
-    if (scopedCsr->getAuthoritativeState() ==
-            CollectionShardingRuntime::AuthoritativeState::kAuthoritative &&
-        scopedCsr->isUnowned()) {
+    if (scopedCsr->isUnowned()) {
         invalidateCollectionMetadataOnSecondaries(
             opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-        scopedCsr->clearFilteringMetadata_authoritative(opCtx);
+        scopedCsr->clearCollectionMetadata(opCtx);
     }
 }
 
@@ -706,7 +702,7 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
     if (!shardOwnsChunks) {
         shard_catalog_commit::invalidateCollectionMetadataOnSecondaries(
             opCtx, nss, oldUuid, true /* forDroppedCollection */);
-        shard_catalog_commit::clearShardCatalogCacheForDroppedCollection(opCtx, nss, oldUuid);
+        shard_catalog_commit::clearShardCatalogCacheForDroppedCollection(opCtx, nss);
     }
 }
 

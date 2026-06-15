@@ -733,7 +733,7 @@ protected:
                            ShardId("dummyShardId")}});
 
             CollectionShardingRuntime::acquireExclusive(operationContext(), kNss)
-                ->setFilteringMetadata_nonAuthoritative(
+                ->setCollectionMetadata(
                     operationContext(),
                     CollectionMetadata(
                         CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),

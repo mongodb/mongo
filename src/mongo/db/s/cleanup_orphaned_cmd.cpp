@@ -183,9 +183,8 @@ public:
                                      "metadata is not yet initialized. ",
                     shardingState->enabled());
 
-            uassertStatusOK(
-                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    opCtx, nss, boost::none));
+            uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
+                opCtx, nss, boost::none));
 
             BSONObj startingFromKey;
 

@@ -452,7 +452,7 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
     }
 }
 
-void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) {
+void clearCollectionMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) {
     stdx::unordered_set<NamespaceString> namespacesToRefresh;
     for (const NamespaceString& homeToReshardingDocs :
          {NamespaceString::kDonorReshardingOperationsNamespace,
@@ -466,12 +466,12 @@ void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) 
             return true;
         });
     }
-    clearFilteringMetadata(opCtx, namespacesToRefresh, scheduleAsyncRefresh);
+    clearCollectionMetadata(opCtx, namespacesToRefresh, scheduleAsyncRefresh);
 }
 
-void clearFilteringMetadata(OperationContext* opCtx,
-                            stdx::unordered_set<NamespaceString> namespacesToRefresh,
-                            bool scheduleAsyncRefresh) {
+void clearCollectionMetadata(OperationContext* opCtx,
+                             stdx::unordered_set<NamespaceString> namespacesToRefresh,
+                             bool scheduleAsyncRefresh) {
     auto* catalogCache = Grid::get(opCtx)->catalogCache();
 
     for (const auto& nss : namespacesToRefresh) {
@@ -484,7 +484,9 @@ void clearFilteringMetadata(OperationContext* opCtx,
 
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+            scopedCsr->clearCollectionMetadata(opCtx);
+            // TODO (SERVER-128449): Remove this once resharding is made authoritative.
+            scopedCsr->setNonAuthoritative();
         }
 
         if (!scheduleAsyncRefresh) {
@@ -495,7 +497,7 @@ void clearFilteringMetadata(OperationContext* opCtx,
             ThreadClient tc("TriggerReshardingRecovery", svcCtx->getService());
             auto opCtx = tc->makeOperationContext();
             uassertStatusOK(FilteringMetadataCache::get(opCtx.get())
-                                ->onCollectionPlacementVersionMismatch(
+                                ->onShardVersionMismatch(
                                     opCtx.get(), nss, boost::none /* chunkVersionReceived */));
         })
             .until([](const Status& status) {

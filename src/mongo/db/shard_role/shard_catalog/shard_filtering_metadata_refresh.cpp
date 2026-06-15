@@ -217,7 +217,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
                                      const ChunkRange& range,
                                      const ChunkVersion& preMigrationChunkVersion) {
     {
-        // TODO (SERVER-125984): Remove this once migration recovery do not follow this path.
+        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
         scopedCsr->setNonAuthoritative();
     }
@@ -401,7 +401,7 @@ bool runRefreshInChildOperationContext(OperationContext* parent,
     }
 }
 
-Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
+Status FilteringMetadataCache::onShardVersionMismatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<ChunkVersion> chunkVersionReceived) noexcept try {
@@ -440,10 +440,9 @@ Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
         const bool shouldRetry = runRefreshInChildOperationContext(
             opCtx, refresh.cancellationToken, [&](OperationContext* refreshOpCtx) {
                 if (isAuthoritative) {
-                    _onCollectionPlacementVersionMismatchAuthoritative(
-                        refreshOpCtx, nss, chunkVersionReceived);
+                    _onShardVersionMismatchAuthoritative(refreshOpCtx, nss, chunkVersionReceived);
                 } else {
-                    _onCollectionPlacementVersionMismatch(refreshOpCtx, nss, chunkVersionReceived);
+                    _onShardVersionMismatch(refreshOpCtx, nss, chunkVersionReceived);
                 }
             });
         if (shouldRetry) {
@@ -463,14 +462,20 @@ Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
     return ex.toStatus();
 }
 
-void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* opCtx,
-                                                             const NamespaceString& nss) {
+void FilteringMetadataCache::forceCollectionMetadataRefresh_DEPRECATED(OperationContext* opCtx,
+                                                                       const NamespaceString& nss) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+    }
+
+    {
+        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->setNonAuthoritative();
     }
 
     const auto catalogCache = [&]() {
@@ -490,7 +495,7 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
 
     if (!cm.hasRoutingTable()) {
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-        scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+        scopedCsr->setCollectionMetadata(opCtx, CollectionMetadata::UNTRACKED());
         return;
     }
 
@@ -523,7 +528,7 @@ void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* o
     }
 
     CollectionMetadata metadata(cm, ShardingState::get(opCtx)->shardId());
-    scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, std::move(metadata));
+    scopedCsr->setCollectionMetadata(opCtx, std::move(metadata));
 }
 
 Status FilteringMetadataCache::onDbVersionMismatch(
@@ -623,6 +628,12 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                                                             CancellationToken cancellationToken) {
     LOGV2_DEBUG(4798501, 2, "Starting migration recovery", logAttrs(nss));
 
+    {
+        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->setNonAuthoritative();
+    }
+
     unsigned migrationRecoveryCount = 0;
 
     PersistentTaskStore<MigrationCoordinatorDocument> store(
@@ -674,15 +685,14 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                           "simulate an error response for forceGetCurrentMetadata");
             }
 
-            auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
+            auto setCollectionMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
                 auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, doc.getNss());
 
                 auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
                 invariant(!optMetadata);
 
                 if (!cancellationToken.isCanceled()) {
-                    scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx,
-                                                                     std::move(currentMetadata));
+                    scopedCsr->setCollectionMetadata(opCtx, std::move(currentMetadata));
                 }
             };
 
@@ -729,7 +739,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                     doc.getRange(),
                     defaultMajorityWriteConcernDoNotUse());
                 coordinator.forgetMigration(opCtx);
-                setFilteringMetadata();
+                setCollectionMetadata();
                 return true;
             }
 
@@ -755,7 +765,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
 
             coordinator.setShardKeyPattern(KeyPattern(currentMetadata.getKeyPattern()));
             coordinator.completeMigration(opCtx);
-            setFilteringMetadata();
+            setCollectionMetadata();
             return true;
         });
 }
@@ -947,7 +957,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
         // the critical section, the ongoing refresh would be interrupted and subsequently
         // re-queued.
         if (!waitForRefreshToComplete(opCtx, *dbMetadataRefreshFuture)) {
-            // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
+            // The refresh was canceled by a 'clearCollectionMetadata'. Retry the refresh.
             continue;
         }
 
@@ -1309,11 +1319,11 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                         AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
 
             // cancellationToken needs to be checked under the CSR lock before overwriting the
-            // filtering metadata to serialize with other threads calling 'clearFilteringMetadata'.
+            // filtering metadata to serialize with other threads calling 'clearCollectionMetadata'.
             if (!cancellationToken.isCanceled() &&
                 scopedCsr->getAuthoritativeState() ==
                     CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                scopedCsr->setFilteringMetadata_authoritative(opCtx, *metadata, noRoutingTableAs);
+                scopedCsr->setCollectionMetadata(opCtx, *metadata, noRoutingTableAs);
                 ShardingStatistics::get(opCtx)
                     .authoritativeCollectionMetadataStatistics.registerDiskRecovery();
             }
@@ -1381,7 +1391,7 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
     }();
 
     if (!status.isOK()) {
-        // clearFilteringMetadata cancels the CSS version waiter with CallbackCanceled. When that
+        // clearCollectionMetadata cancels the CSS version waiter with CallbackCanceled. When that
         // happens the metadata we recovered is now stale, so the caller must retry the recovery.
         if (status.code() == ErrorCodes::CallbackCanceled) {
             return WasWaitInterrupted::kYes;
@@ -1487,7 +1497,7 @@ bool FilteringMetadataCache::_isRecoveredShardVersionSufficient(
     }
 }
 
-void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
+void FilteringMetadataCache::_onShardVersionMismatchAuthoritative(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<ChunkVersion> receivedShardVersion) {
@@ -1560,7 +1570,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
         // after configTime, the router is stale.
         auto result = _waitForConfigTimeOrChunkVersionChange(opCtx, nss, *receivedShardVersion);
         if (result == WasWaitInterrupted::kYes) {
-            // Waits can get interrupted if there's a clearFilteringMetadata on the CSR. At this
+            // Waits can get interrupted if there's a clearCollectionMetadata on the CSR. At this
             // point what was recovered is now stale so it should be recovered again.
             continue;
         }
@@ -1648,11 +1658,11 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
 
                 // cancellationToken needs to be checked under the CSR lock before overwriting the
                 // filtering metadata to serialize with other threads calling
-                // 'clearFilteringMetadata'.
+                // 'clearCollectionMetadata'.
                 if (!cancellationToken.isCanceled()) {
                     // Atomically set the new filtering metadata and check if there is a migration
                     // that must be aborted.
-                    scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, currentMetadata);
+                    scopedCsr->setCollectionMetadata(opCtx, currentMetadata);
 
                     if (currentMetadata.isSharded() && !currentMetadata.allowMigrations()) {
                         if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
@@ -1677,7 +1687,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
                 (status.isOK() || status == ErrorCodes::Interrupted)) {
                 uasserted(ErrorCodes::PlacementVersionRefreshCanceled,
                           "Collection placement version refresh canceled by an interruption, "
-                          "probably due to a 'clearFilteringMetadata'");
+                          "probably due to a 'clearCollectionMetadata'");
             }
             return status;
         })
@@ -1685,7 +1695,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
         .share();
 }
 
-void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
+void FilteringMetadataCache::_onShardVersionMismatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<ChunkVersion> chunkVersionReceived) {
@@ -1695,6 +1705,12 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
 
     if (nss.isNamespaceAlwaysUntracked()) {
         return;
+    }
+
+    {
+        // TODO (SERVER-127444): Remove this and tassert with the feature flag.
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->setNonAuthoritative();
     }
 
     LOGV2_DEBUG(22061,
@@ -1757,7 +1773,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
         }
 
         if (!waitForRefreshToComplete(opCtx, *inRecoverOrRefresh)) {
-            // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
+            // The refresh was canceled by a 'clearCollectionMetadata'. Retry the refresh.
             continue;
         }
         break;

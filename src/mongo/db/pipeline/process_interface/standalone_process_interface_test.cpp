@@ -89,7 +89,7 @@ protected:
     void installUntrackedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
         const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();
         CollectionShardingRuntime::acquireExclusive(opCtx, nss)
-            ->setFilteringMetadata_nonAuthoritative(opCtx, untrackedCollectionMetadata);
+            ->setCollectionMetadata(opCtx, untrackedCollectionMetadata);
     }
 
     void setUp() override {

@@ -190,7 +190,7 @@ public:
                 auto refreshStatus = mockStatus
                     ? *mockStatus
                     : FilteringMetadataCache::get(opCtx.get())
-                          ->onCollectionPlacementVersionMismatch(
+                          ->onShardVersionMismatch(
                               opCtx.get(), nss, boost::none /* chunkVersionReceived */);
 
                 if (refreshStatus.isOK()) {

@@ -113,7 +113,7 @@ public:
      */
     int numberOfEmptyMetadataSnapshots() const;
 
-    void setFilteringMetadata(CollectionMetadata newMetadata);
+    void setCollectionMetadata(CollectionMetadata newMetadata);
 
     /**
      * Returns a future marked as ready when all the ongoing queries retaining the range complete

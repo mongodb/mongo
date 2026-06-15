@@ -109,7 +109,7 @@ public:
                                            const BSONObj& query,
                                            const BSONObj& update) = 0;
 
-    virtual void clearFilteringMetadataOnTempReshardingCollection(
+    virtual void clearCollectionMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) = 0;
 
     virtual void ensureReshardingStashCollectionsEmpty(
@@ -186,7 +186,7 @@ public:
                                    const BSONObj& query,
                                    const BSONObj& update) override;
 
-    void clearFilteringMetadataOnTempReshardingCollection(
+    void clearCollectionMetadataOnTempReshardingCollection(
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) override;
 
     std::unique_ptr<ReshardingDataReplicationInterface> makeDataReplication(

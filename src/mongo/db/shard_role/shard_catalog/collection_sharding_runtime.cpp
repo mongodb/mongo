@@ -368,7 +368,7 @@ boost::optional<CriticalSectionSignal> CollectionShardingRuntime::getCriticalSec
     return {};
 }
 
-void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
+void CollectionShardingRuntime::setCollectionMetadata(OperationContext* opCtx,
                                                       CollectionMetadata newMetadata,
                                                       NoRoutingTableAs noRoutingTableAs) {
     tassert(7032302,
@@ -414,7 +414,7 @@ void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
             std::make_shared<MetadataManager>(opCtx->getServiceContext(), _nss, newMetadata);
         ++_numMetadataManagerChanges;
     } else if (newMetadata.hasRoutingTable()) {
-        _metadataManager->setFilteringMetadata(std::move(newMetadata));
+        _metadataManager->setCollectionMetadata(std::move(newMetadata));
     }
     auto newChunkVersion = _metadataManager->getActivePlacementVersion();
     // Wake waiters on the target version as well as any others that had a comparably lesser
@@ -426,22 +426,7 @@ void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
     });
 }
 
-void CollectionShardingRuntime::setFilteringMetadata_nonAuthoritative(
-    OperationContext* opCtx, CollectionMetadata newMetadata) {
-    // The non-authoritative path assumes "no routing table" means the collection is genuinely
-    // not tracked by the global catalog. kUnowned is reserved for the authoritative recovery
-    // flow, where a non-DB-primary shard can only say it holds nothing.
-    _setFilteringMetadata(opCtx, std::move(newMetadata), NoRoutingTableAs::kUntracked);
-    _authoritativeState = AuthoritativeState::kNonAuthoritative;
-}
-
-void CollectionShardingRuntime::setFilteringMetadata_authoritative(
-    OperationContext* opCtx, CollectionMetadata newMetadata, NoRoutingTableAs noRoutingTableAs) {
-    _setFilteringMetadata(opCtx, std::move(newMetadata), noRoutingTableAs);
-    _authoritativeState = AuthoritativeState::kAuthoritative;
-}
-
-void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
+void CollectionShardingRuntime::clearCollectionMetadata(OperationContext* opCtx,
                                                         bool collIsDropped) {
     if (_placementVersionInRecoverOrRefresh) {
         _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
@@ -463,42 +448,13 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
                 "collIsDropped"_attr = collIsDropped);
 
     // If the collection is sharded and it's being dropped we might need to clean up some state.
-    if (collIsDropped)
+    if (collIsDropped) {
         _cleanupBeforeInstallingNewCollectionMetadata(opCtx);
+        _metadataManager.reset();
+        _allowChunkOperations = true;
+    }
 
     _metadataType = MetadataType::kUnknown;
-    if (collIsDropped)
-        _metadataManager.reset();
-}
-
-void CollectionShardingRuntime::clearFilteringMetadata_nonAuthoritative(OperationContext* opCtx) {
-    _clearFilteringMetadata(opCtx, /* collIsDropped */ false);
-    _authoritativeState = AuthoritativeState::kNonAuthoritative;
-}
-
-void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection_nonAuthoritative(
-    OperationContext* opCtx) {
-    _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
-    _authoritativeState = AuthoritativeState::kNonAuthoritative;
-}
-
-void CollectionShardingRuntime::clearFilteringMetadata_authoritative(OperationContext* opCtx) {
-    _clearFilteringMetadata(opCtx, /* collIsDropped */ false);
-    _authoritativeState = AuthoritativeState::kAuthoritative;
-}
-
-void CollectionShardingRuntime::clearFilteringMetadata_authoritative(OperationContext* opCtx,
-                                                                     const UUID& collectionUuid) {
-    _clearFilteringMetadata(opCtx, /* collIsDropped */ false);
-    _authoritativeState = AuthoritativeState::kAuthoritative;
-}
-
-void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection_authoritative(
-    OperationContext* opCtx, const UUID& collectionUuid) {
-    _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
-    _authoritativeState = AuthoritativeState::kAuthoritative;
-    // Since we are dropping the collection, allowChunkOperations should be reset to `true`.
-    _allowChunkOperations = true;
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
@@ -824,6 +780,10 @@ CollectionShardingRuntime::AuthoritativeState CollectionShardingRuntime::getAuth
 
 void CollectionShardingRuntime::setNonAuthoritative() {
     _authoritativeState = AuthoritativeState::kNonAuthoritative;
+}
+
+void CollectionShardingRuntime::setAuthoritative() {
+    _authoritativeState = AuthoritativeState::kAuthoritative;
 }
 
 bool CollectionShardingRuntime::allowChunkOperations() const {
