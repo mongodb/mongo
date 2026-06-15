@@ -102,7 +102,7 @@ public:
     ExpressionContextBuilder& subPipelineDepth(long long);
     ExpressionContextBuilder& initialPostBatchResumeToken(BSONObj);
     ExpressionContextBuilder& tailableMode(TailableModeEnum);
-    ExpressionContextBuilder& view(boost::optional<ViewInfo>);
+    ExpressionContextBuilder& view(boost::optional<ResolvedNamespace>);
     ExpressionContextBuilder& originalNs(NamespaceString);
     ExpressionContextBuilder& isHybridSearch(bool);
     ExpressionContextBuilder& pathArraynessForNss(
@@ -168,7 +168,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     NamespaceString ns,
     boost::optional<UUID> uuid = boost::none,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none,
-    const boost::optional<ViewInfo>& view = boost::none,
+    const boost::optional<ResolvedNamespace>& view = boost::none,
     boost::optional<NamespaceString> userNs = boost::none);
 
 /**

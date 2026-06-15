@@ -438,7 +438,8 @@ TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
               clonedSubPipelines[0]->getStages()[0].get());
 }
 
-TEST(LiteParsedDocumentSourceNestedPipelinesBindViewInfo, BindsViewWhenSubpipelineTargetIsAView) {
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     BindsViewWhenSubpipelineTargetIsAView) {
     // $lookup with a subpipeline that targets "viewColl".
     const NamespaceString kForeignNss =
         NamespaceString::createNamespaceString_forTest("test", "viewColl");
@@ -466,15 +467,16 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindViewInfo, BindsViewWhenSubpipeli
                                   BSONObj{},
                                   opts));
 
-    // bindViewInfo with an empty ViewInfo should still bind the subpipeline view from the map.
-    stage->bindViewInfo(ViewInfo{}, map);
+    // bindResolvedNamespace with an empty sentinel should still bind the subpipeline view from the
+    // map.
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
     auto bound = stage->getResolvedSubPipelineView();
     ASSERT_TRUE(bound != nullptr);
-    ASSERT_EQ(bound->getViewName(), kForeignNss);
+    ASSERT_EQ(bound->getNamespace(), kForeignNss);
 }
 
-TEST(LiteParsedDocumentSourceNestedPipelinesBindViewInfo,
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
      DoesNotBindWhenSubpipelineTargetIsNotAView) {
     std::vector<BSONObj> pipelineStages = {
         BSON("$lookup" << BSON("from" << "regularColl"
@@ -487,7 +489,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindViewInfo,
 
     // Empty map → subpipeline target isn't a view.
     ResolvedNamespaceMap map;
-    stage->bindViewInfo(ViewInfo{}, map);
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
     ASSERT_TRUE(stage->getResolvedSubPipelineView() == nullptr);
 }

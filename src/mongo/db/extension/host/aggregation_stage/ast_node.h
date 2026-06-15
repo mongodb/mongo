@@ -313,12 +313,12 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _hostBindViewInfo(
+    static ::MongoExtensionStatus* _hostBindResolvedNamespace(
         ::MongoExtensionAggStageAstNode* astNode,
-        const ::MongoExtensionViewInfo* viewInfo) noexcept {
+        const ::MongoExtensionResolvedNamespace* resolvedNamespace) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             tasserted(11507501,
-                      "_hostBindViewInfo should not be called. Ensure that astNode is "
+                      "_hostBindResolvedNamespace should not be called. Ensure that astNode is "
                       "extension-allocated, not host-allocated.");
         });
     }
@@ -330,7 +330,7 @@ private:
         .promote = &_hostPromote,
         .clone = &_hostClone,
         .get_first_stage_view_application_policy = &_hostGetFirstStageViewApplicationPolicy,
-        .bind_view_info = &_hostBindViewInfo};
+        .bind_resolved_namespace = &_hostBindResolvedNamespace};
 
     std::unique_ptr<AggStageAstNode> _astNode;
 };

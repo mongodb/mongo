@@ -150,7 +150,7 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
     // application.
     auto resolvedSubPipelineView = userLpp.getStages()[0]->getResolvedSubPipelineView();
     ASSERT_TRUE(resolvedSubPipelineView != nullptr);
-    ASSERT_EQ(resolvedSubPipelineView->getViewName(), kUnionViewNss);
+    ASSERT_EQ(resolvedSubPipelineView->getNamespace(), kUnionViewNss);
 }
 
 TEST(PipelineResolverTest, ResolverDoesNotBindResolvedSubpipelineViewOnNonViewTarget) {

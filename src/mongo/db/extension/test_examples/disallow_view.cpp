@@ -36,7 +36,7 @@ namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
 /**
- * Test extension that disallows views by uasserting in its bindViewInfo implementation.
+ * Test extension that disallows views by uasserting in its bindResolvedNamespace implementation.
  */
 
 DEFAULT_EXEC_STAGE(DisallowView)
@@ -47,10 +47,10 @@ public:
     DisallowViewAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::AggStageAstNode(stageName), _arguments(arguments.getOwned()) {}
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
+    void bindResolvedNamespace(const sdk::ResolvedNamespace& resolvedNamespace) override {
         std::string message = str::stream() << "Stage " << std::string(getName())
                                             << " does not support views. Attempted to use in view: "
-                                            << std::string(viewInfo.viewName());
+                                            << std::string(resolvedNamespace.viewName());
         sdk_uasserted(11507700, message);
     }
 

@@ -37,7 +37,7 @@
 #include "mongo/db/extension/host_connector/adapter/pipeline_dependencies_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
-#include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/resolved_namespace_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
@@ -200,23 +200,27 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtension
         DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander);
 }
 
-// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-116021 Remove this check when the extension can do this through
+// bindResolvedNamespace().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionVectorSearchStage()
     const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-116021 Remove this check when the extension can do this through
+// bindResolvedNamespace().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionSearchStage() const {
     return search_helpers::isExtensionSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-116021 Remove this check when the extension can do this through
+// bindResolvedNamespace().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionVectorSearchStage() const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-121094 Remove this check when the extension can do this through bindViewInfo().
+// TODO SERVER-116021 Remove this check when the extension can do this through
+// bindResolvedNamespace().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionSearchStage() const {
     return search_helpers::isExtensionSearchStage(getParseTimeName());
 }
@@ -226,11 +230,11 @@ DocumentSourceExtensionOptimizable::LiteParsedExpanded::getFirstStageViewApplica
     return view_util::toFirstStageApplicationPolicy(_astNode->getFirstStageViewApplicationPolicy());
 }
 
-void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
-    const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces) {
-    if (viewInfo.isEmpty()) {
-        // Empty ViewInfo means this stage is being notified that its pipeline is *not* running
-        // on a view. Skip the view-policy checks and the SDK bindViewInfo handoff.
+void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindResolvedNamespace(
+    const ResolvedNamespace& view, const ResolvedNamespaceMap& resolvedNamespaces) {
+    if (view.getNamespace().isEmpty()) {
+        // An empty view namespace means this stage is being notified that its pipeline is *not*
+        // running on a view. Skip the view-policy checks and the SDK bindResolvedNamespace handoff.
         // TODO SERVER-125741 Enable extensions to bind to non-top-level involved namespaces.
         return;
     }
@@ -257,8 +261,9 @@ void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
             "$search/$searchMeta-as-an-extension are not allowed against views.");
     }
 
-    auto viewInfoAdapter = host_connector::ViewInfoAdapter::fromViewInfo(viewInfo);
-    _astNode->bindViewInfo(viewInfoAdapter.getAsBoundaryType());
+    auto resolvedNamespaceAdapter =
+        host_connector::ResolvedNamespaceAdapter::fromResolvedNamespace(view);
+    _astNode->bindResolvedNamespace(resolvedNamespaceAdapter.getAsBoundaryType());
 }
 
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isRankedStage() const {

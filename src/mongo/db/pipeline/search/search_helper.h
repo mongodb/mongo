@@ -123,7 +123,7 @@ bool isMongotPipeline(const Pipeline* pipeline);
  * stage that will rely on calls to mongot.
  *
  * TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and handle
- * the view through a bindViewInfo() override.
+ * the view through a bindResolvedNamespace() override.
  */
 bool isMongotLiteParsedPipeline(const LiteParsedPipeline& lpp);
 
@@ -144,13 +144,15 @@ bool isMongotStage(DocumentSource* stage);
 
 /**
  * Check if this is a $vectorSearch-as-an-extension stage.
- * TODO SERVER-121094 Remove this function when the extension can do this through bindViewInfo().
+ * TODO SERVER-116021 Remove this function when the extension can do this through
+ * bindResolvedNamespace().
  */
 bool isExtensionVectorSearchStage(StringData stageName);
 
 /**
  * Check if this is a $search or $searchMeta extension stage.
- * TODO SERVER-121094 Remove this function when the extension can do this through bindViewInfo().
+ * TODO SERVER-116021 Remove this function when the extension can do this through
+ * bindResolvedNamespace().
  */
 bool isExtensionSearchStage(StringData stageName);
 

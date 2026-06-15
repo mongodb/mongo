@@ -260,13 +260,13 @@ void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
     resetDeferredCaches();
 }
 
-void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
+void LiteParsedPipeline::handleView(const ResolvedNamespace& view,
                                     const ResolvedNamespaceMap& resolvedNamespaces) {
-    bindViewInfoToStages(viewInfo, resolvedNamespaces);
+    bindResolvedNamespaceToStages(view, resolvedNamespaces);
 
-    if (viewInfo.isEmpty()) {
-        // No top-level view to prepend; bindViewInfo has already done all the work that's
-        // possible against an empty ViewInfo.
+    if (view.getNamespace().isEmpty()) {
+        // No top-level view to prepend; bindResolvedNamespace has already done all the work that's
+        // possible against an empty sentinel view.
         return;
     }
 
@@ -276,14 +276,14 @@ void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
     if (firstStagePolicy == FirstStageViewApplicationPolicy::kDefaultPrepend) {
         // If the first stage doesn't explicitly disallow it, clone and prepend the desugared view
         // pipeline to the current pipeline.
-        auto clonedViewPipe = viewInfo.getViewPipeline();
+        auto clonedViewPipe = view.getViewPipeline();
 
         // The view-definition stages may themselves carry subpipelines that target views (e.g. a
         // $unionWith inside the view definition). Bind view info on them so they can inspect
         // 'resolvedNamespaces'.
         for (auto& stage : clonedViewPipe._stageSpecs) {
             if (!stage->isHybridSearchStage()) {
-                stage->bindViewInfo(ViewInfo{}, resolvedNamespaces);
+                stage->bindResolvedNamespace(ResolvedNamespace{}, resolvedNamespaces);
             }
         }
 
@@ -291,10 +291,10 @@ void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
     }
 }
 
-void LiteParsedPipeline::bindViewInfoToStages(const ViewInfo& viewInfo,
-                                              const ResolvedNamespaceMap& resolvedNamespaces) {
+void LiteParsedPipeline::bindResolvedNamespaceToStages(
+    const ResolvedNamespace& view, const ResolvedNamespaceMap& resolvedNamespaces) {
     for (auto& stage : _stageSpecs) {
-        stage->bindViewInfo(viewInfo, resolvedNamespaces);
+        stage->bindResolvedNamespace(view, resolvedNamespaces);
     }
 }
 

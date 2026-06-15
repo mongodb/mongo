@@ -212,8 +212,8 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
                                                    std::move(fromPipeline));
 }
 
-void LiteParsedGraphLookUp::bindViewInfo(const ViewInfo& viewInfo,
-                                         const ResolvedNamespaceMap& resolvedNamespaces) {
+void LiteParsedGraphLookUp::bindResolvedNamespace(const ResolvedNamespace& view,
+                                                  const ResolvedNamespaceMap& resolvedNamespaces) {
     // Save the view's LPP as this LPDS's subpipeline.
     if (!_foreignNss) {
         return;

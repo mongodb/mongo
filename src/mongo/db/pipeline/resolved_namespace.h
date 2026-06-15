@@ -132,6 +132,16 @@ public:
                       BSONObj defaultCollation,
                       ResolvedNamespaceViewOptions metadata = {});
 
+    // Builds a view ResolvedNamespace whose pipeline is lite-parsed eagerly with the given
+    // options (default LiteParserOptions for the overload without one).
+    static ResolvedNamespace makeForView(NamespaceString viewName,
+                                         NamespaceString resolvedNss,
+                                         std::vector<BSONObj> viewPipeBson);
+    static ResolvedNamespace makeForView(NamespaceString viewName,
+                                         NamespaceString resolvedNss,
+                                         std::vector<BSONObj> viewPipeBson,
+                                         const LiteParserOptions& options);
+
     // The namespace as provided by the user (for views, the view name; for collections, the
     // collection's name).
     const NamespaceString& getNamespace() const;

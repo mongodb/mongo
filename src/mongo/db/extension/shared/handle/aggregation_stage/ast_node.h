@@ -95,7 +95,7 @@ public:
     /**
      * Binds view information to this AST node.
      */
-    void bindViewInfo(const ::MongoExtensionViewInfo& viewInfo);
+    void bindResolvedNamespace(const ::MongoExtensionResolvedNamespace& resolvedNamespace);
 
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
@@ -106,8 +106,9 @@ public:
         tassert(11507400,
                 "AggStageAstNode 'get_first_stage_view_application_policy` is null",
                 vtable.get_first_stage_view_application_policy != nullptr);
-        tassert(
-            11507500, "AggStageAstNode `bind_view_info` is null", vtable.bind_view_info != nullptr);
+        tassert(11507500,
+                "AggStageAstNode `bind_resolved_namespace` is null",
+                vtable.bind_resolved_namespace != nullptr);
     }
 };
 

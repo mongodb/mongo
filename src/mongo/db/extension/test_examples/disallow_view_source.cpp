@@ -40,10 +40,10 @@ using namespace mongo;
 
 /**
  * Test extension that is a source stage (kFirst position, requiresInputDocSource=false) AND
- * disallows views by uasserting in its bindViewInfo implementation. Mirrors $disallowViews but with
- * source-stage properties, so it can be used as the inner source of
+ * disallows views by uasserting in its bindResolvedNamespace implementation. Mirrors $disallowViews
+ * but with source-stage properties, so it can be used as the inner source of
  * $_internalDocumentResultsAndMetadata to verify that a view-disallowing source correctly
- * propagates its error through the container's bindViewInfo() chain.
+ * propagates its error through the container's bindResolvedNamespace() chain.
  */
 
 class DisallowViewSourceExecStage : public sdk::ExecAggStageSource {
@@ -86,10 +86,10 @@ public:
         return builder.obj();
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
+    void bindResolvedNamespace(const sdk::ResolvedNamespace& resolvedNamespace) override {
         std::string message = str::stream() << "Stage " << std::string(getName())
                                             << " does not support views. Attempted to use in view: "
-                                            << std::string(viewInfo.viewName());
+                                            << std::string(resolvedNamespace.viewName());
         sdk_uasserted(12756000, message);
     }
 

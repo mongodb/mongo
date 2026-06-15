@@ -149,9 +149,9 @@ public:
           _arguments(arguments.getOwned()),
           _storedViewPipeline(std::move(storedViewPipeline)) {}
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
+    void bindResolvedNamespace(const sdk::ResolvedNamespace& resolvedNamespace) override {
         _storedViewPipeline.clear();
-        for (const auto& stage : viewInfo.viewPipeline()) {
+        for (const auto& stage : resolvedNamespace.viewPipeline()) {
             if (stage.isEmpty()) {
                 continue;
             }

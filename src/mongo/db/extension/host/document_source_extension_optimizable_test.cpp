@@ -2512,8 +2512,8 @@ public:
         return _viewPolicy;
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
-        _boundViewName = std::string(viewInfo.viewName());
+    void bindResolvedNamespace(const sdk::ResolvedNamespace& resolvedNamespace) override {
+        _boundViewName = std::string(resolvedNamespace.viewName());
     }
 
     std::string getBoundViewName() const {
@@ -2546,10 +2546,10 @@ void testViewPolicyHelper(const NamespaceString& nss,
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.collection"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("x" << 1))};
-    ViewInfo viewInfo(viewNss, resolvedNss, std::move(viewPipeline));
+    auto view = ResolvedNamespace::makeForView(viewNss, resolvedNss, std::move(viewPipeline));
 
     ASSERT_EQ(liteParsed.getFirstStageViewApplicationPolicy(), expectedPolicy);
-    liteParsed.bindViewInfo(viewInfo, {});
+    liteParsed.bindResolvedNamespace(view, {});
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), expectedViewName);
 }
 
@@ -2570,8 +2570,8 @@ public:
         return std::make_unique<ViewPipelineValidatorTestAstNode>();
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
-        for (const auto& stage : viewInfo.viewPipeline()) {
+    void bindResolvedNamespace(const sdk::ResolvedNamespace& resolvedNamespace) override {
+        for (const auto& stage : resolvedNamespace.viewPipeline()) {
             if (stage.isEmpty()) {
                 continue;
             }
@@ -2599,9 +2599,9 @@ void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.coll"_sd);
     std::vector<BSONObj> pipelineCopy = viewPipeline;
-    ViewInfo viewInfo(viewNss, resolvedNss, std::move(pipelineCopy));
+    auto view = ResolvedNamespace::makeForView(viewNss, resolvedNss, std::move(pipelineCopy));
 
-    liteParsed.bindViewInfo(viewInfo, {});
+    liteParsed.bindResolvedNamespace(view, {});
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,

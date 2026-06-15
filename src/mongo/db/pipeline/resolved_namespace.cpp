@@ -148,6 +148,26 @@ ResolvedNamespace::ResolvedNamespace(NamespaceString userNss,
     }
 }
 
+ResolvedNamespace ResolvedNamespace::makeForView(NamespaceString viewName,
+                                                 NamespaceString resolvedNss,
+                                                 std::vector<BSONObj> viewPipeBson) {
+    return makeForView(
+        std::move(viewName), std::move(resolvedNss), std::move(viewPipeBson), LiteParserOptions{});
+}
+
+ResolvedNamespace ResolvedNamespace::makeForView(NamespaceString viewName,
+                                                 NamespaceString resolvedNss,
+                                                 std::vector<BSONObj> viewPipeBson,
+                                                 const LiteParserOptions& options) {
+    return ResolvedNamespace{
+        std::move(viewName),
+        std::move(resolvedNss),
+        std::move(viewPipeBson),
+        BSONObj(),
+        ResolvedNamespaceViewOptions{.options = std::make_shared<LiteParserOptions>(options),
+                                     .shouldParseLpp = true}};
+}
+
 // Copy constructor. Should be used carefully when _parsedPipeline is set to avoid unnecessary
 // clones.
 ResolvedNamespace::ResolvedNamespace(const ResolvedNamespace& other)

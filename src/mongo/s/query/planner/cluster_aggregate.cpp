@@ -1214,8 +1214,8 @@ PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
     // We have either a top-level view (state.resolvedView) or a transitive sub-pipeline view
     // closure (state.preResolvedNamespaces) shipped back from a sentinel-primary kickback, or
     // both. Build a new resolved request that handles whichever combination is present, including
-    // special cases for mongot pipelines, timeseries views, and invoking bindViewInfo() for
-    // extension stages.
+    // special cases for mongot pipelines, timeseries views, and invoking bindResolvedNamespace()
+    // for extension stages.
     PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
                                                     resolveInvolvedNamespaces};
 

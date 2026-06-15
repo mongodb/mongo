@@ -201,12 +201,12 @@ public:
             return _parseNode->toBsonForLog();
         }
 
-        // TODO SERVER-121094 Remove this override when extensions can handle views through
-        // bindViewInfo().
+        // TODO SERVER-116021 Remove this override when extensions can handle views through
+        // bindResolvedNamespace().
         bool hasExtensionVectorSearchStage() const override;
 
-        // TODO SERVER-121094 Remove this override when extensions can handle views through
-        // bindViewInfo().
+        // TODO SERVER-116021 Remove this override when extensions can handle views through
+        // bindResolvedNamespace().
         bool hasExtensionSearchStage() const override;
 
         // Extension stages are unsupported on timeseries collections.
@@ -348,8 +348,8 @@ public:
 
         FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override;
 
-        void bindViewInfo(const ViewInfo& viewInfo,
-                          const ResolvedNamespaceMap& resolvedNamespaces) override;
+        void bindResolvedNamespace(const ResolvedNamespace& view,
+                                   const ResolvedNamespaceMap& resolvedNamespaces) override;
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {

@@ -100,88 +100,12 @@ class LoadNativeVectorSearchTest;
 class LiteParsedDocumentSource;
 
 /**
- * A ViewInfo struct stores the view namespace, resolved namespace (underlying collection), and the
- * desugared view pipeline from ResolvedView.
- *
- * TODO SERVER-122116 Remove this class once all callers have been transitioned to the new
- * ResolvedNamespace.
+ * Returns a desugared view ResolvedNamespace for `nss` if it resolves to a view with a pre-parsed
+ * pipeline in `resolvedNamespaces`, or nullptr otherwise. Used by $unionWith and $lookup to consume
+ * the drain loop's pre-stitched LPP directly instead of re-parsing from BSON.
  */
-struct MONGO_MOD_PUBLIC ViewInfo {
-    ViewInfo() = default;
-    ~ViewInfo();
-
-    // Move-only semantics (viewPipeline contains unique_ptrs which are non-copyable).
-    ViewInfo(ViewInfo&&) noexcept;
-    ViewInfo& operator=(ViewInfo&&) noexcept;
-
-    ViewInfo(const ViewInfo&) = delete;
-    ViewInfo& operator=(const ViewInfo&) = delete;
-
-    /**
-     * Constructs a ViewInfo object from the view namespace, underlying collection's namespace, and
-     * parses the bson stages in the view pipeline into LiteParsedDocumentSources.
-     *
-     * Note that the ViewInfo owns the backing BSONObj for `viewPipeline`.
-     */
-    ViewInfo(NamespaceString viewName_,
-             NamespaceString resolvedNss_,
-             std::vector<BSONObj> viewPipeBson_,
-             const LiteParserOptions& options_ = LiteParserOptions{});
-
-    ViewInfo(const ResolvedNamespace& resolvedNamespace);
-
-    NamespaceString getViewName() const {
-        return _wrappedNamespace.getNamespace();
-    }
-
-    /**
-     * Returns the underlying ResolvedNamespace. Used by DocumentSource construction (e.g.
-     * DocumentSourceUnionWith::createFromStageParams) to consume the resolved view info that
-     * bindViewInfo recorded, instead of looking it up again in the ExpressionContext's
-     * resolved-namespaces map.
-     */
-    const ResolvedNamespace& getWrappedNamespace() const {
-        return _wrappedNamespace;
-    }
-
-    /**
-     * Returns true if this is an empty/sentinel ViewInfo — i.e., it does not represent any
-     * actual view.
-     */
-    bool isEmpty() const {
-        return _wrappedNamespace.getNamespace().isEmpty();
-    }
-
-    /**
-     * Returns the original BSON view pipeline. Note that this is the pre-desugared version of the
-     * pipeline.
-     */
-    std::vector<BSONObj> getOriginalBson() const;
-
-    /**
-     * Returns the serialized LiteParsedPipeline as BSON. If the view pipeline has been desugared,
-     * the returned BSON will represent the desugared version of the pipeline.
-     */
-    std::vector<BSONObj> getSerializedViewPipeline() const;
-
-    /**
-     * Returns a cloned instance of the view pipeline with all stages owning their BSON.
-     */
-    LiteParsedPipeline getViewPipeline() const;
-
-    // Desugars the internally-parsed view pipeline in place. Must be called before handleView()
-    // so that extension stages in view definitions are expanded prior to stitching. See
-    // ResolvedNamespace::ViewPipelineDesugarer for why a callback is used instead of a direct call.
-    void desugarViewPipeline();
-
-    // Returns a desugared owned clone of the internally-parsed view pipeline.
-    LiteParsedPipeline desugarAndCloneViewPipeline() const;
-
-    ViewInfo clone() const;
-
-private:
-    ResolvedNamespace _wrappedNamespace;
-};
+std::shared_ptr<ResolvedNamespace> tryGetPreResolvedNamespace(
+    const NamespaceString& nss, const ResolvedNamespaceMap& resolvedNamespaces);
 
 /**
  * Describes what the pipeline as a whole should do with a view on the main aggregate
@@ -426,19 +350,21 @@ public:
 
     /**
      * Bind view information to this stage. Called by handleView() when running against a view.
+     * An empty `view` (i.e. one whose namespace is empty) is a sentinel meaning the pipeline
+     * is *not* running on a view.
      */
-    virtual void bindViewInfo(const ViewInfo& viewInfo,
-                              const ResolvedNamespaceMap& resolvedNamespaces) {
+    virtual void bindResolvedNamespace(const ResolvedNamespace& view,
+                                       const ResolvedNamespaceMap& resolvedNamespaces) {
         // Default implementation is a no-op.
     }
 
     /**
-     * Returns the resolved subpipeline view bound to this stage by bindViewInfo(), if any (see
-     * LiteParsedDocumentSourceNestedPipelines for the override that populates this). Returns null
-     * when no view has been bound. ViewInfo is move-only, so the resolved view is held via
-     * shared_ptr to keep this class trivially copyable through clone().
+     * Returns the resolved subpipeline view bound to this stage by bindResolvedNamespace(), if any
+     * (see LiteParsedDocumentSourceNestedPipelines for the override that populates this). Returns
+     * null when no view has been bound. Held via shared_ptr so binding and consumption share one
+     * copy while keeping this class trivially copyable through clone().
      */
-    virtual std::shared_ptr<const ViewInfo> getResolvedSubPipelineView() const {
+    virtual std::shared_ptr<const ResolvedNamespace> getResolvedSubPipelineView() const {
         return nullptr;
     }
 
@@ -548,8 +474,8 @@ public:
 
     /**
      * Returns true if this is a vector search stage ($vectorSearch) or has a nested $vectorSearch.
-     * TODO SERVER-121094 Remove this override when extensions can handle views through
-     * bindViewInfo().
+     * TODO SERVER-116021 Remove this override when extensions can handle views through
+     * bindResolvedNamespace().
      */
     virtual bool hasExtensionVectorSearchStage() const {
         return false;
@@ -557,8 +483,8 @@ public:
 
     /**
      * Returns true if this is a $search or $searchMeta extension stage, or has a nested one.
-     * TODO SERVER-121094 Remove this override when extensions can handle views through
-     * bindViewInfo().
+     * TODO SERVER-116021 Remove this override when extensions can handle views through
+     * bindResolvedNamespace().
      */
     virtual bool hasExtensionSearchStage() const {
         return false;

@@ -36,7 +36,7 @@
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
-#include "mongo/db/extension/sdk/view_info.h"
+#include "mongo/db/extension/sdk/resolved_namespace.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/get_next_result.h"
@@ -424,10 +424,10 @@ public:
         return MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
     }
 
-    // Note that viewInfo is non-owning, meaning if an extension wants to access the metadata
-    // outside of the call to bindViewInfo, it must make its own copy of it. There are no guarantees
-    // on the lifetime outside of the scope of this function.
-    virtual void bindViewInfo(const ViewInfo& viewInfo) {
+    // Note that resolvedNamespace is non-owning, meaning if an extension wants to access the
+    // metadata outside of the call to bindResolvedNamespace, it must make its own copy of it. There
+    // are no guarantees on the lifetime outside of the scope of this function.
+    virtual void bindResolvedNamespace(const ResolvedNamespace& resolvedNamespace) {
         // Default implementation is a no-op.
     }
 
@@ -537,25 +537,26 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _extBindViewInfo(
+    static ::MongoExtensionStatus* _extBindResolvedNamespace(
         ::MongoExtensionAggStageAstNode* astNode,
-        const ::MongoExtensionViewInfo* viewInfo) noexcept {
+        const ::MongoExtensionResolvedNamespace* resolvedNamespace) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
-            sdk_tassert(11905600, "Provided view info was invalid", viewInfo != nullptr);
+            sdk_tassert(11905600, "Provided view info was invalid", resolvedNamespace != nullptr);
             sdk_tassert(11905604,
                         "If viewPipelineLen is non-zero, viewPipeline must be provided",
-                        viewInfo->viewPipelineLen == 0 || viewInfo->viewPipeline != nullptr);
+                        resolvedNamespace->viewPipelineLen == 0 ||
+                            resolvedNamespace->viewPipeline != nullptr);
             std::vector<mongo::BSONObj> stages;
-            for (size_t i = 0; i < viewInfo->viewPipelineLen; ++i) {
-                stages.emplace_back(bsonObjFromByteView(viewInfo->viewPipeline[i]));
+            for (size_t i = 0; i < resolvedNamespace->viewPipelineLen; ++i) {
+                stages.emplace_back(bsonObjFromByteView(resolvedNamespace->viewPipeline[i]));
             }
-            ViewInfo viewInfoWrapper =
-                ViewInfo(byteViewAsStringView(viewInfo->viewNamespace.databaseName),
-                         byteViewAsStringView(viewInfo->viewNamespace.collectionName),
-                         std::move(stages));
+            ResolvedNamespace resolvedNamespaceWrapper = ResolvedNamespace(
+                byteViewAsStringView(resolvedNamespace->viewNamespace.databaseName),
+                byteViewAsStringView(resolvedNamespace->viewNamespace.collectionName),
+                std::move(stages));
 
-            static_cast<ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().bindViewInfo(
-                viewInfoWrapper);
+            static_cast<ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().bindResolvedNamespace(
+                resolvedNamespaceWrapper);
         });
     }
 
@@ -566,7 +567,7 @@ private:
         .promote = &_extPromote,
         .clone = &_extClone,
         .get_first_stage_view_application_policy = &_extGetFirstStageViewApplicationPolicy,
-        .bind_view_info = &_extBindViewInfo};
+        .bind_resolved_namespace = &_extBindResolvedNamespace};
     std::unique_ptr<AggStageAstNode> _astNode;
 };
 

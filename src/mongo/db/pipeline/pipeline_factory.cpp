@@ -198,9 +198,11 @@ std::unique_ptr<Pipeline> viewPipelineHelperForSearch(
     // storedSource is disabled, idLookup will retrieve full/unmodified documents during
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
-    const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
-    subPipelineExpCtx->setView(resolvedView.toViewInfo(
-        originalNs, LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()}));
+    subPipelineExpCtx->setView(ResolvedNamespace::makeForView(
+        originalNs,
+        resolvedNs.ns,
+        std::move(resolvedNs.pipeline),
+        LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()}));
 
     // return the user pipeline without appending the view stages.
     return makePipeline(currentPipeline, subPipelineExpCtx, opts);
@@ -235,7 +237,8 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     // the helper keeps its transient LiteParsedPipeline local so it cannot outlive that move.
     addViewInvolvedNamespaces(subPipelineExpCtx, resolvedNs.pipeline);
 
-    // Create a LiteParsedPipeline for the user pipeline and apply view handling via bindViewInfo().
+    // Create a LiteParsedPipeline for the user pipeline and apply view handling via
+    // bindResolvedNamespace().
     LiteParsedPipeline userLiteParsedPipeline(
         makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
     desugarIfNecessary(userLiteParsedPipeline, opts, subPipelineExpCtx);

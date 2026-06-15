@@ -130,8 +130,8 @@ public:
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;
 
-    void bindViewInfo(const ViewInfo& viewInfo,
-                      const ResolvedNamespaceMap& resolvedNamespaces) override;
+    void bindResolvedNamespace(const ResolvedNamespace& view,
+                               const ResolvedNamespaceMap& resolvedNamespaces) override;
 
     std::unique_ptr<StageParams> getStageParams() const override;
 

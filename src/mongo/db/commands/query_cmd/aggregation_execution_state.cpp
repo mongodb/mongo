@@ -240,7 +240,8 @@ public:
         // parsed pipeline and recursively resolve any subpipeline-target views in place. After
         // this loop, every view entry's '_parsedPipeline' has its nested view references
         // already stitched in, so a downstream consumer that clones it via
-        // ViewInfo::getViewPipeline() gets a fully-resolved pipeline rather than one that still
+        // ResolvedNamespace::getViewPipeline() gets a fully-resolved pipeline rather than one that
+        // still
         // refers to other map entries by namespace.
         //
         // The 'mainNss' passed to the recursive resolver is each entry's BACKING namespace

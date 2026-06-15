@@ -369,11 +369,12 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     // Update the expression context with any new namespaces the resolved pipeline has
     // introduced.
     LiteParsedPipeline liteParsedPipeline(resolvedNs, viewPipeline);
-    _fromExpCtx = makeCopyFromExpressionContext(_fromExpCtx,
-                                                resolvedNs,
-                                                boost::none,
-                                                boost::none,
-                                                ViewInfo(_fromNs, resolvedNs, viewPipeline));
+    _fromExpCtx = makeCopyFromExpressionContext(
+        _fromExpCtx,
+        resolvedNs,
+        boost::none,
+        boost::none,
+        ResolvedNamespace::makeForView(_fromNs, resolvedNs, viewPipeline));
 
     // TODO SERVER-122035 Remove this workaround once viewless timeseries collections become the
     // default after 9.0 branching.

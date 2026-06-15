@@ -36,14 +36,14 @@
 namespace mongo::extension::sdk {
 
 /**
- * ViewInfo represents the view information passed to an aggregation stage AST node when binding
- * view information. It contains the view namespace and the view pipeline.
+ * ResolvedNamespace represents the view information passed to an aggregation stage AST node when
+ * binding view information. It contains the view namespace and the view pipeline.
  */
-class ViewInfo final {
+class ResolvedNamespace final {
 public:
-    ViewInfo(std::string_view viewNssDb,
-             std::string_view viewNssName,
-             std::vector<mongo::BSONObj> viewPipeline)
+    ResolvedNamespace(std::string_view viewNssDb,
+                      std::string_view viewNssName,
+                      std::vector<mongo::BSONObj> viewPipeline)
         : _viewNssDb(viewNssDb),
           _viewNssName(viewNssName),
           _viewPipeline(std::move(viewPipeline)) {}

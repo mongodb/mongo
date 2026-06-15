@@ -348,7 +348,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::serverSideJsConfig(
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::view(boost::optional<ViewInfo> view) {
+ExpressionContextBuilder& ExpressionContextBuilder::view(boost::optional<ResolvedNamespace> view) {
     params.view = std::move(view);
     return *this;
 }
@@ -572,7 +572,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     NamespaceString ns,
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator,
-    const boost::optional<ViewInfo>& view,
+    const boost::optional<ResolvedNamespace>& view,
     boost::optional<NamespaceString> userNs) {
     auto collator = [&]() {
         if (updatedCollator) {
@@ -584,7 +584,8 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
         }
     }();
 
-    boost::optional<ViewInfo> clonedView = view ? boost::make_optional(view->clone()) : boost::none;
+    boost::optional<ResolvedNamespace> clonedView =
+        view ? boost::make_optional(view->clone()) : boost::none;
 
     // Some of the properties of expression context are not cloned (e.g runtimeConstants,
     // letParameters, view). In case new fields need to be cloned, they will need to be added in the

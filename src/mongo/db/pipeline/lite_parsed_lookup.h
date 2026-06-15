@@ -164,8 +164,8 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
-    void bindViewInfo(const ViewInfo& viewInfo,
-                      const ResolvedNamespaceMap& resolvedNamespaces) override;
+    void bindResolvedNamespace(const ResolvedNamespace& view,
+                               const ResolvedNamespaceMap& resolvedNamespaces) override;
 
     // Moved from document_source_lookup.cpp so createFromBson can still call it.
     static void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline);

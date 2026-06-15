@@ -900,7 +900,7 @@ public:
         _params.tailableMode = tailableMode;
     }
 
-    const boost::optional<ViewInfo>& getView() const {
+    const boost::optional<ResolvedNamespace>& getView() const {
         return _params.view;
     }
 
@@ -908,7 +908,7 @@ public:
         return _featureFlagMongotIndexedViews.get(versionContextForFeatureFlagCheck());
     }
 
-    void setView(boost::optional<ViewInfo> view) {
+    void setView(boost::optional<ResolvedNamespace> view) {
         _params.view = std::move(view);
     }
 
@@ -1150,7 +1150,7 @@ protected:
         // The *view's* namespace with the view's unresolved nss, view's resolved (underlying
         // collection) nss, and the a vector of LiteParsedDocumentSources.
         // TODO SERVER-115590: Remove view information from the expression context.
-        boost::optional<ViewInfo> view = boost::none;
+        boost::optional<ResolvedNamespace> view = boost::none;
 
         // Defaults to empty to prevent external sorting in mongos.
         boost::filesystem::path tmpDir;

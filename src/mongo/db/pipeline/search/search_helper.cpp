@@ -284,8 +284,8 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
     if (liteParsedPipeline.hasSearchStage() && !resolvedView.getPipeline().empty()) {
-        expCtx->setView(boost::make_optional(
-            ViewInfo(viewName, resolvedView.getNamespace(), resolvedView.getPipeline())));
+        expCtx->setView(boost::make_optional(ResolvedNamespace::makeForView(
+            viewName, resolvedView.getNamespace(), resolvedView.getPipeline())));
     }
 }
 
@@ -326,13 +326,15 @@ bool isMongotStage(DocumentSource* stage) {
          dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage));
 }
 
-// TODO SERVER-121094 Remove this function when the extension can do this through bindViewInfo().
+// TODO SERVER-116021 Remove this function when the extension can do this through
+// bindResolvedNamespace().
 bool isExtensionVectorSearchStage(StringData stageName) {
     return stageName == kExtensionVectorSearchStageName ||
         stageName == DocumentSourceVectorSearch::kStageName;
 }
 
-// TODO SERVER-121094 Remove this function when the extension can do this through bindViewInfo().
+// TODO SERVER-116021 Remove this function when the extension can do this through
+// bindResolvedNamespace().
 bool isExtensionSearchStage(StringData stageName) {
     return stageName == kExtensionSearchStageName ||
         stageName == DocumentSourceSearch::kStageName ||
@@ -683,7 +685,7 @@ boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
     if (expCtx->getView()) {
         const auto& expCtxView = *expCtx->getView();
         return boost::make_optional(SearchQueryViewSpec(
-            std::string(expCtxView.getViewName().coll()), expCtxView.getOriginalBson()));
+            std::string(expCtxView.getNamespace().coll()), expCtxView.getOriginalBson()));
     }
 
     return boost::none;

@@ -107,7 +107,8 @@ TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
               FirstStageViewApplicationPolicy::kDoNothing);
 }
 
-TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest, BindViewInfoSurvivesGetStageParams) {
+TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
+       BindResolvedNamespaceSurvivesGetStageParams) {
     // The view binding applied at the LP layer must travel through getStageParams() so it reaches
     // DocumentSource construction; otherwise createFromStageParams would re-parse the inner stage
     // from view-unaware state and silently drop the view.
@@ -120,9 +121,9 @@ TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest, BindViewInfoSurvivesGet
     const auto kResolvedNss =
         NamespaceString::createNamespaceString_forTest("unittests.resolved_for_metadata");
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("status" << "active"))};
-    ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
+    auto view = ResolvedNamespace::makeForView(kViewNss, kResolvedNss, viewPipeline);
 
-    lp->bindViewInfo(viewInfo, {});
+    lp->bindResolvedNamespace(view, {});
 
     auto params = lp->getStageParams();
     auto* typedParams = dynamic_cast<InternalDocumentResultsAndMetadataStageParams*>(params.get());

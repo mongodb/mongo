@@ -118,7 +118,7 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     auto lpp = LiteParsedPipeline(request, true, LiteParserOptions{.ifrContext = ifrContext});
     lpp.makeOwned();
 
-    // Desugar and call handleView() to invoke bindViewInfo() for extension stages.
+    // Desugar and call handleView() to invoke bindResolvedNamespace() for extension stages.
     LiteParsedDesugarer::desugar(&lpp, ifrContext);
 
     auto mergeResolved = [&](ResolvedNamespaceMap m) {
@@ -243,9 +243,10 @@ void PipelineResolver::applyViewToLiteParsed(LiteParsedPipeline* userLPP,
     // Desugar extension stages in the view pipeline before stitching. This uses a callback
     // registered by lite_parsed_desugarer.cpp to avoid a circular build dependency between
     // ResolvedNamespace and LiteParsedDesugarer.
-    auto viewInfo = resolvedView.toViewInfo(viewNss, options);
-    viewInfo.desugarViewPipeline();
-    userLPP->handleView(viewInfo, resolvedNamespaces);
+    auto view = ResolvedNamespace::makeForView(
+        viewNss, resolvedView.getNamespace(), resolvedView.getPipeline(), options);
+    view.desugarViewPipeline();
+    userLPP->handleView(view, resolvedNamespaces);
 }
 
 void PipelineResolver::validateStagesOnView(LiteParsedPipeline* userLPP,
@@ -253,9 +254,10 @@ void PipelineResolver::validateStagesOnView(LiteParsedPipeline* userLPP,
                                             const NamespaceString& viewNss,
                                             const ResolvedNamespaceMap& resolvedNamespaces,
                                             const LiteParserOptions& options) {
-    auto viewInfo = resolvedView.toViewInfo(viewNss, options);
-    viewInfo.desugarViewPipeline();
-    userLPP->bindViewInfoToStages(viewInfo, resolvedNamespaces);
+    auto view = ResolvedNamespace::makeForView(
+        viewNss, resolvedView.getNamespace(), resolvedView.getPipeline(), options);
+    view.desugarViewPipeline();
+    userLPP->bindResolvedNamespaceToStages(view, resolvedNamespaces);
 }
 
 PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosViewRequest(
@@ -328,17 +330,15 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
         auto it = resolvedNamespaces.find(nss);
         return it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView;
     };
-    // Build the ViewInfo to hand to handleView. If 'mainNss' is a view in the map, build a real
-    // ViewInfo from it and desugar its pipeline, else pass a sentinel ViewInfo.
+    // Build the view ResolvedNamespace to hand to handleView. If 'mainNss' is a view in the
+    // map, copy it and desugar its pipeline, else pass an empty sentinel.
     bool anyViewBound = false;
-    ViewInfo viewInfo;
+    ResolvedNamespace view;
     if (auto it = resolvedNamespaces.find(mainNss);
         it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
-        // TODO SERVER-122116 Clean this up when ViewInfo is fully replaced by ResolvedNamespace.
-        ResolvedNamespace viewEntry = it->second;
-        viewEntry.liteParseViewPipeline();
-        viewInfo = ViewInfo(viewEntry);
-        viewInfo.desugarViewPipeline();
+        view = it->second;
+        view.liteParseViewPipeline();
+        view.desugarViewPipeline();
         anyViewBound = true;
     }
 
@@ -347,9 +347,9 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
     const size_t originalSize = lpp->getStages().size();
 
     if (search_helpers::isMongotLiteParsedPipeline(*lpp)) {
-        lpp->bindViewInfoToStages(viewInfo, resolvedNamespaces);
+        lpp->bindResolvedNamespaceToStages(view, resolvedNamespaces);
     } else {
-        lpp->handleView(viewInfo, resolvedNamespaces);
+        lpp->handleView(view, resolvedNamespaces);
     }
 
     // NOTE: lpp->getStages() must be obtained AFTER handleView/_stitchFront, which replaces
@@ -430,8 +430,8 @@ void PipelineResolver::insertTopLevelViewEntry(
     viewOptions.shouldParseLpp = true;
     // Thread the IFR context through so that extension stages within the view pipeline have the
     // same feature-flag view as the top-level request. Without this, extension stages in view
-    // definitions lite-parse with a null _ifrContext and LiteParsedExpanded::bindViewInfo trips
-    // its hybridSearchFlagEnabled check at view-binding time.
+    // definitions lite-parse with a null _ifrContext and LiteParsedExpanded::bindResolvedNamespace
+    // trips its hybridSearchFlagEnabled check at view-binding time.
     viewOptions.options =
         std::make_shared<LiteParserOptions>(LiteParserOptions{.ifrContext = std::move(ifrContext)});
 

@@ -60,9 +60,9 @@ public:
         const AggregateCommandRequest& request);
 
     /**
-     * Applies the view to a LiteParsedPipeline by constructing a ViewInfo from the resolved view,
-     * desugaring the view pipeline, and calling handleView(). This is the legacy view-application
-     * helper used by FF-off paths. Modifies 'userLPP' in place.
+     * Applies the view to a LiteParsedPipeline by constructing a view ResolvedNamespace from the
+     * resolved view, desugaring the view pipeline, and calling handleView(). This is the legacy
+     * view-application helper used by FF-off paths. Modifies 'userLPP' in place.
      * TODO SERVER-121094 Remove together with the FF-off branches in $unionWith / $lookup once
      * featureFlagExtensionsInsideHybridSearch is fully rolled out.
      */
@@ -73,9 +73,9 @@ public:
                                       const LiteParserOptions& options = LiteParserOptions{});
 
     /**
-     * Calls bindViewInfo() on each stage in 'userLPP' without prepending the view pipeline. Used
-     * for mongot pipelines on views where the legacy first stage handles view resolution itself,
-     * but subsequent extension stages still need view validation.
+     * Calls bindResolvedNamespace() on each stage in 'userLPP' without prepending the view
+     * pipeline. Used for mongot pipelines on views where the legacy first stage handles view
+     * resolution itself, but subsequent extension stages still need view validation.
      */
     static void validateStagesOnView(LiteParsedPipeline* userLPP,
                                      const ResolvedView& resolvedView,
@@ -143,7 +143,7 @@ public:
 
     /**
      * Builds a resolved aggregation request for mongos, handling special cases for mongot
-     * pipelines, timeseries views, and invoking bindViewInfo() for extension stages.
+     * pipelines, timeseries views, and invoking bindResolvedNamespace() for extension stages.
      *
      * If 'resolvedView' is set, the top-level namespace is a view and its pipeline is
      * prepended to the user pipeline (modulo mongot/timeseries handling). If 'resolvedView' is

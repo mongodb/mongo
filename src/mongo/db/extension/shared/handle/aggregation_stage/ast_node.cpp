@@ -77,8 +77,9 @@ AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
     return policy;
 }
 
-void AggStageAstNodeAPI::bindViewInfo(const ::MongoExtensionViewInfo& viewInfo) {
+void AggStageAstNodeAPI::bindResolvedNamespace(
+    const ::MongoExtensionResolvedNamespace& resolvedNamespace) {
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().bind_view_info(get(), &viewInfo); });
+        [&]() { return _vtable().bind_resolved_namespace(get(), &resolvedNamespace); });
 }
 }  // namespace mongo::extension

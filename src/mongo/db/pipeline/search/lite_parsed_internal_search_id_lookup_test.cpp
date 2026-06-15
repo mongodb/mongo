@@ -45,8 +45,8 @@ const NamespaceString kResolvedNss =
     NamespaceString::createNamespaceString_forTest("unittests.resolved_coll");
 
 /**
- * Tests for LiteParsed::bindViewInfo() and LiteParsed::getStageParams() to verify that
- * bindViewInfo correctly stores view pipeline BSON for use in desugaring.
+ * Tests for LiteParsed::bindResolvedNamespace() and LiteParsed::getStageParams() to verify that
+ * bindResolvedNamespace correctly stores view pipeline BSON for use in desugaring.
  */
 class LiteParsedInternalSearchIdLookUpTest : public unittest::Test {};
 
@@ -60,7 +60,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, GetFirstStageViewApplicationPolicyR
               FirstStageViewApplicationPolicy::kDoNothing);
 }
 
-TEST_F(LiteParsedInternalSearchIdLookUpTest, BindViewInfoStoresViewPipelineBson) {
+TEST_F(LiteParsedInternalSearchIdLookUpTest, BindResolvedNamespaceStoresViewPipelineBson) {
     BSONObj spec = BSON(LiteParsedInternalSearchIdLookUp::kStageName << BSON("limit" << 100LL));
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
@@ -68,9 +68,9 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, BindViewInfoStoresViewPipelineBson)
     // Create a view pipeline with a $match and $project stage.
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("status" << "active")),
                                          BSON("$project" << BSON("name" << 1 << "status" << 1))};
-    ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
+    auto view = ResolvedNamespace::makeForView(kViewNss, kResolvedNss, viewPipeline);
 
-    liteParsed->bindViewInfo(viewInfo, {});
+    liteParsed->bindResolvedNamespace(view, {});
 
     // Now getStageParams should return params with the view pipeline BSON.
     auto stageParams = liteParsed->getStageParams();
@@ -96,7 +96,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, GetStageParamsReturnsLimitFromSpec)
     // Verify the limit was extracted correctly from the spec.
     ASSERT(typedParams->ownedSpec.getLimit());
     ASSERT_EQ(typedParams->ownedSpec.getLimit().get(), 42);
-    // Without bindViewInfo call, the view pipeline should be empty.
+    // Without bindResolvedNamespace call, the view pipeline should be empty.
     ASSERT_FALSE(typedParams->ownedSpec.getViewPipeline());
 }
 
@@ -113,15 +113,15 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, GetStageParamsReturnsNothingWhenNot
     ASSERT_FALSE(typedParams->ownedSpec.getViewPipeline());
 }
 
-TEST_F(LiteParsedInternalSearchIdLookUpTest, BindViewInfoWithEmptyViewPipeline) {
+TEST_F(LiteParsedInternalSearchIdLookUpTest, BindResolvedNamespaceWithEmptyViewPipeline) {
     BSONObj spec = BSON(LiteParsedInternalSearchIdLookUp::kStageName << BSON("limit" << 10LL));
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
 
     // Create an empty view pipeline.
-    ViewInfo viewInfo(kViewNss, kResolvedNss, {});
+    auto view = ResolvedNamespace::makeForView(kViewNss, kResolvedNss, {});
 
-    liteParsed->bindViewInfo(viewInfo, {});
+    liteParsed->bindResolvedNamespace(view, {});
 
     auto stageParams = liteParsed->getStageParams();
     auto* typedParams = dynamic_cast<InternalSearchIdLookupStageParams*>(stageParams.get());
@@ -210,7 +210,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest,
     ASSERT_EQ(stages.size(), 1U);
     ASSERT_EQ(stages[0]->getParseTimeName(), LiteParsedInternalSearchIdLookUp::kStageName);
 
-    // The IdLookup stage should now carry the desugared view pipeline via bindViewInfo().
+    // The IdLookup stage should now carry the desugared view pipeline via bindResolvedNamespace().
     auto* idLookup = dynamic_cast<LiteParsedInternalSearchIdLookUp*>(stages[0].get());
     ASSERT_TRUE(idLookup != nullptr);
 

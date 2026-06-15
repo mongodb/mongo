@@ -207,7 +207,8 @@ TEST_F(ExpressionContextTest, CanBuildWithView) {
     auto collNss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
-    auto view = boost::make_optional(ViewInfo{viewNss, collNss, viewPipeline});
+    auto view =
+        boost::make_optional(ResolvedNamespace::makeForView(viewNss, collNss, viewPipeline));
     auto expCtxWithView = mongo::ExpressionContextBuilder{}
                               .opCtx(opCtx.get())
                               .ns(collNss)
@@ -219,7 +220,7 @@ TEST_F(ExpressionContextTest, CanBuildWithView) {
                   NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd));
 
     ASSERT_TRUE(expCtxWithView->getView().has_value());
-    ASSERT_EQUALS(expCtxWithView->getView()->getViewName(), viewNss);
+    ASSERT_EQUALS(expCtxWithView->getView()->getNamespace(), viewNss);
 
     auto expCtxViewPipe = expCtxWithView->getView()->getViewPipeline();
     const auto& expCtxViewPipeStages = expCtxViewPipe.getStages();
@@ -235,7 +236,8 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
     auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
-    auto view = boost::make_optional(ViewInfo{viewNss, coll1Nss, viewPipeline});
+    auto view =
+        boost::make_optional(ResolvedNamespace::makeForView(viewNss, coll1Nss, viewPipeline));
     auto expCtxOriginal = mongo::ExpressionContextBuilder{}
                               .opCtx(opCtx.get())
                               .ns(coll1Nss)
@@ -250,7 +252,7 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
 
     // expCtxOriginal isn't affected by the copy.
     ASSERT_TRUE(expCtxOriginal->getView().has_value());
-    ASSERT_EQUALS(expCtxOriginal->getView()->getViewName(), viewNss);
+    ASSERT_EQUALS(expCtxOriginal->getView()->getNamespace(), viewNss);
 
     auto expCtxOriginalViewPipe = expCtxOriginal->getView()->getViewPipeline();
     const auto& expCtxOriginalViewPipeStages = expCtxOriginalViewPipe.getStages();
@@ -266,7 +268,8 @@ TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
     auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
-    auto view = boost::make_optional(ViewInfo{viewNss, coll1Nss, viewPipeline});
+    auto view =
+        boost::make_optional(ResolvedNamespace::makeForView(viewNss, coll1Nss, viewPipeline));
     auto expCtxOriginal = mongo::ExpressionContextBuilder{}
                               .opCtx(opCtx.get())
                               .ns(coll1Nss)
@@ -274,13 +277,14 @@ TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
                               .build();
 
     auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
-    auto viewInfo = boost::make_optional(ViewInfo(viewNss, coll1Nss, viewPipeline));
+    auto viewForCopy =
+        boost::make_optional(ResolvedNamespace::makeForView(viewNss, coll1Nss, viewPipeline));
     auto expCtxCopy = makeCopyFromExpressionContext(
-        expCtxOriginal, namespaceCopy, boost::none, boost::none, std::move(viewInfo));
+        expCtxOriginal, namespaceCopy, boost::none, boost::none, std::move(viewForCopy));
 
     // expCtxCopy has a view.
     ASSERT_TRUE(expCtxCopy->getView().has_value());
-    ASSERT_EQUALS(expCtxCopy->getView()->getViewName(), viewNss);
+    ASSERT_EQUALS(expCtxCopy->getView()->getNamespace(), viewNss);
 
     auto expCtxCopyViewPipe = expCtxCopy->getView()->getViewPipeline();
     const auto& expCtxCopyViewPipeStages = expCtxCopyViewPipe.getStages();

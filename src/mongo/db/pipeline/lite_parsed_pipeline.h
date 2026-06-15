@@ -510,27 +510,26 @@ public:
     /**
      * Applies view semantics to this pipeline.
      *
-     * Each stage is given a chance to validate the view or modify itself via its bindViewInfo()
-     * override. Whether the view pipeline is automatically prepended is determined solely by the
-     * first stage's FirstStageViewApplicationPolicy: if it is kDefaultPrepend (or the
-     * pipeline is empty), the desugared view pipeline is cloned and prepended; otherwise it is not.
+     * Each stage is given a chance to validate the view or modify itself via its
+     * bindResolvedNamespace() override. Whether the view pipeline is automatically prepended is
+     * determined solely by the first stage's FirstStageViewApplicationPolicy: if it is
+     * kDefaultPrepend (or the pipeline is empty), the desugared view pipeline is cloned and
+     * prepended; otherwise it is not.
      *
-     * The provided ViewInfo is not mutated. The resolvedNamespaces map is passed to each stage's
-     * bindViewInfo() to provide access to all resolved namespaces in the aggregation. This will
-     * be used for view resolution in secondary namespaces (e.g. `from` field in $unionWith or
-     * $lookup).
+     * The provided view ResolvedNamespace is not mutated. The resolvedNamespaces map is passed to
+     * each stage's bindResolvedNamespace() to provide access to all resolved namespaces in the
+     * aggregation. This will be used for view resolution in secondary namespaces (e.g. `from` field
+     * in $unionWith or $lookup).
      */
-    void handleView(const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces);
+    void handleView(const ResolvedNamespace& view, const ResolvedNamespaceMap& resolvedNamespaces);
 
     /**
-     * Calls bindViewInfo() on each stage in the pipeline.
+     * Calls bindResolvedNamespace() on each stage in the pipeline.
      */
-    void bindViewInfoToStages(const ViewInfo& viewInfo,
-                              const ResolvedNamespaceMap& resolvedNamespaces);
+    void bindResolvedNamespaceToStages(const ResolvedNamespace& view,
+                                       const ResolvedNamespaceMap& resolvedNamespaces);
 
 private:
-    friend struct ViewInfo;
-
     /**
      * Checks that no stage in the pipeline has canRunOnTimeseries == false.
      */

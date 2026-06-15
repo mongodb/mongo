@@ -152,7 +152,10 @@ std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
     if (!_pipelines.empty()) {
         subParams = _pipelines[0]->getStageParams();
     }
-    auto resolvedView = std::const_pointer_cast<ViewInfo>(getResolvedSubPipelineView());
+    // Forward the resolved-view marker that bindResolvedNamespace populated. The
+    // const_pointer_cast is safe: the marker is owned by this LiteParsed and StageParams
+    // is consumed once at DocumentSource construction time.
+    auto resolvedView = std::const_pointer_cast<ResolvedNamespace>(getResolvedSubPipelineView());
     return std::make_unique<UnionWithStageParams>(*_foreignNss,
                                                   _rawPipeline,
                                                   _hasForeignDB,
@@ -162,9 +165,9 @@ std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
                                                   std::move(resolvedView));
 }
 
-void LiteParsedUnionWith::bindViewInfo(const ViewInfo& viewInfo,
-                                       const ResolvedNamespaceMap& resolvedNamespaces) {
-    LiteParsedDocumentSourceNestedPipelines::bindViewInfo(viewInfo, resolvedNamespaces);
+void LiteParsedUnionWith::bindResolvedNamespace(const ResolvedNamespace& view,
+                                                const ResolvedNamespaceMap& resolvedNamespaces) {
+    LiteParsedDocumentSourceNestedPipelines::bindResolvedNamespace(view, resolvedNamespaces);
     // Handle a $unionWith against a view with no user-provided pipeline.
     if (!_pipelines.empty() || !_foreignNss) {
         return;

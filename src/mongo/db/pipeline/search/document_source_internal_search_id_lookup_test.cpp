@@ -563,7 +563,7 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocuments) {
     collections.clear();
 }
 
-// Helper namespace strings for ViewInfo tests.
+// Helper namespace strings for view-binding tests.
 const NamespaceString kViewNss =
     NamespaceString::createNamespaceString_forTest("unittests.view_test");
 const NamespaceString kResolvedNss =
@@ -583,12 +583,12 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
 
-    // Simulate what handleView() does: invoke bindViewInfo with a view pipeline.
+    // Simulate what handleView() does: invoke bindResolvedNamespace with a view pipeline.
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("active" << true)),
                                          BSON("$sort" << BSON("createdAt" << -1))};
-    ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
+    auto view = ResolvedNamespace::makeForView(kViewNss, kResolvedNss, viewPipeline);
 
-    liteParsed->bindViewInfo(viewInfo, {});
+    liteParsed->bindResolvedNamespace(view, {});
 
     // Now use the registry to build the DocumentSource from the LiteParsed.
     auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
@@ -636,7 +636,7 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
 
-    // Don't invoke bindViewInfo.
+    // Don't invoke bindResolvedNamespace.
 
     auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
 
@@ -676,10 +676,10 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     // Create a view with a $match and $addFields stage.
     std::vector<BSONObj> viewStages = {BSON("$match" << BSON("status" << "active")),
                                        BSON("$addFields" << BSON("timestamp" << "$$NOW"))};
-    ViewInfo viewInfo(kViewNss, kResolvedNss, viewStages);
+    auto view = ResolvedNamespace::makeForView(kViewNss, kResolvedNss, viewStages);
 
     // Call handleView() on the full pipeline, simulating what runAggregate() does.
-    liteParsedPipeline.handleView(viewInfo, ResolvedNamespaceMap{});
+    liteParsedPipeline.handleView(view, ResolvedNamespaceMap{});
 
     // Since $_internalSearchIdLookup has kDoNothing policy, the view pipeline should NOT be
     // prepended. The LiteParsedPipeline should still have 2 stages, not 4.
@@ -726,10 +726,10 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
 
     // Create a view pipeline.
     std::vector<BSONObj> viewStages = {BSON("$match" << BSON("active" << true))};
-    ViewInfo viewInfo(kViewNss, kResolvedNss, viewStages);
+    auto view = ResolvedNamespace::makeForView(kViewNss, kResolvedNss, viewStages);
 
     // Call handleView().
-    liteParsedPipeline.handleView(viewInfo, ResolvedNamespaceMap{});
+    liteParsedPipeline.handleView(view, ResolvedNamespaceMap{});
 
     // Since the first stage is $match (which has kDefaultPrepend policy), the view pipeline should
     // be prepended. The LiteParsedPipeline should now have 3 stages.

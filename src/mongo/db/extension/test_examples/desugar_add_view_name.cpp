@@ -112,8 +112,8 @@ public:
         mongo::BSONObjBuilder bob;
         mongo::BSONObjBuilder stageBuilder;
         stageBuilder.appendElements(_arguments);
-        // Include view name in serialization if it was set via bindViewInfo() so that the shard
-        // receives BSON with the view info after the view has been handled on the router.
+        // Include view name in serialization if it was set via bindResolvedNamespace() so that the
+        // shard receives BSON with the view info after the view has been handled on the router.
         if (!_viewName.empty()) {
             stageBuilder.append("_viewName", _viewName);
         }
@@ -166,8 +166,8 @@ public:
         }
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
-        _viewName = std::string(viewInfo.viewName());
+    void bindResolvedNamespace(const sdk::ResolvedNamespace& resolvedNamespace) override {
+        _viewName = std::string(resolvedNamespace.viewName());
     }
 
     MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()

@@ -43,6 +43,19 @@
 
 namespace mongo {
 
+std::shared_ptr<ResolvedNamespace> tryGetPreResolvedNamespace(
+    const NamespaceString& nss, const ResolvedNamespaceMap& resolvedNamespaces) {
+    auto it = resolvedNamespaces.find(nss);
+    if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView &&
+        it->second.getParsedPipeline()) {
+        auto view = std::make_shared<ResolvedNamespace>(it->second);
+        view->desugarViewPipeline();
+        return view;
+    }
+    return nullptr;
+}
+
+
 using Parser = LiteParsedDocumentSource::Parser;
 using ParserMap = LiteParsedDocumentSource::ParserMap;
 
@@ -216,49 +229,6 @@ bool LiteParsedDocumentSource::isRegisteredExtensionStage(StringData stageName) 
     }
 
     return it->second.getParserInfo().fromExtension;
-}
-
-ViewInfo::~ViewInfo() = default;
-ViewInfo::ViewInfo(ViewInfo&&) noexcept = default;
-ViewInfo& ViewInfo::operator=(ViewInfo&&) noexcept = default;
-
-ViewInfo::ViewInfo(NamespaceString viewName_,
-                   NamespaceString resolvedNss_,
-                   std::vector<BSONObj> viewPipeBson_,
-                   const LiteParserOptions& options_)
-    : _wrappedNamespace(
-          viewName_,
-          resolvedNss_,
-          std::move(viewPipeBson_),
-          BSONObj(),
-          ResolvedNamespaceViewOptions{.options = std::make_shared<LiteParserOptions>(options_),
-                                       .shouldParseLpp = true}) {}
-
-ViewInfo::ViewInfo(const ResolvedNamespace& resolvedNamespace)
-    : _wrappedNamespace(resolvedNamespace) {}
-
-std::vector<BSONObj> ViewInfo::getOriginalBson() const {
-    return _wrappedNamespace.getOriginalBson();
-}
-
-std::vector<BSONObj> ViewInfo::getSerializedViewPipeline() const {
-    return _wrappedNamespace.getSerializedViewPipeline();
-}
-
-LiteParsedPipeline ViewInfo::getViewPipeline() const {
-    return _wrappedNamespace.getViewPipeline();
-}
-
-void ViewInfo::desugarViewPipeline() {
-    _wrappedNamespace.desugarViewPipeline();
-}
-
-LiteParsedPipeline ViewInfo::desugarAndCloneViewPipeline() const {
-    return _wrappedNamespace.desugarAndCloneViewPipeline();
-}
-
-ViewInfo ViewInfo::clone() const {
-    return ViewInfo(_wrappedNamespace.clone());
 }
 
 }  // namespace mongo

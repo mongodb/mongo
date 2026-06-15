@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/resolved_namespace_adapter.h"
 
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 
 namespace mongo::extension::host_connector {
 
-ViewInfoAdapter::ViewInfoAdapter(std::string&& dbName,
-                                 std::string&& viewName,
-                                 std::vector<mongo::BSONObj>&& viewPipeline,
-                                 std::vector<MongoExtensionByteView>&& viewPipelineByteViews)
+ResolvedNamespaceAdapter::ResolvedNamespaceAdapter(
+    std::string&& dbName,
+    std::string&& viewName,
+    std::vector<mongo::BSONObj>&& viewPipeline,
+    std::vector<MongoExtensionByteView>&& viewPipelineByteViews)
     : _dbName(std::move(dbName)),
       _viewName(std::move(viewName)),
       _viewPipeline(std::move(viewPipeline)),
@@ -46,20 +47,21 @@ ViewInfoAdapter::ViewInfoAdapter(std::string&& dbName,
             .viewPipeline =
                 _viewPipelineByteViews.empty() ? nullptr : _viewPipelineByteViews.data()}) {}
 
-ViewInfoAdapter ViewInfoAdapter::fromViewInfo(const ViewInfo& viewInfo) {
-    std::string dbStr = DatabaseNameUtil::serialize(viewInfo.getViewName().dbName(),
+ResolvedNamespaceAdapter ResolvedNamespaceAdapter::fromResolvedNamespace(
+    const ResolvedNamespace& view) {
+    std::string dbStr = DatabaseNameUtil::serialize(view.getNamespace().dbName(),
                                                     SerializationContext::stateCommandRequest());
 
-    std::vector<BSONObj> stages = viewInfo.getOriginalBson();
+    std::vector<BSONObj> stages = view.getOriginalBson();
     std::vector<::MongoExtensionByteView> stageViews;
     stageViews.reserve(stages.size());
     for (const auto& obj : stages) {
         stageViews.push_back(objAsByteView(obj));
     }
 
-    return ViewInfoAdapter(std::move(dbStr),
-                           std::string{viewInfo.getViewName().coll()},
-                           std::move(stages),
-                           std::move(stageViews));
+    return ResolvedNamespaceAdapter(std::move(dbStr),
+                                    std::string{view.getNamespace().coll()},
+                                    std::move(stages),
+                                    std::move(stageViews));
 }
 }  // namespace mongo::extension::host_connector

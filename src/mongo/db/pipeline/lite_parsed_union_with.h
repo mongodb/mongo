@@ -63,7 +63,7 @@ public:
                          bool isHybridSearch,
                          BSONObj ownedBsonObj,
                          boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
-                         std::shared_ptr<ViewInfo> resolvedSubPipelineView = nullptr)
+                         std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView = nullptr)
         : DefaultStageParams(ownedBsonObj.firstElement()),
           unionNss(std::move(unionNss)),
           pipeline(std::move(pipeline)),
@@ -91,8 +91,10 @@ public:
     boost::optional<StageParamsPipeline> subpipelineStageParams;
 
     // The resolved view that the subpipeline targets, populated by
-    // LiteParsedDocumentSourceNestedPipelines::bindViewInfo at parse time.
-    std::shared_ptr<ViewInfo> resolvedSubPipelineView;
+    // LiteParsedDocumentSourceNestedPipelines::bindResolvedNamespace at parse time. Null when the
+    // subpipeline target is not a view. Lets DocumentSourceUnionWith construction consume the
+    // resolved view directly, without re-looking it up from expCtx->getResolvedNamespaces().
+    std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView;
 
 private:
     // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.
@@ -121,8 +123,8 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
-    void bindViewInfo(const ViewInfo& viewInfo,
-                      const ResolvedNamespaceMap& resolvedNamespaces) override;
+    void bindResolvedNamespace(const ResolvedNamespace& view,
+                               const ResolvedNamespaceMap& resolvedNamespaces) override;
 
     bool hasExtensionVectorSearchStage() const override;
 

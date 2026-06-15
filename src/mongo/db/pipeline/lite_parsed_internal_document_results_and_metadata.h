@@ -103,27 +103,27 @@ public:
     }
 
     std::unique_ptr<StageParams> getStageParams() const final {
-        // Clone the inner sub-pipeline so any view info bound onto it via bindViewInfo() travels
-        // with the StageParams to DocumentSource construction.
+        // Clone the inner sub-pipeline so any view info bound onto it via bindResolvedNamespace()
+        // travels with the StageParams to DocumentSource construction.
         return std::make_unique<InternalDocumentResultsAndMetadataStageParams>(
             _metadata, _returnCursor, OwnedLiteParsedPipeline(_pipelines.front()));
     }
 
     FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
         // $_internalDocumentResultsAndMetadata is a source stage; the view (if any) must NOT be
-        // prepended in front of it. Any view application happens via bindViewInfo() below, which
-        // forwards the view info to the inner source stage this stage wraps.
+        // prepended in front of it. Any view application happens via bindResolvedNamespace() below,
+        // which forwards the view info to the inner source stage this stage wraps.
         return FirstStageViewApplicationPolicy::kDoNothing;
     }
 
     bool shouldResolveSubpipelineViews() const override {
-        // We explicitly handle injecting the view info into the subpipeline in `bindViewInfo`, so
-        // we do not need to recurse during view resolution.
+        // We explicitly handle injecting the view info into the subpipeline in
+        // `bindResolvedNamespace`, so we do not need to recurse during view resolution.
         return false;
     }
 
-    void bindViewInfo(const ViewInfo& viewInfo,
-                      const ResolvedNamespaceMap& resolvedNamespaces) override {
+    void bindResolvedNamespace(const ResolvedNamespace& view,
+                               const ResolvedNamespaceMap& resolvedNamespaces) override {
         // Propagate the bound view info to the single source stage so the inner stage can apply the
         // view itself. The constructor guarantees exactly one inner sub-pipeline.
         tassert(12755800,
@@ -131,7 +131,7 @@ public:
                                  "source sub-pipeline, found "
                               << _pipelines.size(),
                 _pipelines.size() == 1);
-        _pipelines.front()->bindViewInfoToStages(viewInfo, resolvedNamespaces);
+        _pipelines.front()->bindResolvedNamespaceToStages(view, resolvedNamespaces);
     }
 
 private:

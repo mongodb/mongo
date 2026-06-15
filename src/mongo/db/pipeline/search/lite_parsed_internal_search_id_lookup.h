@@ -96,13 +96,14 @@ public:
         return FirstStageViewApplicationPolicy::kDoNothing;
     }
 
-    void bindViewInfo(const ViewInfo& viewInfo, const ResolvedNamespaceMap&) override {
-        if (viewInfo.isEmpty()) {
-            // Empty ViewInfo means this stage is being notified that its pipeline is *not*
-            // running on a view. Nothing to bind.
+    void bindResolvedNamespace(const ResolvedNamespace& view,
+                               const ResolvedNamespaceMap&) override {
+        if (view.getNamespace().isEmpty()) {
+            // An empty view namespace means this stage is being notified that its pipeline is
+            // *not* running on a view. Nothing to bind.
             return;
         }
-        _ownedSpec.setViewPipeline(viewInfo.getSerializedViewPipeline());
+        _ownedSpec.setViewPipeline(view.getSerializedViewPipeline());
     }
 
     LiteParsedInternalSearchIdLookUp(DocumentSourceIdLookupSpec spec)

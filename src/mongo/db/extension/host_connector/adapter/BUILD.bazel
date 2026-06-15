@@ -40,7 +40,7 @@ mongo_cc_library(
         "pipeline_dependencies_adapter.cpp",
         "pipeline_rewrite_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
-        "view_info_adapter.cpp",
+        "resolved_namespace_adapter.cpp",
     ],
     deps = [
         ":query_execution_context_adapter",

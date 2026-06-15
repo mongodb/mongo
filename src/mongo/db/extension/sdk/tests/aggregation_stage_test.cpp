@@ -1709,9 +1709,9 @@ private:
     MongoExtensionFirstStageViewApplicationPolicy _viewPolicy;
 };
 
-class ViewInfoBindingExtensionAstNode : public sdk::AggStageAstNode {
+class ResolvedNamespaceBindingExtensionAstNode : public sdk::AggStageAstNode {
 public:
-    ViewInfoBindingExtensionAstNode() : sdk::AggStageAstNode("$viewInfoBinding") {}
+    ResolvedNamespaceBindingExtensionAstNode() : sdk::AggStageAstNode("$viewInfoBinding") {}
 
     std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
@@ -1722,10 +1722,10 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    void bindViewInfo(const ViewInfo& viewInfo) override {
-        _boundDbName = std::string(viewInfo.dbName());
-        _boundViewName = std::string(viewInfo.viewName());
-        _boundPipeline = viewInfo.viewPipeline();
+    void bindResolvedNamespace(const ResolvedNamespace& resolvedNamespace) override {
+        _boundDbName = std::string(resolvedNamespace.dbName());
+        _boundViewName = std::string(resolvedNamespace.viewName());
+        _boundPipeline = resolvedNamespace.viewPipeline();
     }
 
     std::string_view getBoundDbName() const {
@@ -1741,7 +1741,7 @@ public:
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<ViewInfoBindingExtensionAstNode>();
+        return std::make_unique<ResolvedNamespaceBindingExtensionAstNode>();
     }
 
 private:
@@ -1768,9 +1768,10 @@ TEST_F(AggStageTest, ExtensionAstNodeCanReturnDoNothingViewPolicy) {
     ASSERT_EQ(policy, MongoExtensionFirstStageViewApplicationPolicy::kDoNothing);
 }
 
-TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfo) {
-    auto astNodeImpl = ViewInfoBindingExtensionAstNode::make();
-    auto* astNodeImplPtr = static_cast<ViewInfoBindingExtensionAstNode*>(astNodeImpl.get());
+TEST_F(AggStageTest, ExtensionAstNodeCanBindResolvedNamespace) {
+    auto astNodeImpl = ResolvedNamespaceBindingExtensionAstNode::make();
+    auto* astNodeImplPtr =
+        static_cast<ResolvedNamespaceBindingExtensionAstNode*>(astNodeImpl.get());
     auto extensionAstNode = new sdk::ExtensionAggStageAstNodeAdapter(std::move(astNodeImpl));
     auto handle = AggStageAstNodeHandle{extensionAstNode};
 
@@ -1779,16 +1780,18 @@ TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfo) {
     ::MongoExtensionNamespaceString nss{stringViewAsByteView(dbName.c_str()),
                                         stringViewAsByteView(viewName.c_str())};
 
-    // Use a non-empty pipeline so we verify bindViewInfo receives and stores pipeline stages.
+    // Use a non-empty pipeline so we verify bindResolvedNamespace receives and stores pipeline
+    // stages.
     BSONObj stage1 = BSON("$match" << BSON("x" << 1));
     BSONObj stage2 = BSON("$addFields" << BSON("y" << 2));
     std::vector<MongoExtensionByteView> pipelineViews = {
         mongo::extension::objAsByteView(stage1),
         mongo::extension::objAsByteView(stage2),
     };
-    ::MongoExtensionViewInfo viewInfo{nss, pipelineViews.size(), pipelineViews.data()};
+    ::MongoExtensionResolvedNamespace resolvedNamespace{
+        nss, pipelineViews.size(), pipelineViews.data()};
 
-    handle->bindViewInfo(viewInfo);
+    handle->bindResolvedNamespace(resolvedNamespace);
 
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), viewName);
     ASSERT_EQ(astNodeImplPtr->getBoundDbName(), dbName);
@@ -1797,9 +1800,10 @@ TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfo) {
     ASSERT_BSONOBJ_EQ(astNodeImplPtr->getBoundPipeline()[1], stage2);
 }
 
-TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfoIdentityView) {
-    auto astNodeImpl = ViewInfoBindingExtensionAstNode::make();
-    auto* astNodeImplPtr = static_cast<ViewInfoBindingExtensionAstNode*>(astNodeImpl.get());
+TEST_F(AggStageTest, ExtensionAstNodeCanBindResolvedNamespaceIdentityView) {
+    auto astNodeImpl = ResolvedNamespaceBindingExtensionAstNode::make();
+    auto* astNodeImplPtr =
+        static_cast<ResolvedNamespaceBindingExtensionAstNode*>(astNodeImpl.get());
     auto extensionAstNode = new sdk::ExtensionAggStageAstNodeAdapter(std::move(astNodeImpl));
     auto handle = AggStageAstNodeHandle{extensionAstNode};
 
@@ -1807,9 +1811,9 @@ TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfoIdentityView) {
     std::string viewName = "testViewName";
     ::MongoExtensionNamespaceString nss{stringViewAsByteView(dbName.c_str()),
                                         stringViewAsByteView(viewName.c_str())};
-    ::MongoExtensionViewInfo viewInfo{nss, 0, nullptr};
+    ::MongoExtensionResolvedNamespace resolvedNamespace{nss, 0, nullptr};
 
-    handle->bindViewInfo(viewInfo);
+    handle->bindResolvedNamespace(resolvedNamespace);
 
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), viewName);
     ASSERT_EQ(astNodeImplPtr->getBoundDbName(), dbName);

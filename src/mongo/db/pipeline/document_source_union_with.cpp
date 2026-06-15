@@ -102,6 +102,19 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                                                         params.hasForeignDB)};
     }
 
+    // A $unionWith with no user pipeline against a view should just forward the view's LPP
+    // directly.
+    if (auto view = tryGetPreResolvedNamespace(params.unionNss, expCtx->getResolvedNamespaces())) {
+        auto stageParams = view->getViewPipeline().getStageParams();
+        return {make_intrusive<DocumentSourceUnionWith>(expCtx,
+                                                        std::move(params.unionNss),
+                                                        std::move(stageParams),
+                                                        std::move(params.pipeline),
+                                                        std::move(view),
+                                                        params.hasForeignDB)};
+    }
+
+
     return {make_intrusive<DocumentSourceUnionWith>(
         expCtx, std::move(params.unionNss), std::move(params.pipeline), params.hasForeignDB)};
 }
@@ -285,14 +298,14 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     NamespaceString unionNss,
     StageParamsPipeline subpipelineStageParams,
     std::vector<BSONObj> userPipeline,
-    std::shared_ptr<ViewInfo> resolvedSubPipelineView,
+    std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView,
     bool hasForeignDB)
     : DocumentSource(kStageName, expCtx) {
     _hasForeignDB = hasForeignDB;
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
         if (resolvedSubPipelineView) {
-            resolvedUnionNs = resolvedSubPipelineView->getWrappedNamespace();
+            resolvedUnionNs = *resolvedSubPipelineView;
         } else {
             const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
             auto it = resolvedNamespaces.find(unionNss);
@@ -301,6 +314,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             }
         }
 
+        // $facet reparses its subpipeline from raw BSON, bypassing the bindResolvedNamespace pass
+        // so we must apply the view manually in that scenario.
         if (resolvedUnionNs) {
             // TODO SERVER-117260: This fallback can be removed once $facet goes through normal LP
             // view resolution, rather than reparsing from BSON.

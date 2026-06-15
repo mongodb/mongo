@@ -147,9 +147,11 @@ DEATH_TEST(HostAstNodeVTableTestDeathTest,
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsBindViewInfo, "11507500") {
+DEATH_TEST(HostAstNodeVTableTestDeathTest,
+           InvalidAstNodeVTableFailsBindResolvedNamespace,
+           "11507500") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.bind_view_info = nullptr;
+    vtable.bind_resolved_namespace = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
@@ -392,7 +394,7 @@ DEATH_TEST(HostAstNodeViewPolicyTest,
     handle->getFirstStageViewApplicationPolicy();
 }
 
-DEATH_TEST(HostAstNodeViewInfoTest, HostAstNodeCannotBindViewInfo, "11507501") {
+DEATH_TEST(HostAstNodeResolvedNamespaceTest, HostAstNodeCannotBindResolvedNamespace, "11507501") {
     auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{astNode};
 
@@ -400,9 +402,9 @@ DEATH_TEST(HostAstNodeViewInfoTest, HostAstNodeCannotBindViewInfo, "11507501") {
     std::string viewName = "testViewName";
     ::MongoExtensionNamespaceString nss{stringViewAsByteView(dbName.c_str()),
                                         stringViewAsByteView(viewName.c_str())};
-    ::MongoExtensionViewInfo viewInfo{nss, 0, nullptr};
+    ::MongoExtensionResolvedNamespace resolvedNamespace{nss, 0, nullptr};
 
-    handle->bindViewInfo(viewInfo);
+    handle->bindResolvedNamespace(resolvedNamespace);
 }
 
 }  // namespace
