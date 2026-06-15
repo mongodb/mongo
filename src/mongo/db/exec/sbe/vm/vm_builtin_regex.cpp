@@ -218,7 +218,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
                 resultSize <= mongo::BufferMaxSize);
 
         auto [matchTag, matchVal] = match.raw();
-        match.disownAndClear();
+        match.disown();
         arrayView->push_back_raw(matchTag, matchVal);
 
         // Move indexes after the current matched string to prepare for the next search.

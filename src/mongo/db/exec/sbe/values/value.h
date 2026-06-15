@@ -722,7 +722,7 @@ public:
         _tag = o._tag;
         _value = o._value;
         _owned = o._owned;
-        o.disownAndClear();
+        o.disown();
     }
 
     TagValueMaybeOwned(TagValueOwned&& o) {
@@ -742,7 +742,7 @@ public:
             _tag = o._tag;
             _value = o._value;
             _owned = o._owned;
-            o.disownAndClear();
+            o.disown();
         }
         return *this;
     }
@@ -757,14 +757,14 @@ public:
 
     FastTuple<bool, TypeTags, Value> releaseToRaw() {
         FastTuple<bool, TypeTags, Value> ret{_owned, _tag, _value};
-        disownAndClear();
+        disown();
         return ret;
     }
 
     std::pair<TypeTags, Value> releaseToOwnedRaw() {
         makeOwned();
         std::pair<TypeTags, Value> ret{_tag, _value};
-        disownAndClear();
+        disown();
         return ret;
     }
 
@@ -789,7 +789,7 @@ public:
     TagValueOwned moveToOwned() {
         makeOwned();
         TagValueOwned ret = TagValueOwned::fromRaw(_tag, _value);
-        disownAndClear();
+        disown();
         return ret;
     }
 
@@ -800,7 +800,7 @@ public:
     /**
      * Relinquishes ownership and sets the stored tag/value to Nothing.
      */
-    void disownAndClear() {
+    void disown() {
         _tag = TypeTags::Nothing;
         _value = 0;
         _owned = false;
