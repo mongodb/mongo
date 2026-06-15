@@ -65,7 +65,6 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
-#include "mongo/db/shard_role/shard_catalog/shard_catalog_history_cleanup_control.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -326,18 +325,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 // which would leave a reference into _doc dangling.
                 const auto preCommitDbVersion = *_doc.getDatabaseVersion();
                 const auto thisShardId = ShardingState::get(opCtx)->shardId();
-                const auto toShardId = _doc.getToShardId();
-
-                // We need to stop the shard catalog cleanup task to ensure
-                // that the new primary's collection metadata doesn't get
-                // cleaned up in the middle of a movePrimary operation if the new
-                // primary doesn't own any chunks.
-                if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    const auto session = getNewSession(opCtx);
-                    sharding_ddl_util::controlShardCatalogCleanupTask(
-                        opCtx, {thisShardId, toShardId}, session, true, executor, token);
-                }
 
                 if (_doc.getAuthoritativeMetadataAccessLevel() >=
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
@@ -356,13 +343,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 notifyChangeStreamsOnMovePrimary(
                     opCtx, _dbName, ShardingState::get(opCtx)->shardId(), _doc.getToShardId());
-
-                if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    const auto session = getNewSession(opCtx);
-                    sharding_ddl_util::controlShardCatalogCleanupTask(
-                        opCtx, {thisShardId, toShardId}, session, false, executor, token);
-                }
 
                 // Checkpoint the vector clock to ensure causality in the event of a crash or
                 // shutdown.
@@ -468,23 +448,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
                     LOGV2_INFO(7392901,
                                "Failed to remove orphaned data on recipient as it has been removed",
-                               logAttrs(_dbName),
-                               "to"_attr = toShardId);
-                }
-            }
-
-            if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                // TODO (SERVER-127533): Investigate if the remove shards completes before the end
-                // of the command execution
-                try {
-                    const auto session = getNewSession(opCtx);
-                    sharding_ddl_util::controlShardCatalogCleanupTask(
-                        opCtx, {thisShardId, toShardId}, session, false, executor, token);
-                } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
-                    LOGV2_INFO(7392904,
-                               "Failed to resume the shard catalog cleanup task on recipient as it "
-                               "has been removed",
                                logAttrs(_dbName),
                                "to"_attr = toShardId);
                 }

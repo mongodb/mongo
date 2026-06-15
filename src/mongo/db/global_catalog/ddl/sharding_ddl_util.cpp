@@ -1140,25 +1140,6 @@ void commitCreateCollectionChunklessMetadataToShardCatalog(
     sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
-void controlShardCatalogCleanupTask(OperationContext* opCtx,
-                                    const std::vector<ShardId>& shardIds,
-                                    const OperationSessionInfo& osi,
-                                    bool pause,
-                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                    const CancellationToken& token) {
-    ShardsvrControlShardCatalogCleanupTask request;
-    request.setDbName(DatabaseName::kAdmin);
-    request.setPause(pause);
-
-    generic_argument_util::setMajorityWriteConcern(request);
-    generic_argument_util::setOperationSessionInfo(request, osi);
-
-    auto opts =
-        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrControlShardCatalogCleanupTask>>(
-            **executor, token, std::move(request));
-    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
-}
-
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot) {
     const bool isAuthoritativeDDLEnabled =

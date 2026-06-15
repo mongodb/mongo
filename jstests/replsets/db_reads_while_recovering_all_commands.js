@@ -145,7 +145,6 @@ const allCommands = {
     _shardsvrCommitDropCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitCreateCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitCreateCollectionChunklessMetadata: {skip: isPrimaryOnly},
-    _shardsvrControlShardCatalogCleanupTask: {skip: isPrimaryOnly},
     _shardsvrSetAllowChunkOperations: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},

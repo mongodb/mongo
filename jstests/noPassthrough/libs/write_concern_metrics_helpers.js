@@ -87,44 +87,6 @@ export function verifyServerStatusChange(initialStats, newStats, paths, expected
         delete newParent[lastPathComponent];
     });
 
-    // Note: There is a delete that occurs in the AuthoritativeCatalogCleanup background task,
-    //       so we can't reliably compare delete counters
-    let metricsIncreasedByDefaultTask = ["delete.noneInfo.implicitDefault.wnum", "delete.none"];
-    metricsIncreasedByDefaultTask.forEach((path) => {
-        let pathComponents = path.split(".");
-        let initialParent = initialStats;
-        let newParent = newStats;
-        for (let i = 0; i < pathComponents.length - 1; i++) {
-            initialParent = initialParent[pathComponents[i]];
-            newParent = newParent[pathComponents[i]];
-        }
-
-        let lastPathComponent = pathComponents[pathComponents.length - 1];
-        let initialValue = 0;
-        if (initialParent.hasOwnProperty(lastPathComponent)) {
-            initialValue = initialParent[lastPathComponent];
-        }
-        let newValue = 0;
-        if (newParent.hasOwnProperty(lastPathComponent)) {
-            newValue = newParent[lastPathComponent];
-        }
-        assert.gte(
-            newValue,
-            initialValue,
-            "expected " +
-                path +
-                " to increase or be equal " +
-                ", initialStats: " +
-                tojson(initialStats) +
-                ", newStats: " +
-                tojson(newStats),
-        );
-
-        // Delete the changed element.
-        delete initialParent[lastPathComponent];
-        delete newParent[lastPathComponent];
-    });
-
     // The stats objects should be equal without the changed element.
     assert.eq(
         0,

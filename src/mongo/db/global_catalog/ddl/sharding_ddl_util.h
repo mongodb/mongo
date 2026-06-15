@@ -470,17 +470,6 @@ MONGO_MOD_PRIVATE void commitCreateCollectionChunklessMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
- *  Switches the control of shard catalog cleanup task on all given shards.
- */
-MONGO_MOD_PRIVATE void controlShardCatalogCleanupTask(
-    OperationContext* opCtx,
-    const std::vector<ShardId>& shardIds,
-    const OperationSessionInfo& osi,
-    bool pause,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token);
-
-/**
  *  Commits a renameCollection operation to the shard catalog by sending the command
  * `_shardsvrCommitRenameCollectionMetadata` to all given shards.
  */

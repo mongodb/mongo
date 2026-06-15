@@ -259,10 +259,9 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
 }
 
 // Test single insert/update.
-// Note: There is a delete that occurs in the AuthoritativeCatalogCleanup background task,
-//       so we can't reliably compare delete counters
 testWriteConcernMetrics({insert: collName, documents: [{}]}, "insert", 1);
 testWriteConcernMetrics({update: collName, updates: [{q: {}, u: {$set: {a: 1}}}]}, "update", 1);
+testWriteConcernMetrics({delete: collName, deletes: [{q: {}, limit: 1}]}, "delete", 1);
 
 // Test batch writes.
 testWriteConcernMetrics({insert: collName, documents: [{}, {}]}, "insert", 2);
@@ -275,5 +274,16 @@ testWriteConcernMetrics(
         ],
     },
     "update",
+    2,
+);
+testWriteConcernMetrics(
+    {
+        delete: collName,
+        deletes: [
+            {q: {}, limit: 1},
+            {q: {}, limit: 1},
+        ],
+    },
+    "delete",
     2,
 );

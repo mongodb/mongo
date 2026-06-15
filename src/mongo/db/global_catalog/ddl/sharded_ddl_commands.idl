@@ -1182,18 +1182,6 @@ commands:
         type: namespacestring
         api_version: ""
 
-    _shardsvrControlShardCatalogCleanupTask:
-        command_name: _shardsvrControlShardCatalogCleanupTask
-        cpp_name: ShardsvrControlShardCatalogCleanupTask
-        description: "Internal command to pause/resume cleanup task in the shard's catalog."
-        strict: true
-        namespace: ignored
-        api_version: ""
-        fields:
-            pause:
-                type: bool
-                description: "If true, pauses the cleanup task, otherwise resumes."
-
     _shardsvrCommitRenameCollectionMetadata:
         command_name: _shardsvrCommitRenameCollectionMetadata
         cpp_name: ShardsvrCommitRenameCollectionMetadata
