@@ -39,7 +39,15 @@ function makeBlockingCommands(coll) {
     ];
 }
 
-function runTests({label, makeFixture, teardown, getRouter, getShardRs, getMetricsConn}) {
+function runTests({
+    label,
+    makeFixture,
+    teardown,
+    getRouter,
+    getShardRs,
+    getMetricsConn,
+    getDefaultsColl,
+}) {
     describe(label, function () {
         let fixture;
         let router;
@@ -149,6 +157,112 @@ function runTests({label, makeFixture, teardown, getRouter, getShardRs, getMetri
             );
         });
 
+        it("promotes a CWRWC level of available to local when afterClusterTime is present", () => {
+            const getCounters = () => {
+                const status = assert.commandWorked(
+                    metricsConn.adminCommand({serverStatus: 1, defaultRWConcern: false}),
+                );
+                return status.readConcernCounters.nonTransactionOps;
+            };
+
+            assert.commandWorked(
+                router.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultReadConcern: {level: "available"},
+                }),
+            );
+            try {
+                const insertRes = assert.commandWorked(
+                    testDB.runCommand({
+                        insert: collName,
+                        documents: [{_id: nextId()}],
+                        writeConcern: {w: "majority"},
+                    }),
+                );
+                const ts = insertRes.operationTime;
+
+                const beforeCounters = getCounters();
+                // "available" cannot be combined with afterClusterTime, so the dispatcher must
+                // promote the merged level to "local" instead of producing an invalid combination.
+                assert.commandWorked(
+                    testDB.runCommand({find: collName, readConcern: {afterClusterTime: ts}}),
+                );
+                const afterCounters = getCounters();
+
+                const beforeLocal =
+                    (beforeCounters.noneInfo &&
+                        beforeCounters.noneInfo.CWRC &&
+                        beforeCounters.noneInfo.CWRC.local) ||
+                    0;
+                const afterLocal =
+                    (afterCounters.noneInfo &&
+                        afterCounters.noneInfo.CWRC &&
+                        afterCounters.noneInfo.CWRC.local) ||
+                    0;
+                assert.eq(
+                    1,
+                    afterLocal - beforeLocal,
+                    "expected noneInfo.CWRC.local to increment by 1",
+                    {
+                        beforeCounters,
+                        afterCounters,
+                    },
+                );
+            } finally {
+                // Restore the level the rest of the suite expects.
+                assert.commandWorked(
+                    router.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultReadConcern: {level: "majority"},
+                    }),
+                );
+            }
+        });
+
+        if (getDefaultsColl) {
+            it("rejects the read when a directly-written default level cannot be merged", () => {
+                const insertRes = assert.commandWorked(
+                    testDB.runCommand({
+                        insert: collName,
+                        documents: [{_id: nextId()}],
+                        writeConcern: {w: "majority"},
+                    }),
+                );
+                const ts = insertRes.operationTime;
+
+                // No supported command can produce an invalid merge: setDefaultRWConcern bans
+                // "linearizable" as a default, and the one bad combination it can produce
+                // (available + afterClusterTime) is handled by the promotion above. A direct
+                // write to the persisted defaults document bypasses the command-level check —
+                // a state the server explicitly tolerates (see
+                // observeDirectWriteToConfigSettings) — and is the only way to reach the
+                // post-merge uassert. This limits the failure to a per-request InvalidOptions
+                // rather than an invalid {afterClusterTime, level: "linearizable"} combination
+                // reaching the read path.
+                assert.commandWorked(
+                    getDefaultsColl(fixture).update(
+                        {_id: "ReadWriteConcernDefaults"},
+                        {$set: {defaultReadConcern: {level: "linearizable"}}},
+                    ),
+                );
+                try {
+                    assert.commandFailedWithCode(
+                        testDB.runCommand({find: collName, readConcern: {afterClusterTime: ts}}),
+                        ErrorCodes.InvalidOptions,
+                        "expected the post-merge readConcern validation to reject the request",
+                    );
+                } finally {
+                    // Restore the level the rest of the suite expects.
+                    assert.commandWorked(
+                        router.adminCommand({
+                            setDefaultRWConcern: 1,
+                            defaultReadConcern: {level: "majority"},
+                        }),
+                    );
+                }
+            });
+        }
+
         it("blocks a causal-consistency session read when CWRWC level is majority", () => {
             stopReplicationOnSecondaries(shardRs, false);
             let session;
@@ -194,6 +308,10 @@ runTests({
     getRouter: (rst) => rst.getPrimary(),
     getShardRs: (rst) => rst,
     getMetricsConn: (rst) => rst.getPrimary(),
+    // The mongos dispatcher shares the same merge code, but a direct write to the config
+    // server's defaults document is not promptly visible to mongos (periodic cache refresh),
+    // so the direct-write case runs only against the replica set.
+    getDefaultsColl: (rst) => rst.getPrimary().getDB("config").settings,
 });
 
 runTests({

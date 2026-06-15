@@ -847,9 +847,17 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                     "isImplicit"_attr = !readConcernSupport.defaultReadConcernPermit.isOK());
         if (readConcernArgs.isEmpty()) {
             readConcernArgs = std::move(rcDefault);
+        } else if (rcDefault.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern &&
+                   readConcernArgs.getArgsAfterClusterTime()) {
+            // A default level of "available" cannot be combined with afterClusterTime (see
+            // ReadConcernArgs::validate()). Promote to "local": afterClusterTime is honored
+            // and the level resolves as if no default were configured.
+            readConcernArgs.setLevel(repl::ReadConcernLevel::kLocalReadConcern);
         } else {
             readConcernArgs.setLevel(rcDefault.getLevel());
         }
+        // Applying a default must never produce an invalid combination.
+        uassertStatusOK(readConcernArgs.validate());
         readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
                                                              !customDefaultReadConcernWasApplied);
     };
