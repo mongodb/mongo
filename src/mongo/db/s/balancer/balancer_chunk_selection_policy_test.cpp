@@ -685,6 +685,40 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithBalancingD
     future.default_timed_get();
 }
 
+TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithChunkOperationsDisabled) {
+    setupShards({kShard0, kShard1});
+    setupDatabase(kDbName, kShardId0);
+
+    const auto uuid1 = setUpCollectionWithChunks(
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl1"),
+        generateDefaultChunkRanges({kShardId0, kShardId1}));
+    const auto uuid2 = setUpCollectionWithChunks(
+        NamespaceString::createNamespaceString_forTest(kDbName, "TestColl2"),
+        generateDefaultChunkRanges({kShardId0, kShardId1}));
+
+    // Disable chunk operations on collection 1
+    ASSERT_OK(updateToConfigCollection(
+        operationContext(),
+        NamespaceString::kConfigsvrCollectionsNamespace,
+        BSON(CollectionType::kUuidFieldName << uuid1),
+        BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false)),
+        false));
+
+    auto future = launchAsync([&] {
+        ThreadClient tc(getServiceContext()->getService());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        const auto& chunksToMove = selectChunksToMove(opCtx.get());
+
+        ASSERT_EQ(1, chunksToMove.size());
+        ASSERT_EQ(uuid2, chunksToMove[0].uuid);
+    });
+
+    expectGetStatsForBalancingCommandsWithOneMigration(
+        2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+    future.default_timed_get();
+}
+
 TEST_F(BalancerChunkSelectionTest, DontGetMigrationCandidatesIfAllCollectionsAreBalanced) {
     setupShards({kShard0, kShard1});
     setupDatabase(kDbName, kShardId0);

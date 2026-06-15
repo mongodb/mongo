@@ -271,14 +271,15 @@ void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
 }  // namespace
 
 bool balancer_policy_utils::canBalanceCollection(const CollectionType& coll) {
-    if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
-        coll.getDefragmentCollection()) {
+    if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getAllowChunkOperations() ||
+        !coll.getPermitMigrations() || coll.getDefragmentCollection()) {
         LOGV2_DEBUG(5966401,
                     1,
                     "Not balancing explicitly disabled collection",
                     logAttrs(coll.getNss()),
                     "allowBalance"_attr = coll.getAllowBalance(),
                     "allowMigrations"_attr = coll.getAllowMigrations(),
+                    "allowChunkOperations"_attr = coll.getAllowChunkOperations(),
                     "permitMigrations"_attr = coll.getPermitMigrations(),
                     "defragmentCollection"_attr = coll.getDefragmentCollection(),
                     "unsplittable"_attr = coll.getUnsplittable());
