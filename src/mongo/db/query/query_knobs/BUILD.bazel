@@ -12,13 +12,16 @@ exports_files(
 mongo_cc_library(
     name = "query_knob",
     srcs = [
+        "query_knob_change_notifier.cpp",
         "query_knob_registry.cpp",
         "query_knob_snapshot.cpp",
     ],
     hdrs = [
         "query_knob.h",
+        "query_knob_change_notifier.h",
         "query_knob_registry.h",
         "query_knob_snapshot.h",
+        "with_on_update_util.h",
     ],
     deps = [
         "//src/mongo:base",
@@ -75,6 +78,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "query_knob_test",
     srcs = [
+        "query_knob_listener_test.cpp",
         "query_knob_registry_test.cpp",
         "query_knob_snapshot_test.cpp",
         "query_knob_test.cpp",
@@ -82,5 +86,18 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":query_knob_test_knobs",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "with_on_update_util_test",
+    srcs = [
+        "with_on_update_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":query_knob",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:service_context_d_test_fixture",
     ],
 )

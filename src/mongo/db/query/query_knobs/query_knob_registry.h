@@ -32,12 +32,14 @@
 #include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <span>
 #include <type_traits>
@@ -58,6 +60,7 @@ public:
         using ReadGlobalFn = std::function<QueryKnobValue()>;
         using FromBSONFn = QueryKnobValue (*)(const BSONElement&);
         using ToBSONFn = void (*)(BSONObjBuilder&, StringData, const QueryKnobValue&);
+        using AttachOnUpdateFn = std::function<void(const QueryKnobChangeNotifier*)>;
 
         template <auto& global, typename T>
         requires AtomicLoadable<decltype(global)>
@@ -75,6 +78,10 @@ public:
             FromBSONFn fromBSON = detail::ConverterTraits<T>::fromBSON;
             ToBSONFn toBSON = detail::ConverterTraits<T>::toBSON;
             ReadGlobalFn readGlobal = nullptr;
+            AttachOnUpdateFn attachOnUpdate =
+                [param, id = knob.id](const QueryKnobChangeNotifier* notifier) {
+                    notifier->attach(param, id);
+                };
             if constexpr (EnumServerParameter<SPT>) {
                 readGlobal = [param]() -> QueryKnobValue {
                     return static_cast<int>(param->_data.get());
@@ -84,14 +91,15 @@ public:
                     return param->getValue(boost::none /* tenantId */);
                 };
             }
-            return Entry(knob.id, param, fromBSON, toBSON, readGlobal);
+            return Entry(knob.id, param, fromBSON, toBSON, readGlobal, attachOnUpdate);
         }
 
         explicit Entry(QueryKnobId id,
                        ServerParameter* param,
                        FromBSONFn fromBSONFn,
                        ToBSONFn toBSONFn,
-                       ReadGlobalFn readGlobalFn);
+                       ReadGlobalFn readGlobalFn,
+                       AttachOnUpdateFn attachOnUpdateFn);
 
         QueryKnobId id;
         ServerParameter* param = nullptr;
@@ -100,6 +108,7 @@ public:
         FromBSONFn fromBSON = nullptr;
         ToBSONFn toBSON = nullptr;
         ReadGlobalFn readGlobal = nullptr;
+        AttachOnUpdateFn attachOnUpdate = nullptr;
 
         // Non-owning, points into `param`'s annotation BSON (static lifetime).
         StringData wireName;
@@ -148,6 +157,9 @@ QueryKnobId allocateQueryKnobId();
 // Appends an entry to the global initializer context. Called by REGISTER_QUERY_KNOBS and
 // consumed by QueryKnobRegistryInit.
 void registerQueryKnob(QueryKnobRegistry::Entry&& entry);
+
+// Listener counterpart to registerQueryKnob; consumed by QueryKnobRegistryInit into the notifier.
+void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener);
 }  // namespace detail
 
 // clang-format off
@@ -181,5 +193,16 @@ void registerQueryKnob(QueryKnobRegistry::Entry&& entry);
 #define REGISTER_QUERY_KNOBS(group, EXPAND)            \
     EXPAND(MONGO_DETAIL_DEFINE_QUERY_KNOB)             \
     MONGO_DETAIL_INITIALIZE_QUERY_KNOBS(group, EXPAND)
+
+// Registers a knob-change listener. `name` is the initializer name (must be a unique
+// identifier); `listener` is any expression convertible to QueryKnobChangeNotifier::Listener
+// (Status(const QueryKnobChange&)). Place at namespace scope in a .cpp.
+#define REGISTER_QUERY_KNOBS_LISTENER(name, listener)                                \
+    namespace {                                                                      \
+    MONGO_INITIALIZER_GENERAL(name, (), ("QueryKnobRegistryInit"))                   \
+        (InitializerContext*) {                                                      \
+            detail::registerQueryKnobListener(listener); \
+        }                                                                            \
+    } // namespace
 // clang-format on
 }  // namespace mongo

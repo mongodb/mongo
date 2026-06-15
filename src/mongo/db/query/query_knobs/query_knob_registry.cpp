@@ -46,6 +46,7 @@ namespace {
 struct QueryKnobInitializerContext {
     QueryKnobId::value_t numKnobs = 0;
     std::vector<QueryKnobRegistry::Entry> entries;
+    std::vector<QueryKnobChangeNotifier::Listener> listeners;
 } globalQueryKnobInitializerContext;
 
 boost::optional<multiversion::FeatureCompatibilityVersion> extractMinFcv(StringData paramName,
@@ -81,8 +82,14 @@ QueryKnobRegistry::Entry::Entry(QueryKnobId id,
                                 ServerParameter* param,
                                 FromBSONFn fromBSONFn,
                                 ToBSONFn toBSONFn,
-                                ReadGlobalFn readGlobalFn)
-    : id(id), param(param), fromBSON(fromBSONFn), toBSON(toBSONFn), readGlobal(readGlobalFn) {
+                                ReadGlobalFn readGlobalFn,
+                                AttachOnUpdateFn attachOnUpdateFn)
+    : id(id),
+      param(param),
+      fromBSON(fromBSONFn),
+      toBSON(toBSONFn),
+      readGlobal(readGlobalFn),
+      attachOnUpdate(attachOnUpdateFn) {
     invariant(param, fmt::format("No server parameter found for query knob id {}", id.value));
     const auto qk = param->annotations().getObjectField("query_knob");
     invariant(!qk.isEmpty(),
@@ -192,13 +199,22 @@ void registerQueryKnob(QueryKnobRegistry::Entry&& entry) {
     globalQueryKnobInitializerContext.entries.push_back(std::move(entry));
 }
 
+void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener) {
+    globalQueryKnobInitializerContext.listeners.push_back(std::move(listener));
+}
+
 namespace {
 MONGO_INITIALIZER_WITH_PREREQUISITES(QueryKnobRegistryInit, ("EndServerParameterRegistration"))
 (InitializerContext*) {
-    QueryKnobRegistry registry{};
     auto&& params = ServerParameterSet::getNodeParameterSet();
     detectOrphanAnnotations(globalQueryKnobInitializerContext.entries, *params);
     QueryKnobRegistry::init(std::move(globalQueryKnobInitializerContext.entries));
+
+    auto notifier =
+        QueryKnobChangeNotifier::create(std::move(globalQueryKnobInitializerContext.listeners));
+    for (auto&& entry : QueryKnobRegistry::instance().entries()) {
+        entry.attachOnUpdate(notifier.get());
+    }
 }
 
 }  // namespace

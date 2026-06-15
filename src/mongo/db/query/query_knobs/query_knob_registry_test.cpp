@@ -81,7 +81,7 @@ auto createDummyServerParameter(StringData paramName, BSONObj annotations) {
 }
 
 QueryKnobRegistry::Entry createDummyKnobEntry(ServerParameter* sp, QueryKnobId id = {}) {
-    return QueryKnobRegistry::Entry(id, sp, nullptr, nullptr, nullptr);
+    return QueryKnobRegistry::Entry(id, sp, nullptr, nullptr, nullptr, nullptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -203,7 +203,7 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                                                       .pqsSettable = true,
                                                   }));
     std::ignore = createDummyKnobEntry(param.get());
-    QueryKnobRegistry::Entry{QueryKnobId(0), param.get(), nullptr, nullptr, nullptr};
+    QueryKnobRegistry::Entry{QueryKnobId(0), param.get(), nullptr, nullptr, nullptr, nullptr};
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
