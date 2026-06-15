@@ -166,15 +166,14 @@ void generatePlannerInfo(PlanExecutor* exec,
         const Nanoseconds planningTime =
             planningTimeOpt ? duration_cast<Nanoseconds>(planningTimeOpt.value()) : Nanoseconds{0};
 
-        // Always provide the millisecond value.
+        // Always provide the millisecond and microsecond values.
         plannerBob.appendNumber("optimizationTimeMillis",
                                 durationCount<Milliseconds>(planningTime));
+        plannerBob.appendNumber("optimizationTimeMicros",
+                                durationCount<Microseconds>(planningTime));
 
         if (precision == QueryExecTimerPrecision::kNanos) {
-            // When the precise timer is enabled, also expose micro- and nanosecond counts
-            // just like we do for execution stats.
-            plannerBob.appendNumber("optimizationTimeMicros",
-                                    durationCount<Microseconds>(planningTime));
+            // When the precise timer is enabled, also expose the nanosecond count.
             plannerBob.appendNumber("optimizationTimeNanos",
                                     durationCount<Nanoseconds>(planningTime));
         }

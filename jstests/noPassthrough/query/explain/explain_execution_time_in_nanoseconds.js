@@ -1,7 +1,7 @@
 // When running explain commands with "executionStats" verbosity, checks that the explain output
 // includes "executionTimeMicros"/"executionTimeNanos" only if requested.
 // "executionTimeMillisEstimate" will always be present in the explain output.
-// Check that "queryPlanner" has "optimizationTimeMillis".
+// Check that "queryPlanner" always has "optimizationTimeMillis" and "optimizationTimeMicros".
 import {getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({});
@@ -31,10 +31,19 @@ function verifyStages(execStages, microAndNanosExpected) {
 
 // Test explain on find command.
 let explainResult = coll.find({x: {$gt: 500}}).explain("executionStats");
-// Verify that "queryPlanner" has "optimizationTimeMillis".
+// Verify that "queryPlanner" has "optimizationTimeMillis" and "optimizationTimeMicros" by default.
 assert(explainResult.hasOwnProperty("queryPlanner"), explainResult);
 assert(
     explainResult.queryPlanner.hasOwnProperty("optimizationTimeMillis"),
+    explainResult.queryPlanner,
+);
+assert(
+    explainResult.queryPlanner.hasOwnProperty("optimizationTimeMicros"),
+    explainResult.queryPlanner,
+);
+assert.gte(
+    explainResult.queryPlanner.optimizationTimeMicros,
+    explainResult.queryPlanner.optimizationTimeMillis * 1000,
     explainResult.queryPlanner,
 );
 let executionStages = explainResult.executionStats.executionStages;
@@ -72,18 +81,13 @@ for (let executionStage of executionStages) {
     assert(!executionStage.hasOwnProperty("executionTimeMicros"), executionStage);
     assert(!executionStage.hasOwnProperty("executionTimeNanos"), executionStage);
     if (executionStage.hasOwnProperty("$cursor")) {
-        // Verify that "queryPlanner" has "optimizationTimeMillis".
         assert(executionStage["$cursor"].hasOwnProperty("queryPlanner"), executionStage);
         assert(
             executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"),
             executionStage,
         );
         assert(
-            !executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMicros"),
-            executionStage,
-        );
-        assert(
-            !executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeNanos"),
+            executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMicros"),
             executionStage,
         );
         const stages = executionStage["$cursor"]["executionStats"]["executionStages"];
@@ -107,7 +111,6 @@ assert(
     explainResult.queryPlanner,
 );
 assert.gt(explainResult.queryPlanner.optimizationTimeMicros, 0, explainResult.queryPlanner);
-assert.gt(explainResult.queryPlanner.optimizationTimeNanos, 0, explainResult.queryPlanner);
 executionStages = explainResult.executionStats.executionStages;
 assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
 verifyStages(executionStages, true);
@@ -129,11 +132,6 @@ for (let executionStage of executionStages) {
         assert(executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"));
         assert.gt(
             executionStage["$cursor"]["queryPlanner"].optimizationTimeMicros,
-            0,
-            executionStage,
-        );
-        assert.gt(
-            executionStage["$cursor"]["queryPlanner"].optimizationTimeNanos,
             0,
             executionStage,
         );

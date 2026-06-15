@@ -535,7 +535,7 @@ export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOu
                 expectedExplainStages,
                 false /* verbose */,
                 null /* valueComparator */,
-                ["optimizationTimeMillis"] /* fieldsToSkip */,
+                ["optimizationTimeMillis", "optimizationTimeMicros"] /* fieldsToSkip */,
             ),
             "Explains did not match in 'stages'. Expected:\n" +
                 tojson(expectedExplainOutput) +

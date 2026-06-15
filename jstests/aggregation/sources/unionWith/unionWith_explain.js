@@ -40,6 +40,7 @@ const executionStatsIgnoredFields = [
 const stagesIgnoredFields = [
     "slots",
     "optimizationTimeMillis",
+    "optimizationTimeMicros",
     "planCacheKey",
     "querySettings",
     "isCached",
@@ -52,6 +53,7 @@ const mongosIgnoredFields = [
     "queryHash",
     "planCacheShapeHash",
     "optimizationTimeMillis",
+    "optimizationTimeMicros",
 ].concat(executionStatsIgnoredFields, stagesIgnoredFields);
 
 // We ignore `cursorType` because it's only set when there's a $cursor stage, which could be
@@ -59,6 +61,7 @@ const mongosIgnoredFields = [
 const queryPlannerIgnoredFields = [
     "optimizedPipeline",
     "optimizationTimeMillis",
+    "optimizationTimeMicros",
     "cursorType",
 ].concat(stagesIgnoredFields);
 

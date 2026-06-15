@@ -249,7 +249,7 @@ public:
 
         // Amount of time spent planning the query. Begins after parsing and ends
         // after optimizations. This metric is expected to be positive regardless of whether the
-        // plan came from (e.g. multi-planner, cost-based ranker, plan cache).
+        // plan came from (e.g. multi-planner, cost-based ranker, join optimizer, plan cache).
         boost::optional<Microseconds> planningTime;
         // Counts of cardinality estimation methods used by the winning plan's root node.
         // On mongos, this aggregates counts across shards. All zeros if CBR was not used.

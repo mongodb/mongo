@@ -70,6 +70,7 @@ selector:
     - jstests/aggregation/explain/explain_limit.js
     - jstests/aggregation/sources/densify/generated_limit.js
     - jstests/aggregation/sources/unionWith/unionWith.js
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
     - jstests/aggregation/sources/lookup/hash_lookup_spill_large_and_small_documents_correctly.js
     - jstests/aggregation/js/agg_infinite_recursion.js
     - jstests/aggregation/sources/indexStats/verify_index_stats_output.js

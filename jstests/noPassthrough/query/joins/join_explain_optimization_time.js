@@ -63,7 +63,7 @@ describe("optimizationTimeMillis with join optimization", function () {
         MongoRunner.stopMongod(conn);
     });
 
-    it("reports optimizationTimeMillis >= injected delay", function () {
+    it("reports optimizationTimeMillis and optimizationTimeMicros >= injected delay", function () {
         const fp = configureFailPoint(conn, "sleepWhileJoinOptimizing", {ms: kSleepMs});
         try {
             const explain = coll.explain().aggregate(pipeline);
@@ -79,6 +79,17 @@ describe("optimizationTimeMillis with join optimization", function () {
                 queryPlanner.optimizationTimeMillis,
                 kSleepMs,
                 "optimizationTimeMillis should be >= injected sleep delay",
+                {queryPlanner},
+            );
+            assert(
+                queryPlanner.hasOwnProperty("optimizationTimeMicros"),
+                "optimizationTimeMicros missing from queryPlanner",
+                {queryPlanner},
+            );
+            assert.gte(
+                queryPlanner.optimizationTimeMicros,
+                kSleepMs * 1000,
+                "optimizationTimeMicros should be >= injected sleep delay in micros",
                 {queryPlanner},
             );
         } finally {
@@ -105,7 +116,7 @@ describe("optimizationTimeMillis with join optimization", function () {
         );
     });
 
-    it("reports optimizationTimeMicros and optimizationTimeNanos >= injected delay when nanos knob is enabled", function () {
+    it("reports optimizationTimeNanos >= injected delay when nanos knob is enabled", function () {
         assert.commandWorked(
             conn.adminCommand({
                 setParameter: 1,
@@ -117,19 +128,8 @@ describe("optimizationTimeMillis with join optimization", function () {
             const explain = coll.explain().aggregate(pipeline);
             const queryPlanner = getQueryPlanner(explain);
             assert(
-                queryPlanner.hasOwnProperty("optimizationTimeMicros"),
-                "optimizationTimeMicros missing from queryPlanner",
-                {queryPlanner},
-            );
-            assert(
                 queryPlanner.hasOwnProperty("optimizationTimeNanos"),
                 "optimizationTimeNanos missing from queryPlanner",
-                {queryPlanner},
-            );
-            assert.gte(
-                queryPlanner.optimizationTimeMicros,
-                kSleepMs * 1000,
-                "optimizationTimeMicros should be >= injected sleep delay in micros",
                 {queryPlanner},
             );
             assert.gte(
