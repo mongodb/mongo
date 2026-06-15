@@ -1,11 +1,12 @@
 /**
- * Tests the `fixedBucketing` timeseries option on `createCollection`: that the value is correctly
- * persisted in the catalog, that idempotent re-creates succeed, and that conflicting re-creates
- * fail with `NamespaceExists`.
+ * Tests the `fixedBucketing` timeseries option:
+ *  - Persistence: explicit true/false is stored correctly; omitting the field defaults to true.
+ *  - Re-create behavior: omitting the field on re-create inherits the stored value; an explicit
+ *    matching value succeeds; an explicit mismatching value fails with `NamespaceExists`.
+ *  - collMod: changing bucketing parameters sets `fixedBucketing` to false.
  *
- * Runs only when `featureFlagFixedBucketingCatalog` is enabled. Because the field is only valid on
- * viewless timeseries collections, the test also requires
- * `featureFlagCreateViewlessTimeseriesCollections`.
+ * Runs only when `featureFlagFixedBucketingCatalog` and
+ * `featureFlagCreateViewlessTimeseriesCollections` are enabled.
  *
  * @tags: [
  *   requires_timeseries,
@@ -72,56 +73,50 @@ describe("fixedBucketing persistence", function () {
         assert.eq(getStoredFixedBucketing(), false);
     });
 
-    it("omits the field from listCollections when not specified", function () {
+    it("defaults the stored value to true when the field is omitted on create", function () {
         assert.commandWorked(createWithFixedBucketing(undefined));
-        assert.eq(getStoredFixedBucketing(), undefined);
+        assert.eq(getStoredFixedBucketing(), true);
     });
 });
 
-describe("idempotent create with same fixedBucketing", function () {
+// Exhaustively cover createCollection(createVal) followed by re-create(recreateVal).
+// An omitted createVal defaults to true. An omitted recreateVal inherits the stored value
+// (succeeds); an explicit matching value also succeeds; an explicit mismatching value fails.
+describe("re-create behavior", function () {
     afterEach(function () {
         coll.drop();
     });
 
-    it("succeeds when both calls set true", function () {
-        assert.commandWorked(createWithFixedBucketing(true));
-        assert.commandWorked(createWithFixedBucketing(true));
-    });
-
-    it("succeeds when both calls set false", function () {
-        assert.commandWorked(createWithFixedBucketing(false));
-        assert.commandWorked(createWithFixedBucketing(false));
-    });
-
-    it("succeeds when both calls omit the field", function () {
-        assert.commandWorked(createWithFixedBucketing(undefined));
-        assert.commandWorked(createWithFixedBucketing(undefined));
-    });
-});
-
-describe("conflicting create with mismatched fixedBucketing", function () {
-    afterEach(function () {
-        coll.drop();
-    });
-
-    // Unset, false, and true are three distinct states. Any combination that differs across the two create calls must
-    // fail with NamespaceExists when matchesStorageOptions detects the timeseries options have changed.
-    const mismatchedPairs = [
-        {existing: true, retry: false},
-        {existing: true, retry: undefined},
-        {existing: false, retry: true},
-        {existing: false, retry: undefined},
-        {existing: undefined, retry: true},
-        {existing: undefined, retry: false},
+    const cases = [
+        // Omit on re-create: inherits the stored value.
+        {createVal: true, recreateVal: undefined, valid: true},
+        {createVal: false, recreateVal: undefined, valid: true},
+        {createVal: undefined, recreateVal: undefined, valid: true}, // stored=true
+        // Same explicit value: matches stored value.
+        {createVal: true, recreateVal: true, valid: true},
+        {createVal: false, recreateVal: false, valid: true},
+        // Omit on first create (stored=true); explicit true on re-create matches.
+        {createVal: undefined, recreateVal: true, valid: true},
+        // Mismatched explicit value: fails with NamespaceExists.
+        {createVal: true, recreateVal: false, valid: false},
+        {createVal: false, recreateVal: true, valid: false},
+        // Omit on first create (stored=true); explicit false conflicts.
+        {createVal: undefined, recreateVal: false, valid: false},
     ];
 
-    for (const {existing, retry} of mismatchedPairs) {
-        it(`fails when existing=${existing} and retry=${retry}`, function () {
-            assert.commandWorked(createWithFixedBucketing(existing));
-            assert.commandFailedWithCode(
-                createWithFixedBucketing(retry),
-                ErrorCodes.NamespaceExists,
-            );
+    for (const {createVal, recreateVal, valid} of cases) {
+        it(`create(${createVal}) then re-create(${recreateVal}) → ${valid ? "succeeds" : "NamespaceExists"}`, function () {
+            const stored = createVal === undefined ? true : createVal;
+            assert.commandWorked(createWithFixedBucketing(createVal));
+            if (valid) {
+                assert.commandWorked(createWithFixedBucketing(recreateVal));
+                assert.eq(getStoredFixedBucketing(), stored);
+            } else {
+                assert.commandFailedWithCode(
+                    createWithFixedBucketing(recreateVal),
+                    ErrorCodes.NamespaceExists,
+                );
+            }
         });
     }
 });
@@ -139,11 +134,12 @@ describe("collMod fixedBucketing handling for bucketing changes", function () {
             expected: false,
             desc: "false stays false on bucketing change",
         },
+        // Omitting fixedBucketing on create stores true; a bucketing change then flips it to false.
         {
             initial: undefined,
             newSpan: 200,
-            expected: undefined,
-            desc: "unset stays unset on bucketing change",
+            expected: false,
+            desc: "omitted (stored true) → false on bucketing change",
         },
         {
             initial: true,
@@ -157,11 +153,12 @@ describe("collMod fixedBucketing handling for bucketing changes", function () {
             expected: false,
             desc: "false stays false when bucketing unchanged",
         },
+        // Omitting fixedBucketing on create stores true; no bucketing change leaves it as true.
         {
             initial: undefined,
             newSpan: 100,
-            expected: undefined,
-            desc: "unset stays unset when bucketing unchanged",
+            expected: true,
+            desc: "omitted (stored true) stays true when bucketing unchanged",
         },
     ];
 

@@ -59,6 +59,22 @@ const outColl = testDB.out_coll;
 // Observer coll for the $out without timeseries.
 const observerOutColl = testDB.observer_out_coll;
 
+// Returns the timeseries options for a collection, stripping 'fixedBucketing' because:
+// - some tests pass these options as the $out spec's 'timeseries' argument, where
+//   'fixedBucketing' is rejected;
+// - the options comparisons must not include it: in suites that change FCV in the background,
+//   the field can change unpredictably during the test (a downgrade strips it, and a re-upgrade
+//   does not restore it).
+//   TODO(SERVER-128768): Rework this once 9.0 becomes last LTS and stripping is not an issue anymore.
+// Returns undefined for non-timeseries collections.
+function getTimeseriesOptions(collectionInfo) {
+    const tsOptions = collectionInfo["options"]["timeseries"];
+    if (tsOptions) {
+        delete tsOptions.fixedBucketing;
+    }
+    return tsOptions;
+}
+
 function runOutAndCompareResults({
     observer: observerPipeline,
     timeseries: timeseriesPipeline,
@@ -104,11 +120,11 @@ function runOutAndCompareResults({
     if (expectedTSOptions) {
         // Make sure the output collection is a timeseries collection.
         assert(
-            collections[0]["options"]["timeseries"],
+            getTimeseriesOptions(collections[0]),
             `$out should maintain the timeseries collection ${JSON.stringify(collections)}`,
         );
 
-        const actualOptions = collections[0]["options"]["timeseries"];
+        const actualOptions = getTimeseriesOptions(collections[0]);
         validateCollectionOptions({expected: expectedTSOptions, actual: actualOptions});
 
         // TODO SERVER-101784 remove these checks once only viewless timeseries exist.
@@ -157,7 +173,7 @@ function runOutAndCompareResults({
     } else {
         // Make sure the output collection is not a timeseries collection.
         assert(
-            !collections[0]["options"]["timeseries"],
+            !getTimeseriesOptions(collections[0]),
             `$out should maintain the non-timeseries collection if no timeseries options are specified ${JSON.stringify(
                 collections,
             )}`,
@@ -267,7 +283,7 @@ function timeseriesDefaultIndex() {
     assert.eq(collections.length, 1, collections);
 
     // Get the original timeseries options, these should stay the same post $out.
-    const expectedTSOptions = collections[0]["options"]["timeseries"];
+    const expectedTSOptions = getTimeseriesOptions(collections[0]);
 
     const observerPipeline = [{$out: {db: dbName, coll: observerOutColl.getName()}}];
     const timeseriesPipeline = [
@@ -296,7 +312,7 @@ function timeseriesDefaultIndex() {
     assert.eq(collections.length, 1, collections);
 
     // Get the original timeseries options, these should stay the same post $out.
-    const expectedTSOptions = collections[0]["options"]["timeseries"];
+    const expectedTSOptions = getTimeseriesOptions(collections[0]);
 
     // Change the "time" field in the pipeline, so we can confirm the value is changed in the
     // result.
@@ -335,7 +351,7 @@ function timeseriesDefaultIndex() {
     const collections = testDB.getCollectionInfos({name: outColl.getName()});
     assert.eq(collections.length, 1, collections);
 
-    const expectedTSOptions = collections[0]["options"]["timeseries"];
+    const expectedTSOptions = getTimeseriesOptions(collections[0]);
 
     const observerPipeline = [{$out: {db: testDB.getName(), coll: observerOutColl.getName()}}];
     const timeseriesPipeline = [{$out: {db: testDB.getName(), coll: outColl.getName()}}];

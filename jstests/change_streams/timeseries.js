@@ -623,6 +623,18 @@ describe("$changeStream", function () {
 
             // NOTE: the set of events observed on viewless timeseries collections is the same regardless of the 'showSystemEvents' value.
             const eventMap = viewlessTimeseriesEventMap;
+
+            // When fixedBucketing is enabled, we have the following behavior:
+            // * A new viewless collection is created with fixedBucketing: true by default.
+            // * If bucketing is changed (e.g., with a granularity change via collMod), fixedBucketing is set to false.
+            if (FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingCatalog")) {
+                eventMap.collectionCreationEvent.operationDescription.timeseries.fixedBucketing = true;
+                // Granularity not yet modified, fixedBucketing should still be true.
+                eventMap.collectionHourGranularityModificationEvent.stateBeforeChange.collectionOptions.timeseries.fixedBucketing = true;
+                // Granularity now modified (by previous modification event), fixedBucketing should now be false.
+                eventMap.collectionExpirationModificationEvent.stateBeforeChange.collectionOptions.timeseries.fixedBucketing = false;
+            }
+
             return [
                 eventMap.collectionCreationEvent,
                 eventMap.metaIndexCreationEvent,

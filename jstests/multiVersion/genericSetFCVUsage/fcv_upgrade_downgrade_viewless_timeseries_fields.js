@@ -5,6 +5,13 @@
  * TODO(SERVER-128095): populating fixedBucketing on FCV upgrade is not yet implemented; this test
  * currently only covers stripping it on downgrade.
  *
+ * Also verifies upgrade-idempotency for `fixedBucketing`: a collection created in FCV 8.0 (before
+ * `fixedBucketing` existed) must not have the field set after upgrading to FCV 9.0, and
+ * re-creating that collection in FCV 9.0 while omitting `fixedBucketing` must succeed and must
+ * not flip the field to true. Similarly verifies downgrade-idempotency: after a downgrade strips
+ * the field, re-creating the collection while omitting `fixedBucketing` must succeed and must not
+ * resurrect it.
+ *
  * TODO (SERVER-116499): Remove this file once 9.0 becomes last LTS.
  *
  * @tags: [
@@ -149,5 +156,117 @@ testFCVTransition(lastLTSFCV, latestFCV);
 
 // Test downgrade (viewless -> legacy): verifies fields are not present.
 testFCVTransition(latestFCV, lastLTSFCV);
+
+// Check whether fixedBucketingCatalog feature is enabled, regardless of FCV (so that the result does not depend on the
+// FCV left by the previous tests)
+const fixedBucketingFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "FixedBucketingCatalog",
+    /* ignoreFCV */ true,
+);
+
+// Test upgrade-idempotency for fixedBucketing: a collection created in FCV 8.0 must not gain
+// fixedBucketing=true after upgrading to FCV 9.0, and re-creating it without specifying
+// fixedBucketing must succeed (idempotent) and leave the field unset.
+if (fixedBucketingFlagEnabled) {
+    jsTest.log.info(
+        "Testing fixedBucketing upgrade-idempotency: collection created in lastLTSFCV " +
+            "must not have fixedBucketing set after upgrade, and re-creating it without " +
+            "fixedBucketing must leave the field absent.",
+    );
+
+    const collName = "ts_fixedbucketing_idempotency";
+    const tsOpts = {timeField: "t", metaField: "m"};
+
+    // Start in lastLTSFCV (FCV 8.0) and create a sharded timeseries collection without
+    // fixedBucketing (the field did not exist in FCV 8.0).
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
+    createShardedTimeseries(collName);
+
+    // Upgrade to latestFCV. The upgrade path does NOT set fixedBucketing on existing collections.
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
+
+    // Assert that fixedBucketing is absent after upgrade (the field must not be set to true or
+    // false by the upgrade procedure).
+    const entryAfterUpgrade = getConfigEntry(collName);
+    assert(
+        !entryAfterUpgrade.timeseriesFields.hasOwnProperty("fixedBucketing"),
+        "fixedBucketing must not be set on a collection created in lastLTSFCV after upgrading to latestFCV",
+        {timeseriesFieldsAfterUpgrade: entryAfterUpgrade.timeseriesFields},
+    );
+
+    // Re-create the collection via createCollection, omitting fixedBucketing. In FCV 9.0 a brand
+    // new collection would default fixedBucketing=true, but this collection already exists with the
+    // field absent, so the idempotent re-creation must not flip it to true.
+    assert.commandWorked(db.createCollection(collName, {timeseries: tsOpts}));
+
+    const entryAfterRecreate = getConfigEntry(collName);
+    assert(
+        !entryAfterRecreate.timeseriesFields.hasOwnProperty("fixedBucketing"),
+        "fixedBucketing must remain absent after idempotent re-creation of a collection " +
+            "that was originally created in lastLTSFCV",
+        {timeseriesFieldsAfterRecreate: entryAfterRecreate.timeseriesFields},
+    );
+
+    // Re-creating the collection with explicit 'fixedBucketing: true' must fail.
+    assert.commandFailedWithCode(
+        db.createCollection(collName, {timeseries: {...tsOpts, fixedBucketing: true}}),
+        ErrorCodes.NamespaceExists,
+    );
+
+    // Cleanup
+    db[collName].drop();
+}
+
+// Test downgrade-idempotency for fixedBucketing:
+// * Create the timeseries omitting fixedBucketing in FCV 9.0 => fixedBucketing set to true by default
+// * Downgrade => fixedBucketing stripped
+// * Re-create the timeseries omitting fixedBucketing => succeeds (idempotent), but does not bring back
+//   'fixedBucketing: true'
+if (fixedBucketingFlagEnabled) {
+    jsTest.log.info(
+        "Testing fixedBucketing downgrade-idempotency: re-creating a collection after a " +
+            "downgrade stripped fixedBucketing must succeed and leave the field absent.",
+    );
+
+    const collName = "ts_fixedbucketing_downgrade_idempotency";
+    const tsOpts = {timeField: "t", metaField: "m"};
+
+    // Create a sharded timeseries collection in latestFCV; omitting fixedBucketing defaults the
+    // stored value to true.
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}),
+    );
+    createShardedTimeseries(collName);
+    assert.eq(true, getConfigEntry(collName).timeseriesFields.fixedBucketing);
+
+    // Downgrade to lastLTSFCV strips the field.
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    );
+    const entryAfterDowngrade = getConfigEntry(collName);
+    assert(
+        !entryAfterDowngrade.timeseriesFields.hasOwnProperty("fixedBucketing"),
+        "fixedBucketing must be stripped after downgrading to lastLTSFCV",
+        {timeseriesFieldsAfterDowngrade: entryAfterDowngrade.timeseriesFields},
+    );
+
+    // Re-create the collection omitting fixedBucketing: must succeed (idempotent) and leave the
+    // field absent.
+    assert.commandWorked(db.createCollection(collName, {timeseries: tsOpts}));
+    const entryAfterRecreate = getConfigEntry(collName);
+    assert(
+        !entryAfterRecreate.timeseriesFields.hasOwnProperty("fixedBucketing"),
+        "fixedBucketing must remain absent after idempotent re-creation following a downgrade",
+        {timeseriesFieldsAfterRecreate: entryAfterRecreate.timeseriesFields},
+    );
+
+    // Cleanup
+    db[collName].drop();
+}
 
 st.stop();

@@ -29,7 +29,6 @@
 
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -50,10 +49,6 @@ protected:
     void createTimeseriesCollection(const NamespaceString& nss) {
         CreateCommand cmd = CreateCommand(nss);
         TimeseriesOptions tsOpts("timestamp");
-        // TODO(SERVER-126823): Remove once fixedBucketing is set by default for new collections.
-        if (gFeatureFlagFixedBucketingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
-            tsOpts.setFixedBucketing(true);
-        }
         cmd.getCreateCollectionRequest().setTimeseries(tsOpts);
         ASSERT_OK(createCollection(operationContext(), cmd));
     }

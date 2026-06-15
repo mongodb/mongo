@@ -42,7 +42,7 @@ if (!FeatureFlagUtil.isEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation")) 
 }
 
 // Check that the collection can be converted to viewful timeseries and back to viewless.
-function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
+function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat, expectedFixedBucketing}) {
     // The collection exists
     assert(nodeColl.exists());
     if (expectViewlessFormat) {
@@ -53,19 +53,25 @@ function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
         assert(getTimeseriesBucketsColl(nodeColl).getMetadata().options.validator);
     }
 
+    // Deep copy the expected metadata so we can manipulate it below. Serialize to BSON and back
+    // (rather than a plain JS deep copy) to preserve BSON-typed fields like the UUID.
+    const expectedMetadata = hexToBSON(dumpBSONAsHex(expectedViewlessMetadata));
+
+    // Set the expected 'fixedBucketing' value or strip it when absent.
+    if (expectedFixedBucketing === undefined) {
+        delete expectedMetadata.options.timeseries.fixedBucketing;
+    } else {
+        expectedMetadata.options.timeseries.fixedBucketing = expectedFixedBucketing;
+    }
+
     // We keep the same metadata and indexes
     if (expectViewlessFormat) {
-        assert.docEq(expectedViewlessMetadata, nodeColl.getMetadata());
+        assert.docEq(expectedMetadata, nodeColl.getMetadata());
     } else {
         // In the case of viewful format, the UUID is detached to the system.buckets collection,
         // but the rest of the metadata matches that of the viewless format.
-        const expectedViewfulMetadata = Object.extend(
-            {},
-            expectedViewlessMetadata,
-            true /* deep */,
-        );
-        delete expectedViewfulMetadata.info.uuid;
-        assert.docEq(expectedViewfulMetadata, nodeColl.getMetadata());
+        delete expectedMetadata.info.uuid;
+        assert.docEq(expectedMetadata, nodeColl.getMetadata());
         assert.eq(expectedViewlessMetadata.info.uuid, getTimeseriesBucketsColl(nodeColl).getUUID());
     }
 
@@ -84,20 +90,35 @@ function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
     assert.eq(1, nodeColl.countDocuments({}, {rawData: true}));
 }
 
-function assertValidTimeseriesCollectionInAllNodes({expectViewlessFormat}) {
-    assertValidTimeseriesCollection(coll, {expectViewlessFormat});
+function assertValidTimeseriesCollectionInAllNodes({expectViewlessFormat, expectedFixedBucketing}) {
+    assertValidTimeseriesCollection(coll, {expectViewlessFormat, expectedFixedBucketing});
 
     rst.awaitReplication();
     const secondaryColl = rst.getSecondary().getDB(db.getName()).getCollection(coll.getName());
-    assertValidTimeseriesCollection(secondaryColl, {expectViewlessFormat});
+    assertValidTimeseriesCollection(secondaryColl, {expectViewlessFormat, expectedFixedBucketing});
 }
 
-assertValidTimeseriesCollectionInAllNodes({expectViewlessFormat: true});
+// Create defaults 'fixedBucketing' to true when enabled.
+assertValidTimeseriesCollectionInAllNodes({
+    expectViewlessFormat: true,
+    expectedFixedBucketing: FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingCatalog")
+        ? true
+        : undefined,
+});
 
 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-assertValidTimeseriesCollectionInAllNodes({expectViewlessFormat: false});
+// Downgrade strips 'fixedBucketing'.
+assertValidTimeseriesCollectionInAllNodes({
+    expectViewlessFormat: false,
+    expectedFixedBucketing: undefined,
+});
 
 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-assertValidTimeseriesCollectionInAllNodes({expectViewlessFormat: true});
+// Upgrade does not restore 'fixedBucketing'.
+// TODO(SERVER-128095): expect false instead of undefined once upgrade sets it.
+assertValidTimeseriesCollectionInAllNodes({
+    expectViewlessFormat: true,
+    expectedFixedBucketing: undefined,
+});
 
 rst.stopSet();

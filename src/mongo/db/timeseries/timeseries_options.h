@@ -85,6 +85,23 @@ Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& 
  * Rounds down timestamp by the specified seconds.
  */
 Date_t roundTimestampBySeconds(const Date_t& time, long long roundingSeconds);
+
+/**
+ * Defaults the 'fixedBucketing' option to true for a NEW viewless time-series collection when the
+ * user omitted it. No-op when 'fixedBucketingEnabled' (featureFlagFixedBucketingCatalog) is false,
+ * or when the field was set explicitly (an explicit false is preserved). Only call for viewless
+ * collections; the caller is responsible for the viewless check.
+ */
+void setFixedBucketingDefaultForNewCollection(TimeseriesOptions& timeseriesOptions,
+                                              bool fixedBucketingEnabled);
+
+/**
+ * Inherits the 'fixedBucketing' value from 'existing' into 'requested' if the field is absent
+ * in 'requested'.
+ */
+void inheritFixedBucketingIfOmitted(TimeseriesOptions& requested,
+                                    const TimeseriesOptions& existing);
+
 /**
  * Validates the combination of bucketRoundingSeconds, bucketMaxSpanSeconds and granularity in
  * TimeseriesOptions. If the parameters are not valid we return a bad status and if no parameters

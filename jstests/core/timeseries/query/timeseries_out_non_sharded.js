@@ -22,10 +22,7 @@
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-import {
-    runningWithViewlessTimeseriesUpgradeDowngrade,
-    isViewfulTimeseriesOnlySuite,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isViewfulTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -170,6 +167,19 @@ function validateCollectionOptions({expected: expectedOptions, actual: actualOpt
     }
 }
 
+// Returns the timeseries options for a collection, stripping 'fixedBucketing' because:
+// - some tests pass these options as the $out spec's 'timeseries' argument, where
+//   'fixedBucketing' is rejected;
+// - validateCollectionOptions() must not compare it: in suites that change FCV in the background,
+//   the field can change unpredictably during the test (a downgrade strips it, and a re-upgrade
+//   does not restore it).
+//   TODO(SERVER-128768): Rework this once 9.0 becomes last LTS and stripping is not an issue anymore.
+function getExpectedTSOptions(collectionInfo) {
+    const tsOptions = collectionInfo["options"]["timeseries"];
+    delete tsOptions.fixedBucketing;
+    return tsOptions;
+}
+
 function dropOutCollections() {
     outColl.drop();
     observerOutColl.drop();
@@ -247,7 +257,7 @@ function timeseriesDefaultIndex() {
     assert.eq(collections.length, 1, collections);
 
     // Get the original timeseries options, these should stay the same post $out.
-    const expectedTSOptions = collections[0]["options"]["timeseries"];
+    const expectedTSOptions = getExpectedTSOptions(collections[0]);
 
     const observerPipeline = [{$out: {db: dbName, coll: observerOutColl.getName()}}];
     const timeseriesPipeline = [
@@ -276,7 +286,7 @@ function timeseriesDefaultIndex() {
     assert.eq(collections.length, 1, collections);
 
     // Get the original timeseries options, these should stay the same post $out.
-    const expectedTSOptions = collections[0]["options"]["timeseries"];
+    const expectedTSOptions = getExpectedTSOptions(collections[0]);
 
     // Change the "time" field in the pipeline, so we can confirm the value is changed in the
     // result.
@@ -315,7 +325,7 @@ function timeseriesDefaultIndex() {
     const collections = testDB.getCollectionInfos({name: outColl.getName()});
     assert.eq(collections.length, 1, collections);
 
-    const expectedTSOptions = collections[0]["options"]["timeseries"];
+    const expectedTSOptions = getExpectedTSOptions(collections[0]);
 
     const observerPipeline = [{$out: {db: testDB.getName(), coll: observerOutColl.getName()}}];
     const timeseriesPipeline = [{$out: {db: testDB.getName(), coll: outColl.getName()}}];
@@ -466,6 +476,28 @@ if (isV82OrLower) {
 
     assert.throwsWithCode(() => inColl.aggregate(pipeline), 40415);
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 40415);
+})();
+
+(function testCannotSpecifyFixedBucketingInOutSpec() {
+    dropOutCollections();
+
+    for (const fixedBucketing of [true, false]) {
+        const pipeline = [
+            {
+                $out: {
+                    db: testDB.getName(),
+                    coll: outColl.getName(),
+                    timeseries: {timeField: "time", metaField: "tags", fixedBucketing},
+                },
+            },
+        ];
+        // On pre-9.0 binaries 'fixedBucketing' is an unknown field rejected with IDLUnknownField.
+        // TODO SERVER-120014: Remove IDLUnknownField once 9.0 becomes last LTS.
+        assert.throwsWithCode(
+            () => inColl.aggregate(pipeline),
+            [ErrorCodes.InvalidOptions, ErrorCodes.IDLUnknownField],
+        );
+    }
 })();
 
 (function testCannotHaveMismatchingTimeField() {

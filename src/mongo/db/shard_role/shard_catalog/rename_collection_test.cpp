@@ -59,6 +59,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
@@ -1396,6 +1397,94 @@ TEST_F(RenameCollectionTestMultitenancy, RenameCollectionAcrossTenantIds) {
     options.dropTarget = true;
     ASSERT_EQUALS(ErrorCodes::IllegalOperation,
                   renameCollection(_opCtx.get(), _sourceNssTid, targetNssTid, options));
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests for checkTargetCollectionOptionsMatch.
+//
+// checkTargetCollectionOptionsMatch is the rename options guard used by $out's finalize rename.
+// These tests run without a server fixture — the function only operates on
+// BSONObjs and a NamespaceString.
+// ---------------------------------------------------------------------------
+class CheckTargetCollectionOptionsMatchTest : public unittest::Test {
+protected:
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
+
+    // Build a minimal timeseries collection-options BSON, optionally with fixedBucketing.
+    static BSONObj makeOpts(boost::optional<bool> fixedBucketing = boost::none,
+                            boost::optional<BucketGranularityEnum> granularity = boost::none) {
+        TimeseriesOptions ts{"t" /* timeField */};
+        ts.setMetaField("m"_sd);
+        ts.setGranularity(granularity);
+        ts.setFixedBucketing(fixedBucketing ? OptionalBool(*fixedBucketing) : OptionalBool{});
+
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+        options.timeseries = std::move(ts);
+        return options.toBSON(/*includeUUID=*/false);
+    }
+};
+
+// Identical options — always OK.
+TEST_F(CheckTargetCollectionOptionsMatchTest, IdenticalOptionsMatch) {
+    const auto opts = makeOpts(true);
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, opts, opts));
+}
+
+// The existing uuid exclusion must still hold.
+TEST_F(CheckTargetCollectionOptionsMatchTest, UuidDifferenceIsIgnored) {
+    const auto base = makeOpts();
+    auto addUuid = [&base] {
+        BSONObjBuilder bob(base);
+        UUID::gen().appendToBuilder(&bob, "uuid");
+        return bob.obj();
+    };
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, addUuid(), addUuid()));
+}
+
+// fixedBucketing deltas must all be ignored, regardless of direction or value.
+TEST_F(CheckTargetCollectionOptionsMatchTest, FixedBucketingPresentVsAbsentIsIgnored) {
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, makeOpts(true), makeOpts()));
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, makeOpts(), makeOpts(true)));
+}
+
+TEST_F(CheckTargetCollectionOptionsMatchTest, FixedBucketingFalseVsAbsentIsIgnored) {
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, makeOpts(false), makeOpts()));
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, makeOpts(), makeOpts(false)));
+}
+
+TEST_F(CheckTargetCollectionOptionsMatchTest, FixedBucketingTrueVsFalseIsIgnored) {
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, makeOpts(true), makeOpts(false)));
+    ASSERT_OK(checkTargetCollectionOptionsMatch(_nss, makeOpts(false), makeOpts(true)));
+}
+
+// A real shape difference (granularity) must still be rejected.
+TEST_F(CheckTargetCollectionOptionsMatchTest, GranularityDifferenceIsRejected) {
+    ASSERT_EQUALS(
+        ErrorCodes::CommandFailed,
+        checkTargetCollectionOptionsMatch(_nss,
+                                          makeOpts(boost::none, BucketGranularityEnum::Seconds),
+                                          makeOpts(boost::none, BucketGranularityEnum::Minutes)));
+}
+
+// fixedBucketing difference combined with a real difference must also be rejected
+// (the granularity delta is still caught even when fixedBucketing differs too).
+TEST_F(CheckTargetCollectionOptionsMatchTest,
+       GranularityDifferenceIsRejectedEvenWithFixedBucketingDelta) {
+    ASSERT_EQUALS(
+        ErrorCodes::CommandFailed,
+        checkTargetCollectionOptionsMatch(_nss,
+                                          makeOpts(true, BucketGranularityEnum::Seconds),
+                                          makeOpts(false, BucketGranularityEnum::Minutes)));
+}
+
+// Non-timeseries options are unaffected — a validator difference must still be rejected.
+TEST_F(CheckTargetCollectionOptionsMatchTest, NonTimeseriesOptionsDifferenceIsRejected) {
+    const auto withValidator = BSON("validator" << BSON("x" << BSON("$gt" << 0)));
+    const auto withoutValidator = BSONObj();
+    ASSERT_EQUALS(ErrorCodes::CommandFailed,
+                  checkTargetCollectionOptionsMatch(_nss, withValidator, withoutValidator));
 }
 
 }  // namespace

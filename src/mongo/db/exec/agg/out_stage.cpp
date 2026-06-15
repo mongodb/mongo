@@ -215,13 +215,27 @@ void OutStage::createTemporaryCollection() {
     auto createCommandOptions = [&] {
         BSONObjBuilder builder;
         if (_timeseries) {
-            // Append the original collection options without the 'validator' and 'clusteredIndex'
-            // fields since these fields are invalid with the 'timeseries' field and will be
-            // recreated when the timeseries collection is created.
-            !_originalOutCollInfo
-                ? builder << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON()
-                : builder.appendElementsUnique(_originalOutCollInfo->options.removeFields(
-                      StringDataSet{"clusteredIndex", "validator"}));
+            if (!_originalOutCollInfo) {
+                builder << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
+            } else {
+                // Append the original collection options without the 'validator' and
+                // 'clusteredIndex' fields since these fields are invalid with the 'timeseries'
+                // field and will be recreated when the timeseries collection is created.
+                auto opts = _originalOutCollInfo->options.removeFields(
+                    StringDataSet{"clusteredIndex", "validator"});
+                // Strip 'fixedBucketing' so it is not passed to the temp collection creation:
+                // an explicit value would be rejected if an FCV transition makes the creation
+                // happen on a legacy timeseries path.
+                // NOTE: Omitting 'fixedBucketing' on creation means that a viewless temporary
+                // collection gets the default ('fixedBucketing: true') applied at creation time.
+                // TODO(SERVER-128579): Revisit whether to preserve the target's fixedBucketing
+                // value once 9.0 becomes last LTS and viewful timeseries no longer exist.
+                auto tsElem = opts["timeseries"];
+                BSONObjBuilder b;
+                b.appendElementsUnique(opts.removeField("timeseries"));
+                b.append("timeseries", tsElem.Obj().removeField("fixedBucketing"));
+                builder.appendElementsUnique(b.obj());
+            }
         } else if (_originalOutCollInfo) {
             builder.appendElementsUnique(_originalOutCollInfo->options);
         }
@@ -678,8 +692,19 @@ std::shared_ptr<TimeseriesOptions> OutStage::validateTimeseries() {
             "Cannot create a time-series collection from a non time-series collection or view.",
             targetTSOpts || !_originalOutCollInfo);
 
+    // 'fixedBucketing' is not allowed in the $out spec.
+    uassert(ErrorCodes::InvalidOptions,
+            "the 'fixedBucketing' option is not allowed in $out",
+            !_timeseries->getFixedBucketing().has_value());
+
     // If the user did specify 'timeseries' options and the target namespace is a time-series
     // collection, then the time-series options should match.
+    // 'fixedBucketing' value in the target collection must be excluded from the check: the $out
+    // spec cannot specify it (rejected above) and the replacement collection does not have to
+    // preserve the target's value (it takes the creation-time default).
+    if (targetTSOpts) {
+        targetTSOpts->setFixedBucketing(OptionalBool{});
+    }
     uassert(7406103,
             str::stream() << "Time-series options inputted must match the existing time-series "
                              "collection. Received: "

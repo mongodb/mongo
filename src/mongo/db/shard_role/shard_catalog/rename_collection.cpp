@@ -1092,8 +1092,27 @@ Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
     // collection was dropped and recreated, as long as the new target collection has the same
     // options and indexes as the original one did. This is mainly to support concurrent $out to
     // the same collection.
-    auto compExpectedOptions = expectedOptions.removeField("uuid");
-    auto compCurrentOptions = currentOptions.removeField("uuid");
+    //
+    // We also exclude 'timeseries.fixedBucketing'. It records whether the bucketing parameters
+    // have remained unchanged since the collection's creation. It is system-managed rather than
+    // user-curated. For this reason $out unconditionally recreates the target with the
+    // creation-time default ('true' for viewless timeseries). Additionally, an FCV downgrade strips
+    // the field from existing collections. Treating a fixedBucketing-only delta as a conflict would
+    // produce spurious CommandFailed errors for concurrent $out or FCV-race interleavings.
+    // TODO(SERVER-128579): Revisit once 9.0 becomes last LTS.
+    auto normalize = [](const BSONObj& options) {
+        BSONObj result = options.removeField("uuid");
+        const auto tsElem = result["timeseries"];
+        if (tsElem.isABSONObj()) {
+            BSONObjBuilder bob;
+            bob.appendElementsUnique(result.removeField("timeseries"));
+            bob.append("timeseries", tsElem.Obj().removeField("fixedBucketing"));
+            result = bob.obj();
+        }
+        return result;
+    };
+    auto compExpectedOptions = normalize(expectedOptions);
+    auto compCurrentOptions = normalize(currentOptions);
 
     if (SimpleBSONObjComparator::kInstance.evaluate(compExpectedOptions != compCurrentOptions)) {
         return Status(ErrorCodes::CommandFailed,

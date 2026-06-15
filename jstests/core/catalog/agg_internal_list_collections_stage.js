@@ -72,13 +72,19 @@ function normalizeTimeseriesCollectionFormat(listOfCollections) {
         (collEntry) => !collEntry["ns"].includes(".system.buckets."),
     );
 
-    // Remove the UUID field, since it is only present for viewless timeseries collections
-    // (normalize so that we can compare timeseries collections regardless of the format).
     list = list.map((entry) => {
         if (entry.type !== "timeseries") {
             return entry;
         }
 
+        // fixedBucketing is a FCV 9.0 TimeseriesOptions field that gets stripped on downgrade; in
+        // FCV-changing suites its presence is racy, so exclude it from comparisons.
+        // TODO SERVER-120014: Remove this deletion once 9.0 becomes last LTS.
+        delete entry.options.timeseries.fixedBucketing;
+
+        // Remove the UUID field, since it is only present for viewless timeseries collections
+        // (normalize so that we can compare timeseries collections regardless of the format).
+        // TODO SERVER-120014: Remove this normalization once 9.0 becomes last LTS.
         const {
             info: {uuid: uuid, ...infoWithoutUuid},
             ...entryWithoutInfo

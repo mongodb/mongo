@@ -417,20 +417,6 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
             !createViewlessTimeseriesColl || !options.timeseries.has_value() ||
                 options.validator.isEmpty());
 
-    // The 'fixedBucketing' option requires viewless time-series collections and the
-    // featureFlagFixedBucketingCatalog flag.
-    if (options.timeseries.has_value() && options.timeseries->getFixedBucketing().has_value()) {
-        uassert(ErrorCodes::InvalidOptions,
-                "the 'fixedBucketing' option requires featureFlagFixedBucketingCatalog to be "
-                "enabled",
-                gFeatureFlagFixedBucketingCatalog.isEnabledUseLatestFCVWhenUninitialized(
-                    VersionContext::getDecoration(opCtx)));
-
-        uassert(ErrorCodes::InvalidOptions,
-                "the 'fixedBucketing' option can only be set on viewless time-series collections",
-                createViewlessTimeseriesColl);
-    }
-
     // TODO SERVER-109289: Investigate whether this is safe on viewless time-series collections.
     uassert(
         ErrorCodes::OperationNotSupportedInTransaction,
@@ -650,6 +636,13 @@ void checkExistingCollectionIsCompatible(OperationContext* opCtx,
         // for a timeseries collection will be always forbidden.
         normalizedRequestedOptions.validator = BSONObj();
         normalizedRequestedOptions.clusteredIndex = boost::none;
+
+        // An omitted 'fixedBucketing' is defaulted to true only when creating a brand-new
+        // collection. For an existing collection an omitted value inherits the stored value, so
+        // that an idempotent re-create that omits the field never conflicts regardless of the
+        // existing value (unset/true/false). Explicit values still compare exactly.
+        timeseries::inheritFixedBucketingIfOmitted(*normalizedRequestedOptions.timeseries,
+                                                   *existingOptions.timeseries);
 
         existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
             false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
@@ -899,6 +892,9 @@ void _createTimeseriesCollection(
     const auto viewlessTimeseriesEnabled =
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx));
+    const auto fixedBucketingEnabled =
+        gFeatureFlagFixedBucketingCatalog.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx));
 
     // This uassert is used to signal $out that is attempting to create a legacy timeseries temp
     // collection when we are already in FCV 9.0. $out has special logic to catch this and switch to
@@ -967,6 +963,33 @@ void _createTimeseriesCollection(
 
         if (!bucketsCollExists) {
             auto bucketsOptions = optionsArg;
+            // Gate 'fixedBucketing' on the feature flag only when creating a brand-new collection.
+            // During the transient window of an FCV downgrade the timeseries collection is still
+            // viewless (not yet converted) and still carries 'fixedBucketing', but FCV is no longer
+            // 9.0 so the flag is disabled. A 'shardCollection' in that window has
+            // 'CreateCollectionCoordinator' re-issue an internal create with options read back from
+            // the catalog (carrying 'fixedBucketing'): in this case we must ensure that
+            // 'fixedBucketing' is not rejected even if FCV is not 9.0 anymore.
+            // NOTE: the field is stripped on downgrade completion, after which a re-create
+            // specifying 'fixedBucketing' is correctly rejected as NamespaceExists (the value can't
+            // match the stored one).
+            if (bucketsOptions.timeseries->getFixedBucketing().has_value()) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "the 'fixedBucketing' option requires featureFlagFixedBucketingCatalog to "
+                        "be enabled",
+                        fixedBucketingEnabled);
+                uassert(ErrorCodes::InvalidOptions,
+                        "the 'fixedBucketing' option can only be set on viewless time-series "
+                        "collections",
+                        viewlessTimeseriesEnabled);
+            }
+            // Default 'fixedBucketing' to true for a newly created viewless time-series collection.
+            // This branch runs only when the buckets collection does not already exist, so existing
+            // collections are never modified.
+            if (viewlessTimeseriesEnabled) {
+                timeseries::setFixedBucketingDefaultForNewCollection(*bucketsOptions.timeseries,
+                                                                     fixedBucketingEnabled);
+            }
             uassertStatusOK(_setBucketingParametersAndAddClusteredIndex(bucketsOptions));
 
             if (viewlessTimeseriesEnabled) {

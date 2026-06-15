@@ -731,15 +731,18 @@ void checkLocalCatalogCollectionOptions(OperationContext* opCtx,
                 "provided must match the ones of the existing collection.",
                 isTimeseries(targetColl));
 
+        const auto& existingOptions = *targetColl->getCollectionPtr()->getTimeseriesOptions();
+        auto requestedOptions = *request.getTimeseries();
+        timeseries::inheritFixedBucketingIfOmitted(requestedOptions, existingOptions);
+
         uassert(
             ErrorCodes::InvalidOptions,
             fmt::format(
                 "The `timeseries` options provided must match the ones of the existing collection. "
                 "Requested {} but found {}",
                 request.getTimeseries()->toBSON().toString(),
-                targetColl->getCollectionPtr()->getTimeseriesOptions()->toBSON().toString()),
-            timeseries::optionsAreEqual(*request.getTimeseries(),
-                                        *targetColl->getCollectionPtr()->getTimeseriesOptions()));
+                existingOptions.toBSON().toString()),
+            timeseries::optionsAreEqual(requestedOptions, existingOptions));
     }
 }
 
@@ -830,13 +833,16 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                 // they match
                 const auto& existingTimeseriesOptions =
                     cm.getTimeseriesFields()->getTimeseriesOptions();
+                auto requestedTimeseriesOptions = *request.getTimeseries();
+                timeseries::inheritFixedBucketingIfOmitted(requestedTimeseriesOptions,
+                                                           existingTimeseriesOptions);
                 uassert(ErrorCodes::AlreadyInitialized,
                         fmt::format("Collection '{}' already exists with a different timeseries "
                                     "options. Requested '{}' but found '{}'",
                                     targetNss.toStringForErrorMsg(),
                                     request.getTimeseries()->toBSON().toString(),
                                     existingTimeseriesOptions.toBSON().toString()),
-                        timeseries::optionsAreEqual(*request.getTimeseries(),
+                        timeseries::optionsAreEqual(requestedTimeseriesOptions,
                                                     existingTimeseriesOptions));
             } else {
                 // The collection exists and is timeseries but it was requested to create a normal
@@ -1797,11 +1803,19 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
             optExtendedTimeseriesFields = std::move(extendedTimeseriesFields);
         } else if (_request.getTimeseries()) {
             // The collection does not exists so we are creating a new timeseries collection.
+            auto timeseriesOptions = *_request.getTimeseries();
             auto extendedTimeseriesFields = TypeCollectionTimeseriesFields();
-            extendedTimeseriesFields.setTimeseriesOptions(*_request.getTimeseries());
             if (viewlessTimeseriesEnabled(opCtx)) {
                 extendedTimeseriesFields.setTimeseriesBucketsMayHaveMixedSchemaData(false);
+
+                // Default 'fixedBucketing' to true for a new viewless time-series collection so the
+                // global catalog entry matches what the shard-local create persists.
+                timeseries::setFixedBucketingDefaultForNewCollection(
+                    timeseriesOptions,
+                    gFeatureFlagFixedBucketingCatalog.isEnabledUseLatestFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx)));
             }
+            extendedTimeseriesFields.setTimeseriesOptions(timeseriesOptions);
 
             optExtendedTimeseriesFields = std::move(extendedTimeseriesFields);
         }

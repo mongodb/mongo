@@ -5,7 +5,7 @@
  * `listCollections`). `fixedBucketing` is only valid for viewless timeseries collections; this
  * test ensures the auto-disable logic does not leak the field into legacy catalog entries.
  *
- * TODO(SERVER-126823): remove this test once 9.0 becomes last LTS and all timeseries collections
+ * TODO(SERVER-120014): remove this test once 9.0 becomes last LTS and all timeseries collections
  * are viewless.
  *
  * @tags: [

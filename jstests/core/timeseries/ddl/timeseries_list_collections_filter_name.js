@@ -7,7 +7,11 @@
  *   requires_timeseries,
  * ]
  */
-import {assertOnlyForViewlessTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    assertOnlyForViewlessTimeseries,
+    isViewlessTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const timeFieldName = "time";
 
@@ -31,6 +35,18 @@ const timeseriesOptions = {
     granularity: "seconds",
     bucketMaxSpanSeconds: 3600,
 };
+
+if (
+    isViewlessTimeseriesOnlySuite(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingCatalog")
+) {
+    // fixedBucketing is FCV-gated; since the field is omitted on create here, it defaults to
+    // true on viewless timeseries collections, so add it to the expected options.
+    Object.assign(timeseriesOptions, {fixedBucketing: true});
+} else {
+    // fixedBucketing presence is racy under background FCV changes; ignore it here.
+    delete collectionDocument.options.timeseries.fixedBucketing;
+}
 
 const collectionOptions = {
     name: coll.getName(),

@@ -377,10 +377,12 @@ bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& 
         return false;
     }
 
-    // The fixedBucketing option must match. Treat unset, false, and true as three distinct
-    // states: OptionalBool's `operator bool()` collapses unset and false together, so we must
-    // compare `has_value()` separately from the underlying boolean.
-    // TODO(SERVER-126823): revisit when fixedBucketing becomes true by default.
+    // The fixedBucketing option must match exactly. Treat unset, false, and true as three distinct
+    // states.
+    // NOTE: in practice, calling code normalizes the 'unset' case for brand-new collections, but
+    // collections converted from legacy timeseries may still have 'unset'.
+    // TODO(SERVER-128095): once upgrade sets 'fixedBucketing' to false on existing collections,
+    // 'unset' should no longer be reachable here and can be asserted away.
     if (option1.getFixedBucketing().has_value() != option2.getFixedBucketing().has_value()) {
         return false;
     }
@@ -436,6 +438,25 @@ Date_t roundTimestampBySeconds(const Date_t& time, const long long roundingSecon
         roundedTimeMilliSeconds -= roundingMilliSeconds;
     }
     return Date_t::fromMillisSinceEpoch(roundedTimeMilliSeconds);
+}
+
+void setFixedBucketingDefaultForNewCollection(TimeseriesOptions& timeseriesOptions,
+                                              bool fixedBucketingEnabled) {
+    // TODO SERVER-127534: Remove the featureFlagFixedBucketingCatalog gating and default
+    // 'fixedBucketing' unconditionally once 9.0 becomes last LTS.
+    // Default 'fixedBucketing' to true when the user omitted it. No-op when the feature flag is
+    // off or the user set the field explicitly (an explicit false is preserved). Use has_value()
+    // (not operator bool()) so that an explicit false is preserved.
+    if (fixedBucketingEnabled && !timeseriesOptions.getFixedBucketing().has_value()) {
+        timeseriesOptions.setFixedBucketing(true);
+    }
+}
+
+void inheritFixedBucketingIfOmitted(TimeseriesOptions& requested,
+                                    const TimeseriesOptions& existing) {
+    if (!requested.getFixedBucketing().has_value()) {
+        requested.setFixedBucketing(existing.getFixedBucketing());
+    }
 }
 
 Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
