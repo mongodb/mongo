@@ -50,26 +50,6 @@ evergreen_buildvariants:
     platform: ubuntu1804
     architecture: s390x
 
-  - name: ubuntu2004
-    edition: targeted
-    platform: ubuntu2004
-    architecture: x86_64
-
-  - name: enterprise-ubuntu2004-64
-    edition: enterprise
-    platform: ubuntu2004
-    architecture: x86_64
-
-  - name: ubuntu2004-arm64
-    edition: targeted
-    platform: ubuntu2004
-    architecture: aarch64
-
-  - name: enterprise-ubuntu2004-arm64
-    edition: enterprise
-    platform: ubuntu2004
-    architecture: aarch64
-
   - name: amazon
     edition: targeted
     platform: amazon

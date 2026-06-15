@@ -201,22 +201,6 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
-  enterprise-ubuntu2004-64:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
-  enterprise-ubuntu2004-arm64:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
-  ubuntu2004:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
-  ubuntu2004-arm64:
-    - task: aggregation_blockprocessing_fuzzer
-      exec_timeout: 600 # 10 hours
-
   enterprise-ubuntu2204-64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
