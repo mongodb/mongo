@@ -12,6 +12,7 @@ import {
     OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
     OCSP_RESPONDER_CERT,
     OCSP_RESPONDER_KEY,
+    OCSP_SERVER_CERT,
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 
 // These are a list of faults to match the list of faults
@@ -20,6 +21,10 @@ export const FAULT_REVOKED = "revoked";
 
 export const FAULT_UNKNOWN = "unknown";
 export const OCSP_PROGRAM = "jstests/ocsp/lib/ocsp_mock.py";
+
+// Standalone TLS server that staples a malformed (undecodable) OCSP response. Launched by
+// MockMalformedStapleServer.
+export const MALFORMED_STAPLE_SERVER_PROGRAM = "jstests/ocsp/lib/malformed_staple_server.py";
 
 export class ResponderCertSet {
     /**
@@ -188,5 +193,85 @@ export class MockOCSPServer {
         }
 
         print("Mock OCSP Server stop complete");
+    }
+}
+
+/**
+ * A mock TLS server that staples a malformed (single 0x00 byte) OCSP response
+ * during the handshake. It launches malformed_staple_server.py to exercise a TLS
+ * client's handling of an undecodable stapled OCSP response.
+ */
+export class MockMalformedStapleServer {
+    /**
+     * Create a new malformed-staple TLS server.
+     *
+     * @param {number} port - port to listen on.
+     * @param {string} tls_cert_key_file - PEM file with the certificate chain and
+     *     private key the server presents. Must carry an OCSP AIA URI so that the
+     *     client invokes its stapled-response handling.
+     */
+    constructor(port, tls_cert_key_file = OCSP_SERVER_CERT) {
+        this.python = getPython3Binary();
+        this.port = port;
+        this.tls_cert_key_file = tls_cert_key_file;
+    }
+
+    start() {
+        jsTest.log.info("Mock malformed staple TLS server will listen on port: " + this.port);
+        const args = [
+            this.python,
+            "-u",
+            MALFORMED_STAPLE_SERVER_PROGRAM,
+            "--port=" + this.port,
+            "--tls_cert_key_file=" + this.tls_cert_key_file,
+            "--verbose",
+        ];
+
+        clearRawMongoProgramOutput();
+        const pid = _startMongoProgram({args: args});
+        assert(checkProgram(pid).alive);
+
+        assert.soon(function () {
+            const output = rawMongoProgramOutput(".*");
+            assert.eq(output.search("Address already in use"), -1, "Mock staple server port in use");
+            return output.search("Malformed staple TLS server listening on") !== -1;
+        }, "Mock malformed staple TLS server failed to start");
+
+        this.pid = pid;
+    }
+
+    /**
+     * Get the host:port the server is listening on.
+     *
+     * @return {string} host of the TLS server.
+     */
+    getHost() {
+        return "localhost:" + this.port;
+    }
+
+    /**
+     * Stop the TLS server. If SIGINT doesn't kill it after a few seconds, kill with SIGKILL.
+     */
+    stop() {
+        if (!this.pid) {
+            jsTest.log.warning("Not stopping Mock malformed staple TLS server, it was never started");
+            return;
+        }
+
+        jsTest.log.info("Stopping Mock malformed staple TLS server");
+        const kSIGINT = 2;
+        stopMongoProgramByPid(this.pid, kSIGINT);
+
+        for (let i = 0; i < 50; i++) {
+            if (!checkProgram(this.pid).alive) {
+                jsTest.log.info("Mock malformed staple TLS server stop complete");
+                return;
+            }
+            sleep(100);
+        }
+
+        const kSIGKILL = 9;
+        stopMongoProgramByPid(this.pid, kSIGKILL);
+        jsTest.log.info("Mock malformed staple TLS server stop complete");
     }
 }

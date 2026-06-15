@@ -2012,6 +2012,13 @@ int ocspClientCallback(SSL* ssl, void* arg) {
 
     auto response = UniqueOCSPResponse(d2i_OCSP_RESPONSE(NULL, &response_ptr, length));
 
+    if (response == nullptr) {
+        LOGV2_ERROR(12836200,
+                    "ocspClientCallback: Failed to decode OCSP response from DER format",
+                    "error"_attr = getSSLFailure("OCSP response decode failed."));
+        return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
+    }
+
     auto swStapleOK = verifyStapledResponse(ssl, peerCert.get(), response.get());
 
     // The swStapleOK object has three states. If the status returned by the function is
