@@ -105,16 +105,20 @@ namespace catalog_repair {
 
 /**
  * This method reconciles differences between idents the KVEngine is aware of and the
- * MDBCatalog. There are three differences to consider:
+ * MDBCatalog. There are four differences to consider:
  *
  * First, a KVEngine may know of an ident that the MDBCatalog does not. This method will drop
  * the ident from the KVEngine.
  *
  * Second, a MDBCatalog may have a collection ident that the KVEngine does not. This is an
- * illegal state and this method fasserts.
+ * illegal state and this method returns an error.
  *
- * Third, a MDBCatalog may have an index ident that the KVEngine does not. This method will
- * rebuild the index.
+ * Third, a MDBCatalog may have an index ident that the KVEngine does not. For ready indexes
+ * this method logs the inconsistency. Unfinished two-phase builds are returned to the caller
+ * for restart and other unfinished indexes are dropped, whether or not their idents exist.
+ *
+ * Fourth, a catalog entry may record no usable ident for an index it lists. This is an
+ * illegal state and this method returns an error.
  */
 StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
     OperationContext* opCtx,
@@ -210,11 +214,9 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         }
     }
 
-    // Scan all indexes and return those in the catalog where the storage engine does not have the
-    // corresponding ident. The caller is expected to rebuild these indexes.
-    //
-    // Also, remove unfinished builds except those that were background index builds started on a
-    // secondary.
+    // Scan all indexes in the catalog. Every present index must record a usable ident.
+    // Unfinished two-phase builds are returned to the caller for restart; other unfinished
+    // indexes are dropped. A ready index whose ident the engine no longer has is logged.
     for (const MDBCatalog::EntryIdentifier& entry : catalogEntries) {
         const auto catalogEntry =
             durable_catalog::getParsedCatalogEntry(opCtx, entry.catalogId, mdbCatalog);
@@ -224,7 +226,36 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         std::vector<std::string> indexesToDrop;
         for (const auto& indexMetaData : md->indexes) {
             auto indexName = indexMetaData.nameStringData();
-            auto indexIdent = mdbCatalog->getIndexIdent(opCtx, entry.catalogId, indexName);
+            auto indexIdentElem = catalogEntry->indexIdents.getField(indexName);
+
+            // Every present index must have a non-empty ident. An empty string cannot be
+            // acted on by dropIdent or index build restart, so such an entry is corrupt
+            // and unsafe to start from (SERVER-128615).
+            if (!forRepair && indexMetaData.isPresent() &&
+                (indexIdentElem.type() != BSONType::string ||
+                 indexIdentElem.valueStringData().empty())) {
+                LOGV2_ERROR(12861500,
+                            "Index in catalog entry has no usable ident",
+                            logAttrs(md->nss),
+                            "index"_attr = indexName,
+                            "catalogId"_attr = entry.catalogId,
+                            "collectionIdent"_attr = entry.ident,
+                            "indexIdents"_attr = catalogEntry->indexIdents,
+                            "metadata"_attr = md->toBSON(),
+                            "lastShutdownState"_attr =
+                                (lastShutdownState == StorageEngine::LastShutdownState::kClean
+                                     ? "clean"_sd
+                                     : "unclean"_sd));
+                return {ErrorCodes::DataCorruptionDetected,
+                        str::stream()
+                            << "Expected index ident is missing from the catalog entry, "
+                               "indicating catalog corruption (SERVER-128725). Remediate by "
+                               "resyncing this node from a healthy replica set member or by "
+                               "restoring from a backup. Collection: "
+                            << md->nss.toStringForErrorMsg() << " Index: " << indexName};
+            }
+
+            const std::string indexIdent = indexIdentElem.str();
 
             // Warn in case of incorrect "multikeyPath" information in catalog documents. This is
             // the result of a concurrency bug which has since been fixed, but may persist in

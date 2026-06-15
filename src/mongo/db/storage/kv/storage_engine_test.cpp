@@ -1272,6 +1272,169 @@ TEST_F(StorageEngineTest, IdentMissingForReadyIndex) {
                        ErrorCodes::NoSuchKey);
 }
 
+// Plants a torn catalog record by rewriting the entry's idxIdent sub-document while md.indexes
+// is left untouched
+void rewriteIdxIdent(OperationContext* opCtx, const RecordId& catalogId, BSONObj idxIdent) {
+    auto mdbCatalog = opCtx->getServiceContext()->getStorageEngine()->getMDBCatalog();
+    auto entry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
+    WriteUnitOfWork wuow(opCtx);
+    durable_catalog::putMetaData(opCtx, catalogId, *entry->metadata, mdbCatalog, idxIdent);
+    wuow.commit();
+}
+
+TEST_F(StorageEngineTest, ReconcileFailsForReadyIndexAbsentFromIdxIdent) {
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexNameX("x_1");
+    const std::string indexNameY("y_1");
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(createIndex(opCtx.get(), ns, indexNameX));
+        wuow.commit();
+    }
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(createIndex(opCtx.get(), ns, indexNameY));
+        wuow.commit();
+    }
+
+    const auto identY =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), collInfo.catalogId, indexNameY);
+
+    // Drop x_1 from idxIdent while both indexes stay ready in md.indexes
+    rewriteIdxIdent(opCtx.get(), collInfo.catalogId, BSON(indexNameY << identY));
+
+    // Reconciliation must fail with a diagnostic naming the collection and index
+    auto status = reconcile(opCtx.get()).getStatus();
+    ASSERT_EQ(ErrorCodes::DataCorruptionDetected, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), indexNameX);
+    ASSERT_STRING_CONTAINS(status.reason(), "db.coll1");
+}
+
+TEST_F(StorageEngineTest, ReconcileRestartsTwoPhaseBuildWhenEngineIdentMissing) {
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+    const auto buildUUID = UUID::gen();
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, buildUUID));
+        wuow.commit();
+    }
+
+    // Point the unfinished index at an ident the engine does not have to simulate when an unclean
+    // shutdown follows the untimestamped ident drop of an index build restart
+    rewriteIdxIdent(opCtx.get(), collInfo.catalogId, BSON(indexName << "index-doesnotexist"));
+
+    // An unfinished two-phase build with a missing ident must properly reconcile, carrying the
+    // catalog's ident onward rather than a regenerated one
+    auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
+    ASSERT_EQ(1UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQ(buildUUID, reconcileResult.indexBuildsToRestart.begin()->first);
+    const auto& specsAndIdents =
+        reconcileResult.indexBuildsToRestart.begin()->second.indexSpecsAndIdents;
+    ASSERT_EQ(1UL, specsAndIdents.size());
+    ASSERT_EQ("index-doesnotexist", std::get<1>(specsAndIdents.front()));
+}
+
+TEST_F(StorageEngineTest, ReconcileFailsForUnfinishedTwoPhaseBuildWithEmptyIdxIdent) {
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+    const auto buildUUID = UUID::gen();
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, buildUUID));
+        wuow.commit();
+    }
+
+    // Tear the idxIdent entry away entirely while the unfinished build stays in md.indexes. The
+    // restart path cannot construct internal idents from an empty ident string, so reconcile must
+    // refuse the record.
+    rewriteIdxIdent(opCtx.get(), collInfo.catalogId, BSONObj());
+
+    auto status = reconcile(opCtx.get()).getStatus();
+    ASSERT_EQ(ErrorCodes::DataCorruptionDetected, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), indexName);
+}
+
+TEST_F(StorageEngineTest, GetAllIdentsThrowsForWrongTypeIdxIdent) {
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("x_1");
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(createIndex(opCtx.get(), ns, indexName));
+        wuow.commit();
+    }
+
+    rewriteIdxIdent(opCtx.get(), collInfo.catalogId, BSON(indexName << 123));
+
+    // getAllIdents rejects the wrong-type value before reconcile's corruption check can see it
+    ASSERT_THROWS_CODE(reconcile(opCtx.get()).getStatus().ignore(), DBException, 13111);
+}
+
+TEST_F(StorageEngineTest, ReconcileFailsForReadyIndexWithEmptyStringIdent) {
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("x_1");
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(createIndex(opCtx.get(), ns, indexName));
+        wuow.commit();
+    }
+
+    // An empty ident string passes a type-only check but is equally unusable
+    rewriteIdxIdent(opCtx.get(), collInfo.catalogId, BSON(indexName << ""));
+
+    auto status = reconcile(opCtx.get()).getStatus();
+    ASSERT_EQ(ErrorCodes::DataCorruptionDetected, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), indexName);
+}
+
+TEST_F(StorageEngineTest, ReconcileFailsForUnfinishedSinglePhaseIndexWithEmptyIdxIdent) {
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    auto collInfo = createCollection(opCtx.get(), ns);
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, boost::none));
+        wuow.commit();
+    }
+
+    rewriteIdxIdent(opCtx.get(), collInfo.catalogId, BSONObj());
+
+    // The drop path this index would otherwise take cannot drop an empty ident (buildTableUri
+    // invariants on it), so reconcile must refuse the torn record like every other shape.
+    auto status = reconcile(opCtx.get()).getStatus();
+    ASSERT_EQ(ErrorCodes::DataCorruptionDetected, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), indexName);
+}
+
 StorageEngine* reconfigureStorageEngine(OperationContext* opCtx, auto fn) {
     StorageControl::stopStorageControls(
         opCtx->getServiceContext(),
