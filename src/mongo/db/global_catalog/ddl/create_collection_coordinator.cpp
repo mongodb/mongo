@@ -1792,14 +1792,6 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
                 if (!mixedSchemaBucketsState.mustConsiderMixedSchemaBucketsInReads()) {
                     extendedTimeseriesFields.setTimeseriesBucketsMayHaveMixedSchemaData(false);
                 }
-
-                if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                    // Set bucketingParametersChanged property
-                    extendedTimeseriesFields.setTimeseriesBucketingParametersHaveChanged(
-                        coll.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
-                }
             }
 
             optExtendedTimeseriesFields = std::move(extendedTimeseriesFields);
@@ -1809,11 +1801,6 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
             extendedTimeseriesFields.setTimeseriesOptions(*_request.getTimeseries());
             if (viewlessTimeseriesEnabled(opCtx)) {
                 extendedTimeseriesFields.setTimeseriesBucketsMayHaveMixedSchemaData(false);
-                if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                    extendedTimeseriesFields.setTimeseriesBucketingParametersHaveChanged(false);
-                }
             }
 
             optExtendedTimeseriesFields = std::move(extendedTimeseriesFields);

@@ -45,7 +45,3 @@ structs:
                 type: bool
                 optional: true
                 description: "Indicates if time-series buckets may have mixed schema data."
-            timeseriesBucketingParametersHaveChanged:
-                type: bool
-                optional: true
-                description: "Indicates if bucketing parameters have changed for this time-series collection."
