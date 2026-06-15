@@ -87,10 +87,10 @@ struct WorkgenTimeStamp {
 struct WorkgenException {
     WorkgenException() = default;
     WorkgenException(int err, const std::string& msg) {
-	if (err != 0)
-	    _str += wiredtiger_strerror(err);
-	if (!msg.empty()) {
-	    if (!_str.empty())
+        if (err != 0)
+            _str += wiredtiger_strerror(err);
+        if (!msg.empty()) {
+            if (!_str.empty())
                 _str += ": ";
             _str += msg;
         }
@@ -144,7 +144,7 @@ struct ThreadRunner {
     Stats _stats;
 
     typedef enum {
-	USAGE_READ = 0x1, USAGE_WRITE = 0x2, USAGE_MIXED = 0x4 } Usage;
+        USAGE_READ = 0x1, USAGE_WRITE = 0x2, USAGE_MIXED = 0x4 } Usage;
     std::map<tint_t, uint32_t> _table_usage;       // value is Usage
     WT_CURSOR **_cursors;                          // indexed by tint_t
     volatile bool _stop;
@@ -263,7 +263,7 @@ struct OperationInternal {
     virtual ~OperationInternal() {}
     virtual void parse_config(const std::string &config) { (void)config; }
     virtual int run(ThreadRunner *runner, WT_SESSION *session) {
-	(void)runner; (void)session; return (0); }
+        (void)runner; (void)session; return (0); }
     virtual uint64_t sync_time_us() const { return (0); }
 };
 
@@ -271,7 +271,7 @@ struct CheckpointOperationInternal : OperationInternal {
     std::string ckpt_config;
     CheckpointOperationInternal() : OperationInternal(), ckpt_config() {}
     CheckpointOperationInternal(const CheckpointOperationInternal &other) :
-	OperationInternal(other), ckpt_config(other.ckpt_config)  {}
+        OperationInternal(other), ckpt_config(other.ckpt_config)  {}
     virtual void parse_config(const std::string &config);
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
 };
@@ -279,7 +279,7 @@ struct CheckpointOperationInternal : OperationInternal {
 struct LogFlushOperationInternal : OperationInternal {
     LogFlushOperationInternal() : OperationInternal() {}
     LogFlushOperationInternal(const LogFlushOperationInternal &other) :
-	OperationInternal(other) {}
+        OperationInternal(other) {}
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
 };
 
@@ -296,11 +296,11 @@ struct TableOperationInternal : OperationInternal {
     uint64_t _valuemax;
 
     TableOperationInternal() : OperationInternal(), _keysize(0), _valuesize(0),
-			       _keymax(0), _valuemax(0) {}
+                               _keymax(0), _valuemax(0) {}
     TableOperationInternal(const TableOperationInternal &other) :
-	OperationInternal(other),
-	_keysize(other._keysize), _valuesize(other._valuesize),
-	_keymax(other._keymax), _valuemax(other._valuemax) {}
+        OperationInternal(other),
+        _keysize(other._keysize), _valuesize(other._valuesize),
+        _keymax(other._keymax), _valuemax(other._valuemax) {}
     virtual void parse_config(const std::string &config);
 };
 
@@ -309,7 +309,7 @@ struct SleepOperationInternal : OperationInternal {
 
     SleepOperationInternal() : OperationInternal(), _sleepvalue(0) {}
     SleepOperationInternal(const SleepOperationInternal &other) :
-	OperationInternal(other),_sleepvalue(other._sleepvalue) {}
+        OperationInternal(other),_sleepvalue(other._sleepvalue) {}
     virtual void parse_config(const std::string &config);
     virtual int run(ThreadRunner *runner, WT_SESSION *session);
     virtual uint64_t sync_time_us() const;

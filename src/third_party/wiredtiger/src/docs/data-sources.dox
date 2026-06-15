@@ -4,56 +4,56 @@ The following are the builtin basic cursor types:
 <table>
 @hrow{URI, Type, Notes}
 @row{<tt>table:\<table name\>[\<projection\>]</tt>,
-	table cursor,
-	table key\, table value(s) with optional projection of columns}
+    table cursor,
+    table key\, table value(s) with optional projection of columns}
 @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
-	column group cursor,
-	table key\, column group value(s)}
+    column group cursor,
+    table key\, column group value(s)}
 @row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
-	index cursor,
-	key=index key\, value=table value(s) with optional projection
-	of columns}
+    index cursor,
+    key=index key\, value=table value(s) with optional projection
+    of columns}
 </table>
 Some administrative tasks can be accomplished using the following special
 cursor types that give access to data managed by WiredTiger:
 <table>
 @hrow{URI, Type, Notes}
 @row{<tt>backup:</tt>,
-	backup cursor,
-	key=<code>string</code>\, see @ref backup for details}
+    backup cursor,
+    key=<code>string</code>\, see @ref backup for details}
 @row{<tt>backup:export</tt>,
-	export cursor that generates a text file WiredTiger.export. The file contains metadata for all
-	objects in the database. It can be used in the import process as the value for
-	<code>metadata_file</code> configuration option,
-	key=<code>string</code>\, see @ref backup_export for details}
+    export cursor that generates a text file WiredTiger.export. The file contains metadata for all
+    objects in the database. It can be used in the import process as the value for
+    <code>metadata_file</code> configuration option,
+    key=<code>string</code>\, see @ref backup_export for details}
 @row{<tt>backup:query_id</tt>,
-	backup cursor that only returns block incremental ids,
-	key=<code>string</code>\, see @ref backup for details}
+    backup cursor that only returns block incremental ids,
+    key=<code>string</code>\, see @ref backup for details}
 @row{<code>log:</code>,
-	log cursor,
-	key=<code>(long fileID\, long offset\, int seqno)</code>\,<br>
-	value=<code>(uint64_t txnid\, uint32_t rectype\,<br>
-	uint32_t optype\, uint32_t fileid\,<br>
-	WT_ITEM key\, WT_ITEM value)</code>\,<br>
-	see @ref cursor_log for details}
+    log cursor,
+    key=<code>(long fileID\, long offset\, int seqno)</code>\,<br>
+    value=<code>(uint64_t txnid\, uint32_t rectype\,<br>
+    uint32_t optype\, uint32_t fileid\,<br>
+    WT_ITEM key\, WT_ITEM value)</code>\,<br>
+    see @ref cursor_log for details}
 @row{<tt>metadata:[create]</tt>,
-	metadata cursor (optionally only returning configuration strings for
-	WT_SESSION::create if <code>create</code> is appended),
-	key=<code>string</code>\, value=<code>string</code>\,<br>
-	see @ref metadata for details}
+    metadata cursor (optionally only returning configuration strings for
+    WT_SESSION::create if <code>create</code> is appended),
+    key=<code>string</code>\, value=<code>string</code>\,<br>
+    see @ref metadata for details}
 @row{<tt>statistics:[\<data source URI\>]</tt>,
-	database\, data source\ or session statistics cursor,
-	key=<code>int id</code>\,<br>
-	value=<code>(string description\,
-	string value\, uint64_t value)</code>\,<br>
-	see @ref data_statistics for details}
+    database\, data source\ or session statistics cursor,
+    key=<code>int id</code>\,<br>
+    value=<code>(string description\,
+    string value\, uint64_t value)</code>\,<br>
+    see @ref data_statistics for details}
 </table>
 Advanced applications may also open the following low-level cursor types:
 <table>
 @hrow{URI, Type, Notes}
 @row{<tt>file:\<file name\></tt>,
-	file cursor,
-	file key\, file value(s)}
+    file cursor,
+    file key\, file value(s)}
 </table>
 */
 

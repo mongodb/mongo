@@ -101,9 +101,9 @@ weren't using the cursor for the call to WT_CURSOR::insert above, this loop
 would simplify to:
 
 @code
-	while ((ret = cursor->next(cursor)) == 0) {
-		...
-	}
+    while ((ret = cursor->next(cursor)) == 0) {
+        ...
+    }
 @endcode
 
 @section internal_access Access to Internal Data Structures

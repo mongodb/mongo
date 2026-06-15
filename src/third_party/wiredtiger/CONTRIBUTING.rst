@@ -35,7 +35,9 @@ and formatted using Clang-Format. Some specific points are listed
 below. This is not an exhaustive list, however. If in doubt, find an
 existing example in the source code and copy it.
 
-* Use space characters rather than tabs
+* Use space characters rather than tabs for indentation
+* Do not leave trailing whitespace at the end of a line
+* Use only 7-bit ASCII characters in source files
 * Line re-indents are always 2 space characters
 * Lines wrap at 100 characters, split after an operator
 * All groups of things should be in alphabetical order where possible

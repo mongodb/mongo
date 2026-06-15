@@ -102,7 +102,7 @@ while :
         done
         sort -u -o $t $t
 
-	if ! diff $t $custom_words >/dev/null 2>&1; then
+        if ! diff $t $custom_words >/dev/null 2>&1; then
             echo "The $custom_words list will be updated to remove words that are no longer needed."
             cp $t $custom_words
             exit_val=1

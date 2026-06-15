@@ -122,8 +122,8 @@ python-nvd3 installed.
      $ ./configure && make -j 12
      $ echo "Run an application that will generate statistics"
      $ mkdir WT_TEST && ./bench/wtperf/wtperf \
-	-O bench/wtperf/runners/update-btree.wtperf \
-	-o "conn_config=\"cache_size=1G,statistics=[fast,clear],statistics_log=(wait=30)\""
+    -O bench/wtperf/runners/update-btree.wtperf \
+    -o "conn_config=\"cache_size=1G,statistics=[fast,clear],statistics_log=(wait=30)\""
      $ echo "Now generate a graph from the statistics"
      $ python ./tools/wtstats.py WT_TEST/WiredTigerStat.*
 

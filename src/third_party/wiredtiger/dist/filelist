@@ -92,6 +92,7 @@ src/conn/conn_capacity.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
 src/conn/conn_handle.c
+src/conn/conn_layered_checkpoint_pick_up.c
 src/conn/conn_layered_ingest.c
 src/conn/conn_layered_page_log.c
 src/conn/conn_layered_table_manager.c

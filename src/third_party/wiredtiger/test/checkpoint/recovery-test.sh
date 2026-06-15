@@ -35,25 +35,25 @@ trap "kill -9 $pid" 0 1 2 3 13 15
 
 # Wait for the test to start running
 while ! grep -q "Finished a checkpoint" $home.out && kill -0 $pid ; do
-	sleep 1
+    sleep 1
 done
 
 while kill -STOP $pid ; do
-	rm -rf $backup $recovery ; mkdir $backup ; mkdir $recovery
-	# Make sure all threads are stopped before copying files
-	sleep 1
-	cp $home/* $backup
-	kill -CONT $pid
-	cp $backup/* $recovery
+    rm -rf $backup $recovery ; mkdir $backup ; mkdir $recovery
+    # Make sure all threads are stopped before copying files
+    sleep 1
+    cp $home/* $backup
+    kill -CONT $pid
+    cp $backup/* $recovery
 
-	recovery_flags=""
+    recovery_flags=""
 
-	# Include -e and -x flags if -e is present in original config.
-	if [ -n "$precise_checkpoint" ]; then
-		recovery_flags+=" -e -x"
-	fi
+    # Include -e and -x flags if -e is present in original config.
+    if [ -n "$precise_checkpoint" ]; then
+        recovery_flags+=" -e -x"
+    fi
 
-	./${bin} $recovery_flags -t r -D -v -h $recovery || exit 1
+    ./${bin} $recovery_flags -t r -D -v -h $recovery || exit 1
 done
 
 # Clean the home directory once the test is completed. Note that once we fail to send the signal to

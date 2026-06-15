@@ -88,9 +88,9 @@ main(int argc, char *argv[])
     testutil_assert(check("<s", "invalid format") == EINVAL);
     testutil_assert(check("@s", "invalid format") == EINVAL);
 #if 0
-	/* TODO: need a WT_ITEM */
-	check("u", r"\x42" * 20)
-	check("uu", r"\x42" * 10, r"\x42" * 10)
+        /* TODO: need a WT_ITEM */
+        check("u", r"\x42" * 20)
+        check("uu", r"\x42" * 10, r"\x42" * 10)
 #endif
     return (0);
 }

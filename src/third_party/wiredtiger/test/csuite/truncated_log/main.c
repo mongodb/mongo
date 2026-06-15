@@ -92,11 +92,11 @@ write_and_read_new(WT_SESSION *session)
         if (log_file == 2 && rectype != WT_LOGREC_SYSTEM)
             testutil_die(EINVAL, "Found LSN in Log 2");
 #if 0
-		printf("LSN [%" PRIu32 "][%" PRIu32 "].%" PRIu32
-		    ": record type %" PRIu32 " optype %" PRIu32
-		    " txnid %" PRIu64 " fileid %" PRIu32 "\n",
-		    log_file, log_offset, opcount,
-		    rectype, optype, txnid, fileid);
+                printf("LSN [%" PRIu32 "][%" PRIu32 "].%" PRIu32
+                    ": record type %" PRIu32 " optype %" PRIu32
+                    " txnid %" PRIu64 " fileid %" PRIu32 "\n",
+                    log_file, log_offset, opcount,
+                    rectype, optype, txnid, fileid);
 #endif
         if (rectype == WT_LOGREC_MESSAGE) {
             saw_msg = true;

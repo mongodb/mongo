@@ -8,9 +8,9 @@ cd_top
 # It should never be - the "snap_min" visibility check should be used instead.
 found=`grep -rnI "txn_visible(.*addr.ta" src/`
 if [ ! -z "$found" ]; then
-	echo "Found invalid usage(s) of visibility check and a time aggregate window"
-	echo "$found"
-	exit 1
+    echo "Found invalid usage(s) of visibility check and a time aggregate window"
+    echo "$found"
+    exit 1
 fi
 
 exit 0

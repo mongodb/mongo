@@ -44,14 +44,14 @@ while getopts b:dhO:RWr:sv OPT; do
             ;;
         s)
             RUNTIME=20
-	    PERF_BASE="-S"
+            PERF_BASE="-S"
             ;;
         v)
             VERBOSE=0
             ;;
         W)
             WORKLOAD=1
-	    REUSE=1 # skip the populate phase.
+            REUSE=1 # skip the populate phase.
             ;;
         \?)
             # getopts issues an error message
@@ -64,8 +64,8 @@ done
 # Configuration settings that may be altered by command line options
 WTPERF=${BIN_DIR}/wtperf
 if [ ! -x $WTPERF ]; then
-	echo "Could not find or execute $WTPERF"
-	exit 1
+    echo "Could not find or execute $WTPERF"
+    exit 1
 fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
@@ -74,22 +74,22 @@ SHARED_OPTS="${OPTFILE} ${PERF_BASE} -o read_threads=1,update_threads=1,report_i
 CREATE_OPTS="$SHARED_OPTS -o run_time=0"
 RUN_OPTS="$SHARED_OPTS -o run_time=$RUNTIME"
 if [ $WORKLOAD -eq 0 ]; then
-	RUN_OPTS="$RUN_OPTS -o create=false"
+    RUN_OPTS="$RUN_OPTS -o create=false"
 else
-	RUN_OPTS="$RUN_OPTS -o icount=0"
+    RUN_OPTS="$RUN_OPTS -o icount=0"
 fi
 
 if [ $REUSE -eq 0 ]; then
-	if [ $VERBOSE -ne 0 ]; then
-		echo "Creating database and archiving it for reuse."
-	fi
-	rm -rf $DB_HOME && mkdir $DB_HOME
-	$DEBUG $WTPERF $CREATE_OPTS || exit 1
+    if [ $VERBOSE -ne 0 ]; then
+        echo "Creating database and archiving it for reuse."
+    fi
+    rm -rf $DB_HOME && mkdir $DB_HOME
+    $DEBUG $WTPERF $CREATE_OPTS || exit 1
 
-	# Save the database so that it can be re-used by all runs.
-	# I'd rather not hard code WT_TEST, but need to get the path right.
-	rm -f $ROOT_DIR/WT_TEST.tgz
-	tar zcf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR WT_TEST
+    # Save the database so that it can be re-used by all runs.
+    # I'd rather not hard code WT_TEST, but need to get the path right.
+    rm -f $ROOT_DIR/WT_TEST.tgz
+    tar zcf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR WT_TEST
 fi
 
 rm -rf $OUT_DIR && mkdir $OUT_DIR
@@ -97,40 +97,40 @@ rm -rf $OUT_DIR && mkdir $OUT_DIR
 # Run the benchmarks..
 # for ckpt in "" "-c 120"; do
 for ckpt in "checkpoint_threads=1,checkpoint_interval=120"; do
-	# for opts in "" "-C eviction_dirty_target=20"; do
-	for opts in ""; do
-		if [ $VERBOSE -ne 0 ]; then
-			echo "Doing a run with:"
-			echo "\t$WTPERF $RUN_OPTS $ckpt $opts"
-		fi
-		res_name="run_${ckpt},${opts}"
-		res_name=`echo $res_name | tr '[:upper:][=\- ,]' '[:lower:]_'`
-		if [ $WORKLOAD -eq 0 ]; then
-			rm -rf $DB_HOME && tar zxf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR
-		else
-			rm -rf $DB_HOME && mkdir $DB_HOME
-		fi
-		if [ "$DEBUG" = '' ]; then
-			$WTPERF $RUN_OPTS -o "$ckpt" -o "$opts" &
-			pid=$!
-			t=0
-			while kill -0 $pid 2> /dev/null; do
-				echo "Time $t"
-				pmp $pid
-				sleep 1
-				(( t++ ))
-			done > $OUT_DIR/${res_name}.trace
-		else
-			$DEBUG $WTPERF $RUN_OPTS $ckpt $opts
-		fi
-		cp $DB_HOME/test.stat "$OUT_DIR/${res_name}.res"
-	done
+    # for opts in "" "-C eviction_dirty_target=20"; do
+    for opts in ""; do
+        if [ $VERBOSE -ne 0 ]; then
+            echo "Doing a run with:"
+            echo "\t$WTPERF $RUN_OPTS $ckpt $opts"
+        fi
+        res_name="run_${ckpt},${opts}"
+        res_name=`echo $res_name | tr '[:upper:][=\- ,]' '[:lower:]_'`
+        if [ $WORKLOAD -eq 0 ]; then
+            rm -rf $DB_HOME && tar zxf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR
+        else
+            rm -rf $DB_HOME && mkdir $DB_HOME
+        fi
+        if [ "$DEBUG" = '' ]; then
+            $WTPERF $RUN_OPTS -o "$ckpt" -o "$opts" &
+            pid=$!
+            t=0
+            while kill -0 $pid 2> /dev/null; do
+                echo "Time $t"
+                pmp $pid
+                sleep 1
+                (( t++ ))
+            done > $OUT_DIR/${res_name}.trace
+        else
+            $DEBUG $WTPERF $RUN_OPTS $ckpt $opts
+        fi
+        cp $DB_HOME/test.stat "$OUT_DIR/${res_name}.res"
+    done
 done
 
 if [ $VERBOSE -ne 0 ]; then
-	echo "Post processing result files."
+    echo "Post processing result files."
 fi
 for f in ${OUT_DIR}/*res; do
-	grep "^[0-9]* reads" ${f} | sed -e 's/ reads//' -e 's/ inserts//' -e 's/ updates in 1 secs//' > ${f}.out
-	${SCRIPT_DIR}/get_ckpt.py < ${f} > ${f}.ckpt
+    grep "^[0-9]* reads" ${f} | sed -e 's/ reads//' -e 's/ inserts//' -e 's/ updates in 1 secs//' > ${f}.out
+    ${SCRIPT_DIR}/get_ckpt.py < ${f} > ${f}.ckpt
 done

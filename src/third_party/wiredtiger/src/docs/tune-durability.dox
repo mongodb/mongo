@@ -54,17 +54,17 @@ most durability guarantees).
 @hrow{Durability Mode, Notes}
 @row{<code>log=(enabled=false)</code>, checkpoint-level durability}
 @row{<code>log=(enabled)\,transaction_sync=(enabled=false)</code>,
-	in-memory buffered logging configured; updates durable after
-	checkpoint or after \c sync is set in WT_SESSION::begin_transaction}
+    in-memory buffered logging configured; updates durable after
+    checkpoint or after \c sync is set in WT_SESSION::begin_transaction}
 @row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=none)</code>,
-	logging configured; updates durable after application failure\,
-	but not after system failure}
+    logging configured; updates durable after application failure\,
+    but not after system failure}
 @row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=fsync)</code>,
-	logging configured; updates durable on application or system
-	failure}
+    logging configured; updates durable on application or system
+    failure}
 @row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=dsync)</code>,
-	logging configured; updates durable on application or system
-	failure}
+    logging configured; updates durable on application or system
+    failure}
 </table>
 
 The durability setting can also be controlled directly on a per-transaction

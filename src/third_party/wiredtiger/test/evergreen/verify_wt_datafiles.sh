@@ -17,10 +17,10 @@ set -eu
 verbose=false
 
 if [ $# -gt 1 ]; then
-	echo "Usage: $0 [-v]"
-	exit 5
+    echo "Usage: $0 [-v]"
+    exit 5
 elif [ $# -eq 1 ]; then
-	[ "$1" == "-v" ] && verbose=true || verbose=false
+    [ "$1" == "-v" ] && verbose=true || verbose=false
 fi
 
 # Switch to the Git repo toplevel directory
@@ -32,15 +32,15 @@ cd cmake_build/test/format
 # Check the existence of 'WT_TEST' directories
 num_dirs=$(find . -type d -name 'WT_TEST.[0-9]*' | wc -l)
 if [ "${num_dirs}" -eq "0" ]; then
-	echo "test/format 'WT_TEST' directories do not exist, exiting ..."
-	exit 7
+    echo "test/format 'WT_TEST' directories do not exist, exiting ..."
+    exit 7
 fi
 
 # Check the existence of 'wt' binary
 wt_binary="../../wt"
 if [ ! -x "${wt_binary}" ]; then
-	echo "'wt' binary does not exist, exiting ..."
-	exit 6
+    echo "'wt' binary does not exist, exiting ..."
+    exit 6
 fi
 
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-""}:$(dirname "${wt_binary}")
@@ -54,51 +54,51 @@ echo -e "\n[dirs_include_datafile]:\n${dirs_include_datafile}\n"
 IFS=$'\n'
 for d in ${dirs_include_datafile}
 do
-	echo "${d}"
+    echo "${d}"
 
-	# Make sure logging is enabled before running the printlog command.
-	if grep -q -E "logging=(1|on)" ${d}/CONFIG; then
-		if ! ${wt_binary} -h ${d} printlog > /dev/null; then
-			echo "Failed to dump '${d}' log files, exiting ..."
-			exit 1
-		fi
-	fi
+    # Make sure logging is enabled before running the printlog command.
+    if grep -q -E "logging=(1|on)" ${d}/CONFIG; then
+        if ! ${wt_binary} -h ${d} printlog > /dev/null; then
+            echo "Failed to dump '${d}' log files, exiting ..."
+            exit 1
+        fi
+    fi
 
-	if ! tables=$(${wt_binary} -h "${d}" list); then
-		echo "Failed to list '${d}' directory, exiting ..."
-		exit 1
-	fi
+    if ! tables=$(${wt_binary} -h "${d}" list); then
+        echo "Failed to list '${d}' directory, exiting ..."
+        exit 1
+    fi
 
-	# Loop through each table object in the data file
-	for t in ${tables}
-	do
-		echo ${t}
-		${wt_binary} -h ${d} verify ${t}
-		if [ "$?" -ne "0" ]; then
-			echo "Failed to verify '${t}' table under '${d}' directory, exiting ..."
-			exit 2
-		fi
+    # Loop through each table object in the data file
+    for t in ${tables}
+    do
+        echo ${t}
+        ${wt_binary} -h ${d} verify ${t}
+        if [ "$?" -ne "0" ]; then
+            echo "Failed to verify '${t}' table under '${d}' directory, exiting ..."
+            exit 2
+        fi
 
-		if [ "${verbose}" == true ]; then
-			${wt_binary} -h ${d} dump ${t}
-		else
-			${wt_binary} -h ${d} dump ${t} > /dev/null
-		fi
+        if [ "${verbose}" == true ]; then
+            ${wt_binary} -h ${d} dump ${t}
+        else
+            ${wt_binary} -h ${d} dump ${t} > /dev/null
+        fi
 
-		if [ "$?" -ne "0" ]; then
-			echo "Failed to dump '${t}' table under '${d}' directory, exiting ..."
-			exit 3
-		fi
+        if [ "$?" -ne "0" ]; then
+            echo "Failed to dump '${t}' table under '${d}' directory, exiting ..."
+            exit 3
+        fi
 
-		# Table verification is successful, increment the counter
-		let "num_tables_verified+=1"
-		echo "num_tables_verified = ${num_tables_verified}"
-	done
+        # Table verification is successful, increment the counter
+        let "num_tables_verified+=1"
+        echo "num_tables_verified = ${num_tables_verified}"
+    done
 done
 
 if [ "${num_tables_verified}" -eq 0 ]; then
-	echo "No table is verified from all data files, something could have gone wrong ..."
-	exit 4
+    echo "No table is verified from all data files, something could have gone wrong ..."
+    exit 4
 fi
 
 # If reaching here, the testing result is positive

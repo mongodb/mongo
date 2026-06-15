@@ -44,26 +44,26 @@ n=0
 while IFS= read -r line; do
     case "$line" in
     '{"'*)
-	tag=`echo "$line" |
-	sed -e 's/{"//' \
-	    -e 's/",.*//' \
-	    -e 's/\./_/g' |
-	tr '[:lower:]' '[:upper:]'`
-	prefix="GLOBAL"
-	if `echo "$line" | grep 'C_TABLE' > /dev/null`; then
-	    prefix="TABLE"
-	fi
-	def="V_""$prefix""_""$tag"
-	echo "$line" |
-	sed -e "s/}/, $def},/" \
-	    -e 's/\(^.*",\) \(.*\)/  \1\n    \2/'
+    tag=`echo "$line" |
+    sed -e 's/{"//' \
+        -e 's/",.*//' \
+        -e 's/\./_/g' |
+    tr '[:lower:]' '[:upper:]'`
+    prefix="GLOBAL"
+    if `echo "$line" | grep 'C_TABLE' > /dev/null`; then
+        prefix="TABLE"
+    fi
+    def="V_""$prefix""_""$tag"
+    echo "$line" |
+    sed -e "s/}/, $def},/" \
+        -e 's/\(^.*",\) \(.*\)/  \1\n    \2/'
 
-	echo "#define $def $n" >> $fh
+    echo "#define $def $n" >> $fh
 
-	n=`expr $n + 1`
-	;;
+    n=`expr $n + 1`
+    ;;
     *)
-	echo "$line"
+    echo "$line"
     esac
 done<<END_OF_INPUT>$fc
 /* DO NOT EDIT: automatically built by format/config.sh. */

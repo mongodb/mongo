@@ -14,7 +14,7 @@ endif()
 # Download and install the project into the build directory.
 ExternalProject_Add(lazyfs
     PREFIX lazyfs
-    GIT_CONFIG advice.detachedHead=false 
+    GIT_CONFIG advice.detachedHead=false
     GIT_REPOSITORY https://github.com/dsrhaslab/lazyfs.git
     GIT_TAG b0383127
     CONFIGURE_COMMAND ""

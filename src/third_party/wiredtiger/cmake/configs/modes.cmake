@@ -134,7 +134,6 @@ else()
     set(asan_link_flags "-fsanitize=address")
 endif()
 
-
 # UBSAN build variant flags.
 set(ubsan_link_flags "-fsanitize=undefined")
 set(ubsan_compiler_c_flag "-fsanitize=undefined")

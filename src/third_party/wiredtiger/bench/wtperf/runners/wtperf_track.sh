@@ -126,7 +126,7 @@ GetDiskLoadAverage()
     case `uname -s` in
         *Linux* )
             # iostat -d $DEVICE | grep -v Device: | head -1 | sed -e 's/.* //'
-	    echo '0.0'
+            echo '0.0'
             ;;
         * )
             echo '0.0'

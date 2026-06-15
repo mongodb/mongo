@@ -167,6 +167,7 @@ run --bg "s_typedef -c" &
 run --bg "s_visibility_checks" &
 run --bg "s_void" &
 run --bg "s_whitespace" &
+run --bg "s_charset" &
 run --bg "function.py" &
 run --bg "style.py" &
 run --bg "comment_style.py" &

@@ -4,7 +4,7 @@
 # Win32 threading on Windows. Consumers link the Threads::Threads imported
 # target.
 #
-# Layer 1 (capability): HAVE_LIBPTHREAD — true when threading is available.
+# Layer 1 (capability): HAVE_LIBPTHREAD - true when threading is available.
 # pthread is non-optional on supported platforms; configure fails without it.
 
 if(TARGET Threads::Threads)

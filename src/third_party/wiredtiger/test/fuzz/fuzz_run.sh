@@ -29,8 +29,8 @@
 #	worker will be produced. These will be used by fuzz_coverage.
 
 if test "$#" -lt "1"; then
-	echo "$0: must specify fuzz test to run"
-	exit 1
+    echo "$0: must specify fuzz test to run"
+    exit 1
 fi
 
 # Take the binary name and shift.

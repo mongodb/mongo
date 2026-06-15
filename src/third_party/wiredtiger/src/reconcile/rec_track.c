@@ -60,17 +60,17 @@ __ovfl_discard_verbose(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, c
 static void
 __ovfl_discard_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_CELL **cellp;
-	WT_OVFL_TRACK *track;
-	size_t i;
+    WT_CELL **cellp;
+    WT_OVFL_TRACK *track;
+    size_t i;
 
-	if (page->modify == NULL || page->modify->ovfl_track == NULL)
-		return;
+    if (page->modify == NULL || page->modify->ovfl_track == NULL)
+        return;
 
-	track = page->modify->ovfl_track;
-	for (i = 0, cellp = track->discard;
-	    i < track->discard_entries; ++i, ++cellp)
-		(void)__ovfl_discard_verbose(session, page, *cellp, "dump");
+    track = page->modify->ovfl_track;
+    for (i = 0, cellp = track->discard;
+        i < track->discard_entries; ++i, ++cellp)
+        (void)__ovfl_discard_verbose(session, page, *cellp, "dump");
 }
 #endif
 
@@ -187,14 +187,14 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session, WT_PAGE *page, WT_OVFL_REUSE *reu
 static void
 __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_OVFL_REUSE **head, *reuse;
+    WT_OVFL_REUSE **head, *reuse;
 
-	if (page->modify == NULL || page->modify->ovfl_track == NULL)
-		return;
-	head = page->modify->ovfl_track->ovfl_reuse;
+    if (page->modify == NULL || page->modify->ovfl_track == NULL)
+        return;
+    head = page->modify->ovfl_track->ovfl_reuse;
 
-	for (reuse = head[0]; reuse != NULL; reuse = reuse->next[0])
-		(void)__ovfl_reuse_verbose(session, page, reuse, "dump");
+    for (reuse = head[0]; reuse != NULL; reuse = reuse->next[0])
+        (void)__ovfl_reuse_verbose(session, page, reuse, "dump");
 }
 #endif
 

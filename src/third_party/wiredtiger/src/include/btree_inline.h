@@ -2744,9 +2744,12 @@ __wt_btcur_skip_page(
 
     /*
      * We are making these decisions while holding a lock for the page as checkpoint or eviction can
-     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading. Skipping is
+     * only an optimization, so try the lock once and read the page rather than spin under
+     * contention.
      */
-    WT_REF_LOCK(session, ref, &previous_state);
+    if (WT_REF_TRYLOCK(session, ref, &previous_state) != 0)
+        return (0);
 
     /*
      * Check the fast-truncate information; there are 3 cases:

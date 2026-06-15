@@ -171,7 +171,7 @@ struct Context {
     Context();
     ~Context();
     void describe(std::ostream &os) const {
-	os << "Context: verbose " << (_verbose ? "true" : "false");
+        os << "Context: verbose " << (_verbose ? "true" : "false");
     }
 
 #ifndef SWIG
@@ -193,17 +193,17 @@ struct TableOptions {
     ~TableOptions() = default;
 
     void describe(std::ostream &os) const {
-	os << "key_size " << key_size;
-	os << ", value_size " << value_size;
-	os << ", random_value " << random_value;
-	os << ", range " << range;
+        os << "key_size " << key_size;
+        os << ", value_size " << value_size;
+        os << ", random_value " << random_value;
+        os << ", range " << range;
     }
 
     std::string help() const { return _options.help(); }
     std::string help_description(const std::string& option_name) const {
-	return _options.help_description(option_name); }
+        return _options.help_description(option_name); }
     std::string help_type(const std::string& option_name) const {
-	return _options.help_type(option_name); }
+        return _options.help_type(option_name); }
 
 private:
     OptionsList _options;
@@ -237,17 +237,17 @@ struct ParetoOptions {
     ~ParetoOptions() = default;
 
     void describe(std::ostream &os) const {
-	os << "Pareto: parameter " << param;
-	if (range_low != 0.0 || range_high != 1.0) {
-	    os << "range [" << range_low << "-" << range_high << "]";
-	}
+        os << "Pareto: parameter " << param;
+        if (range_low != 0.0 || range_high != 1.0) {
+            os << "range [" << range_low << "-" << range_high << "]";
+        }
     }
 
     std::string help() const { return _options.help(); }
     std::string help_description(const std::string& option_name) const {
-	return _options.help_description(option_name); }
+        return _options.help_description(option_name); }
     std::string help_type(const std::string& option_name) const {
-	return _options.help_type(option_name); }
+        return _options.help_type(option_name); }
 
     static ParetoOptions DEFAULT;
 private:
@@ -256,7 +256,7 @@ private:
 
 struct Key {
     typedef enum {
-	KEYGEN_AUTO, KEYGEN_APPEND, KEYGEN_PARETO, KEYGEN_UNIFORM } KeyType;
+        KEYGEN_AUTO, KEYGEN_APPEND, KEYGEN_PARETO, KEYGEN_UNIFORM } KeyType;
     KeyType _keytype;
     int _size;
     ParetoOptions _pareto;
@@ -265,13 +265,13 @@ struct Key {
     Key() : _keytype(KEYGEN_AUTO), _size(0), _pareto(ParetoOptions::DEFAULT) {}
     Key(KeyType keytype, int size=0,
       const ParetoOptions &pareto=ParetoOptions::DEFAULT) :
-	_keytype(keytype), _size(size), _pareto(pareto) {}
+        _keytype(keytype), _size(size), _pareto(pareto) {}
     Key(const Key &other) : _keytype(other._keytype), _size(other._size),
-	_pareto(other._pareto) {}
+        _pareto(other._pareto) {}
     ~Key() {}
 
     void describe(std::ostream &os) const {
-	os << "Key: type " << _keytype << ", size " << _size;
+        os << "Key: type " << _keytype << ", size " << _size;
         if (_pareto.param != ParetoOptions::DEFAULT.param) {
             os << ", ";
             _pareto.describe(os);
@@ -293,8 +293,8 @@ struct Value {
 
 struct Operation {
     enum OpType {
-	OP_CHECKPOINT, OP_INSERT, OP_LOG_FLUSH, OP_NONE, OP_NOOP,
-	OP_REMOVE, OP_SEARCH, OP_SLEEP, OP_UPDATE, OP_RTS , OP_VERIFY };
+        OP_CHECKPOINT, OP_INSERT, OP_LOG_FLUSH, OP_NONE, OP_NOOP,
+        OP_REMOVE, OP_SEARCH, OP_SLEEP, OP_UPDATE, OP_RTS , OP_VERIFY };
     OpType _optype;
     OperationInternal *_internal;
 
@@ -357,17 +357,17 @@ struct ThreadOptions {
     ~ThreadOptions() = default;
 
     void describe(std::ostream &os) const {
-	os << "throttle " << throttle;
-	os << ", throttle_burst " << throttle_burst;
-	os << ", synchronized " << synchronized;
-	os << ", session_config " << session_config;
+        os << "throttle " << throttle;
+        os << ", throttle_burst " << throttle_burst;
+        os << ", synchronized " << synchronized;
+        os << ", session_config " << session_config;
     }
 
     std::string help() const { return _options.help(); }
     std::string help_description(const std::string& option_name) const {
-	return _options.help_description(option_name); }
+        return _options.help_description(option_name); }
     std::string help_type(const std::string& option_name) const {
-	return _options.help_type(option_name); }
+        return _options.help_type(option_name); }
 
 private:
     OptionsList _options;
@@ -386,7 +386,7 @@ struct ThreadListWrapper {
 
     ThreadListWrapper() : _threads() {}
     ThreadListWrapper(const ThreadListWrapper &other) :
-	_threads(other._threads) {}
+        _threads(other._threads) {}
     ThreadListWrapper(const std::vector<Thread> &threads) : _threads(threads) {}
     void append(const Thread &);
     void extend(const ThreadListWrapper &);
@@ -425,18 +425,18 @@ struct Transaction {
     {}
 
     void describe(std::ostream &os) const {
-	os << "Transaction: ";
-	if (_rollback)
-	    os << "(rollback) ";
-	if (use_commit_timestamp)
-	    os << "(use_commit_timestamp) ";
-	if (use_prepare_timestamp)
-	    os << "(use_prepare_timestamp) ";
-	os << "begin_config: " << _begin_config;
-	if (!_commit_config.empty())
-	    os << ", commit_config: " << _commit_config;
-	if (read_timestamp_lag != 0.0)
-	    os << ", read_timestamp_lag: " << read_timestamp_lag;
+        os << "Transaction: ";
+        if (_rollback)
+            os << "(rollback) ";
+        if (use_commit_timestamp)
+            os << "(use_commit_timestamp) ";
+        if (use_prepare_timestamp)
+            os << "(use_prepare_timestamp) ";
+        os << "begin_config: " << _begin_config;
+        if (!_commit_config.empty())
+            os << ", commit_config: " << _commit_config;
+        if (read_timestamp_lag != 0.0)
+            os << ", read_timestamp_lag: " << read_timestamp_lag;
     }
 };
 
@@ -478,15 +478,15 @@ struct WorkloadOptions {
     ~WorkloadOptions() = default;
 
     void describe(std::ostream &os) const {
-	os << "run_time " << run_time;
-	os << ", report_interval " << report_interval;
+        os << "run_time " << run_time;
+        os << ", report_interval " << report_interval;
     }
 
     std::string help() const { return _options.help(); }
     std::string help_description(const std::string& option_name) const {
-	return _options.help_description(option_name); }
+        return _options.help_description(option_name); }
     std::string help_type(const std::string& option_name) const {
-	return _options.help_type(option_name); }
+        return _options.help_type(option_name); }
 
 private:
     OptionsList _options;
@@ -508,15 +508,15 @@ struct Workload {
 #endif
 
     void describe(std::ostream &os) const {
-	os << "Workload: ";
-	_context->describe(os);
-	os << ", ";
-	options.describe(os);
-	os << ", [" << std::endl;
-	for (std::vector<Thread>::const_iterator i = _threads.begin(); i != _threads.end(); i++) {
-	    os << "  "; i->describe(os); os << std::endl;
-	}
-	os << "]";
+        os << "Workload: ";
+        _context->describe(os);
+        os << ", ";
+        options.describe(os);
+        os << ", [" << std::endl;
+        for (std::vector<Thread>::const_iterator i = _threads.begin(); i != _threads.end(); i++) {
+            os << "  "; i->describe(os); os << std::endl;
+        }
+        os << "]";
     }
     int run(WT_CONNECTION *conn);
 };

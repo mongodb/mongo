@@ -36,34 +36,34 @@
 #	generated.
 #
 if ! test -f ./wtperf; then
-	echo "$0: could not find wtperf in current working directory"
-	exit 1
+    echo "$0: could not find wtperf in current working directory"
+    exit 1
 fi
 
 if test "$#" -lt "1"; then
-	echo "$0: must specify wtperf configuration to run"
-	exit 1
+    echo "$0: must specify wtperf configuration to run"
+    exit 1
 fi
 
 # By default, wtperf uses WT_TEST as its home directory.
 xray_home="WT_TEST"
 if test "$2" = "-h"; then
-	if ! test -z "$3"; then
-		xray_home="$3"
-	fi
+    if ! test -z "$3"; then
+        xray_home="$3"
+    fi
 fi
 echo "$0: using $xray_home as home directory"
 
 # Check symbols to ensure we've compiled with XRay.
 objdump -h -j xray_instr_map ./wtperf > /dev/null
 if test "$?" -ne "0"; then
-	echo "$0: wtperf not compiled with xray, add '-fxray-instrument' to your CFLAGS"
-	exit 1
+    echo "$0: wtperf not compiled with xray, add '-fxray-instrument' to your CFLAGS"
+    exit 1
 fi
 
 if ! test -d "$xray_home"; then
-	echo "$0: creating directory $xray_home"
-	mkdir "$xray_home"
+    echo "$0: creating directory $xray_home"
+    mkdir "$xray_home"
 fi
 
 xray_account_path="${xray_home}/wtperf_account.txt"
@@ -72,10 +72,10 @@ xray_graph_path="${xray_home}/wtperf_graph.svg"
 xray_flame_path="${xray_home}/wtperf_flame.svg"
 
 rm xray-log.wtperf.* \
-	"$xray_account_path" \
-	"$xray_stack_path" \
-	"$xray_graph_path" \
-	"$xray_flame_path" &> /dev/null
+    "$xray_account_path" \
+    "$xray_stack_path" \
+    "$xray_graph_path" \
+    "$xray_flame_path" &> /dev/null
 
 export XRAY_OPTIONS="patch_premain=true xray_mode=xray-basic verbosity=1"
 ./wtperf -O "$@"
@@ -83,40 +83,40 @@ export XRAY_OPTIONS="patch_premain=true xray_mode=xray-basic verbosity=1"
 xray_log=$(ls xray-log.wtperf.*)
 num_logs=$(echo "$xray_log" | wc -w)
 if test "$num_logs" -ne "1"; then
-	echo "$0: detected more than one xray log"
-	exit 1
+    echo "$0: detected more than one xray log"
+    exit 1
 fi
 
 if test -z "$XRAY_BINARY"; then
-	xray_bin="llvm-xray"
-	echo "$0: XRAY_BINARY is unset, defaulting to $xray_bin"
+    xray_bin="llvm-xray"
+    echo "$0: XRAY_BINARY is unset, defaulting to $xray_bin"
 else
-	xray_bin="$XRAY_BINARY"
+    xray_bin="$XRAY_BINARY"
 fi
 
 $xray_bin account "$xray_log" \
-	-top=10 -sort=sum -sortorder=dsc -instr_map ./wtperf > \
-	"$xray_account_path"
+    -top=10 -sort=sum -sortorder=dsc -instr_map ./wtperf > \
+    "$xray_account_path"
 
 # Use the -per-thread-stacks option to get the top 10 stacks for each thread.
 # We could use the -aggregate-threads flag here so get the top stacks for all threads (omitting duplicates).
 $xray_bin stack -per-thread-stacks "$xray_log" \
-	-instr_map ./wtperf > \
-	"$xray_stack_path"
+    -instr_map ./wtperf > \
+    "$xray_stack_path"
 
 # Generate a DOT graph.
 $xray_bin graph "$xray_log" \
-	-m ./wtperf -color-edges=sum -edge-label=sum | \
-	unflatten -f -l10 | \
-	dot -Tsvg -o "$xray_graph_path"
+    -m ./wtperf -color-edges=sum -edge-label=sum | \
+    unflatten -f -l10 | \
+    dot -Tsvg -o "$xray_graph_path"
 
 # This file can be inspected in the Google Chrome Trace Viewer.
 # It seems to take a long time to generate this so just disable it for now.
 # $xray_bin convert -symbolize -instr_map=./wtperf -output-format=trace_event $xray_log | gzip > wtperf_trace.txt.gz
 if test -z "$FLAME_GRAPH_PATH"; then
-	echo "$0: FLAME_GRAPH_PATH is unset, skipping flame graph generation"
+    echo "$0: FLAME_GRAPH_PATH is unset, skipping flame graph generation"
 else
-	$xray_bin stack "$xray_log" \
-		-instr_map ./wtperf -stack-format=flame -aggregation-type=time -all-stacks | \
-		"$FLAME_GRAPH_PATH" > "$xray_flame_path"
+    $xray_bin stack "$xray_log" \
+        -instr_map ./wtperf -stack-format=flame -aggregation-type=time -all-stacks | \
+        "$FLAME_GRAPH_PATH" > "$xray_flame_path"
 fi

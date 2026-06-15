@@ -21,7 +21,7 @@ __wt_ref_is_root(WT_REF *ref)
 /*
  * # The ref state API. #
  *
- * 5 macros are defined to manipulate the ref state. This is a highly sensitive field and protected
+ * Macros are defined to manipulate the ref state. This is a highly sensitive field and protected
  * via the double underscore keyword. The field should only be accessed via these macros.
  *
  * WT_REF_GET_STATE:
@@ -40,6 +40,11 @@ __wt_ref_is_root(WT_REF *ref)
  * WT_REF_LOCK:
  * Spin until the state WT_REF_LOCKED is swapped into the ref state field. Once the call to this
  * function completes the caller has exclusive access to the ref.
+ *
+ * WT_REF_TRYLOCK:
+ * Try once to swap WT_REF_LOCKED into the ref state field, returning EBUSY without waiting if the
+ * ref is already locked or the state changed under us. Use when locking the ref is only an
+ * optimization and spinning under contention is not worthwhile.
  *
  * WT_REF_UNLOCK:
  * Effectively wraps WT_REF_SET_STATE, however should only be used when returning the ref to the
@@ -149,5 +154,26 @@ __ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
 }
 
 #define WT_REF_LOCK(session, ref, previous_statep) __ref_lock((session), (ref), (previous_statep))
+
+/*
+ * __ref_try_lock --
+ *     Try once to lock the ref, returning EBUSY without waiting if it is already locked. On success
+ *     return the previous state to the caller.
+ */
+static WT_INLINE int
+__ref_try_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
+{
+    WT_REF_STATE previous_state;
+
+    previous_state = WT_REF_GET_STATE(ref);
+    if (previous_state == WT_REF_LOCKED ||
+      !WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+        return (EBUSY);
+    *(previous_statep) = previous_state;
+    return (0);
+}
+
+#define WT_REF_TRYLOCK(session, ref, previous_statep) \
+    __ref_try_lock((session), (ref), (previous_statep))
 
 #define WT_REF_UNLOCK(ref, state) WT_REF_SET_STATE(ref, state)

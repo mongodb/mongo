@@ -349,6 +349,21 @@ __wt_string_match(const char *str, const char *bytes, size_t len)
 }
 
 /*
+ * __wt_string_slice_cmp --
+ *     Compare two length-delimited strings.
+ */
+static WT_INLINE int
+__wt_string_slice_cmp(const char *a, size_t a_len, const char *b, size_t b_len)
+{
+    int cmp;
+
+    cmp = memcmp(a, b, WT_MIN(a_len, b_len));
+    if (cmp == 0)
+        cmp = a_len < b_len ? -1 : a_len > b_len ? 1 : 0;
+    return (cmp);
+}
+
+/*
  * CONFIG versions of the WT_STRING_LIT_MATCH and WT_STRING_MATCH macros. These are convenient when
  * matching WT_CONFIG_ITEMs.
  */

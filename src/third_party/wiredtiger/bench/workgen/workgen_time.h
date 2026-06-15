@@ -73,11 +73,11 @@ operator-(const timespec &lhs, const timespec &rhs)
     timespec ts;
 
     if (lhs.tv_nsec < rhs.tv_nsec) {
-	ts.tv_sec = lhs.tv_sec - rhs.tv_sec - 1;
-	ts.tv_nsec = lhs.tv_nsec - rhs.tv_nsec + NSEC_PER_SEC;
+        ts.tv_sec = lhs.tv_sec - rhs.tv_sec - 1;
+        ts.tv_nsec = lhs.tv_nsec - rhs.tv_nsec + NSEC_PER_SEC;
     } else {
-	ts.tv_sec = lhs.tv_sec - rhs.tv_sec;
-	ts.tv_nsec = lhs.tv_nsec - rhs.tv_nsec;
+        ts.tv_sec = lhs.tv_sec - rhs.tv_sec;
+        ts.tv_nsec = lhs.tv_nsec - rhs.tv_nsec;
     }
     return (ts);
 }
@@ -94,18 +94,18 @@ inline bool
 operator<(const timespec &lhs, const timespec &rhs)
 {
     if (lhs.tv_sec == rhs.tv_sec)
-	return (lhs.tv_nsec < rhs.tv_nsec);
+        return (lhs.tv_nsec < rhs.tv_nsec);
     else
-	return (lhs.tv_sec < rhs.tv_sec);
+        return (lhs.tv_sec < rhs.tv_sec);
 }
 
 inline bool
 operator>(const timespec &lhs, const timespec &rhs)
 {
     if (lhs.tv_sec == rhs.tv_sec)
-	return (lhs.tv_nsec > rhs.tv_nsec);
+        return (lhs.tv_nsec > rhs.tv_nsec);
     else
-	return (lhs.tv_sec > rhs.tv_sec);
+        return (lhs.tv_sec > rhs.tv_sec);
 }
 
 inline bool
@@ -151,8 +151,8 @@ operator-=(timespec &lhs, const timespec &rhs)
     lhs.tv_sec -= rhs.tv_sec;
     lhs.tv_nsec -= rhs.tv_nsec;
     if (lhs.tv_nsec < 0) {
-	lhs.tv_nsec += NSEC_PER_SEC;
-	lhs.tv_sec -= 1;
+        lhs.tv_nsec += NSEC_PER_SEC;
+        lhs.tv_sec -= 1;
     }
     return (lhs);
 }
@@ -165,8 +165,8 @@ ts_add_ms(const timespec &lhs, const uint64_t n)
     ts.tv_sec = lhs.tv_sec + ms_to_sec(n);
     ts.tv_nsec = lhs.tv_nsec + ms_to_ns(n % THOUSAND);
     while ((unsigned long)ts.tv_nsec > NSEC_PER_SEC) {
-	ts.tv_nsec -= NSEC_PER_SEC;
-	ts.tv_sec++;
+        ts.tv_nsec -= NSEC_PER_SEC;
+        ts.tv_sec++;
     }
     return (ts);
 }
