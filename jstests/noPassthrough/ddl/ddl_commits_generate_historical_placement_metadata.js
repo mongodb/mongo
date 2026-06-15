@@ -353,6 +353,7 @@ function verifyCommitOpEntriesOnShards(
                 "o.dropDatabaseMetadata": {$exists: false},
                 "o.createDatabaseMetadata": {$exists: false},
                 "o.invalidateCollectionMetadata": {$exists: false},
+                "o.setAllowChunkOperations": {$exists: false},
             })
             .sort({ts: -1})
             .limit(expectedOpEntryTemplates.length)
@@ -385,7 +386,6 @@ function verifyCommitOpEntriesOnShards(
             }
             return strippedOpEntry;
         });
-
         if (orderStrict) {
             assert.eq(expectedOpEntryTemplates.length, redactedOpEntries.length);
             for (let i = 0; i < foundOpEntries.length; ++i) {
