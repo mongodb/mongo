@@ -82,7 +82,8 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString{kConfigHostAndPort},
-                                    ShardHandle(kMyShardName, kMyShardUUID)});
+                                    kMyShardName},
+                                   kMyShardUUID);
 
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, settings);

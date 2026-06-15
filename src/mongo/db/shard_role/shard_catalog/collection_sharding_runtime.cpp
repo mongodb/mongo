@@ -293,7 +293,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
                         receivedShardVersion ? *receivedShardVersion
                                              : ShardVersionPlacementIgnored(),
                         boost::none /* wantedVersion */,
-                        ShardingState::get(_serviceContext)->getShardHandle().toShardRef(opCtx)),
+                        ShardingState::get(_serviceContext)->asShardRef(opCtx)),
         str::stream() << "sharding status of collection " << _nss.toStringForErrorMsg()
                       << " is not currently available for description and needs to be recovered "
                       << "from the config server",
@@ -571,7 +571,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         uasserted(StaleConfigInfo(_nss,
                                   receivedShardVersion,
                                   boost::none /* wantedVersion */,
-                                  ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                                  ShardingState::get(opCtx)->asShardRef(opCtx)),
                   "Failing with StaleConfig as alwaysThrowStaleConfigInfo is enabled");
     });
 
@@ -589,7 +589,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         uassert(StaleConfigInfo(_nss,
                                 receivedShardVersion,
                                 boost::none /* wantedVersion */,
-                                ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx),
+                                ShardingState::get(opCtx)->asShardRef(opCtx),
                                 std::move(criticalSectionSignal),
                                 shard_role_details::getLocker(opCtx)->isWriteLocked()
                                     ? StaleConfigInfo::OperationType::kWrite
@@ -603,7 +603,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     uassert(StaleConfigInfo(_nss,
                             receivedShardVersion,
                             boost::none /* wantedVersion */,
-                            ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx)),
+                            ShardingState::get(opCtx)->asShardRef(opCtx)),
             str::stream() << "sharding status of collection " << _nss.toStringForErrorMsg()
                           << " is not currently known and needs to be recovered",
             optCurrentMetadata);
@@ -662,7 +662,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     StaleConfigInfo sci(_nss,
                         receivedShardVersion,
                         wantedShardVersion,
-                        ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx));
+                        ShardingState::get(opCtx)->asShardRef(opCtx));
 
     uassert(std::move(sci),
             str::stream() << "timestamp mismatch detected for " << _nss.toStringForErrorMsg(),

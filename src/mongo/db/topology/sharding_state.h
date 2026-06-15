@@ -84,7 +84,7 @@ public:
         ConnectionString configShardConnectionString;
 
         // Will be empty if running as a MongoS exclusively, otherwise must be set
-        ShardHandle shardHandle;
+        ShardId shardId;
 
         std::string toString() const;
     };
@@ -133,7 +133,13 @@ public:
     /**
      * Returns the shard handle for this node, including its UUID when available.
      */
-    const ShardHandle& getShardHandle() const;
+    ShardHandle shardHandle() const;
+
+    /**
+     * Returns a ShardRef representation of this node (based on the currently installed ShardHandle
+     * value).
+     */
+    ShardRef asShardRef(OperationContext* opCtx) const;
 
     /**
      * Returns the cluster id of the cluster to which this node belongs.
@@ -145,8 +151,15 @@ public:
      * successful initialization or an error. This method may only be called once for the lifetime
      * of the object.
      */
-    void setRecoveryCompleted(RecoveredClusterRole role);
+    void setRecoveryCompleted(RecoveredClusterRole role, boost::optional<UUID> shardUuidOnRecovery);
     void setRecoveryFailed(Status failedStatus);
+
+    /**
+     * Updates the shard handle for this node. This method is expected to only be called within the
+     * context of an FCV transition to update the current value of the shard's UUID.
+     * TODO SERVER-126212 Remove this method once 9.0 becomes last LTS.
+     */
+    void onShardHandleUpdate(ShardHandle newShardHandle);
 
     /**
      * Returns the severity the direct shard operation warnings should be logged at. This is
@@ -168,11 +181,25 @@ private:
     Promise<RecoveredClusterRole> _promise;
     Future<RecoveredClusterRole> _future;
 
+    // Mutex protecting the current shard handle. This field is not part of the RecoveredClusterRole
+    // because its value can be updated during an FCV transition, whereas the rest of the fields in
+    // RecoveredClusterRole are expected to be constant after recovery completes. This mutex is
+    // expected to be lightly contended since updates only happen during FCV transitions and reads
+    // happen outside of any critical path.
+    // TODO SERVER-126212 remove this mutex.
+    mutable WriteRarelyRWMutex _shardHandleMutex;
+    // TODO SERVER-126212 embed the shardHandleField into RecoveredClusterRole (removing its shardId
+    // field).
+    ShardHandle _shardHandle;
+
     // Log severity suppressor for direct connection checks
     logv2::SeveritySuppressor _directConnectionLogSuppressor{
         Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
     logv2::SeveritySuppressor _directShardDDLLogSuppressor{
         Hours{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+
+    // TODO SERVER-126212 Remove this getter (and access _future instead).
+    const ShardHandle& _getShardHandleInstance(const WriteRarelyRWMutex::ReadLock&) const;
 };
 
 }  // namespace mongo

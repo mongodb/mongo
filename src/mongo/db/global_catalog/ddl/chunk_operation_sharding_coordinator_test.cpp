@@ -83,7 +83,8 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(HostAndPort("localhost", 27017)),
-                                    kTestShardHandle});
+                                    kTestShardHandle.name()},
+                                   kTestShardHandle.uuid().value());
 
         _opCtx = cc().getOperationContext();
         if (!_opCtx) {

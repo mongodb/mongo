@@ -73,7 +73,7 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
                                            const boost::optional<Timestamp>& expectedTimestamp,
                                            const CollectionPtr& collection,
                                            const CollectionShardingRuntime& csr) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     auto optMetadata = csr.getCurrentMetadataIfKnown();
 
     uassert(StaleConfigInfo(nss,
@@ -116,7 +116,7 @@ void checkCollectionIdentity(OperationContext* opCtx,
                              const boost::optional<OID>& expectedEpoch,
                              const boost::optional<Timestamp>& expectedTimestamp,
                              const CollectionMetadata& metadata) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
@@ -150,7 +150,7 @@ void checkShardKeyPattern(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const CollectionMetadata& metadata,
                           const ChunkRange& chunkRange) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto& keyPattern = metadata.getKeyPattern();
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
@@ -168,7 +168,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionMetadata& metadata,
                             const ChunkRange& chunkRange) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     ChunkType existingChunk;
@@ -193,7 +193,7 @@ void checkRangeWithinChunk(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const CollectionMetadata& metadata,
                            const ChunkRange& chunkRange) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     ChunkType existingChunk;
@@ -211,7 +211,7 @@ void checkRangeOwnership(OperationContext* opCtx,
                          const NamespaceString& nss,
                          const CollectionMetadata& metadata,
                          const ChunkRange& chunkRange) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     ChunkType existingChunk;
@@ -242,7 +242,7 @@ void validateSplitPoints(OperationContext* opCtx,
                          const CollectionMetadata& metadata,
                          const ChunkRange& chunkRange,
                          const std::vector<BSONObj>& splitKeys) {
-    const auto shardRef = ShardingState::get(opCtx)->getShardHandle().toShardRef(opCtx);
+    const auto shardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     // Iterate split keys with startKey advancing through each entry; mirrors the loop in

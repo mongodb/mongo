@@ -97,7 +97,7 @@ public:
             result.append("shardName", shardingState->shardId());
             result.append("clusterId", shardingState->clusterId());
 
-            const auto& shardHandle = shardingState->getShardHandle();
+            const auto& shardHandle = shardingState->shardHandle();
             if (const auto& shardUuid = shardHandle.uuid()) {
                 shardUuid->appendToBuilder(&result, "shardUuid");
             }

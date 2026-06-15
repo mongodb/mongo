@@ -257,14 +257,15 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
+    const auto& nss = args.coll->ns();
+
     const auto& updateDoc = args.updateArgs->update;
     // Most of these handlers do not need to run when the update is a full document replacement.
     // An empty updateDoc implies a no-op update and is not a valid oplog entry.
     const bool needsSpecialHandling = !updateDoc.isEmpty() &&
         (update_oplog_entry::extractUpdateType(updateDoc) !=
          update_oplog_entry::UpdateType::kReplacement);
-    if (needsSpecialHandling &&
-        args.coll->ns() == NamespaceString::kShardConfigCollectionsNamespace) {
+    if (needsSpecialHandling && nss == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes is only needed on secondaries that are applying
         // oplog entries.
         if (opCtx->isEnforcingConstraints()) {
@@ -325,7 +326,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         }
     }
 
-    if (args.coll->ns() == NamespaceString::kCollectionCriticalSectionsNamespace) {
+    if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ShardServerOpObserver"));
         invariant(collCSDoc.getBlockReads());
@@ -344,7 +345,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             });
     }
 
-    const auto& nss = args.coll->ns();
     if (nss == NamespaceString::kServerConfigurationNamespace) {
         [&]() {
             const auto idElem = args.updateArgs->criteria["_id"];
@@ -379,6 +379,21 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                 } catch (const AssertionException& ex) {
                     fassertFailedWithStatus(10892400, ex.toStatus());
                 }
+            }
+
+            // Notify ShardingState on any change of the shard UUID value.
+            // TODO SERVER-126212 Remove this block once 9.0 becomes last LTS.
+            if (shardIdentityDoc.getUuid() != oldShardIdentityDoc.getUuid()) {
+                tassert(12776400,
+                        "Overriding an already existing shard UUID is not allowed",
+                        !oldShardIdentityDoc.getUuid().has_value() ||
+                            !shardIdentityDoc.getUuid().has_value() ||
+                            oldShardIdentityDoc.getUuid().value() ==
+                                shardIdentityDoc.getUuid().value());
+                ShardHandle updatedShardHandle(
+                    ShardId(std::string{shardIdentityDoc.getShardName()}),
+                    shardIdentityDoc.getUuid());
+                ShardingState::get(opCtx)->onShardHandleUpdate(std::move(updatedShardHandle));
             }
         }();
     }

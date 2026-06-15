@@ -158,7 +158,8 @@ protected:
                 ->setRecoveryCompleted({clusterId,
                                         ClusterRole::ShardServer,
                                         ConnectionString(kConfigHostAndPort),
-                                        originatorShardHandle});
+                                        originatorShardId},
+                                       originatorShardHandle.uuid().value());
 
             _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShardId));
 
