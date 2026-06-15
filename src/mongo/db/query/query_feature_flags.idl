@@ -561,3 +561,12 @@ feature_flags:
         cpp_varname: gFixedBucketingOptimizations
         default: false
         fcv_gated: false
+
+    featureFlagChangeStreamOptimizedUpdateLookup:
+        description:
+            "Feature flag to enable optimized change stream updateLookup and pre-image lookups via
+            specialized local execution (Express/SBE) with an aggregation-pipeline fallback."
+        cpp_varname: gFeatureFlagChangeStreamOptimizedUpdateLookup
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
