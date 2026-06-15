@@ -37,6 +37,8 @@
 
 #include <string>
 
+#include <boost/functional/hash.hpp>
+
 namespace mongo {
 
 std::string ShardRef::toString() const {
@@ -76,6 +78,24 @@ void ShardRef::serialize(BSONArrayBuilder* builder) const {
               [&](const UUID& ref) { ref.appendToArrayBuilder(builder); },
           },
           _ref);
+}
+
+std::size_t ShardRef::Hasher::operator()(const ShardRef& ref) const {
+    return visit(OverloadedVisitor{
+                     [&](const ShardId& id) {
+                         std::size_t seed = 0;
+                         boost::hash_combine(seed, std::size_t{0});
+                         boost::hash_combine(seed, ShardId::Hasher{}(id));
+                         return seed;
+                     },
+                     [&](const UUID& uuid) {
+                         std::size_t seed = 0;
+                         boost::hash_combine(seed, std::size_t{1});
+                         boost::hash_combine(seed, UUID::Hash{}(uuid));
+                         return seed;
+                     },
+                 },
+                 ref._ref);
 }
 
 }  // namespace mongo

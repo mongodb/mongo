@@ -40,6 +40,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <iterator>
 #include <utility>
@@ -50,18 +51,43 @@
 namespace mongo::chunks_test_util {
 namespace {
 
+UUID buildShardUuid(int shardIdx) {
+    std::array<unsigned char, UUID::kNumBytes> bytes{};
+    bytes[0] = 0x00;
+    bytes[1] = 0x01;
+    int64_t idx = shardIdx;
+    for (int i = 0; i < 8; ++i) {
+        bytes[15 - i] = static_cast<unsigned char>(idx & 0xFF);
+        idx >>= 8;
+    }
+    return UUID::fromCDR(bytes);
+}
+
+/**
+ * Returns a stable shard ref for the given shard index. If useUuid is true, returns a shard UUID
+ * otherwise returns a shard id of the form "shard_<shardIdx>". Used by genChunkVector and
+ * performRandomChunkOperations to ensure chunks have stable shard id and UUID mappings.
+ */
+ShardRef buildShardRef(int shardIdx, bool useUuid = false) {
+    if (useUuid) {
+        return ShardRef(buildShardUuid(shardIdx));
+    }
+    return ShardRef(std::string(str::stream() << "shard_" << shardIdx));
+}
+
 PseudoRandom _random{SecureRandom().nextInt64()};
 
-std::vector<ChunkHistory> genChunkHistory(const ShardId& currentShard,
+std::vector<ChunkHistory> genChunkHistory(const ShardRef& currentShard,
                                           const Timestamp& onCurrentShardSince,
                                           size_t numShards,
-                                          size_t maxLenght) {
+                                          size_t maxLength,
+                                          bool useUuid) {
     std::vector<ChunkHistory> history;
-    const auto historyLength = _random.nextInt64(maxLenght);
+    const auto historyLength = _random.nextInt64(maxLength);
     auto lastTime = onCurrentShardSince;
     for (int64_t i = 0; i < historyLength; i++) {
-        auto shard = i == 0 ? currentShard : getShardId(_random.nextInt64(numShards));
-        history.emplace_back(onCurrentShardSince, shard);
+        auto shard = i == 0 ? currentShard : buildShardRef(_random.nextInt64(numShards), useUuid);
+        history.emplace_back(lastTime, shard);
         lastTime = lastTime - 1 - _random.nextInt64(10000);
     }
     return history;
@@ -73,14 +99,10 @@ void assertEqualChunkInfo(const ChunkInfo& x, const ChunkInfo& y) {
     ASSERT_BSONOBJ_EQ(x.getMin(), y.getMin());
     ASSERT_BSONOBJ_EQ(x.getMax(), y.getMax());
     ASSERT_EQ(x.getMaxKeyString(), y.getMaxKeyString());
-    ASSERT_EQ(x.getShardId(), y.getShardId());
+    ASSERT_EQ(x.getShardRef(), y.getShardRef());
     ASSERT_EQ(x.getLastmod(), y.getLastmod());
     ASSERT_EQ(x.isJumbo(), y.isJumbo());
     ASSERT_EQ(x.getHistory(), y.getHistory());
-}
-
-ShardId getShardId(int shardIdx) {
-    return {std::string(str::stream() << "shard_" << shardIdx)};
 }
 
 std::vector<BSONObj> genRandomSplitPoints(size_t numChunks) {
@@ -120,16 +142,21 @@ std::vector<ChunkVersion> genRandomVersions(size_t num, const ChunkVersion& init
 std::vector<ChunkType> genChunkVector(const UUID& uuid,
                                       const std::vector<BSONObj>& splitPoints,
                                       const ChunkVersion& initialVersion,
-                                      size_t numShards) {
+                                      size_t numShards,
+                                      bool useUuid) {
 
-    return genChunkVector(
-        uuid, splitPoints, genRandomVersions(splitPoints.size() - 1, initialVersion), numShards);
+    return genChunkVector(uuid,
+                          splitPoints,
+                          genRandomVersions(splitPoints.size() - 1, initialVersion),
+                          numShards,
+                          useUuid);
 }
 
 std::vector<ChunkType> genChunkVector(const UUID& uuid,
                                       const std::vector<BSONObj>& splitPoints,
                                       const std::vector<ChunkVersion>& versions,
-                                      size_t numShards) {
+                                      size_t numShards,
+                                      bool useUuid) {
 
     invariant(SimpleBSONObjComparator::kInstance.evaluate(splitPoints.front() ==
                                                           kShardKeyPattern.globalMin()));
@@ -144,24 +171,25 @@ std::vector<ChunkType> genChunkVector(const UUID& uuid,
     auto minKey = splitPoints.front();
     for (size_t i = 0; i < numChunks; ++i) {
         auto maxKey = splitPoints.at(i + 1);
-        const auto shard = getShardId(_random.nextInt64(numShards));
+        const auto shard = buildShardRef(_random.nextInt64(numShards), useUuid);
         const auto version = versions.at(i);
         ChunkType chunk{uuid, ChunkRange{minKey, maxKey}, version, shard};
         chunk.setHistory(
             genChunkHistory(shard,
                             oldestValidAfter + version.majorVersion() * 10 + version.minorVersion(),
                             numShards,
-                            10 /* maxLenght */));
+                            10 /* maxLength */,
+                            useUuid));
         chunks.emplace_back(std::move(chunk));
         minKey = std::move(maxKey);
     }
     return chunks;
 }
 
-std::map<ShardId, Timestamp> calculateShardsMaxValidAfter(
+std::map<ShardRef, Timestamp> calculateShardsMaxValidAfter(
     const std::vector<ChunkType>& chunkVector) {
 
-    std::map<ShardId, Timestamp> vaMap;
+    std::map<ShardRef, Timestamp> vaMap;
     for (const auto& chunk : chunkVector) {
         if (chunk.getHistory().empty())
             continue;
@@ -179,18 +207,18 @@ std::map<ShardId, Timestamp> calculateShardsMaxValidAfter(
     return vaMap;
 }
 
-ChunkVersion calculateCollVersion(const std::map<ShardId, ChunkVersion>& shardVersions) {
+ChunkVersion calculateCollVersion(const std::map<ShardRef, ChunkVersion>& shardVersions) {
     return std::max_element(shardVersions.begin(),
                             shardVersions.end(),
-                            [](const std::pair<ShardId, ChunkVersion>& p1,
-                               const std::pair<ShardId, ChunkVersion>& p2) {
+                            [](const std::pair<ShardRef, ChunkVersion>& p1,
+                               const std::pair<ShardRef, ChunkVersion>& p2) {
                                 return (p1.second <=> p2.second) == std::partial_ordering::less;
                             })
         ->second;
 }
 
-std::map<ShardId, ChunkVersion> calculateShardVersions(const std::vector<ChunkType>& chunkVector) {
-    std::map<ShardId, ChunkVersion> svMap;
+std::map<ShardRef, ChunkVersion> calculateShardVersions(const std::vector<ChunkType>& chunkVector) {
+    std::map<ShardRef, ChunkVersion> svMap;
     for (const auto& chunk : chunkVector) {
         auto mapIt = svMap.find(chunk.getShard());
         if (mapIt == svMap.end()) {
@@ -208,7 +236,8 @@ std::vector<ChunkType> genRandomChunkVector(const UUID& uuid,
                                             const OID& epoch,
                                             const Timestamp& timestamp,
                                             size_t maxNumChunks,
-                                            size_t minNumChunks) {
+                                            size_t minNumChunks,
+                                            bool useUuid) {
     invariant(minNumChunks <= maxNumChunks);
     const auto numChunks = minNumChunks + _random.nextInt32((maxNumChunks - minNumChunks) + 1);
     const auto numShards = _random.nextInt32(numChunks) + 1;
@@ -219,7 +248,8 @@ std::vector<ChunkType> genRandomChunkVector(const UUID& uuid,
           "numChunks"_attr = numChunks,
           "numShards"_attr = numShards);
 
-    return genChunkVector(uuid, genRandomSplitPoints(numChunks), initialVersion, numShards);
+    return genChunkVector(
+        uuid, genRandomSplitPoints(numChunks), initialVersion, numShards, useUuid);
 }
 
 BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
@@ -268,7 +298,9 @@ BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
     return BSON(kSKey << splitPoint);
 }
 
-void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numOperations) {
+void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr,
+                                  size_t numOperations,
+                                  bool useUuid) {
     auto& chunks = *chunksPtr;
     auto collVersion = calculateCollVersion(calculateShardVersions(chunks));
 
@@ -284,7 +316,7 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
             controlChunkIt->setVersion(collVersion);
             collVersion.incMinor();
         }
-        auto newShard = getShardId(_random.nextInt64(chunks.size()));
+        auto newShard = buildShardRef(_random.nextInt64(chunks.size()), useUuid);
         chunkToMigrate.setShard(newShard);
         chunkToMigrate.setVersion(collVersion);
         chunkToMigrate.setHistory([&] {
@@ -326,9 +358,9 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
 
     auto mergeChunks = [&] {
         const auto firstChunkIt = chunks.begin() + _random.nextInt32(chunks.size());
-        const auto& shardId = firstChunkIt->getShard();
+        const auto& shardRef = firstChunkIt->getShard();
         auto lastChunkIt = std::find_if(firstChunkIt, chunks.end(), [&](const auto& chunk) {
-            return chunk.getShard() != shardId;
+            return chunk.getShard() != shardRef;
         });
         const auto numContiguosChunks = std::distance(firstChunkIt, lastChunkIt);
         if (numContiguosChunks < 2) {

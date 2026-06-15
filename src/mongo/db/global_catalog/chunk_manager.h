@@ -42,6 +42,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -90,7 +91,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT PlacementVersionTargetingInfo {
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
 // shard is currently marked as needing a catalog cache refresh (stale).
 using ShardPlacementVersionMap MONGO_MOD_NEEDS_REPLACEMENT =
-    stdx::unordered_map<ShardId, PlacementVersionTargetingInfo, ShardId::Hasher>;
+    stdx::unordered_map<ShardRef, PlacementVersionTargetingInfo, ShardRef::Hasher>;
 
 /**
  * This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
@@ -175,6 +176,10 @@ public:
         return _maxChunkVectorSize;
     }
 
+    /**
+     * The placement version map may contain both ShardId and ShardUUIDs for the same shard.
+     * Callers are responsible for resolving this information into a consistent view.
+     */
     const ShardPlacementVersionMap& getShardPlacementVersionMap() const {
         return _placementVersions;
     }

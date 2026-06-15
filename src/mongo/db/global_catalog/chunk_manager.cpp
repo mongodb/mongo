@@ -355,7 +355,7 @@ void ChunkMap::_splitAndCommitUpdatedChunkVector(ChunkVectorMap::const_iterator 
 }
 
 void ChunkMap::_updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk) {
-    auto placementVersionIt = _placementVersions.find(chunk.getShardId());
+    auto placementVersionIt = _placementVersions.find(chunk.getShardRef());
     if (placementVersionIt != _placementVersions.end() &&
         placementVersionIt->second.placementVersion == chunk.getLastmod()) {
         _placementVersions.erase(placementVersionIt);
@@ -370,7 +370,7 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
             ? Timestamp{0, 0}
             : chunk.getHistory().front().getValidAfter();
 
-        auto oldPlacementVersionIt = oldPlacementVersions.find(chunk.getShardId());
+        auto oldPlacementVersionIt = oldPlacementVersions.find(chunk.getShardRef());
         auto oldShardValidAfter = oldPlacementVersionIt == oldPlacementVersions.end()
             ? Timestamp{0, 0}
             : oldPlacementVersionIt->second.validAfter;
@@ -383,7 +383,7 @@ void ChunkMap::_updateShardVersionFromUpdateChunk(
     bool versionUpdated{false};
 
     auto [placementVersionIt, created] =
-        _placementVersions.try_emplace(chunk.getShardId(), newVersion, newValidAfter);
+        _placementVersions.try_emplace(chunk.getShardRef(), newVersion, newValidAfter);
 
     if (created) {
         // We just created a new entry in the _placementVersions map with
