@@ -233,6 +233,16 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
                     "Retrying acquiring state for lock-free read because collection, catalog or "
                     "replication state changed.");
         shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+        // If the active state transition is draining an intent this opCtx holds, respond to the
+        // kill so the drain can complete. StepDown only drain Write intents, so they interrupt only
+        // if the opCtx has a Write intent declared; an unrelated kill must not cut short work that
+        // is legitimately allowed to continue.
+        if (gFeatureFlagIntentRegistration.isEnabled() &&
+            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                .isOpBlockedByActiveTransitionDrain(opCtx)) {
+            opCtx->checkForInterrupt();
+        }
     }
 }
 

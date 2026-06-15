@@ -37,7 +37,6 @@
 #include "mongo/util/decorable.h"
 
 #include <mutex>
-#include <shared_mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -43,6 +43,7 @@
 #include <functional>
 #include <future>
 #include <mutex>
+#include <shared_mutex>
 #include <vector>
 
 
@@ -170,7 +171,7 @@ public:
      * Returns true if there is an active Replication state transition ongoing, false otherwise.
      */
     bool activeStateTransition() {
-        std::unique_lock lock(_stateMutex);
+        std::shared_lock lock(_stateMutex);
         return _interruptionCtx != nullptr;
     }
 
@@ -179,11 +180,36 @@ public:
      * boost::none otherwise.
      */
     boost::optional<OperationContext*> replicationStateTransitionInterruptionCtx() {
-        std::unique_lock lock(_stateMutex);
+        std::shared_lock lock(_stateMutex);
         if (_interruptionCtx != nullptr) {
             return _interruptionCtx;
         } else {
             return boost::none;
+        }
+    }
+
+    /**
+     * Returns true when the active state transition is draining an intent held by this opCtx,
+     * meaning the operation should call checkForInterrupt() so the drain can complete.
+     */
+    bool isOpBlockedByActiveTransitionDrain(OperationContext* opCtx) {
+        InterruptionType interruption;
+        {
+            std::shared_lock lock(_stateMutex);
+            if (!_interruptionCtx) {
+                return false;
+            }
+            interruption = _lastInterruption;
+        }
+        switch (interruption) {
+            case InterruptionType::Rollback:
+            case InterruptionType::Shutdown:
+                return true;
+            case InterruptionType::StepDown:
+            case InterruptionType::StepUp:
+                return hasWriteIntentDeclared(opCtx);
+            default:
+                return false;
         }
     }
 
