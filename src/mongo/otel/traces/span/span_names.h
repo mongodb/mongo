@@ -32,39 +32,37 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::otel::traces {
-class SpanNameMaker;
-
-/** Helper to implement the passkey idiom. */
-template <typename T>
-class MONGO_MOD_PUBLIC Passkey {
-private:
-    friend T;
-    constexpr Passkey() = default;
-};
 
 /**
- * Indicates whether a span should be included in sampled traces by default when no explicit
- * sampling decision has been made by the caller.
+ * Indicates whether a span can initiate a sampled trace by default assuming no other configuration
+ * on this specific span.
  *
- * "yes" means this span is an entry point to an operation we always want to trace (e.g., the
- * root span of a tracked operation). Only a small number of spans should be "yes" — typically
- * only the outermost entry points to operations listed as sampled-by-default in the OTel design.
- * Child spans within a sampled trace are captured automatically and should remain "no".
+ * `true` means this span is an entry point to an operation we always want to trace (e.g., the
+ * root span of a tracked operation). Only a small number of spans should be `true` — typically
+ * only the outermost entry points to operations we want to gather traces for by default. Child
+ * spans within a sampled trace are captured automatically regardless of this value.
  *
- * "no" means the span defers sampling to the parent context or the configured sampler.
+ * `false` means a trace is never sampled due to the inclusion of this span (but could be via other
+ * means).
  */
-enum class SampledByDefault : bool { no, yes };
+enum class SampledByDefault : bool {};
 
 /** Wrapper class around a string to ensure `SpanName`s are only constructed in certain places. */
 class MONGO_MOD_PUBLIC SpanName {
+private:
+    class Passkey {
+        friend class SpanName;
+        explicit constexpr Passkey() = default;
+    };
+
 public:
+    /** N&O team must own all uses of this passkey variable. */
+    MONGO_MOD_PRIVATE static constexpr Passkey passkeyForNetworkingAndObservabilityOnly{};
+
     /**
-     * Note that this can only be constructed by code allowed to access the passkey. N&O must have
-     * ownership of the files defining and instantiating the Passkey types. Additional Passkey types
-     * are meant to facilitate cases where the span names should not be visible outside some
-     * module, in order to prevent leaking information related to that module.
+     * Note that this requires a passkey for construction, which only N&O code is allowed to use.
      */
-    constexpr SpanName(StringData name, Passkey<SpanNameMaker>, SampledByDefault sampledByDefault)
+    constexpr SpanName(Passkey, StringData name, SampledByDefault sampledByDefault)
         : _name(name), _sampledByDefault{sampledByDefault} {}
 
     constexpr StringData getName() const {
@@ -84,13 +82,14 @@ private:
     SampledByDefault _sampledByDefault;
 };
 
-/** Helper to create SpanName instances. */
-class MONGO_MOD_FILE_PRIVATE SpanNameMaker{public : static constexpr SpanName make(
-    StringData name, SampledByDefault sampledByDefault = SampledByDefault::no){
-    return SpanName(name, Passkey<SpanNameMaker>{}, sampledByDefault);
-}  // namespace mongo::otel::traces
+namespace span_names_details {
+/** Absolutely no calls to this function should be made from code that is NOT owned by N&O team. */
+MONGO_MOD_FILE_PRIVATE constexpr SpanName make(StringData name,
+                                               SampledByDefault sampledByDefault = SampledByDefault{
+                                                   false}) {
+    return SpanName{SpanName::passkeyForNetworkingAndObservabilityOnly, name, sampledByDefault};
 }
-;
+}  // namespace span_names_details
 
 /**
  * Central registry of OpenTelemetry span names used in the server. When adding a new span to the
@@ -100,102 +99,108 @@ class MONGO_MOD_FILE_PRIVATE SpanNameMaker{public : static constexpr SpanName ma
  * centralized collaboration with downstream OTel consumers.
  */
 class MONGO_MOD_PUBLIC SpanNames {
+private:
+    /** Wraps span_name_details::make to make the definitions below less verbose. */
+    static constexpr auto make = []<typename... Args>(Args&&... args) {
+        return span_names_details::make(std::forward<Args>(args)...);
+    };
+
 public:
     // Test-only
-    static constexpr SpanName kTest1 = SpanNameMaker::make("test_only.span1");
-    static constexpr SpanName kTest2 = SpanNameMaker::make("test_only.span2");
-    static constexpr SpanName kTest3 = SpanNameMaker::make("test_only.span3");
+    static constexpr SpanName kTest1 = make("test_only.span1");
+    static constexpr SpanName kTest2 = make("test_only.span2");
+    static constexpr SpanName kTest3 = make("test_only.span3");
 
     // Resharding spans
     static constexpr SpanName kReshardCollectionCmdInvocationTypedRun =
-        SpanNameMaker::make("ReshardCollectionCmd::Invocation::typedRun");
-    static constexpr SpanName kReshardingCoordinatorRun =
-        SpanNameMaker::make("ReshardingCoordinator::run");
+        make("ReshardCollectionCmd::Invocation::typedRun");
+    static constexpr SpanName kReshardingCoordinatorRun = make("ReshardingCoordinator::run");
     static constexpr SpanName kReshardingCoordinatorRunUntilReadyToCommit =
-        SpanNameMaker::make("ReshardingCoordinator::_runUntilReadyToCommit");
+        make("ReshardingCoordinator::_runUntilReadyToCommit");
     static constexpr SpanName kReshardingCoordinatorCommitting =
-        SpanNameMaker::make("ReshardingCoordinator::committing");
+        make("ReshardingCoordinator::committing");
     static constexpr SpanName kReshardingCoordinatorAfterFinish =
-        SpanNameMaker::make("ReshardingCoordinator::afterFinish");
+        make("ReshardingCoordinator::afterFinish");
     static constexpr SpanName kReshardingCoordinatorWaitForCommitMonitor =
-        SpanNameMaker::make("ReshardingCoordinator::waitForCommitMonitor");
+        make("ReshardingCoordinator::waitForCommitMonitor");
     static constexpr SpanName kReshardingCoordinatorFinalize =
-        SpanNameMaker::make("ReshardingCoordinator::finalize");
+        make("ReshardingCoordinator::finalize");
     static constexpr SpanName kReshardingCoordinatorRecipientPostCloningDeltaCollector =
-        SpanNameMaker::make("ReshardingCoordinator::RecipientPostCloningDeltaCollector");
+        make("ReshardingCoordinator::RecipientPostCloningDeltaCollector");
     static constexpr SpanName kReshardingCoordinatorAwaitAllDonorsReadyToDonate =
-        SpanNameMaker::make("ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
+        make("ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
     static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsCloning =
-        SpanNameMaker::make("ReshardingCoordinator::_awaitAllRecipientsCloning");
+        make("ReshardingCoordinator::_awaitAllRecipientsCloning");
     static constexpr SpanName kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors =
-        SpanNameMaker::make("ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
+        make("ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
     static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsFinishedCloning =
-        SpanNameMaker::make("ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
+        make("ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
     static constexpr SpanName kReshardingCoordinatorTellAllDonorsToRefresh =
-        SpanNameMaker::make("ReshardingCoordinator::_tellAllDonorsToRefresh");
+        make("ReshardingCoordinator::_tellAllDonorsToRefresh");
     static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsFinishedApplying =
-        SpanNameMaker::make("ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
+        make("ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
     static constexpr SpanName kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit =
-        SpanNameMaker::make("ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
+        make("ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
     static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsInStrictConsistency =
-        SpanNameMaker::make("ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
+        make("ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
     static constexpr SpanName kReshardingDonorStateMachineRun =
-        SpanNameMaker::make("ReshardingDonorService::DonorStateMachine::run");
+        make("ReshardingDonorService::DonorStateMachine::run");
     static constexpr SpanName kReshardingCoordinatorDonorPostCloningDeltaCollector =
-        SpanNameMaker::make("ReshardingCoordinator::DonorPostCloningDeltaCollector");
+        make("ReshardingCoordinator::DonorPostCloningDeltaCollector");
     static constexpr SpanName
         kReshardingDonorOnPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData =
-            SpanNameMaker::make(
-                "ReshardingDonorService::_"
-                "onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData");
+            make(
+                "ReshardingDonorService::_onPreparingToDonate"
+                "CalculateTimestampThenTransitionToDonatingInitialData");
     static constexpr SpanName
-        kReshardingDonorAwaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries =
-            SpanNameMaker::make(
-                "ReshardingDonorService::_"
-                "awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries");
+        kReshardingDonorAwaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries = make(
+            "ReshardingDonorService::_awaitAllRecipientsDoneCloning"
+            "ThenTransitionToDonatingOplogEntries");
     static constexpr SpanName kReshardingDonorCreateAndStartChangeStreamsMonitor =
-        SpanNameMaker::make("ReshardingDonorService::_createAndStartChangeStreamsMonitor");
+        make("ReshardingDonorService::_createAndStartChangeStreamsMonitor");
     static constexpr SpanName
-        kReshardingDonorAwaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites =
-            SpanNameMaker::make(
-                "ReshardingDonorService::_"
-                "awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites");
+        kReshardingDonorAwaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites = make(
+            "ReshardingDonorService::_awaitAllRecipientsDoneApplying"
+            "ThenTransitionToPreparingToBlockWrites");
     static constexpr SpanName
-        kReshardingDonorWriteTransactionOplogEntryThenTransitionToBlockingWrites =
-            SpanNameMaker::make(
-                "ReshardingDonorService::_"
-                "writeTransactionOplogEntryThenTransitionToBlockingWrites");
+        kReshardingDonorWriteTransactionOplogEntryThenTransitionToBlockingWrites = make(
+            "ReshardingDonorService::_writeTransactionOplogEntry"
+            "ThenTransitionToBlockingWrites");
     static constexpr SpanName kReshardingDonorRunUntilBlockingWritesOrErrored =
-        SpanNameMaker::make("ReshardingDonorService::_runUntilBlockingWritesOrErrored");
+        make("ReshardingDonorService::_runUntilBlockingWritesOrErrored");
     static constexpr SpanName kReshardingDonorNotifyCoordinatorAndAwaitDecision =
-        SpanNameMaker::make("ReshardingDonorService::_notifyCoordinatorAndAwaitDecision");
-    static constexpr SpanName kReshardingRecipientRun =
-        SpanNameMaker::make("ReshardingRecipientService::run");
+        make("ReshardingDonorService::_notifyCoordinatorAndAwaitDecision");
+    static constexpr SpanName kReshardingRecipientRun = make("ReshardingRecipientService::run");
     static constexpr SpanName
-        kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection =
-            SpanNameMaker::make(
-                "ReshardingRecipientService::_"
-                "awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection");
+        kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection = make(
+            "ReshardingRecipientService::_awaitAllDonorsPreparedToDonate"
+            "ThenTransitionToCreatingCollection");
     static constexpr SpanName
-        kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning =
-            SpanNameMaker::make(
-                "ReshardingRecipientService::_"
-                "createTemporaryReshardingCollectionThenTransitionToCloning");
+        kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning = make(
+            "ReshardingRecipientService::_createTemporaryReshardingCollection"
+            "ThenTransitionToCloning");
     static constexpr SpanName kReshardingRecipientCloneThenTransitionToBuildingIndex =
-        SpanNameMaker::make("ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
+        make("ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
     static constexpr SpanName kReshardingRecipientBuildIndexThenTransitionToApplying =
-        SpanNameMaker::make("ReshardingRecipientService::_buildIndexThenTransitionToApplying");
+        make("ReshardingRecipientService::_buildIndexThenTransitionToApplying");
     static constexpr SpanName kReshardingRecipientCreateAndStartChangeStreamsMonitor =
-        SpanNameMaker::make("ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
+        make("ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
     static constexpr SpanName
-        kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency =
-            SpanNameMaker::make(
-                "ReshardingRecipientService::_"
-                "awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency");
+        kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency = make(
+            "ReshardingRecipientService::_awaitAllDonorsBlockingWrites"
+            "ThenTransitionToStrictConsistency");
     static constexpr SpanName kReshardingRecipientRunUntilStrictConsistencyOrErrored =
-        SpanNameMaker::make("ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
+        make("ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
     static constexpr SpanName kReshardingRecipientNotifyCoordinatorAndAwaitDecision =
-        SpanNameMaker::make("ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
+        make("ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
 };
+
+/**
+ * Registers a span name for a `mongo::Command`. Must only be called from `Command`'s constructor.
+ * Do not add calls to this function anywhere else.
+ * The returned reference is stable for the lifetime of the process.
+ */
+MONGO_MOD_PUBLIC const SpanName& registerCommandSpanName(
+    StringData name, SampledByDefault sampledByDefault = SampledByDefault{false});
 
 }  // namespace mongo::otel::traces

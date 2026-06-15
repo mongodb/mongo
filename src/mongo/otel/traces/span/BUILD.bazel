@@ -39,6 +39,7 @@ mongo_cc_library(
     name = "span",
     srcs = ["span.cpp"],
     deps = [
+        ":span_names",
         ":span_telemetry_context",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",
@@ -74,6 +75,7 @@ mongo_cc_unit_test(
 
 mongo_cc_library(
     name = "span_names",
+    srcs = ["span_names.cpp"],
     hdrs = ["span_names.h"],
     deps = ["//src/mongo:base"],
 )

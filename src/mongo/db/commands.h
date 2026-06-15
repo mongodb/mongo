@@ -60,6 +60,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/otel/traces/span/span_names.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
@@ -451,6 +452,14 @@ public:
         return _atom;
     }
 
+    /**
+     * Returns the OTel span name registered for this command. The name equals `getName()` and the
+     * SpanName is valid for the lifetime of the process.
+     */
+    const otel::traces::SpanName& getTraceSpanName() const {
+        return _traceSpanName;
+    }
+
     /** Returns the command's aliases if any. Constant. */
     const std::vector<StringData>& getAliases() const {
         return _aliases;
@@ -773,6 +782,7 @@ private:
     const std::string _name;
     const CommandNameAtom _atom{_name};
     const std::vector<StringData> _aliases;
+    const otel::traces::SpanName _traceSpanName = otel::traces::registerCommandSpanName(_name);
 
     // Counters for how many times this command has been executed and failed
     Counter64* _commandsExecuted{};

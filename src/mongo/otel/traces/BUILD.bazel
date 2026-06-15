@@ -186,8 +186,8 @@ mongo_cc_library(
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        ":telemetry_context_serialization_header",
         "//src/mongo/db:server_base",
+        "//src/mongo/otel/traces:telemetry_context_serialization_header",
         "//src/mongo/otel/traces/span:span_telemetry_context",
         "//src/third_party/opentelemetry-cpp/api",
     ],

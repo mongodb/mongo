@@ -2058,8 +2058,8 @@ void ExecCommandDatabase::_commandExec() {
     // We do not want to create a span for every incoming command, we only want a span when
     // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
     // Span::start.
-    auto otelSpan =
-        otel::traces::Span::startIfExistingTraceParent(opCtx, _execContext.getCommand()->getName());
+    auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
+        opCtx, _execContext.getCommand()->getTraceSpanName());
 
     // If this command should start a new transaction, waitForReadConcern will be invoked
     // after invoking the TransactionParticipant, which will determine whether a transaction

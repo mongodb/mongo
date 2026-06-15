@@ -1122,7 +1122,7 @@ void ParseAndRunCommand::RunAndRetry::run() {
     // $traceCtx is specified on the command so we call Span::startIfExistingTraceParent instead of
     // Span::start.
     auto otelSpan = otel::traces::Span::startIfExistingTraceParent(
-        _parc->_rec->getOpCtx(), _parc->_rec->getCommand()->getName());
+        _parc->_rec->getOpCtx(), _parc->_rec->getCommand()->getTraceSpanName());
     do {
         try {
             // Try gMaxNumStaleVersionRetries times. On the last try, exceptions are
