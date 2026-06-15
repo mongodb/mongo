@@ -69,6 +69,20 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "core_heap_profiling",
+    config = "//buildscripts/resmokeconfig:suites/core_heap_profiling.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "decimal",
     config = "//buildscripts/resmokeconfig:suites/decimal.yml",
     tags = [
