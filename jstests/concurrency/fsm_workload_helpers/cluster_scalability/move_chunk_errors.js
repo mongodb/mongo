@@ -5,6 +5,7 @@ export const ConcurrentOperation = {
     ShardKeyUpdate: "shardKeyUpdate",
     RefineShardKey: "refineShardKey",
     CoordinatedMultiWrite: "coordinatedMultiWrite",
+    ValidationLevelChange: "validationLevelChange",
 };
 
 const acceptabilityHandlers = new Map([
@@ -14,6 +15,7 @@ const acceptabilityHandlers = new Map([
     [ConcurrentOperation.ShardKeyUpdate, isErrorAcceptableWithShardKeyUpdate],
     [ConcurrentOperation.RefineShardKey, isErrorAcceptableWithRefineShardKey],
     [ConcurrentOperation.CoordinatedMultiWrite, isErrorAcceptableWithCoordinatedMultiWrite],
+    [ConcurrentOperation.ValidationLevelChange, isErrorAcceptableWithValidationLevelChange],
 ]);
 
 function getConcurrentOperationsFromConfig() {
@@ -111,5 +113,16 @@ function isErrorAcceptableWithCoordinatedMultiWrite(error) {
     // Coordinated multi writes will interrupt ongoing chunk migrations.
     const acceptableCodes = [ErrorCodes.Interrupted];
     const acceptableReasons = [];
+    return isErrorAcceptable(error, acceptableCodes, acceptableReasons);
+}
+
+function isErrorAcceptableWithValidationLevelChange(error) {
+    // collMod operations that change the validation level acquire an X lock on the collection,
+    // which can interrupt an in-progress migration. A full document scan during constraint-level
+    // upgrade can also hold collection resources long enough for a concurrent migration's
+    // waitForClean() to observe metadata in a transitional state ("metadata reset"). Orphan
+    // cleanup from a previous migration may also cause the next migration into that range to fail.
+    const acceptableCodes = [ErrorCodes.Interrupted];
+    const acceptableReasons = ["orphans cleanup", "metadata reset"];
     return isErrorAcceptable(error, acceptableCodes, acceptableReasons);
 }
