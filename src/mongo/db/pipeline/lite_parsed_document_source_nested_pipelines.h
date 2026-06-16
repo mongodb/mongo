@@ -47,7 +47,9 @@ public:
                                             std::vector<OwnedLiteParsedPipeline> pipelines)
         : LiteParsedDocumentSourceDefault<Derived>(originalBson),
           _foreignNss(std::move(foreignNss)),
-          _pipelines(std::move(pipelines)) {}
+          _pipelines(std::move(pipelines)),
+          _resolvedBackingNss(_foreignNss ? ResolvedNamespace{*_foreignNss, {}}
+                                          : ResolvedNamespace{}) {}
 
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             const LiteParserOptions& options,
@@ -55,7 +57,9 @@ public:
                                             std::vector<OwnedLiteParsedPipeline> pipelines)
         : LiteParsedDocumentSourceDefault<Derived>(originalBson, options),
           _foreignNss(std::move(foreignNss)),
-          _pipelines(std::move(pipelines)) {}
+          _pipelines(std::move(pipelines)),
+          _resolvedBackingNss(_foreignNss ? ResolvedNamespace{*_foreignNss, {}}
+                                          : ResolvedNamespace{}) {}
 
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
@@ -138,19 +142,50 @@ public:
 
     void bindResolvedNamespace(const ResolvedNamespace&,
                                const ResolvedNamespaceMap& resolvedNamespaces) override {
+        // Handle explicit user pipelines running against a view.
         for (const auto& subpipeline : _pipelines) {
             auto it = resolvedNamespaces.find(subpipeline->getOriginalParseNss());
             if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
-                _resolvedSubPipelineView = std::make_shared<ResolvedNamespace>(it->second);
+                _resolvedBackingNss = it->second;
+            }
+        }
+        // Handle if the user specified this stage is running against a view but specified no user
+        // pipeline.
+        if (_foreignNss && needsViewSubpipelineMaterialized()) {
+            auto it = resolvedNamespaces.find(*_foreignNss);
+            if (it != resolvedNamespaces.end() && it->second.involvedNamespaceIsAView) {
+                _resolvedBackingNss = it->second;
+                materializeViewSubpipeline(it->second);
             }
         }
     }
 
-    std::shared_ptr<const ResolvedNamespace> getResolvedSubPipelineView() const override {
-        return _resolvedSubPipelineView;
+    ResolvedNamespace getResolvedBackingNss() const override {
+        return _resolvedBackingNss;
     }
 
 protected:
+    // Returns true if this stage should treat a bare `_foreignNss` view target (no user-written
+    // subpipeline) by materializing the view's pipeline into `_pipelines` in bindResolvedNamespace.
+    virtual bool needsViewSubpipelineMaterialized() const {
+        return false;
+    }
+
+    // Materializes a view's resolved pipeline into `_pipelines`, parsing and desugaring using the
+    // ResolvedNamespace entry.
+    void materializeViewSubpipeline(const ResolvedNamespace& viewEntry) {
+        // A stage only materializes a view subpipeline when it has no user-written subpipeline, so
+        // `_pipelines` should always be empty here.
+        tassert(12792401,
+                "expected an empty subpipeline list when materializing a view subpipeline",
+                _pipelines.empty());
+        // Copy is intentional: the map entry is const and liteParseViewPipeline() mutates it.
+        ResolvedNamespace copy = viewEntry;
+        copy.liteParseViewPipeline();
+        copy.desugarViewPipeline();
+        _pipelines.push_back(std::move(*copy.getMutableParsedPipeline()));
+    }
+
     /**
      * Simple implementation that only gets the privileges needed by children pipelines.
      */
@@ -167,12 +202,9 @@ protected:
     boost::optional<NamespaceString> _foreignNss;
     std::vector<OwnedLiteParsedPipeline> _pipelines;
 
-    // Set by the recursive resolver when this stage's subpipeline target resolves to a view and
-    // the view's pipeline has been stitched into the subpipeline. Allows downstream
-    // DocumentSource construction to skip a per-stage view application. Held via shared_ptr so
-    // that LiteParsedDocumentSource subclasses remain cheaply copyable through the default
-    // clone() implementation without deep-copying the parsed view pipeline.
-    std::shared_ptr<ResolvedNamespace> _resolvedSubPipelineView;
+    // The most-resolved namespace this stage knows about: the resolved backing namespace its
+    // subpipeline targets. Before view resolution, this just points to the user NSS.
+    ResolvedNamespace _resolvedBackingNss;
 };
 
 }  // namespace mongo

@@ -130,10 +130,12 @@ public:
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override;
 
-    void bindResolvedNamespace(const ResolvedNamespace& view,
-                               const ResolvedNamespaceMap& resolvedNamespaces) override;
-
     std::unique_ptr<StageParams> getStageParams() const override;
+
+protected:
+    bool needsViewSubpipelineMaterialized() const override {
+        return _pipelines.empty();
+    }
 
 private:
     boost::optional<FieldPath> _as;

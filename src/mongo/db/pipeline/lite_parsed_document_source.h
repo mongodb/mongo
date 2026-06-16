@@ -359,13 +359,11 @@ public:
     }
 
     /**
-     * Returns the resolved subpipeline view bound to this stage by bindResolvedNamespace(), if any
-     * (see LiteParsedDocumentSourceNestedPipelines for the override that populates this). Returns
-     * null when no view has been bound. Held via shared_ptr so binding and consumption share one
-     * copy while keeping this class trivially copyable through clone().
+     * Returns the resolved backing namespace this stage currently knows about: the most-resolved
+     * form of the namespace its subpipeline targets.
      */
-    virtual std::shared_ptr<const ResolvedNamespace> getResolvedSubPipelineView() const {
-        return nullptr;
+    virtual ResolvedNamespace getResolvedBackingNss() const {
+        return {};
     }
 
     /**

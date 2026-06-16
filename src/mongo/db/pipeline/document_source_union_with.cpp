@@ -98,7 +98,7 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                                                         std::move(params.unionNss),
                                                         std::move(*params.subpipelineStageParams),
                                                         std::move(params.pipeline),
-                                                        std::move(params.resolvedSubPipelineView),
+                                                        std::move(params.resolvedBackingNss),
                                                         params.hasForeignDB)};
     }
 
@@ -110,7 +110,7 @@ DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
                                                         std::move(params.unionNss),
                                                         std::move(stageParams),
                                                         std::move(params.pipeline),
-                                                        std::move(view),
+                                                        std::move(*view),
                                                         params.hasForeignDB)};
     }
 
@@ -298,14 +298,17 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     NamespaceString unionNss,
     StageParamsPipeline subpipelineStageParams,
     std::vector<BSONObj> userPipeline,
-    std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView,
+    ResolvedNamespace resolvedBackingNss,
     bool hasForeignDB)
     : DocumentSource(kStageName, expCtx) {
     _hasForeignDB = hasForeignDB;
     boost::optional<ResolvedNamespace> resolvedUnionNs;
     try {
-        if (resolvedSubPipelineView) {
-            resolvedUnionNs = *resolvedSubPipelineView;
+        // A view stitched at lite-parse time arrives via resolvedBackingNss; otherwise consult the
+        // ExpressionContext (covers plain collections and the $facet BSON-reparse path).
+        const bool viewStitched = resolvedBackingNss.involvedNamespaceIsAView;
+        if (viewStitched) {
+            resolvedUnionNs = std::move(resolvedBackingNss);
         } else {
             const auto& resolvedNamespaces = expCtx->getResolvedNamespaces();
             auto it = resolvedNamespaces.find(unionNss);
@@ -320,7 +323,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             // TODO SERVER-117260: This fallback can be removed once $facet goes through normal LP
             // view resolution, rather than reparsing from BSON.
             const bool viewNotYetStitched =
-                resolvedUnionNs->involvedNamespaceIsAView && !resolvedSubPipelineView;
+                resolvedUnionNs->involvedNamespaceIsAView && !viewStitched;
             if (viewNotYetStitched) {
                 _sharedState = std::make_shared<UnionWithSharedState>(
                     parsePipelineWithMaybeViewDefinition(

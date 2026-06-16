@@ -63,14 +63,14 @@ public:
                          bool isHybridSearch,
                          BSONObj ownedBsonObj,
                          boost::optional<StageParamsPipeline> subpipelineStageParams = boost::none,
-                         std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView = nullptr)
+                         ResolvedNamespace resolvedBackingNss = {})
         : DefaultStageParams(ownedBsonObj.firstElement()),
           unionNss(std::move(unionNss)),
           pipeline(std::move(pipeline)),
           hasForeignDB(hasForeignDB),
           isHybridSearch(isHybridSearch),
           subpipelineStageParams(std::move(subpipelineStageParams)),
-          resolvedSubPipelineView(std::move(resolvedSubPipelineView)),
+          resolvedBackingNss(std::move(resolvedBackingNss)),
           _ownedOriginalBson(std::move(ownedBsonObj)) {}
 
     static const Id& id;
@@ -90,11 +90,10 @@ public:
     // user pipeline specified against a collection (non-view).
     boost::optional<StageParamsPipeline> subpipelineStageParams;
 
-    // The resolved view that the subpipeline targets, populated by
-    // LiteParsedDocumentSourceNestedPipelines::bindResolvedNamespace at parse time. Null when the
-    // subpipeline target is not a view. Lets DocumentSourceUnionWith construction consume the
-    // resolved view directly, without re-looking it up from expCtx->getResolvedNamespaces().
-    std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView;
+    // The resolved backing namespace the subpipeline targets, populated by
+    // LiteParsedDocumentSourceNestedPipelines::bindResolvedNamespace at parse time. Identity
+    // (not-a-view) unless a view was stitched; check `.involvedNamespaceIsAView`.
+    ResolvedNamespace resolvedBackingNss;
 
 private:
     // Owns the BSON buffer that DefaultStageParams::_originalSpec points into.
@@ -123,15 +122,17 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const override;
 
-    void bindResolvedNamespace(const ResolvedNamespace& view,
-                               const ResolvedNamespaceMap& resolvedNamespaces) override;
-
     bool hasExtensionVectorSearchStage() const override;
 
     bool hasExtensionSearchStage() const override;
 
     static void validateUnionWithCollectionlessPipeline(
         const boost::optional<std::vector<mongo::BSONObj>>& pipeline);
+
+protected:
+    bool needsViewSubpipelineMaterialized() const override {
+        return _pipelines.empty();
+    }
 
 private:
     std::vector<BSONObj> _rawPipeline;

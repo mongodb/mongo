@@ -125,17 +125,17 @@ public:
                             std::vector<BSONObj> pipeline,
                             bool hasForeignDB = false);
 
-    // Constructor that accepts a pre-desugared LiteParsedPipeline for the subpipeline.
-    // Uses Pipeline::parseFromLiteParsed instead of re-parsing from BSON. 'resolvedSubPipelineView'
-    // is the resolved view recorded by
-    // LiteParsedDocumentSourceNestedPipelines::bindResolvedNamespace at parse time; if non-null, it
-    // short-circuits the expCtx->getResolvedNamespaces() lookup that otherwise has to find the
-    // foreign namespace's resolved view.
+    // Constructor used by createFromStageParams(): accepts pre-parsed StageParams for the
+    // subpipeline together with the user-facing fields that the copy constructor and serialize()
+    // require. 'resolvedBackingNss' is the resolved backing namespace recorded by
+    // bindResolvedNamespace at parse time; when it is a view (involvedNamespaceIsAView), it
+    // short-circuits the expCtx->getResolvedNamespaces() lookup because the view was already
+    // resolved.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
                             StageParamsPipeline subpipelineStageParams,
                             std::vector<BSONObj> userPipeline,
-                            std::shared_ptr<ResolvedNamespace> resolvedSubPipelineView,
+                            ResolvedNamespace resolvedBackingNss,
                             bool hasForeignDB);
 
     // Expose a constructor that skips the parsing step for testing purposes.

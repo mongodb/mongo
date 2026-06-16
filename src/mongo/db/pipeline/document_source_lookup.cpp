@@ -522,7 +522,7 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
                                              std::move(localForeignFields),
                                              std::move(params.unwindSpec),
                                              expCtx,
-                                             !params.isPlaceholderInjected);
+                                             !params.noUserPipeline);
 
     if (const auto& idx = params.internalFieldMatchPipelineIdx)
         relocateFieldMatchPlaceholder(lookupStage, static_cast<size_t>(*idx));

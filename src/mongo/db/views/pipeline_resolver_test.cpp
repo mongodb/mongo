@@ -145,17 +145,17 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
     ASSERT_EQ(innerStages[0]->getParseTimeName(), "$match"_sd);
     ASSERT_EQ(innerStages[1]->getParseTimeName(), "$match"_sd);
 
-    // The recursive resolver should have bound the resolved subpipeline view onto the parent
-    // $unionWith stage so downstream DocumentSource construction can skip a per-stage view
-    // application.
-    auto resolvedSubPipelineView = userLpp.getStages()[0]->getResolvedSubPipelineView();
-    ASSERT_TRUE(resolvedSubPipelineView != nullptr);
-    ASSERT_EQ(resolvedSubPipelineView->getNamespace(), kUnionViewNss);
+    // The recursive resolver should have upgraded the resolved backing namespace on the parent
+    // $unionWith stage to the view, so downstream DocumentSource construction can skip a per-stage
+    // view application.
+    auto resolvedBackingNss = userLpp.getStages()[0]->getResolvedBackingNss();
+    ASSERT_TRUE(resolvedBackingNss.involvedNamespaceIsAView);
+    ASSERT_EQ(resolvedBackingNss.getNamespace(), kUnionViewNss);
 }
 
 TEST(PipelineResolverTest, ResolverDoesNotBindResolvedSubpipelineViewOnNonViewTarget) {
     // $unionWith targeting a regular collection (not a view) should leave the parent stage's
-    // resolved-view marker null.
+    // resolved backing namespace at its identity default (not a view).
     const NamespaceString kLocalUserNss =
         NamespaceString::createNamespaceString_forTest("test", "userColl");
     const NamespaceString kForeignNss =
@@ -171,8 +171,11 @@ TEST(PipelineResolverTest, ResolverDoesNotBindResolvedSubpipelineViewOnNonViewTa
     PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
         &userLpp, kLocalUserNss, emptyMap);
 
-    // No view in the map → parent stage should not have a resolved subpipeline view bound.
-    ASSERT_TRUE(userLpp.getStages()[0]->getResolvedSubPipelineView() == nullptr);
+    // No view in the map → parent stage's resolved backing namespace stays at its identity default:
+    // not a view, and pointing at the user-provided foreign namespace.
+    auto resolvedBackingNss = userLpp.getStages()[0]->getResolvedBackingNss();
+    ASSERT_FALSE(resolvedBackingNss.involvedNamespaceIsAView);
+    ASSERT_EQ(resolvedBackingNss.getNamespace(), kForeignNss);
 }
 
 TEST(PipelineResolverTest, WalkerRespectsViewPolicyKDoNothing) {

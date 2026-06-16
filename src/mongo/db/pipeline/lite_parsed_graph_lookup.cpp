@@ -36,7 +36,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_graph_lookup_gen.h"
-#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -210,26 +209,6 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
                                                    maxDepth,
                                                    options,
                                                    std::move(fromPipeline));
-}
-
-void LiteParsedGraphLookUp::bindResolvedNamespace(const ResolvedNamespace& view,
-                                                  const ResolvedNamespaceMap& resolvedNamespaces) {
-    // Save the view's LPP as this LPDS's subpipeline.
-    if (!_foreignNss) {
-        return;
-    }
-    // _pipelines may already be pre-populated from $_internalFromPipeline when a shard receives a
-    // pre-resolved pipeline from mongos.
-    if (!_pipelines.empty()) {
-        return;
-    }
-    auto it = resolvedNamespaces.find(*_foreignNss);
-    if (it == resolvedNamespaces.end() || !it->second.involvedNamespaceIsAView) {
-        return;
-    }
-    _pipelines.emplace_back(
-        it->second.ns, it->second.pipeline, LiteParserOptions{.ifrContext = _ifrContext});
-    LiteParsedDesugarer::desugar(&(*_pipelines.back()), _ifrContext);
 }
 
 PrivilegeVector LiteParsedGraphLookUp::requiredPrivileges(bool isMongos,

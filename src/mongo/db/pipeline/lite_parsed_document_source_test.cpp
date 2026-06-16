@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -467,13 +468,13 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
                                   BSONObj{},
                                   opts));
 
-    // bindResolvedNamespace with an empty sentinel should still bind the subpipeline view from the
-    // map.
+    // bindResolvedNamespace with an empty sentinel should still upgrade the resolved backing
+    // namespace from the map.
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
-    auto bound = stage->getResolvedSubPipelineView();
-    ASSERT_TRUE(bound != nullptr);
-    ASSERT_EQ(bound->getNamespace(), kForeignNss);
+    auto backingNss = stage->getResolvedBackingNss();
+    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 }
 
 TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
@@ -487,11 +488,188 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     LiteParsedPipeline lpp(kTestNss, pipelineStages);
     auto& stage = lpp.getStages()[0];
 
-    // Empty map → subpipeline target isn't a view.
+    // Empty map → subpipeline target isn't a view, so the resolved backing namespace stays at its
+    // identity default (not a view).
     ResolvedNamespaceMap map;
     stage->bindResolvedNamespace(ResolvedNamespace{}, map);
 
-    ASSERT_TRUE(stage->getResolvedSubPipelineView() == nullptr);
+    ASSERT_FALSE(stage->getResolvedBackingNss().involvedNamespaceIsAView);
+}
+
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     UnionWithShorthandBindsViewAndMaterializesPipeline) {
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "viewColl");
+    const NamespaceString kBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "backingColl");
+
+    // Shorthand: {$unionWith: "viewColl"} (no pipeline field).
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$unionWith" << "viewColl"),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages);
+    auto& stage = lpp.getStages()[0];
+
+    // Before bind: _pipelines must be empty so needsViewSubpipelineMaterialized() returns true.
+    ASSERT_TRUE(stage->getMutableSubPipelines() != nullptr);
+    ASSERT_TRUE(stage->getMutableSubPipelines()->empty());
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kForeignNss,
+                ResolvedNamespace(kForeignNss,
+                                  kBackingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("v" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
+
+    // _resolvedBackingNss must be set to the view entry.
+    auto backingNss = stage->getResolvedBackingNss();
+    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
+
+    // The view pipeline must have been materialized into _pipelines.
+    auto* subPipelines = stage->getMutableSubPipelines();
+    ASSERT_NE(subPipelines, nullptr);
+    ASSERT_FALSE(subPipelines->empty());
+}
+
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     GraphLookupShorthandBindsViewAndMaterializesPipeline) {
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "viewColl");
+    const NamespaceString kBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "backingColl");
+
+    // Minimal valid $graphLookup — no internal pipeline field, so _pipelines starts empty.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$graphLookup" << BSON("from" << "viewColl"
+                                           << "startWith"
+                                           << "$x"
+                                           << "connectFromField"
+                                           << "x"
+                                           << "connectToField"
+                                           << "y"
+                                           << "as"
+                                           << "result")),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages);
+    auto& stage = lpp.getStages()[0];
+
+    // Before bind: no pipeline slot yet.
+    ASSERT_TRUE(stage->getMutableSubPipelines() != nullptr);
+    ASSERT_TRUE(stage->getMutableSubPipelines()->empty());
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kForeignNss,
+                ResolvedNamespace(kForeignNss,
+                                  kBackingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("v" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
+
+    auto backingNss = stage->getResolvedBackingNss();
+    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
+
+    auto* subPipelines = stage->getMutableSubPipelines();
+    ASSERT_NE(subPipelines, nullptr);
+    ASSERT_FALSE(subPipelines->empty());
+}
+
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     LookupShorthandBindsViewAndMaterializesPipeline) {
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "viewColl");
+    const NamespaceString kBackingNss =
+        NamespaceString::createNamespaceString_forTest("test", "backingColl");
+
+    // Build an ifrContext with featureFlagExtensionsInsideHybridSearch = true so that
+    // LiteParsedLookUp::parse sets _noUserPipeline=true and leaves _pipelines empty.
+    std::vector<BSONObj> flagValues{
+        BSON("name" << feature_flags::gFeatureFlagExtensionsInsideHybridSearch.getName() << "value"
+                    << true)};
+    LiteParserOptions options;
+    options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+
+    // No `pipeline:` field — _pipelines stays empty and the view is materialized on bind.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "viewColl"
+                                      << "localField"
+                                      << "a"
+                                      << "foreignField"
+                                      << "b"
+                                      << "as"
+                                      << "result")),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages, false, options);
+    auto& stage = lpp.getStages()[0];
+
+    // Before bind: _pipelines must be empty so needsViewSubpipelineMaterialized() returns true.
+    auto* subPipelinesBefore = stage->getMutableSubPipelines();
+    ASSERT_NE(subPipelinesBefore, nullptr);
+    ASSERT_TRUE(subPipelinesBefore->empty());
+
+    ResolvedNamespaceViewOptions opts;
+    opts.involvedNamespaceIsAView = true;
+    opts.shouldParseLpp = true;
+    ResolvedNamespaceMap map;
+    map.emplace(kForeignNss,
+                ResolvedNamespace(kForeignNss,
+                                  kBackingNss,
+                                  std::vector<BSONObj>{BSON("$match" << BSON("v" << 1))},
+                                  BSONObj{},
+                                  opts));
+
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
+
+    // _resolvedBackingNss must now reflect the view.
+    auto backingNss = stage->getResolvedBackingNss();
+    ASSERT_TRUE(backingNss.involvedNamespaceIsAView);
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
+
+    // The view pipeline must have been materialized into _pipelines.
+    auto* subPipelines = stage->getMutableSubPipelines();
+    ASSERT_NE(subPipelines, nullptr);
+    ASSERT_EQ(subPipelines->size(), 1u);
+    ASSERT_FALSE((*subPipelines)[0]->getStages().empty());
+}
+
+TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
+     UnionWithShorthandAgainstPlainCollectionDoesNotMaterialize) {
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest("test", "regularColl");
+
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$unionWith" << "regularColl"),
+    };
+    LiteParsedPipeline lpp(kTestNss, pipelineStages);
+    auto& stage = lpp.getStages()[0];
+
+    // Empty map — the foreign namespace is not a view.
+    ResolvedNamespaceMap map;
+    stage->bindResolvedNamespace(ResolvedNamespace{}, map);
+
+    // Not a view: involvedNamespaceIsAView must be false.
+    auto backingNss = stage->getResolvedBackingNss();
+    ASSERT_FALSE(backingNss.involvedNamespaceIsAView);
+
+    // Identity default: namespace should equal the foreign nss.
+    ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
+
+    // Nothing was materialized: _pipelines must remain empty.
+    auto* subPipelines = stage->getMutableSubPipelines();
+    ASSERT_NE(subPipelines, nullptr);
+    ASSERT_TRUE(subPipelines->empty());
 }
 
 TEST(LiteParsedPipelineClone, DeferredCachesAreResetInClonedPipeline) {
