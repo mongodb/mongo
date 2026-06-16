@@ -194,4 +194,24 @@ void DeduplicatorReporter::add(int64_t bytesDiff, int64_t recordsDiff) {
     }
 }
 
+void SimpleMemoryUsageTracker::assertWithinMemoryLimit(StringData name) const {
+    if (withinMemoryLimit()) {
+        return;
+    }
+    str::stream msg;
+    msg << name << " needs too much memory. Needs: " << _inUseTrackedMemoryBytes
+        << " bytes. Local memory limit: " << _maxAllowedMemoryUsageBytes << " bytes.";
+    int level = 1;
+    for (const SimpleMemoryUsageTracker* current = _base; current; current = current->_base) {
+        if (current->_base) {
+            msg << " Level " << level << " memory limit: " << current->maxAllowedMemoryUsageBytes()
+                << " bytes.";
+            ++level;
+        } else {
+            msg << " Global memory limit: " << current->maxAllowedMemoryUsageBytes() << " bytes.";
+        }
+    }
+    uasserted(ErrorCodes::ExceededMemoryLimit, msg);
+}
+
 }  // namespace mongo

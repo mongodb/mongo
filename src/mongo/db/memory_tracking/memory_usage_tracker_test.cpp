@@ -29,6 +29,8 @@
 
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -424,6 +426,59 @@ DEATH_TEST_F(DeduplicatorReporterTestDeathTest,
              "Underflow in memory tracking") {
     _reporter.add(100);   // bytes = 100
     _reporter.add(-200);  // would bring bytes to -100
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotThrowWhenUnderLimit) {
+    SimpleMemoryUsageTracker tracker{1000};
+    tracker.add(500);
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr"));
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitDoesNotThrowWhenAtLimit) {
+    SimpleMemoryUsageTracker tracker{1000};
+    tracker.add(1000);
+    ASSERT_DOES_NOT_THROW(tracker.assertWithinMemoryLimit("$testExpr"));
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitThrowsWhenOverLimit) {
+    SimpleMemoryUsageTracker tracker{100};
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "$testExpr");
+        ASSERT_STRING_CONTAINS(ex.reason(), "200");  // current usage
+        ASSERT_STRING_CONTAINS(ex.reason(), "100");  // local limit
+    }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitIncludesGlobalLimitWhenBaseIsSet) {
+    SimpleMemoryUsageTracker base{5000};
+    SimpleMemoryUsageTracker tracker{&base, 100};
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "100");   // local limit
+        ASSERT_STRING_CONTAINS(ex.reason(), "5000");  // global limit from base
+    }
+}
+
+TEST(SimpleMemoryUsageTrackerTest, AssertWithinMemoryLimitOmitsGlobalLimitWhenNoBase) {
+    SimpleMemoryUsageTracker tracker{100};
+    tracker.add(200);
+    try {
+        tracker.assertWithinMemoryLimit("$testExpr");
+        FAIL("Expected ExceededMemoryLimit to be thrown");
+    } catch (const AssertionException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::ExceededMemoryLimit);
+        ASSERT_STRING_CONTAINS(ex.reason(), "100");
+        ASSERT_STRING_OMITS(ex.reason(), "Global memory limit");
+    }
 }
 
 }  // namespace

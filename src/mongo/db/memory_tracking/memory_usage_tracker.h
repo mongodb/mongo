@@ -82,6 +82,12 @@ public:
     }
 
     /**
+     * Throws ExceededMemoryLimit if the current usage exceeds the limit, including a
+     * name, current usage, and limit in the error message.
+     */
+    void assertWithinMemoryLimit(StringData name) const;
+
+    /**
      * Returns a new SimpleMemoryUsageTracker. The copy constructor for this class is purposefully
      * deleted - use this method instead. Note that the members _peakTrackedMemoryBytes and
      * _inUseTrackedMemoryBytes will be initialized to zero.
