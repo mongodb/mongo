@@ -77,3 +77,7 @@ echo "common --color=yes" >>.bazelrc.evergreen # force ANSI colors as parsley ca
 # Disable remote execution in evergreen only since it runs on every PR, but we still
 # want it to be fast on workstations
 echo "coverage --config=no-remote-exec" >>.bazelrc.evergreen
+
+if [[ -n "${bazelrc_flags:-}" ]]; then
+    echo "common ${bazelrc_flags}" >>.bazelrc.evergreen
+fi
