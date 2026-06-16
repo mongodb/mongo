@@ -316,6 +316,18 @@ void ReplicationCoordinatorMock::setMyLastAppliedAndLastWrittenOpTimeAndWallTime
 
     if (opTimeAndWallTime.opTime >= _myLastAppliedOpTime) {
         _setMyLastAppliedOpTimeAndWallTime(lk, opTimeAndWallTime);
+    } else if (_updateCommittedSnapshot) {
+        // Potentially update the allDurable timestamp even if we did not advance lastApplied.
+        if (auto storageEngine = _service->getStorageEngine()) {
+            auto allDurable = storageEngine->getAllDurableTimestamp();
+            if (allDurable > _currentCommittedSnapshotOpTime.getTimestamp()) {
+                _setCurrentCommittedSnapshotOpTime(lk,
+                                                   {allDurable, _myLastAppliedOpTime.getTerm()});
+                if (auto snapshotManager = storageEngine->getSnapshotManager()) {
+                    snapshotManager->setCommittedSnapshot(allDurable);
+                }
+            }
+        }
     }
 }
 
