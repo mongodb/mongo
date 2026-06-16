@@ -51,6 +51,9 @@ Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* 
     auto argValue = expr.getPassedArgs()->evaluate(root, variables);
     uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::array);
 
+    // Invalidate any unowned BSON wrappers retained by JS globals from prior invocations.
+    scope->advanceGeneration();
+
     // This logic exists to desugar $where into $expr + $function. In this case set the global obj
     // to this, to handle cases where the $where function references the current document through
     // obj.

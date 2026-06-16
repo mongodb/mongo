@@ -4,6 +4,7 @@
 //   requires_scripting,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.expression_function;
 coll.drop();
@@ -145,3 +146,44 @@ pipeline = [
     },
 ];
 assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}), 31266);
+
+// Test that retained BSON arguments are invalidated across $function invocations.
+// Requires a single JS scope processing both docs, so skip on mongos where docs may be split
+// across shards with independent scopes.
+(function testBSONArgumentLifetime() {
+    if (FixtureHelpers.isSharded(coll)) {
+        jsTestLog("testBSONArgumentLifetime: skipping on sharded collection as it requires single JS scope");
+        return;
+    }
+
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: 1, x: "first"}));
+    assert.commandWorked(coll.insert({_id: 2, x: "second"}));
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [
+                {$sort: {_id: 1}},
+                {
+                    $project: {
+                        result: {
+                            $function: {
+                                body: function (arg) {
+                                    if (typeof globalThis.savedArg === "undefined") {
+                                        globalThis.savedArg = arg;
+                                        return "saved";
+                                    }
+                                    return globalThis.savedArg.x;
+                                },
+                                args: ["$$ROOT"],
+                                lang: "js",
+                            },
+                        },
+                    },
+                },
+            ],
+            cursor: {},
+        }),
+        ErrorCodes.BadValue,
+    );
+})();
