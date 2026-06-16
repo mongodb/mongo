@@ -300,7 +300,7 @@ TEST_F(RateLimiterWithMockClockTest, NegativeMaxQueueDepthDisablesQueueing) {
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
 
     auto tokenResult = rateLimiter.acquireToken();
-    ASSERT_EQ(tokenResult.getStatus(), Status(RateLimiter::kRejectedErrorCode, ""));
+    ASSERT_FALSE(tokenResult);
     ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 0);
     ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
     ASSERT_EQ(rateLimiter.queued(), 0);
@@ -431,8 +431,8 @@ TEST_F(RateLimiterWithPreciseClockSpyTest,
 
     // Acquire a deferred token: non-ready, positive napTime.
     auto deferredResult = rateLimiter.acquireToken();
-    ASSERT_OK(deferredResult);
-    auto& deferred = deferredResult.getValue();
+    ASSERT_TRUE(deferredResult);
+    auto& deferred = *deferredResult;
     ASSERT_FALSE(deferred.isReady());
 
     // Advance both tick source and clock past the token's ready time. This simulates the race
@@ -694,8 +694,8 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenRecordExemptionAndReleaseQueue
 
     {
         auto tokenResult = rateLimiter.acquireToken();
-        ASSERT(tokenResult.isOK());
-        auto deferredToken = std::move(tokenResult.getValue());
+        ASSERT_TRUE(tokenResult);
+        auto deferredToken = std::move(*tokenResult);
         ASSERT_FALSE(deferredToken.isReady());
         // Token is borrowed (bucket goes negative).
         ASSERT_EQ(rateLimiter.tokenBalance(), -1);
@@ -727,8 +727,8 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenDestructorCleansUpDroppedNonRe
 
     {
         auto tokenResult = rateLimiter.acquireToken();
-        ASSERT(tokenResult.isOK());
-        auto deferredToken = std::move(tokenResult.getValue());
+        ASSERT_TRUE(tokenResult);
+        auto deferredToken = std::move(*tokenResult);
         ASSERT_FALSE(deferredToken.isReady());
         ASSERT_EQ(rateLimiter.tokenBalance(), -1);
         ASSERT_EQ(rateLimiter.queued(), 1);
@@ -751,8 +751,8 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenReadyDestructorIsNoOp) {
 
     {
         auto tokenResult = rateLimiter.acquireToken();
-        ASSERT(tokenResult.isOK());
-        auto deferredToken = std::move(tokenResult.getValue());
+        ASSERT_TRUE(tokenResult);
+        auto deferredToken = std::move(*tokenResult);
         ASSERT_TRUE(deferredToken.isReady());
         // For ready DeferredTokens, acquireToken() already incremented successfulAdmissions.
         ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
@@ -776,10 +776,10 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenMoveSemantics) {
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
 
     auto tokenResult = rateLimiter.acquireToken();
-    ASSERT(tokenResult.isOK());
+    ASSERT_TRUE(tokenResult);
 
     {
-        auto deferredToken1 = std::move(tokenResult.getValue());
+        auto deferredToken1 = std::move(*tokenResult);
         ASSERT_FALSE(deferredToken1.isReady());
         ASSERT_EQ(rateLimiter.queued(), 1);
 

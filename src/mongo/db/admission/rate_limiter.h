@@ -182,9 +182,9 @@ public:
      * either ready (the token was immediately available) or queued (the token was not immediately
      * available and the caller must wait for the slot to become valid).
      *
-     * Returns an error if the max queue depth is exceeded.
+     * Returns boost::none if no tokens are available and the max queue depth is exceeded.
      */
-    StatusWith<DeferredToken> acquireToken(double numTokensToConsume = 1.0);
+    boost::optional<DeferredToken> acquireToken(double numTokensToConsume = 1.0);
 
     /**
      * Convenience method that acquires a token and blocks until it is ready. This is equivalent to

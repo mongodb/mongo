@@ -200,32 +200,29 @@ const Status& IngressRequestRateLimiter::rejectionStatus() {
     return kIngressRequestRateLimitExceededError;
 }
 
-Status IngressRequestRateLimiter::admitRequest(Client* client) {
+bool IngressRequestRateLimiter::admitRequest(Client* client) {
     if (ClientAdmissionControlState::isExempted(client)) {
         _rateLimiter.recordExemption();
-        return Status::OK();
+        return true;
     }
 
     auto tokenResult = _rateLimiter.acquireToken();
-    if (MONGO_likely(tokenResult.isOK())) {
-        if (!tokenResult.getValue().isReady()) {
+    if (MONGO_likely(tokenResult)) {
+        if (!tokenResult->isReady()) {
             // The rate limiter issued a non-ready DeferredToken, store it on the client to resolve
             // later in the request pipeline.
             dassert(!getDeferredAdmissionToken(client).has_value(),
                     "Client already has a deferred admission token");
-            getDeferredAdmissionToken(client).emplace(std::move(tokenResult.getValue()));
+            getDeferredAdmissionToken(client).emplace(std::move(*tokenResult));
         }
 
         // The rate limiter's DeferredToken is ready now, the token was already consumed and stats
         // were recorded. Dropping the DeferredToken here is intentional, the destructor is a no-op
         // for ready DeferredTokens.
-        return Status::OK();
+        return true;
     }
 
-    if (tokenResult.getStatus() == RateLimiter::kRejectedErrorCode) {
-        return kIngressRequestRateLimitExceededError;
-    }
-    return tokenResult.getStatus();
+    return false;
 }
 
 Status IngressRequestRateLimiter::waitForAdmission(OperationContext* opCtx,

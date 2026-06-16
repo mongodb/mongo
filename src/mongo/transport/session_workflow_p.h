@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/protocol.h"
@@ -37,11 +36,6 @@
 namespace mongo::transport {
 
 /** Build a `DbResponse` carrying a rate-limit-rejection error for `message`. */
-DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Status& status);
-
-/** Build a rate limiter error message we can use to build an error DbResponse or template. */
-Message makeRateLimitErrorMessage(rpc::Protocol protocol,
-                                  const Status& status,
-                                  long long retryAfterMs);
+DbResponse makeDbResponseErrorForRateLimiting(const Message& message);
 
 }  // namespace mongo::transport

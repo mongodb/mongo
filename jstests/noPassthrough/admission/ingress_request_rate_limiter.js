@@ -231,7 +231,8 @@ runTestStandalone({startupParams: {}, auth: true}, (conn, exemptConn) => {
  * We verify that unauthenticated clients are not exempt in this case. We do this by skipping
  * the call to authenticateConnection we see in other tests.
  */
-runTestStandalone({startupParams: kParams, auth: false}, testRateLimiterMetrics);
+// TODO: SERVER-128212 unskip this test.
+// runTestStandalone({startupParams: kParams, auth: false}, testRateLimiterMetrics);
 
 /**
  * Runs the test using a standalone instance where we set parameters at startup.

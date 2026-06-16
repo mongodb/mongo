@@ -276,13 +276,13 @@ RateLimiter::RateLimiter(double refreshRatePerSec,
 
 RateLimiter::~RateLimiter() = default;
 
-StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numTokensToConsume) {
+boost::optional<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numTokensToConsume) {
     const bool hangInLimiter = hangInRateLimiter.shouldFail();
     const auto maxQueueDepth = _impl->maxQueueDepth.loadRelaxed();
     if (!hangInLimiter && (maxQueueDepth <= 0 || _impl->queued.load() >= maxQueueDepth)) {
         // Queueing unavailable (disabled or currently full): use try-acquire semantics.
         if (!tryAcquireToken(numTokensToConsume)) {
-            return _impl->rejectedStatus;
+            return boost::none;
         }
         _impl->stats.averageTimeQueuedMicros.addSample(0);
         return DeferredToken(_impl.get(), numTokensToConsume, Milliseconds{0}, Milliseconds{0});
@@ -306,7 +306,7 @@ StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numToken
         if (auto status = _impl->enqueue(); !status.isOK()) {
             _impl->readScopedTokenBucket().returnTokens(numTokensToConsume);
             _impl->stats.rejectedAdmissions.incrementRelaxed();
-            return status;
+            return boost::none;
         }
         _impl->stats.addedToQueue.incrementRelaxed();
         return DeferredToken(_impl.get(), numTokensToConsume, _impl->nowInMillis(), napTime);
@@ -321,10 +321,10 @@ StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numToken
 
 Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToConsume) {
     auto tokenResult = acquireToken(numTokensToConsume);
-    if (!tokenResult.isOK()) {
-        return tokenResult.getStatus();
+    if (!tokenResult) {
+        return _impl->rejectedStatus;
     }
-    return std::move(tokenResult.getValue()).get(opCtx);
+    return std::move(*tokenResult).get(opCtx);
 }
 
 bool RateLimiter::tryAcquireToken(double numTokensToConsume) {

@@ -50,13 +50,13 @@ public:
     static IngressRequestRateLimiter& get(ServiceContext* svcCtx);
 
     /**
-     * Attempts to admit a request into the system. Returns an error status if the rate limit and
+     * Attempts to admit a request into the system. Returns false if the rate limit and
      * burst capacity are exceeded AND the queue is at capacity (if configured).
      *
-     * If an admission is queued a DeferredToken is stored on a client decoration which will be
+     * If an admission is queued, a DeferredToken is stored on a client decoration which will be
      * resolved later in the request pipeline.
      */
-    Status admitRequest(Client* client);
+    bool admitRequest(Client* client);
 
     /**
      * Returns the canonical rejection Status that `admitRequest` returns when the rate limit is

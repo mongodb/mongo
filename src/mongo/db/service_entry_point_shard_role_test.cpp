@@ -332,10 +332,10 @@ TEST_F(ServiceEntryPointShardServerTest, WaitForAdmissionResolvesDeferredTokenBe
     auto opCtx = makeOperationContext();
     ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
     auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_OK(queuedTokenResult.getStatus());
-    ASSERT_FALSE(queuedTokenResult.getValue().isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
-        opCtx->getClient(), std::move(queuedTokenResult.getValue()));
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
+    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
+                                                                 std::move(*queuedTokenResult));
 
     // Mark this client as a direct client so that waitForAdmission exempts it rather than sleeping
     // on the mock clock. We are just testing that waitForAdmission resolves the deferred token and
@@ -360,11 +360,11 @@ TEST_F(ServiceEntryPointShardServerTest,
     auto opCtx = makeOperationContext();
     ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
     auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_OK(queuedTokenResult.getStatus());
-    ASSERT_FALSE(queuedTokenResult.getValue().isReady());
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
 
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
-        opCtx->getClient(), std::move(queuedTokenResult.getValue()));
+    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
+                                                                 std::move(*queuedTokenResult));
 
     auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
     ASSERT_OK(handleRequest(msg, opCtx.get()));
@@ -389,10 +389,10 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionInterrupted) {
 
     ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
     auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_OK(queuedTokenResult.getStatus());
-    ASSERT_FALSE(queuedTokenResult.getValue().isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
-        client, std::move(queuedTokenResult.getValue()));
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
+    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
+                                                                 std::move(*queuedTokenResult));
 
     // handleRequest blocks in waitForAdmission while the queued token's napTime elapses. A
     // background thread waits until the opCtx is blocking there, then kills it to trigger
@@ -440,10 +440,10 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionRespectsMaxTimeMS) {
 
     ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
     auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_OK(queuedTokenResult.getStatus());
-    ASSERT_FALSE(queuedTokenResult.getValue().isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
-        client, std::move(queuedTokenResult.getValue()));
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
+    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
+                                                                 std::move(*queuedTokenResult));
 
     // handleRequest parses maxTimeMS from the message and sets the opCtx deadline. A background
     // thread waits until the opCtx is blocking in waitForAdmission, then advances the mock clock
@@ -493,10 +493,10 @@ TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSuccee
 
     ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
     auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_OK(queuedTokenResult.getStatus());
-    ASSERT_FALSE(queuedTokenResult.getValue().isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
-        client, std::move(queuedTokenResult.getValue()));
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
+    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
+                                                                 std::move(*queuedTokenResult));
 
     // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
     // 1 token/sec) elapses. A background thread waits until the opCtx is blocking, then advances

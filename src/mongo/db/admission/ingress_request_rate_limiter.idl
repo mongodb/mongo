@@ -88,6 +88,16 @@ server_parameters:
             override_set: true
         redact: false
 
+    ingressRequestRateLimiterAllowRetries:
+        description: >-
+            Whether or not rejections from the rate limiter should indicate to clients that the error is
+            retryable.
+        set_at: [startup, runtime]
+        cpp_varname: gIngressRequestRateLimiterAllowRetries
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+
     ingressRequestAdmissionMaxQueueDepth:
         description: >-
             The maximum number of requests that may be queued waiting for an admission token when
