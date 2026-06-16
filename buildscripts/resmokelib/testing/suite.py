@@ -87,6 +87,7 @@ class Suite(object):
         self._excluded = None
 
         self.return_code = None  # Set by the executor.
+        self._tss_skipped_tests: list[str] = []
 
         self._suite_start_time = None
         self._suite_end_time = None
@@ -202,7 +203,7 @@ class Suite(object):
                 test_selection_strategy = (
                     _config.EVERGREEN_TEST_SELECTION_STRATEGY
                     if _config.EVERGREEN_TEST_SELECTION_STRATEGY is not None
-                    else ["NotFailing"]
+                    else ["ExcludeManuallyQuarantined"]
                 )
                 request = {
                     "project_id": str(_config.EVERGREEN_PROJECT_NAME),
@@ -234,9 +235,10 @@ class Suite(object):
                     except TimeoutError:
                         loggers.ROOT_EXECUTOR_LOGGER.info("TSS took too long or never finished")
                         select_tests_succeeds_flag = False
-                    except Exception:
+                    except Exception as exc:
                         loggers.ROOT_EXECUTOR_LOGGER.info(
-                            f"Failure using the select tests evergreen endpoint with the following request:\n{request}"
+                            f"Failure using the select tests evergreen endpoint with the following request:\n{request}\nException: {exc}",
+                            exc_info=True,
                         )
                         select_tests_succeeds_flag = False
 
@@ -259,6 +261,7 @@ class Suite(object):
                         loggers.ROOT_EXECUTOR_LOGGER.info(
                             f"to exclude the following tests: {evergreen_excluded_tests}"
                         )
+                        self._tss_skipped_tests = list(evergreen_excluded_tests)
                         excluded.extend(evergreen_excluded_tests)
                         tests = tss_selected
 
@@ -509,7 +512,9 @@ class Suite(object):
         if self.options.time_repeat_tests_secs:
             num_skipped = 0
         else:
-            num_tests = len(self.tests) * self.options.num_repeat_tests
+            num_tests = (
+                len(self.tests) + len(self._tss_skipped_tests)
+            ) * self.options.num_repeat_tests
             num_skipped = num_tests + report.num_dynamic - num_run
 
         if report.num_succeeded == num_run and num_skipped == 0:
@@ -562,6 +567,13 @@ class Suite(object):
             )
             for test_name in test_names:
                 sb.append("    %s" % (test_name))
+
+        if self._tss_skipped_tests:
+            sb.append(
+                f"The following {len(self._tss_skipped_tests)} test(s) were skipped by test selection:"
+            )
+            for test_name in sorted(self._tss_skipped_tests):
+                sb.append("    %s" % test_name)
 
         return summary
 
