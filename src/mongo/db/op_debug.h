@@ -657,19 +657,43 @@ public:
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
 
     // Tracks the amount of dynamic indexed loop joins in a pushed down stage.
-    int dynamicIndexedLoopJoin{0};
+    int lookupDynamicIndexedLoopJoin{0};
 
     // Tracks the amount of indexed loop joins in a pushed down lookup stage.
-    int indexedLoopJoin{0};
+    int lookupIndexedLoopJoin{0};
 
     // Tracks the amount of nested loop joins in a pushed down lookup stage.
-    int nestedLoopJoin{0};
+    int lookupNestedLoopJoin{0};
 
     // Tracks the amount of hash lookups in a pushed down lookup stage.
-    int hashLookup{0};
+    int lookupHashLookup{0};
 
     // Tracks the amount of spills by hash lookup in a pushed down lookup stage.
     int hashLookupSpillToDisk{0};
+
+    // Tracks the amount of indexed loop joins in a pushed down lookup+unwind stage.
+    int luIndexedLoopJoin{0};
+
+    // Tracks the amount of nested loop joins in a pushed down lookup+unwind stage.
+    int luNestedLoopJoin{0};
+
+    // Tracks the amount of hash lookups in a pushed down lookup+unwind stage.
+    int luHashLookup{0};
+
+    // Tracks the amount of dynamic indexed loop joins in a pushed down lookup+unwind stage.
+    int luDynamicIndexedLoopJoin{0};
+
+    // Local-side plan shape is tracked for LU but not plain $lookup because the LU IFR rollout
+    // flags gate pushdown based on local plan shape, requiring per-shape observability.
+    // Tracks the amount of local collection scans in a pushed down lookup+unwind stage.
+    int luLocalCollscan{0};
+
+    // Tracks the amount of local index scan + fetch plans in a pushed down lookup+unwind stage.
+    int luLocalIxscanFetch{0};
+
+    // Tracks the amount of complex local plan types (e.g. OR of indexes) in a pushed down
+    // lookup+unwind stage.
+    int luLocalComplex{0};
 
     // Tracks the number of spilled bytes by hash lookup in a pushed down lookup stage. The spilled
     // storage size after compression might be different from the bytes spilled.

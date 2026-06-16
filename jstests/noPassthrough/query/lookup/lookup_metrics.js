@@ -8,6 +8,8 @@ const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}}
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
+
+const initialLuCounters = db.serverStatus().metrics.query.lookupUnwind;
 assert.commandWorked(db.dropDatabase());
 
 // Set up the database.
@@ -178,5 +180,9 @@ expectedCounters = generateExpectedCounters(
 );
 assert.eq(db.people.aggregate(pipeline).itcount(), 4 /* Matching results */);
 compareLookupCounters(expectedCounters);
+
+// Plain $lookup must not increment LU counters.
+const finalLuCounters = db.serverStatus().metrics.query.lookupUnwind;
+assert.docEq(initialLuCounters, finalLuCounters, "LU counters should not change for plain $lookup");
 
 MongoRunner.stopMongod(conn);

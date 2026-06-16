@@ -458,6 +458,44 @@ public:
 };
 extern LookupPushdownCounters lookupPushdownCounters;
 
+/**
+ * Counters tracking $lookup+$unwind (LU) IFR flag metrics: join strategy and local-side plan shape.
+ * TODO SERVER-128934: Add spill counters once LU and plain $lookup spill paths are separated.
+ */
+class LookupUnwindPushdownCounters {
+public:
+    LookupUnwindPushdownCounters() = default;
+    LookupUnwindPushdownCounters(LookupUnwindPushdownCounters&) = delete;
+    LookupUnwindPushdownCounters& operator=(const LookupUnwindPushdownCounters&) = delete;
+
+    void incrementLookupUnwindCountersPerQuery(int luIndexedLoopJoin,
+                                               int luNestedLoopJoin,
+                                               int luHashLookup,
+                                               int luDynamicIndexedLoopJoin,
+                                               int luLocalCollscan,
+                                               int luLocalIxscanFetch,
+                                               int luLocalComplex) {
+        inljCounter.incrementRelaxed(luIndexedLoopJoin);
+        nljCounter.incrementRelaxed(luNestedLoopJoin);
+        hjCounter.incrementRelaxed(luHashLookup);
+        dinljCounter.incrementRelaxed(luDynamicIndexedLoopJoin);
+        localCollscanCounter.incrementRelaxed(luLocalCollscan);
+        localIxscanFetchCounter.incrementRelaxed(luLocalIxscanFetch);
+        localComplexCounter.incrementRelaxed(luLocalComplex);
+    }
+
+    Counter64& inljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.indexedLoopJoin"};
+    Counter64& nljCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.nestedLoopJoin"};
+    Counter64& hjCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.hashLookup"};
+    Counter64& dinljCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.dynamicIndexedLoopJoin"};
+    Counter64& localCollscanCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.localCollscan"};
+    Counter64& localIxscanFetchCounter =
+        *MetricBuilder<Counter64>{"query.lookupUnwind.localIxscanFetch"};
+    Counter64& localComplexCounter = *MetricBuilder<Counter64>{"query.lookupUnwind.localComplex"};
+};
+extern LookupUnwindPushdownCounters lookupUnwindPushdownCounters;
+
 /** Counters tracking group stats across all execution engines. */
 class GroupCounters : public SpillingCounters {
 public:

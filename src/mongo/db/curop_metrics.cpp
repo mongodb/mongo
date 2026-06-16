@@ -167,10 +167,18 @@ private:
     static void _updateExternalStats(const OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
         auto& debug = curOp->debug();
-        lookupPushdownCounters.incrementLookupCountersPerQuery(debug.nestedLoopJoin,
-                                                               debug.indexedLoopJoin,
-                                                               debug.hashLookup,
-                                                               debug.dynamicIndexedLoopJoin);
+        lookupPushdownCounters.incrementLookupCountersPerQuery(debug.lookupNestedLoopJoin,
+                                                               debug.lookupIndexedLoopJoin,
+                                                               debug.lookupHashLookup,
+                                                               debug.lookupDynamicIndexedLoopJoin);
+        lookupUnwindPushdownCounters.incrementLookupUnwindCountersPerQuery(
+            debug.luIndexedLoopJoin,
+            debug.luNestedLoopJoin,
+            debug.luHashLookup,
+            debug.luDynamicIndexedLoopJoin,
+            debug.luLocalCollscan,
+            debug.luLocalIxscanFetch,
+            debug.luLocalComplex);
         sortCounters.incrementSortCountersPerQuery(debug.sortTotalDataSizeBytes, debug.keysSorted);
         queryFrameworkCounters.incrementQueryEngineCounters(curOp);
     }

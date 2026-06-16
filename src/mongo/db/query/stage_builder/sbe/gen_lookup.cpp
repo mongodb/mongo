@@ -740,7 +740,11 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     boost::optional<sbe::value::SlotId> indexSlot) {
     SbBuilder b(state, nodeId);
 
-    CurOp::get(state.opCtx)->debug().nestedLoopJoin += 1;
+    if (unwindSpec.has_value()) {
+        CurOp::get(state.opCtx)->debug().luNestedLoopJoin += 1;
+    } else {
+        CurOp::get(state.opCtx)->debug().lookupNestedLoopJoin += 1;
+    }
 
     // Build the outer branch that produces the set of local key values.
     auto [localKeySlot, outerRootStage] =
@@ -1131,7 +1135,11 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     boost::optional<sbe::value::SlotId> indexSlot) {
     SbBuilder b(state, nodeId);
 
-    CurOp::get(state.opCtx)->debug().indexedLoopJoin += 1;
+    if (unwindSpec.has_value()) {
+        CurOp::get(state.opCtx)->debug().luIndexedLoopJoin += 1;
+    } else {
+        CurOp::get(state.opCtx)->debug().lookupIndexedLoopJoin += 1;
+    }
 
     // Build the outer branch that produces the correlated local key slot.
     auto [localKeysSetSlot, localKeysSetStage] =
@@ -1232,7 +1240,11 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
 
     SbBuilder b(state, nodeId);
 
-    CurOp::get(state.opCtx)->debug().dynamicIndexedLoopJoin += 1;
+    if (unwindSpec.has_value()) {
+        CurOp::get(state.opCtx)->debug().luDynamicIndexedLoopJoin += 1;
+    } else {
+        CurOp::get(state.opCtx)->debug().lookupDynamicIndexedLoopJoin += 1;
+    }
 
     // Build the index Lookup branch
     auto [localKeysSetSlot, localKeysSetStage] =
@@ -1327,7 +1339,11 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
     boost::optional<sbe::value::SlotId> indexSlot) {
     SbBuilder b(state, nodeId);
 
-    CurOp::get(state.opCtx)->debug().hashLookup += 1;
+    if (unwindSpec.has_value()) {
+        CurOp::get(state.opCtx)->debug().luHashLookup += 1;
+    } else {
+        CurOp::get(state.opCtx)->debug().lookupHashLookup += 1;
+    }
 
     // Build the outer branch that produces the correlated local key slot.
     auto [localKeysSetSlot, localKeysSetStage] =
@@ -1392,8 +1408,13 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
  */
 std::pair<SbSlot, SbStage> buildNonExistentForeignCollLookupStage(SbStage localStage,
                                                                   const PlanNodeId nodeId,
-                                                                  StageBuilderState& state) {
+                                                                  StageBuilderState& state,
+                                                                  bool isLookupUnwind) {
     SbBuilder b(state, nodeId);
+
+    if (isLookupUnwind) {
+        CurOp::get(state.opCtx)->debug().luNestedLoopJoin += 1;
+    }
 
     auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
     auto emptyArrayConstant = b.makeConstant(emptyArrayTag, emptyArrayVal);
@@ -1525,8 +1546,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
             // plan stages and it has messier semantics. Builds a project stage that projects an
             // empty array for each local document.
             case EqLookupNode::LookupStrategy::kNonExistentForeignCollection: {
-                return buildNonExistentForeignCollLookupStage(
-                    std::move(localStage), eqLookupNode->nodeId(), _state);
+                return buildNonExistentForeignCollLookupStage(std::move(localStage),
+                                                              eqLookupNode->nodeId(),
+                                                              _state,
+                                                              eqLookupNode->unwindSpec.has_value());
             }
             case EqLookupNode::LookupStrategy::kIndexedLoopJoin:
             case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
@@ -1632,6 +1655,23 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                 MONGO_UNREACHABLE_TASSERT(5842605);
         }  // switch lookupStrategy
     }();
+
+    // The local-side plan type is only visible here via the QSN children; the strategy
+    // build methods operate on pre-built SBE stages and cannot inspect the QSN node type.
+    if (eqLookupNode->unwindSpec.has_value()) {
+        auto& debug = CurOp::get(_state.opCtx)->debug();
+
+        const auto* localChild = eqLookupNode->children[0].get();
+        if (localChild->getType() == STAGE_COLLSCAN) {
+            debug.luLocalCollscan += 1;
+        } else if (localChild->getType() == STAGE_FETCH && localChild->children.size() == 1 &&
+                   localChild->children[0]->getType() == STAGE_IXSCAN) {
+            debug.luLocalIxscanFetch += 1;
+        } else {
+            // Any complex local plan (e.g. OR of indexes, distinct scan).
+            debug.luLocalComplex += 1;
+        }
+    }
 
     if (eqLookupNode->unwindSpec &&
         eqLookupNode->lookupStrategy ==
