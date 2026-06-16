@@ -899,18 +899,39 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     }
-    ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
-        opCtx,
-        updatedCoordinatorDoc.getSourceNss(),
-        [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Remove entry for this resharding operation from config.reshardingOperations
-            writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
+    auto changeMetadataFunc = [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        // Remove entry for this resharding operation from config.reshardingOperations
+        writeToCoordinatorStateNss(opCtx, metrics, updatedCoordinatorDoc, txnNumber);
 
-            // Remove the resharding fields from the config.collections entry
-            updateConfigCollectionsForOriginalNss(
-                opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-        },
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+        // Remove the resharding fields from the config.collections entry
+        updateConfigCollectionsForOriginalNss(
+            opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
+    };
+
+    const bool isAuthoritative = updatedCoordinatorDoc.getAuthoritativeMetadataAccessLevel() >=
+        ReshardingAuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
+    if (isAuthoritative) {
+        // In the authoritative model the owning shards already hold the final,
+        // reshardingFields-free filtering metadata, committed directly to them during the temporary
+        // collection rename, and no participant acts on reshardingFields once the decision has been
+        // committed. Bumping the collection placement version here would only advance the config
+        // server ahead of the owning shard's authoritative version, which then rejects the next
+        // chunk migration. So remove the resharding state without bumping. Routers learn of the
+        // reshardingFields removal lazily; they never act on the field, so observing it one refresh
+        // late (or unbumped) is harmless.
+        ShardingCatalogManager::withTransaction(
+            opCtx,
+            NamespaceString::kConfigReshardingOperationsNamespace,
+            std::move(changeMetadataFunc),
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+    } else {
+        ShardingCatalogManager::get(opCtx)->bumpCollectionPlacementVersionAndChangeMetadataInTxn(
+            opCtx,
+            updatedCoordinatorDoc.getSourceNss(),
+            std::move(changeMetadataFunc),
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+    }
 
     metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
     return updatedCoordinatorDoc;
