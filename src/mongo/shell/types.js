@@ -456,6 +456,10 @@ DBPointer.prototype.tojson = function () {
     return this.toString();
 };
 
+DBPointer.prototype.toJSON = function () {
+    return {ns: this.ns, id: this.id};
+};
+
 DBPointer.prototype.getCollection = function () {
     return this.ns;
 };

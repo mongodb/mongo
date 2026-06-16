@@ -68,8 +68,8 @@ struct OIDInfo : public BaseInfo {
     static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
 
     static void make(JSContext* cx, const OID& oid, JS::MutableHandleValue out);
-    static OID getOID(JSContext* cx, JS::HandleValue value);
-    static OID getOID(JSContext* cx, JS::HandleObject object);
+    static OID getOID(JSContext* cx, JS::HandleValue value, const JSClass* checkClass);
+    static OID getOID(JSContext* cx, JS::HandleObject object, const JSClass* checkClass);
 };
 
 }  // namespace mozjs

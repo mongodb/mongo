@@ -118,15 +118,18 @@ void OIDInfo::make(JSContext* cx, const OID& oid, JS::MutableHandleValue out) {
     out.setObjectOrNull(thisv);
 }
 
-OID OIDInfo::getOID(JSContext* cx, JS::HandleValue value) {
+OID OIDInfo::getOID(JSContext* cx, JS::HandleValue value, const JSClass* checkClass) {
     JS::RootedObject obj(cx, value.toObjectOrNull());
-    return getOID(cx, obj);
+
+    return getOID(cx, obj, checkClass);
 }
 
-OID OIDInfo::getOID(JSContext* cx, JS::HandleObject object) {
+OID OIDInfo::getOID(JSContext* cx, JS::HandleObject object, const JSClass* checkClass) {
     auto oid = JS::GetMaybePtrFromReservedSlot<OID>(object, OIDSlot);
 
-    if (oid) {
+    auto jsclass = JS::GetClass(object);
+
+    if (oid && jsclass == checkClass) {
         return *oid;
     }
 

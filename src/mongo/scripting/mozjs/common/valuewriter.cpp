@@ -298,7 +298,8 @@ Decimal128 ValueWriter::toDecimal128() {
 
 OID ValueWriter::toOID() {
     if (getCommonRuntime(_context)->oidProto().instanceOf(_value)) {
-        return OIDInfo::getOID(_context, _value);
+        return OIDInfo::getOID(
+            _context, _value, getCommonRuntime(_context)->oidProto().getJSClass());
     }
 
     throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write ObjectId value.");
@@ -408,7 +409,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
         if (jsclass) {
             if (runtime->oidProto().getJSClass() == jsclass) {
-                b->append(sd, OIDInfo::getOID(_context, obj));
+                b->append(sd, OIDInfo::getOID(_context, obj, runtime->oidProto().getJSClass()));
 
                 return;
             }
@@ -459,7 +460,12 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 JS::RootedValue id(_context);
                 o.getValue("id", &id);
 
-                b->appendDBRef(sd, o.getString("ns"), OIDInfo::getOID(_context, id));
+                uassert(
+                    ErrorCodes::BadValue, "DBPointer ObjectID must be and object", id.isObject());
+
+                b->appendDBRef(sd,
+                               o.getString("ns"),
+                               OIDInfo::getOID(_context, id, runtime->oidProto().getJSClass()));
 
                 return;
             }

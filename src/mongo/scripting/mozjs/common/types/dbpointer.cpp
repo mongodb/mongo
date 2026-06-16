@@ -62,8 +62,8 @@ void DBPointerInfo::construct(JSContext* cx, JS::CallArgs args) {
     getProto<DBPointerInfo>(runtime).newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue(InternedString::ns, args.get(0));
-    o.setValue(InternedString::id, args.get(1));
+    o.defineProperty(InternedString::ns, args.get(0), JSPROP_READONLY);
+    o.defineProperty(InternedString::id, args.get(1), JSPROP_READONLY);
 
     args.rval().setObjectOrNull(thisv);
 }
