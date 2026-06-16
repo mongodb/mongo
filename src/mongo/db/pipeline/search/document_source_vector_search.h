@@ -208,21 +208,7 @@ public:
         return make_intrusive<DocumentSourceVectorSearch>(expCtx, _taskExecutor, _stageSpec.copy());
     }
 
-    StageConstraints constraints(PipelineSplitState pipeState) const final {
-        StageConstraints constraints(StreamType::kStreaming,
-                                     PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
-                                     DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed,
-                                     TransactionRequirement::kNotAllowed,
-                                     LookupRequirement::kNotAllowed,
-                                     UnionRequirement::kAllowed,
-                                     ChangeStreamRequirement::kDenylist);
-        constraints.setConstraintsForNoInputSources();
-        // All search stages are unsupported on timeseries collections.
-        constraints.canRunOnTimeseries = false;
-        return constraints;
-    }
+    StageConstraints constraints(PipelineSplitState pipeState) const final;
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);

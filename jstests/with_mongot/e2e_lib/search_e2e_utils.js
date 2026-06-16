@@ -55,6 +55,15 @@ import {
  *     can be kept low, but an outlier can still be accepted, without opening up the tolerance to
  *     something needlessly large for all docs.
  */
+/**
+ * Strips the 'score' field from every document in the array. Useful before calling
+ * assertDocArrExpectedFuzzy() when the expected and actual arrays come from two separate search
+ * queries: assertDocArrExpectedFuzzy() does an exact docEq per matched document, and exact
+ * floating-point comparison of search scores between two separate mongot queries can flake. Do not
+ * use this when the test intends to verify exact score values.
+ */
+export const stripScores = (docArr) => docArr.map(({score, ...rest}) => rest);
+
 export const defaultTolerancePercentage = 0.3;
 export const FuzzingStrategy = Object.freeze({
     EnforceTolerancePerDoc: 0,

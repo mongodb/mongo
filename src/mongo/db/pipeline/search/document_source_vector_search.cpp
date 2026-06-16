@@ -143,6 +143,27 @@ bool DocumentSourceVectorSearch::rebuildWithNewFilterForFLE(
     return false;
 }
 
+StageConstraints DocumentSourceVectorSearch::constraints(PipelineSplitState pipeState) const {
+    auto ifrCtx = getExpCtx()->getIfrContext();
+    const bool hybridSearchFlagEnabled = ifrCtx &&
+        ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
+
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kFirst,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 hybridSearchFlagEnabled ? LookupRequirement::kAllowed
+                                                         : LookupRequirement::kNotAllowed,
+                                 UnionRequirement::kAllowed,
+                                 ChangeStreamRequirement::kDenylist);
+    constraints.setConstraintsForNoInputSources();
+    // All search stages are unsupported on timeseries collections.
+    constraints.canRunOnTimeseries = false;
+    return constraints;
+}
+
 Value DocumentSourceVectorSearch::serialize(const query_shape::SerializationOptions& opts) const {
     if (!opts.isKeepingLiteralsUnchanged()) {
         BSONObjBuilder builder;

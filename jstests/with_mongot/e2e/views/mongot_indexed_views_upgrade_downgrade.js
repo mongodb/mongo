@@ -8,6 +8,10 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
+import {
+    getParameter,
+    setParameterOnAllNonConfigNodes,
+} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
@@ -218,23 +222,64 @@ upgradeDowngradeFCV([
         ],
         cursor: {},
     },
-    // TODO SERVER-106849: Uncomment when $vectorSearch is supported in $lookup.
-    // {
-    //     // Basic $vectorSearch $lookup.
-    //     aggregate: coll.getName(),
-    //     pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: vectorSearchPipeline}}],
-    //     cursor: {}
-    // },
-    // {
-    //     // Nested $vectorSearch $lookup.
-    //     aggregate: coll.getName(),
-    //     pipeline: [{
-    //         $lookup: {
-    //             from: coll.getName(),
-    //             as: "lookup",
-    //             pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: vectorSearchPipeline}}]
-    //         }
-    //     }],
-    //     cursor: {}
-    // },
 ]);
+
+// TODO SERVER-121094 these should be deleted when the feature flag is removed.
+
+// The two $vectorSearch-in-$lookup commands require featureFlagExtensionsInsideHybridSearch to be
+// enabled.
+const basicVsLookupCommand = {
+    // Basic $vectorSearch $lookup.
+    aggregate: coll.getName(),
+    pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: vectorSearchPipeline}}],
+    cursor: {},
+};
+const nestedVsLookupCommand = {
+    // Nested $vectorSearch $lookup.
+    aggregate: coll.getName(),
+    pipeline: [
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "lookup",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: addFieldsViewName,
+                            as: "lookup",
+                            pipeline: vectorSearchPipeline,
+                        },
+                    },
+                ],
+            },
+        },
+    ],
+    cursor: {},
+};
+
+// Save the flag's current value (may be true on all-feature-flags variants) and restore on exit.
+const kFlagName = "featureFlagExtensionsInsideHybridSearch";
+const prevFlagValue = getParameter(testDb.getMongo(), kFlagName).value;
+setParameterOnAllNonConfigNodes(testDb.getMongo(), kFlagName, false);
+try {
+    // Assert the flag gate is independent of FCV: with flag OFF on latestFCV, $vectorSearch in
+    // $lookup is rejected at lite-parse time with error 51047 (LiteParsedLookUp::validate()).
+    assert.commandFailedWithCode(
+        testDb.runCommand(basicVsLookupCommand),
+        51047,
+        "Expected 51047 when featureFlagExtensionsInsideHybridSearch is off on latestFCV",
+    );
+    assert.commandFailedWithCode(
+        testDb.runCommand(nestedVsLookupCommand),
+        51047,
+        "Expected 51047 when featureFlagExtensionsInsideHybridSearch is off on latestFCV",
+    );
+
+    // With the flag ON, the lite-parse 51047 gate is lifted. On FCV 8.0, featureFlagMongotIndexedViews
+    // is still FCV-gated (off), so the query fails at execution time with OptionNotSupportedOnView —
+    // exactly as the other commands in upgradeDowngradeFCV() do. On latestFCV the query succeeds.
+    setParameterOnAllNonConfigNodes(testDb.getMongo(), kFlagName, true);
+    upgradeDowngradeFCV([basicVsLookupCommand, nestedVsLookupCommand]);
+} finally {
+    setParameterOnAllNonConfigNodes(testDb.getMongo(), kFlagName, prevFlagValue);
+}

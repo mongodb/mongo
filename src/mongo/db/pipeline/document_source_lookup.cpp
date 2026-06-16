@@ -321,8 +321,8 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // When fromNs represents a view, we have to decipher if the view is mongot-indexed or not.
     // Currently, if the pipeline to be run on the joined collection is a
-    // mongot pipeline (it starts with $search, $searchMeta), $lookup assumes the view is
-    // mongot-indexed.
+    // mongot pipeline (it starts with $search, $searchMeta, or $vectorSearch), $lookup assumes
+    // the view is mongot-indexed.
     //
     // Skip validation/view application when we know that the router already processed the view.
     const bool pipelineIsAlreadyDesugared = !pipeline.empty() &&

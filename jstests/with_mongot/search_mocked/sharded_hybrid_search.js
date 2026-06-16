@@ -12,7 +12,19 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
-const stWithMock = new ShardingTestWithMongotMock({shards: {rs0: {nodes: 1}}, mongos: 1});
+// featureFlagExtensionsInsideHybridSearch allows $vectorSearch inside a $lookup subpipeline.
+// TODO SERVER-121094 Remove the explicit setParameter when the feature flag is removed.
+const extensionsInsideHybridSearchParams = {
+    setParameter: {featureFlagExtensionsInsideHybridSearch: true},
+};
+const stWithMock = new ShardingTestWithMongotMock({
+    shards: {rs0: {nodes: 1}},
+    mongos: 1,
+    other: {
+        rsOptions: extensionsInsideHybridSearchParams,
+        mongosOptions: extensionsInsideHybridSearchParams,
+    },
+});
 stWithMock.start();
 const st = stWithMock.st;
 
@@ -243,6 +255,34 @@ function testVectorLookupSearch() {
     assert.sameMembers(actualResults, expectedResults);
 }
 
+const lookupVector = {
+    $lookup: {
+        from: vectorColl.getName(),
+        pipeline: [{$vectorSearch: vectorSearchQuery}],
+        as: "lookup_results",
+    },
+};
+function testLookupVector() {
+    const pipeline = [lookupVector];
+    setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: vectorSearchMock()});
+    const expectedResults = searchCollDocs.map((res) =>
+        Object.merge(res, {lookup_results: mockedVectorSearchResults}),
+    );
+    const actualResults = searchColl.aggregate(pipeline).toArray();
+    assert.sameMembers(actualResults, expectedResults);
+}
+function testSearchLookupVector() {
+    const pipeline = [{$search: searchQuery}, lookupVector];
+    setupMockRequest({mongotMockConn: sMongot, mockCmdAndResponse: planShardedSearchMock});
+    setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: searchMock()});
+    setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: vectorSearchMock()});
+    const expectedResults = mockedSearchResults.map((res) =>
+        Object.merge(res, {lookup_results: mockedVectorSearchResults}),
+    );
+    const actualResults = searchColl.aggregate(pipeline).toArray();
+    assert.sameMembers(actualResults, expectedResults);
+}
+
 function runTest(testFn) {
     testFn();
     stWithMock.assertEmptyMocks();
@@ -255,8 +295,8 @@ function testAll() {
     runTest(testSearchUnionWithVector);
     runTest(testLookupSearch);
     runTest(testVectorLookupSearch);
-    // TODO SERVER-88602 $vectorSearch is not supported inside a $lookup. That would be interesting
-    // coverage to add here.
+    runTest(testLookupVector);
+    runTest(testSearchLookupVector);
 }
 
 //-----------------------

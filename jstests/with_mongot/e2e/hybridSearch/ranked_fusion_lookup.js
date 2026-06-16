@@ -33,10 +33,13 @@ const limit = 20;
  * Identity $lookup.
  */
 
-// Note: There is no $vectorSearch stage here as $vectorSearch is not allowed to be executed inside
-// of a $lookup stage.
-// TODO SERVER-88602: Add a $vectorSearch stage inside of the $rankFusion below. Copying the
-// equivalent portion of ranked_fusion_union_with.js should be all that is needed.
+// Note: There is no $vectorSearch input pipeline here because a $rankFusion with more than one
+// input pipeline desugars to a $unionWith, and $unionWith is not allowed inside a $lookup
+// subpipeline (error 51047). This is independent of featureFlagExtensionsInsideHybridSearch,
+// which only lifts the restriction on $vectorSearch itself appearing in a $lookup subpipeline.
+// TODO SERVER-128801: Add a $vectorSearch pipeline to the $rankFusion below (copying the
+// equivalent portion of ranked_fusion_union_with.js) once multi-pipeline hybrid search is
+// supported inside $lookup.
 let collATestQuery = [
     {
         $rankFusion: {
@@ -76,8 +79,8 @@ assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIE
  */
 assert.commandWorked(collB.insertMany(getMovieData()));
 
-// TODO SERVER-88602: Add a $vectorSearch stage inside of the $rankFusion below. Copying the
-// equivalent portion of ranked_fusion_union_with.js should be all that is needed.
+// TODO SERVER-128801: Add a $vectorSearch pipeline to the $rankFusion below once multi-pipeline
+// hybrid search ($unionWith desugaring) is supported inside $lookup; see the note above.
 let collBTestQuery = [
     {
         $rankFusion: {

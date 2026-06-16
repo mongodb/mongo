@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 
 #include <list>
@@ -103,14 +104,16 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::optimiz
     // Iterate through the pipeline stages until we find one which cannot be cached.
     // A stage cannot be cached if it either:
     //  1. does not support dependency tracking, and may thus require the full object and metadata.
-    //     $search is an exception to rule 1, as it doesn't depend on other stages.
+    //     $search and $vectorSearch are exceptions to rule 1, as they don't depend on other
+    //     stages; their score metadata travels inside the cached Documents.
     //  2. depends on a variable defined in this scope, or
     //  3. generates random numbers.
     std::set<Variables::Id> prefixVarRefs;
     for (; prefixSplit != container->end(); ++prefixSplit) {
         (*prefixSplit)->addVariableRefs(&prefixVarRefs);
 
-        bool isNotSearch = !(*prefixSplit)->isInstanceOf<DocumentSourceSearch>();
+        bool isNotSearch = !(*prefixSplit)->isInstanceOf<DocumentSourceSearch>() &&
+            !(*prefixSplit)->isInstanceOf<DocumentSourceVectorSearch>();
         bool doesNotSupportDependencies =
             ((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED);
 

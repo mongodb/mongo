@@ -33,8 +33,10 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -72,6 +74,53 @@ TEST_F(DocumentSourceVectorSearchTest, NotAllowedInTransaction) {
     ASSERT_THROWS_CODE(Pipeline::create({vectorStage}, expCtx),
                        AssertionException,
                        ErrorCodes::OperationNotSupportedInTransaction);
+}
+
+TEST_F(DocumentSourceVectorSearchTest, NotAllowedInLookupWhenHybridSearchFlagDisabled) {
+    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << false)});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(getOpCtx())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10
+        }
+    })");
+
+    // featureFlagExtensionsInsideHybridSearch is explicitly disabled in the IFR context, so
+    // $vectorSearch is not allowed in a $lookup subpipeline.
+    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), expCtx);
+    ASSERT_FALSE(
+        vectorStage->constraints(PipelineSplitState::kUnsplit).isAllowedInLookupPipeline());
+}
+
+TEST_F(DocumentSourceVectorSearchTest, AllowedInLookupWhenHybridSearchFlagEnabled) {
+    auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
+        BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(getOpCtx())
+                      .ns(getExpCtx()->getNamespaceString())
+                      .ifrContext(ifrCtx)
+                      .build();
+
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10
+        }
+    })");
+
+    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), expCtx);
+    ASSERT_TRUE(vectorStage->constraints(PipelineSplitState::kUnsplit).isAllowedInLookupPipeline());
 }
 
 TEST_F(DocumentSourceVectorSearchTest, NotAllowedInvalidFilter) {
