@@ -121,6 +121,16 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
         return;
 
     /*
+     * Pages from cold collections must never enter the victim cache: caching cold data wastes
+     * capacity that should serve hot pages. Skipping here also avoids the compression and checksum
+     * work below.
+     */
+    if (S2BT(session)->storage_tier == WT_BTREE_STORAGE_TIER_COLD) {
+        WT_STAT_CONN_INCR(session, block_cache_cold_not_cached);
+        return;
+    }
+
+    /*
      * Victim cache: store evicted pages in disagg cache. The format must match what disagg read
      * path expects: WT_PAGE_HEADER + WT_BLOCK_DISAGG_HEADER + data
      */

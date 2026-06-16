@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 import re, os, subprocess, json
-import wttest
+import wiredtiger, wttest
 from run import wt_builddir
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages, get_shard_id
 from wtdataset import SimpleDataSet
@@ -37,12 +37,15 @@ from wtscenario import make_scenarios
 #    to the turtle key-provider page after a checkpoint.
 @disagg_test_class
 class test_key_provider_disagg03(wttest.WiredTigerTestCase):
-    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = ',create,statistics=(all),'
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
     disagg_storages = gen_disagg_storages('test_key_provider_disagg03', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
+
+    # The crypt key data.
+    DEFAULT_KEY_DATA = b'abcdefghijklmnopqrstuvwxyz'
 
     MAIN_KEK_PAGE_ID = 1
     EXPECTED_KEK_VERSION = 1
@@ -81,11 +84,18 @@ class test_key_provider_disagg03(wttest.WiredTigerTestCase):
                 WHERE table_id={self.WT_SPECIAL_PALI_TURTLE_FILE_ID}
                 ORDER BY lsn DESC LIMIT 1;'''
         )
-        m = re.search(".*page_id=(\d+),lsn=(\d+).*version=(\d+)", result['page_data'])
+        m = re.search(r".*page_id=(\d+),lsn=(\d+).*version=(\d+)", result['page_data'])
         self.assertTrue(m)
         page_id, version = int(m.group(1)), int(m.group(3))
         self.assertEqual(page_id, self.MAIN_KEK_PAGE_ID)
         self.assertEqual(version, self.EXPECTED_KEK_VERSION)
+
+    def push_key(self, timestamp):
+        # Push a key with the given timestamp via the exposed set_key API.
+        crypt = wiredtiger.CryptKeys()
+        crypt.keys = self.DEFAULT_KEY_DATA
+        crypt.timestamp = timestamp
+        self.assertEqual(self.conn.get_key_provider().set_key(self.session, crypt), 0)
 
     def test_set_key_persists(self):
         if (self.ds_name != "palite"):
@@ -93,8 +103,10 @@ class test_key_provider_disagg03(wttest.WiredTigerTestCase):
 
         ds = SimpleDataSet(self, self.uri, 10)
         ds.populate()
-        # A pushed key is only persisted once the stable timestamp reaches it. Advance stable so the
-        # checkpoint selects the earliest pushed key.
+
+        # Push a key at timestamp 1, then advance stable to it so the checkpoint selects and
+        # persists the pushed key to the key-provider page.
+        self.push_key(1)
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.session.checkpoint()
 

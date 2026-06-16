@@ -2952,6 +2952,22 @@ err:
 }
 
 /*
+ * __conn_get_key_provider --
+ *     WT_CONNECTION->get_key_provider method.
+ */
+static int
+__conn_get_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER **key_providerp)
+{
+    WT_CONNECTION_IMPL *conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+    *key_providerp = conn->key_provider;
+    if (*key_providerp == NULL)
+        WT_RET_MSG(conn->default_session, EINVAL, "no key provider configured");
+
+    return (0);
+}
+
+/*
  * __conn_set_file_system --
  *     Configure a custom file system implementation on database open.
  */
@@ -3257,7 +3273,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
       __conn_load_extension, __conn_add_data_source, __conn_add_collator, __conn_add_compressor,
       __conn_add_encryptor, __conn_set_file_system, __conn_add_page_log, __conn_add_storage_source,
       __conn_get_page_log, __conn_get_storage_source, __conn_set_context_uint,
-      __conn_dump_error_log, __conn_set_key_provider, __conn_get_extension_api};
+      __conn_dump_error_log, __conn_set_key_provider, __conn_get_key_provider,
+      __conn_get_extension_api};
     static const WT_NAME_FLAG file_types[] = {
       {"data", WT_FILE_TYPE_DATA}, {"log", WT_FILE_TYPE_LOG}, {NULL, 0}};
 

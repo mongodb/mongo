@@ -1014,6 +1014,7 @@ __disagg_step_up(WT_SESSION_IMPL *session)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_SESSION_IMPL *internal_session;
+    uint64_t now;
 
     conn = S2C(session);
 
@@ -1061,6 +1062,17 @@ __disagg_step_up(WT_SESSION_IMPL *session)
     /* Drain the ingest tables before switching to leader. */
     WT_ERR_MSG_CHK(session, __wti_layered_drain_ingest_tables(internal_session),
       "Failed to drain ingest tables");
+
+    /*
+     * Mark the shared disk cache read-only: reads can still reuse cached images but puts are
+     * blocked. Record the transition time so the sweep server can mark the cache dead once the
+     * grace period elapses.
+     */
+    WT_ASSERT(session,
+      __wt_atomic_load_uint8_relaxed(&conn->cache->shared_dsk_cache.state) == WT_DSK_CACHE_ACTIVE);
+    __wt_seconds(session, &now);
+    __wt_atomic_store_uint64_relaxed(&conn->cache->shared_dsk_cache.readonly_since, now);
+    __wt_atomic_store_uint8_release(&conn->cache->shared_dsk_cache.state, WT_DSK_CACHE_READONLY);
 
 err:
     WT_TRET(__wt_session_close_internal(internal_session));
@@ -1127,6 +1139,8 @@ __disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
 static void
 __disagg_step_down(WT_SESSION_IMPL *session)
 {
+    WT_SHARED_DSK_CACHE *shared_dsk_cache;
+
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
 
     __wt_verbose_debug1(
@@ -1141,6 +1155,19 @@ __disagg_step_down(WT_SESSION_IMPL *session)
 
     /* Do some cleanup as we are abandoning the current checkpoint. */
     __disagg_shared_metadata_queue_clear(session);
+
+    /*
+     * Re-enable the shared disk cache on step-down. Create the table only if this node never had
+     * one, otherwise it was kept alive and is reused.
+     */
+    shared_dsk_cache = &S2C(session)->cache->shared_dsk_cache;
+    if (shared_dsk_cache->hash == NULL)
+        WT_IGNORE_RET(
+          __wt_shared_dsk_cache_init(session, WT_SHARED_DSK_CACHE_DEFAULT_HASH_SIZE(session)));
+
+    WT_ASSERT(session, shared_dsk_cache->hash != NULL);
+    if (shared_dsk_cache->hash != NULL)
+        __wt_atomic_store_uint8_release(&shared_dsk_cache->state, WT_DSK_CACHE_ACTIVE);
 }
 
 /*

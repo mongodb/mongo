@@ -39,6 +39,7 @@ extern "C" {
  * encryption key management functionality for testing purposes.
  *
  * Configuration parameters:
+ * - version: provider mode, 0 (pull) or 1 (push).
  * - verbose: verbosity level for logging (default: WT_VERBOSE_INFO)
  * - key_expires: key expiration period, in seconds (default: 12 hours = 43200 seconds).
  *     On creation, initial key is set.
@@ -60,6 +61,9 @@ extern "C" {
  * - READ -> CURRENT: on_key_update called, key marked as current
  * irrespective of key expiration:
  * - CURRENT -> CURRENT: key_load called, key loaded from persisted data
+ *
+ * In push mode (version 1) the module hands keys to WiredTiger via set_key and on_key_update simply
+ * adopts the confirmed key; the state machine and key_expires above are not used.
  */
 
 typedef enum { KEY_STATE_CURRENT = 0, KEY_STATE_PENDING, KEY_STATE_READ } KEY_STATE;
@@ -76,12 +80,10 @@ typedef struct {
     int verbose;     /* Verbosity level for logging. See WT_VERBOSE_LEVEL . */
     int key_expires; /* Key expiration time in seconds, or special values as described above */
 
-    /* Monotonic counter used to stamp pushed keys. */
-    uint64_t next_push_ts;
-
     /* Simulated key state */
     struct {
         uint64_t lsn;
+        uint64_t timestamp;
         KEY_STATE key_state;
         uint64_t key_time;
         size_t key_size;

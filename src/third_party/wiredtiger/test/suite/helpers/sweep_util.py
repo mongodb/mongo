@@ -30,24 +30,28 @@ import time
 import wttest
 from wiredtiger import stat
 
-# Base class providing checkpoint-related helpers.
-class checkpoint_util(wttest.WiredTigerTestCase):
+# Base class providing dhandle-sweep helpers for any test that needs them.
+class sweep_util(wttest.WiredTigerTestCase):
 
-    def wait_for_checkpoint_start(self, session=None, timeout=60, poll_interval=0.1):
+    def wait_for_sweep(self, baseline=None, increment=1, statistic=stat.conn.dh_sweeps,
+                       session=None, timeout=60, poll_interval=0.5):
         """
-        Poll until a checkpoint is running (the checkpoint_state connection statistic becomes
-        non-zero). Bounded so the test fails fast with a clear message instead of spinning to a
-        task-level timeout if a checkpoint never starts. poll_interval controls how often the
-        statistic is sampled.
+        Poll until a sweep statistic has advanced by at least `increment` over `baseline`. If
+        `baseline` is None it is sampled at entry. Bounded so the test fails fast with a clear
+        message instead of spinning to a task-level timeout if the sweep server makes no progress.
+        poll_interval controls how often the statistic is sampled. Returns the observed value.
         """
         if session is None:
             session = self.session
+        if baseline is None:
+            with wttest.open_cursor(session, 'statistics:') as stat_cursor:
+                baseline = stat_cursor[statistic][2]
         deadline = time.time() + timeout
         while True:
             with wttest.open_cursor(session, 'statistics:') as stat_cursor:
-                state = stat_cursor[stat.conn.checkpoint_state][2]
-            if state != 0:
-                break
+                value = stat_cursor[statistic][2]
+            if value - baseline >= increment:
+                return value
             self.assertLess(time.time(), deadline,
-                'checkpoint did not start running within %d seconds' % timeout)
+                'sweep statistic did not advance by %d within %d seconds' % (increment, timeout))
             time.sleep(poll_interval)

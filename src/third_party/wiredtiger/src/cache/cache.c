@@ -67,7 +67,6 @@ int
 __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval;
-    u_int hash_size;
     bool leader;
 
     WT_ASSERT(session, S2C(session)->cache == NULL);
@@ -86,20 +85,13 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_config_gets(session, cfg, "disaggregated.page_log", &cval));
     if (cval.len != 0) {
         WT_RET(__wt_disagg_config_get_role(session, cfg, &leader));
-        S2C(session)->cache->shared_dsk_cache.enabled = !leader;
-    } else
-        S2C(session)->cache->shared_dsk_cache.enabled = false;
 
-    if (S2C(session)->cache->shared_dsk_cache.enabled) {
-        /*
-         * Best-effort sizing: budget 0.2% of the cache and assume one item per bucket, so dividing
-         * that budget by the per-bucket cost gives the count, with a floor of a thousand buckets.
-         */
-        hash_size = (u_int)WT_MAX(S2C(session)->cache_size / 500 /
-            (sizeof(WT_SHARED_DSK_ITEM) + sizeof(*S2C(session)->cache->shared_dsk_cache.hash)),
-          WT_THOUSAND);
-        WT_RET(__wti_shared_dsk_cache_init(session, hash_size));
-        WT_STAT_CONN_SET(session, cache_shared_dsk_hash_size, hash_size);
+        if (!leader) {
+            WT_RET(
+              __wt_shared_dsk_cache_init(session, WT_SHARED_DSK_CACHE_DEFAULT_HASH_SIZE(session)));
+            __wt_atomic_store_uint8_relaxed(
+              &S2C(session)->cache->shared_dsk_cache.state, WT_DSK_CACHE_ACTIVE);
+        }
     }
 
     /*
@@ -277,7 +269,7 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
           cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
     /* Destroy the shared disk cache if it was initialized. */
-    if (conn->cache->shared_dsk_cache.enabled)
+    if (conn->cache->shared_dsk_cache.hash != NULL)
         __wti_shared_dsk_cache_destroy(session);
 
     __wt_free(session, conn->cache);

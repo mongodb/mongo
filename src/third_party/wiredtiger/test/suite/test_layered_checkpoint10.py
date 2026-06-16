@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 #   iterating. The scan must complete without skipping or duplicating keys,
 #   and must remain monotonically ordered.
 #
-#   Several tests assert that the layered_curs_advance_stable statistic
+#   Several tests assert that the layered_curs_reopen_stable statistic
 #   increments, confirming the checkpoint switch triggered during iteration.
 #
 #   A mid-scan checkpoint switch requires ALL of the following:
@@ -183,7 +183,7 @@ class test_layered_checkpoint10(wttest.WiredTigerTestCase):
         cursor = self.session_follow.open_cursor(self.uri)
 
         # --- Forward scan ---
-        advance_stable_before = self.get_stat(wiredtiger.stat.conn.layered_curs_advance_stable)
+        reopen_stable_before = self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable)
 
         keys_before = []
         for _ in range(100):
@@ -198,8 +198,8 @@ class test_layered_checkpoint10(wttest.WiredTigerTestCase):
         while cursor.next() == 0:
             keys_after.append(cursor.get_key())
 
-        advance_stable_after = self.get_stat(wiredtiger.stat.conn.layered_curs_advance_stable)
-        self.assertGreater(advance_stable_after, advance_stable_before,
+        reopen_stable_after = self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable)
+        self.assertGreater(reopen_stable_after, reopen_stable_before,
             "Checkpoint switch did not trigger during forward iteration")
 
         fwd_keys = keys_before + keys_after
@@ -252,7 +252,7 @@ class test_layered_checkpoint10(wttest.WiredTigerTestCase):
         cursor = self.session_follow.open_cursor(self.uri)
 
         # --- Forward scan ---
-        advance_stable_before = self.get_stat(wiredtiger.stat.conn.layered_curs_advance_stable)
+        reopen_stable_before = self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable)
 
         cursor.set_key(self.fmt_key(lo))
         cursor.bound("bound=lower")
@@ -272,8 +272,8 @@ class test_layered_checkpoint10(wttest.WiredTigerTestCase):
         while cursor.next() == 0:
             keys_after.append(cursor.get_key())
 
-        advance_stable_after = self.get_stat(wiredtiger.stat.conn.layered_curs_advance_stable)
-        self.assertGreater(advance_stable_after, advance_stable_before,
+        reopen_stable_after = self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable)
+        self.assertGreater(reopen_stable_after, reopen_stable_before,
             "Checkpoint switch did not trigger during bounded forward iteration")
 
         fwd_keys = keys_before + keys_after
@@ -380,7 +380,7 @@ class test_layered_checkpoint10(wttest.WiredTigerTestCase):
 
         self.begin_read_ts_txn()
 
-        advance_stable_before = self.get_stat(wiredtiger.stat.conn.layered_curs_advance_stable)
+        reopen_stable_before = self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable)
 
         cursor = self.session_follow.open_cursor(self.uri)
         all_keys = []
@@ -404,8 +404,8 @@ class test_layered_checkpoint10(wttest.WiredTigerTestCase):
         while cursor.next() == 0:
             all_keys.append(cursor.get_key())
 
-        advance_stable_after = self.get_stat(wiredtiger.stat.conn.layered_curs_advance_stable)
-        self.assertGreater(advance_stable_after, advance_stable_before,
+        reopen_stable_after = self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable)
+        self.assertGreater(reopen_stable_after, reopen_stable_before,
             "checkpoint advance did not trigger during multi-checkpoint scan")
 
         for i in range(len(all_keys) - 1):

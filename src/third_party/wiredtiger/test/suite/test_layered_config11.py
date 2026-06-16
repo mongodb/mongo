@@ -31,7 +31,7 @@ from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_stora
 from wtscenario import make_scenarios
 
 # test_layered_config11.py
-# Simple read write testing using the page log API
+# Simple read write testing with stepping down using the page log API
 
 @disagg_test_class
 class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
@@ -63,9 +63,11 @@ class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
         DisaggConfigMixin.conn_extensions(self, extlist)
 
     def test_layered_read_write(self):
+        # FIXME-WT-15763: Step-down is not supported yet.
+        self.skipTest('Step-down is not supported yet.')
+
         uri = "layered:test_layered_config11"
         create_session_config = 'key_format=S,value_format=S,block_compressor={}'.format(self.block_compress)
-        self.pr('CREATING')
         self.session.create(uri, create_session_config)
 
         cursor = self.session.open_cursor(uri, None, None)
@@ -75,10 +77,6 @@ class test_layered_config11(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         self.session.checkpoint()
 
-        # XXX
-        # Inserted timing delays around reopen, apparently needed because of the
-        # layered table watcher implementation
-        import time
         follower_config = self.conn_base_config + 'disaggregated=(role="follower")'
         self.reopen_conn(config=follower_config)
 

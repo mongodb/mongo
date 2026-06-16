@@ -96,6 +96,9 @@ from packing import pack, unpack
 %typemap(in, numinputs=0) WT_PAGE_LOG_HANDLE ** (WT_PAGE_LOG_HANDLE *temp = NULL) {
     $1 = &temp;
  }
+%typemap(in, numinputs=0) WT_KEY_PROVIDER ** (WT_KEY_PROVIDER *temp = NULL) {
+    $1 = &temp;
+ }
 %typemap(in, numinputs=0) WT_STORAGE_SOURCE ** (WT_STORAGE_SOURCE *temp = NULL) {
     $1 = &temp;
  }
@@ -318,6 +321,10 @@ from packing import pack, unpack
     $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_page_log, 0);
 }
 
+%typemap(argout) WT_KEY_PROVIDER ** {
+    $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_key_provider, 0);
+}
+
 %typemap(argout) WT_PAGE_LOG_HANDLE ** {
     $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_page_log_handle, 0);
 }
@@ -533,6 +540,8 @@ static int pageLogCompleteCheckpointArgsClearMetadata(
     WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args);
 static int pageLogCompleteCheckpointArgsSetMetadata(
     WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args, const WT_ITEM *value);
+static int cryptKeysClearKeys(WT_CRYPT_KEYS *crypt);
+static int cryptKeysSetKeys(WT_CRYPT_KEYS *crypt, const WT_ITEM *value);
 
 #define WT_GETATTR(var, parent, name)					\
     do if ((var = PyObject_GetAttrString(parent, name)) == NULL) {	\
@@ -649,6 +658,7 @@ SELFHELPER(struct __wt_file_handle, file_handle)
 SELFHELPER(struct __wt_file_system, file_system)
 SELFHELPER(struct __wt_page_log, page_log)
 SELFHELPER(struct __wt_page_log_handle, page_log_handle)
+SELFHELPER(struct __wt_key_provider, key_provider)
 SELFHELPER(struct __wt_storage_source, storage_source)
 
  /*
@@ -726,6 +736,8 @@ ANY_OK(__wt_page_log_put_args::__wt_page_log_put_args)
 ANY_OK(__wt_page_log_put_args::~__wt_page_log_put_args)
 ANY_OK(__wt_page_log_get_args::__wt_page_log_get_args)
 ANY_OK(__wt_page_log_get_args::~__wt_page_log_get_args)
+ANY_OK(__wt_crypt_keys::__wt_crypt_keys)
+ANY_OK(__wt_crypt_keys::~__wt_crypt_keys)
 
 COMPARE_OK(__wt_cursor::_compare)
 COMPARE_OK(__wt_cursor::_equals)
@@ -1240,6 +1252,10 @@ SIDESTEP_METHOD(__wt_page_log, terminate,
   (WT_SESSION *session),
   (self, session))
 
+SIDESTEP_METHOD(__wt_key_provider, set_key,
+  (WT_SESSION *session, const WT_CRYPT_KEYS *crypt),
+  (self, session, crypt))
+
 SIDESTEP_METHOD(__wt_page_log_handle, plh_put,
   (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, const WT_ITEM *buf),
   (self, session, page_id, checkpoint_id, put_args, buf))
@@ -1434,6 +1450,16 @@ int standalone_build();
 %ignore __wt_item;
 %ignore __wt_lsn;
 
+%ignore __wt_key_provider::load_key;
+%ignore __wt_key_provider::get_key;
+%ignore __wt_key_provider::on_key_update;
+%ignore __wt_key_provider::terminate;
+
+%ignore __wt_crypt_keys::keys;
+
+%ignore __wt_crypt_keys_r;
+%ignore __wt_crypt_keys::r;
+
 %ignore __wt_connection::add_collator;
 %ignore __wt_connection::add_compressor;
 %ignore __wt_connection::add_data_source;
@@ -1462,6 +1488,8 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
 %rename(FileHandle) __wt_file_handle;
+%rename(KeyProvider) __wt_key_provider;
+%rename(CryptKeys) __wt_crypt_keys;
 %rename(PageLog) __wt_page_log;
 %rename(PageLogCompleteCheckpointArgs) __wt_page_log_complete_checkpoint_args;
 %rename(PageLogDiscardArgs) __wt_page_log_discard_args;
@@ -1472,6 +1500,22 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(FileSystem) __wt_file_system;
 
 %include "wiredtiger.h"
+
+%extend __wt_crypt_keys {
+    __wt_crypt_keys() {
+        return (struct __wt_crypt_keys *)calloc(1, sizeof(struct __wt_crypt_keys));
+    }
+    int _set_keys(const WT_ITEM *value) {
+        return (cryptKeysSetKeys($self, value));
+    }
+    int _clear_keys() {
+        return (cryptKeysClearKeys($self));
+    }
+    ~__wt_crypt_keys() {
+        (void)cryptKeysClearKeys($self);
+        free($self);
+    }
+}
 
 %extend __wt_page_log_complete_checkpoint_args {
     __wt_page_log_complete_checkpoint_args() {
@@ -1685,6 +1729,28 @@ err:
         __wt_buf_free(NULL, metadata);
         __wt_free(NULL, metadata);
     }
+    return (ret);
+}
+
+static int
+cryptKeysClearKeys(WT_CRYPT_KEYS *crypt)
+{
+    if (crypt == NULL)
+        return (0);
+    __wt_buf_free(NULL, &crypt->keys);
+    return (0);
+}
+
+static int
+cryptKeysSetKeys(WT_CRYPT_KEYS *crypt, const WT_ITEM *value)
+{
+    WT_DECL_RET;
+
+    WT_ERR(cryptKeysClearKeys(crypt));
+    if (value != NULL && value->size != 0)
+        WT_ERR(__wt_buf_set(NULL, &crypt->keys, value->data, value->size));
+
+err:
     return (ret);
 }
 
@@ -1905,4 +1971,22 @@ PageLogCompleteCheckpointArgs.checkpoint_metadata = property(
 
 del _page_log_complete_checkpoint_args_get_metadata
 del _page_log_complete_checkpoint_args_set_metadata
+
+def _crypt_keys_get_keys(self):
+    return getattr(self, '_keys_python_value', None)
+
+def _crypt_keys_set_keys(self, value):
+    if value is None:
+        self._clear_keys()
+        self._keys_python_value = None
+        return
+    ret = self._set_keys(value)
+    if ret != 0:
+        raise WiredTigerError(wiredtiger_strerror(ret))
+    self._keys_python_value = value
+
+CryptKeys.keys = property(_crypt_keys_get_keys, _crypt_keys_set_keys)
+
+del _crypt_keys_get_keys
+del _crypt_keys_set_keys
 %}

@@ -15,7 +15,7 @@
 
 /*
  * Grace period before closing an outdated checkpoint handle so the next generation can reuse its
- * shared disk image.
+ * shared disk image. The shared disk cache uses the same window to stop serving reads.
  */
 #define WT_DISAGG_OUTDATED_GRACE_SECS 5
 
@@ -215,8 +215,7 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
         if (F_ISSET(dhandle, WT_DHANDLE_OUTDATED)) {
             if (__wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0)
                 continue;
-            if (__wt_conn_is_disagg(session) && !conn->layered_table_manager.leader &&
-              WT_URI_IS_STABLE_CHECKPOINT(dhandle->name)) {
+            if (__wt_conn_is_disagg(session) && WT_URI_IS_STABLE_CHECKPOINT(dhandle->name)) {
                 if (tod == 0) {
                     __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, now);
                     continue;
@@ -526,6 +525,24 @@ __sweep_server(void *arg)
           "Sweep server performing a session check after removing %u dead handles", dead_handles);
 
         __sweep_check_session_sweep(session, now);
+
+        /* On a stepped-up leader, mark the shared disk cache dead once its reuse window elapses. */
+        if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader &&
+          __wt_atomic_load_uint8_acquire(&conn->cache->shared_dsk_cache.state) ==
+            WT_DSK_CACHE_READONLY) {
+            uint64_t readonly_since =
+              __wt_atomic_load_uint64_relaxed(&conn->cache->shared_dsk_cache.readonly_since);
+            if (now > readonly_since && now - readonly_since > WT_DISAGG_OUTDATED_GRACE_SECS) {
+                /*
+                 * A failed swap means a concurrent step-down reactivated the cache, leave it alone.
+                 */
+                if (!__wt_atomic_cas_uint8(&conn->cache->shared_dsk_cache.state,
+                      WT_DSK_CACHE_READONLY, WT_DSK_CACHE_DEAD))
+                    WT_ASSERT(session,
+                      WT_DSK_CACHE_READABLE(
+                        __wt_atomic_load_uint8_relaxed(&conn->cache->shared_dsk_cache.state)));
+            }
+        }
 
         /* Remember the last sweep time. */
         last = now;

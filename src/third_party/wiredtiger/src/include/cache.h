@@ -57,11 +57,37 @@ struct __wt_shared_dsk_item {
     uint8_t addr[];
 };
 
+/*
+ * Best-effort sizing: budget 0.2% of the cache and assume one item per bucket, so dividing that
+ * budget by the per-bucket cost gives the count, with a floor of a thousand buckets.
+ */
+#define WT_SHARED_DSK_CACHE_DEFAULT_HASH_SIZE(session)                                      \
+    ((u_int)WT_MAX(S2C(session)->cache_size / 500 /                                         \
+        (sizeof(WT_SHARED_DSK_ITEM) + sizeof(*S2C(session)->cache->shared_dsk_cache.hash)), \
+      WT_THOUSAND))
+
+/* Shared disk cache state. */
+typedef enum {
+    WT_DSK_CACHE_OFF = 0,  /* No table: a leader that has never been a standby, or non-disagg. */
+    WT_DSK_CACHE_ACTIVE,   /* Standby: allow reads and puts. */
+    WT_DSK_CACHE_READONLY, /* Stepped-up leader: allow reads only. */
+    WT_DSK_CACHE_DEAD      /* Drained on a leader: both reads and writes are disabled. */
+} WT_DSK_CACHE_STATE;
+
+#define WT_DSK_CACHE_READABLE(state) \
+    ((state) == WT_DSK_CACHE_ACTIVE || (state) == WT_DSK_CACHE_READONLY)
+
+#define WT_DSK_CACHE_CAN_READ(state, btree) \
+    (WT_DSK_CACHE_READABLE(state) && F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+
+#define WT_DSK_CACHE_CAN_WRITE(state, btree) \
+    ((state) == WT_DSK_CACHE_ACTIVE && F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+
 struct __wt_shared_dsk_cache {
-    bool enabled;
+    wt_shared uint8_t state;
+    wt_shared uint64_t readonly_since; /* Seconds when the cache went read-only on step-up. */
 
     TAILQ_HEAD(__wt_shared_dsk_hash, __wt_shared_dsk_item) * hash;
-    /* FIXME-WT-17168: Investigate whether spinlock should be changed to rwlock. */
     WT_SPINLOCK *hash_locks;
     u_int hash_size;
     u_int hash_lock_size;

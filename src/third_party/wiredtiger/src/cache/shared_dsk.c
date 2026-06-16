@@ -46,7 +46,7 @@ __wt_shared_dsk_cache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t 
     *shared_dsk_retp = NULL;
 
     shared_dsk_cache = &S2C(session)->cache->shared_dsk_cache;
-    WT_ASSERT(session, shared_dsk_cache->enabled);
+    WT_ASSERT(session, shared_dsk_cache->hash != NULL);
 
     hash = __wt_hash_city64(addr, addr_size);
     bucket = hash % shared_dsk_cache->hash_size;
@@ -103,7 +103,7 @@ __wt_shared_dsk_cache_put(WT_SESSION_IMPL *session, void *data, size_t data_size
 #endif
 
     shared_dsk_cache = &S2C(session)->cache->shared_dsk_cache;
-    WT_ASSERT(session, shared_dsk_cache->enabled);
+    WT_ASSERT(session, shared_dsk_cache->hash != NULL);
     cache_inserted = false;
     shared_dsk_store = NULL;
     *shared_dsk_retp = NULL;
@@ -198,7 +198,7 @@ __wt_shared_dsk_cache_release(WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shar
     WT_ASSERT(session, shared_dsk_item != NULL);
 
     shared_dsk_cache = &S2C(session)->cache->shared_dsk_cache;
-    WT_ASSERT(session, shared_dsk_cache->enabled);
+    WT_ASSERT(session, shared_dsk_cache->hash != NULL);
     hash = __wt_hash_city64(shared_dsk_item->addr, shared_dsk_item->addr_size);
     bucket = hash % shared_dsk_cache->hash_size;
     lock_idx = bucket % shared_dsk_cache->hash_lock_size;
@@ -230,11 +230,11 @@ __wt_shared_dsk_cache_release(WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shar
 }
 
 /*
- * __wti_shared_dsk_cache_init --
+ * __wt_shared_dsk_cache_init --
  *     Initialize the shared disk cache.
  */
 int
-__wti_shared_dsk_cache_init(WT_SESSION_IMPL *session, u_int hash_size)
+__wt_shared_dsk_cache_init(WT_SESSION_IMPL *session, u_int hash_size)
 {
     WT_DECL_RET;
     WT_SHARED_DSK_CACHE *shared_dsk_cache;
@@ -257,6 +257,8 @@ __wti_shared_dsk_cache_init(WT_SESSION_IMPL *session, u_int hash_size)
     for (i = 0; i < shared_dsk_cache->hash_lock_size; i++)
         WT_ERR(__wt_spin_init(
           session, &shared_dsk_cache->hash_locks[i], "shared disk cache bucket locks"));
+
+    WT_STAT_CONN_SET(session, cache_shared_dsk_hash_size, hash_size);
 
     return (0);
 

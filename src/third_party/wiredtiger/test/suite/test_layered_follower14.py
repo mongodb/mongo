@@ -35,13 +35,13 @@
 # entries and corrupt visibility (WT-16798).
 
 import unittest
-import time, wttest, wiredtiger
+import wiredtiger
 from helper_disagg import disagg_test_class, gen_disagg_storages
-from wiredtiger import stat
+from sweep_util import sweep_util
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_follower14(wttest.WiredTigerTestCase):
+class test_layered_follower14(sweep_util):
     # Use aggressive sweep settings so the server has every opportunity to
     # incorrectly close the ingest dhandle while we are running as follower.
     conn_config = 'statistics=(all),' \
@@ -54,20 +54,6 @@ class test_layered_follower14(wttest.WiredTigerTestCase):
 
     disagg_storages = gen_disagg_storages('test_layered_follower14', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
-
-    def wait_for_sweep(self):
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        baseline = stat_cursor[stat.conn.dh_sweeps][2]
-        stat_cursor.close()
-        for _ in range(120):
-            stat_cursor = self.session.open_cursor('statistics:', None, None)
-            sweeps = stat_cursor[stat.conn.dh_sweeps][2]
-            stat_cursor.close()
-            # Sweep server only closes after the handle goes through multiple phases.
-            if sweeps - baseline >= 3:
-                return
-            time.sleep(1)
-        self.assertTrue(False, 'sweep server did not run within 120s')
 
     def test_layered_dhandle_not_swept_during_stepup(self):
         """
@@ -93,7 +79,7 @@ class test_layered_follower14(wttest.WiredTigerTestCase):
         # Wait for the sweep server to run several cycles. If it is not configured
         # to skip layered dhandles, it would mark and close them, causing gaps when
         # draining the ingest table at step-up.
-        self.wait_for_sweep()
+        self.wait_for_sweep(increment=3, timeout=120, poll_interval=1)
 
         # Step up to leader.
         self.conn.reconfigure('disaggregated=(role="leader")')
@@ -142,7 +128,7 @@ class test_layered_follower14(wttest.WiredTigerTestCase):
         # Wait for the sweep server to run several cycles. If the layered dhandle is
         # incorrectly swept while the truncate entry lives in its truncate list,
         # the truncated range will go missing.
-        self.wait_for_sweep()
+        self.wait_for_sweep(increment=3, timeout=120, poll_interval=1)
 
         c_start.close()
         c_stop.close()

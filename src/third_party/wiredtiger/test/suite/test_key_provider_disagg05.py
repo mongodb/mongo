@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import json, os, struct, subprocess
-import wttest
+import json, os, subprocess
+import wiredtiger, wttest
 from run import wt_builddir
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages, get_shard_id
 from wtdataset import SimpleDataSet
@@ -38,7 +38,7 @@ from wtscenario import make_scenarios
 #    verify each checkpoint persists a new key-provider page.
 @disagg_test_class
 class test_key_provider_disagg05(wttest.WiredTigerTestCase):
-    conn_base_config = ',create,statistics=(all),statistics_log=(wait=1,json=true,on_close=true),'
+    conn_base_config = ',create,statistics=(all),'
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + 'disaggregated=(role="leader")'
 
@@ -46,10 +46,15 @@ class test_key_provider_disagg05(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages)
 
     MAIN_KEK_PAGE_ID = 1
+    # Byte offset of the header_size field within WT_CRYPT_HEADER (see crypt_header.h).
+    CRYPT_HEADER_SIZE_OFFSET = 6
     WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID = 26
     key_provider_table = f'pages_{get_shard_id(WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID):02d}.db'
 
     uri = "layered:test_key_provider_disagg05"
+
+    # Base bytes for each pushed key; key_for() appends a unique per-push suffix.
+    KEY_PREFIX = b'abcdefghijklmnopqrstuvwxyz'
 
     def conn_extensions(self, extlist):
         config = '=(early_load=true,config=\"verbose=-1,version=1,key_expires=0\")'
@@ -63,60 +68,98 @@ class test_key_provider_disagg05(wttest.WiredTigerTestCase):
             capture_output=True, text=True, check=True)
         return json.loads(result.stdout)
 
-    # The pushed timestamp lives at offset 16 of the WT_CRYPT_HEADER (8 bytes, little-endian).
-    CRYPT_HEADER_TIMESTAMP_OFFSET = 16
-
     def key_provider_pages(self):
-        # Read each persisted page ordered by LSN, with a hex dump of its bytes.
-        return self.sqlite_fetch(
+        # Read each persisted page ordered by LSN, exposing the persisted key as a named field so
+        # callers don't parse the raw hex dump.
+        rows = self.sqlite_fetch(
             f'SELECT lsn, page_id, hex(page_data) AS hex FROM pages '
             f'WHERE table_id={self.WT_SPECIAL_PALI_KEY_PROVIDER_FILE_ID} '
             f'ORDER BY lsn ASC;')
-
-    def header_timestamp(self, hex_page):
-        # The WT_CRYPT_HEADER stores the pushed timestamp as a little-endian uint64 at byte offset 16.
-        data = bytes.fromhex(hex_page)
-        return struct.unpack_from('<Q', data, self.CRYPT_HEADER_TIMESTAMP_OFFSET)[0]
-
-    def validate_key_provider_pages(self, expected_count_min):
-        # Every page references the main KEK page, and both the LSN and the pushed timestamp must
-        # strictly increase across pages.
-        rows = self.key_provider_pages()
-        self.assertGreaterEqual(len(rows), expected_count_min)
-        previous_lsn = -1
-        previous_ts = -1
         for row in rows:
-            self.assertEqual(row['page_id'], self.MAIN_KEK_PAGE_ID)
-            self.assertGreater(row['lsn'], previous_lsn)
-            timestamp = self.header_timestamp(row['hex'])
-            self.assertGreater(timestamp, previous_ts)
-            previous_lsn = row['lsn']
-            previous_ts = timestamp
+            # Each page is the crypt header followed by the key; expose the key under 'key'.
+            data = bytes.fromhex(row['hex'])
+            header_size = data[self.CRYPT_HEADER_SIZE_OFFSET]
+            row['key'] = data[header_size:]
+        return rows
+
+    def validate_latest_key_provider_page(self, timestamp):
+        # Validate the most recently persisted key-provider page: it is on the main KEK page and
+        # holds the key pushed for this checkpoint (which encodes the timestamp).
+        rows = self.key_provider_pages()
+        self.assertGreater(len(rows), 0)
+        latest = rows[-1]
+        self.assertEqual(latest['page_id'], self.MAIN_KEK_PAGE_ID)
+        self.assertEqual(latest['key'], self.key_for(timestamp))
+
+    def key_for(self, timestamp):
+        # A unique key per push: the key prefix followed by the push timestamp.
+        return self.KEY_PREFIX + str(timestamp).encode()
+
+    def push_key(self, timestamp):
+        crypt = wiredtiger.CryptKeys()
+        crypt.keys = self.key_for(timestamp)
+        crypt.timestamp = timestamp
+        self.assertEqual(self.conn.get_key_provider().set_key(self.session, crypt), 0)
 
     def test_multiple_pushes_across_checkpoints(self):
-        # Each checkpoint pushes a fresh key onto the pending list and drains it, persisting one
-        # new key-provider page.
         if self.ds_name != "palite":
             self.skipTest("Must use PALite to verify contents")
 
         ds = SimpleDataSet(self, self.uri, 10)
         ds.populate()
-
-        # The first checkpoint creates the page table; record the baseline page count.
-        stable = 1
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(stable))
-        self.session.checkpoint()
-        baseline = len(self.key_provider_pages())
-        self.assertGreaterEqual(baseline, 1)
-
-        # Write and checkpoint a few more times; each checkpoint persists another page.
         cursor = self.session.open_cursor(self.uri)
-        for i in range(4):
-            cursor[ds.key(100 + i)] = ds.value(100 + i)
-            stable += 1
-            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(stable))
-            self.session.checkpoint()
+
+        # Each checkpoint writes a row (so it does real work) and persists the most recent pending
+        # key whose timestamp is at or below the stable timestamp as a new key-provider page.
+
+        # Queue three keys, then advance stable to 3 so the checkpoint selects the most recent
+        # (timestamp 3) and drains the consumed entries.
+        self.push_key(1)
+        self.push_key(2)
+        self.push_key(3)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(3))
+        cursor[ds.key(101)] = ds.value(101)
+        self.session.checkpoint()
+        self.validate_latest_key_provider_page(timestamp=3)
+
+        # Push a single key and advance stable to it: the checkpoint persists it (timestamp 4).
+        self.push_key(4)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
+        cursor[ds.key(102)] = ds.value(102)
+        self.session.checkpoint()
+        self.validate_latest_key_provider_page(timestamp=4)
+
+        # Push another key and advance stable to it: the checkpoint persists it (timestamp 5).
+        self.push_key(5)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
+        cursor[ds.key(103)] = ds.value(103)
+        self.session.checkpoint()
+        self.validate_latest_key_provider_page(timestamp=5)
+
         cursor.close()
 
-        # The page count must have grown past the baseline.
-        self.validate_key_provider_pages(baseline + 1)
+    def test_select_highest_at_or_below_stable(self):
+        if self.ds_name != "palite":
+            self.skipTest("Must use PALite to verify contents")
+
+        ds = SimpleDataSet(self, self.uri, 10)
+        ds.populate()
+        cursor = self.session.open_cursor(self.uri)
+
+        # Queue three keys but advance stable only to 2: the checkpoint must select the highest
+        # key at or below stable (timestamp 2), leaving the timestamp-3 key pending.
+        self.push_key(1)
+        self.push_key(2)
+        self.push_key(3)
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
+        cursor[ds.key(101)] = ds.value(101)
+        self.session.checkpoint()
+        self.validate_latest_key_provider_page(timestamp=2)
+
+        # Advance stable to 3: the still-pending timestamp-3 key is now selected.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(3))
+        cursor[ds.key(102)] = ds.value(102)
+        self.session.checkpoint()
+        self.validate_latest_key_provider_page(timestamp=3)
+
+        cursor.close()

@@ -260,8 +260,8 @@ __page_free_delta_leaf_merge_state(
 static WT_INLINE void
 __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
-    /* Return if the start time window is empty. */
-    if (!WT_TIME_WINDOW_HAS_START(tw))
+    /* Return if the time window is empty. */
+    if (WT_TIME_WINDOW_IS_EMPTY(tw))
         return;
 
     /*
@@ -274,6 +274,18 @@ __time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 
         tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
         tw->start_txn = WT_TXN_NONE;
+    }
+
+    /*
+     * Check if the stop of the time window is globally visible, and if so remove unnecessary
+     * values.
+     */
+    if (__wt_txn_tw_stop_visible_all(session, tw)) {
+        /* The durable timestamp should never be less than the stop timestamp. */
+        WT_ASSERT(session, tw->stop_ts <= tw->durable_stop_ts);
+
+        tw->stop_ts = tw->durable_stop_ts = WT_TS_NONE;
+        tw->stop_txn = WT_TXN_NONE;
     }
 }
 

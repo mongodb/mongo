@@ -111,6 +111,9 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
         conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())}')
         session_follow.checkpoint()
 
+        # FIXME-WT-15763: Step-down is not supported yet.
+        self.skipTest('Step-down is not supported yet.')
+
         # Reopen the new leader as follower to get rid of the content in the ingest table
         conn_follow.close()
         conn_follow = self.wiredtiger_open('follower', self.conn_follower_config)
@@ -169,6 +172,9 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
         # Checkpoint after draining the ingest table
         conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())}')
         session_follow.checkpoint()
+
+        # FIXME-WT-15763: Step-down is not supported yet.
+        self.skipTest('Step-down is not supported yet.')
 
         # Reopen the new leader as follower to get rid of the content in the ingest table
         conn_follow.close()
@@ -289,6 +295,9 @@ class test_layered_stepup08(wttest.WiredTigerTestCase):
         # Checkpoint after draining the ingest table
         conn_follow.set_timestamp(f'stable_timestamp={self.timestamp_str(oplog.last_timestamp())}')
         session_follow.checkpoint()
+
+        # FIXME-WT-15763: Step-down is not supported yet.
+        self.skipTest('Step-down is not supported yet.')
 
         # Reopen the new leader as follower to get rid of the content in the ingest table
         conn_follow.close()

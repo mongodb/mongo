@@ -29,7 +29,7 @@
 # test_key_provider_disagg04.py
 #    Toggle the key_provider API version across restarts and verify the database stays readable.
 
-import wttest
+import wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -53,10 +53,25 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
     # Restart re-invokes conn_extensions, so flipping this field switches the loaded provider.
     current_version = 0
 
+    DEFAULT_KEY_DATA = b'abcdefghijklmnopqrstuvwxyz'
+
     def conn_extensions(self, extlist):
         config = f'=(early_load=true,config=\"verbose=-1,version={self.current_version}\")'
         extlist.extension('test', "key_provider" + config)
         DisaggConfigMixin.conn_extensions(self, extlist)
+
+    def checkpoint(self):
+        # Push mode: a checkpoint only persists a pushed key once stable reaches its timestamp, so
+        # push at a fresh timestamp then advance stable to it. Pull mode rotates keys through
+        # get_key, so no push is needed there.
+        if self.current_version == 1:
+            self.push_ts += 1
+            crypt = wiredtiger.CryptKeys()
+            crypt.keys = self.DEFAULT_KEY_DATA
+            crypt.timestamp = self.push_ts
+            self.assertEqual(self.conn.get_key_provider().set_key(self.session, crypt), 0)
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.push_ts))
+        self.session.checkpoint()
 
     def restart_with_version(self, version):
         self.current_version = version
@@ -65,6 +80,9 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
     def test_key_provider_version_toggle(self):
         if (self.ds_name != "palite"):
             self.skipTest("Must use PALite for disagg key provider testing")
+
+        # Monotonic push timestamp for this test; advances on each push-mode checkpoint.
+        self.push_ts = 0
 
         # The scenario runs start -> other -> start -> other, covering both directions.
         other_version = 1 - self.start_version
@@ -75,9 +93,7 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
 
         ds1 = SimpleDataSet(self, self.uri, self.nentries)
         ds1.populate()
-        # Advance stable so the first checkpoint persists a key.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
-        self.session.checkpoint()
+        self.checkpoint()
         ds1.check()
 
         # Part 2: restart on the other version, verify, add more.
@@ -86,7 +102,7 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
 
         ds2 = SimpleDataSet(self, self.uri, self.nentries * 2)
         ds2.populate(first_row=self.nentries + 1)
-        self.session.checkpoint()
+        self.checkpoint()
         ds2.check()
 
         # Part 3: restart back on the starting version.
@@ -95,7 +111,7 @@ class test_key_provider_disagg04(wttest.WiredTigerTestCase):
 
         ds3 = SimpleDataSet(self, self.uri, self.nentries * 3)
         ds3.populate(first_row=self.nentries * 2 + 1)
-        self.session.checkpoint()
+        self.checkpoint()
         ds3.check()
 
         # Part 4: final flip to the other version, verify all three batches.
