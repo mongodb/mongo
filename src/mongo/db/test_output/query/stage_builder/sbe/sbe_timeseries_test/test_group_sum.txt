@@ -5,7 +5,7 @@
 [3] project [s17 = doubleDoubleSumFinalize(s15)] 
 [3] group [s16] [s15 = aggDoubleDoubleSum(s11)] spillSlots[s14] mergingExprs[aggMergeDoubleDoubleSums(s14)] 
 [3] project [s16 = (s13 ?: null)] 
-[3] extract_field_paths inputs[s11 = Get(a)/Id, s12 = Get(b)/Id] outputs[s13 = Get(b)/Traverse/Get(a)/Traverse/Get(b)/Id] 
+[3] project [s13 = traverseP(s12, lambda(l4.0) { traverseP(getField(move(l4.0), "a"), lambda(l5.0) { getField(move(l5.0), "b") }, 1) }, 1)] 
 [2] block_to_row blocks[s5, s6] row[s11, s12] s9 
 [2] filter {!(valueBlockNone(s9, true))} 
 [2] project [s9 = valueBlockLogicalAnd(s3, cellFoldValues_F(valueBlockFillEmpty(valueBlockGtScalar(cellBlockGetFlatValuesBlock(s8), Date(1738785568339)), false), s8))] 
