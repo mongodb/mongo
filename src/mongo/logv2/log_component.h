@@ -105,6 +105,7 @@ namespace MONGO_MOD_PUBLIC logv2 {
     X(kFTDC,                   , "ftdc"                  , "FTDC"            , kDefault) \
     X(kASIO,                   , "asio"                  , "ASIO"            , kNetwork) \
     X(kBridge,                 , "bridge"                , "BRIDGE"          , kNetwork) \
+    X(kOpMsg,                  , "opMsg"                 , "OP_MSG"          , kNetwork) \
     X(kTransaction,            , "transaction"           , "TXN"             , kDefault) \
     X(kConnectionPool,         , "connectionPool"        , "CONNPOOL"        , kNetwork) \
     X(kTest,                   , "test"                  , "TEST"            , kDefault) \
@@ -113,7 +114,7 @@ namespace MONGO_MOD_PUBLIC logv2 {
     X(kDisaggregatedStorage,   , "disaggregatedStorage"  , "DISAGG"          , kDefault) \
     X(kExtension,              , "extension"             , "EXTENSION"       , kDefault) \
     X(kExtensionMongot,        , "extensionMongot"       , "EXTENSION-MONGOT", kExtension) \
-    X(kRecorder,               , "trafficRecorder"       , "TRAFFICREC"           , kDefault) \
+    X(kRecorder,               , "trafficRecorder"       , "TRAFFICREC"      , kDefault) \
     X(kNumLogComponents,       , "total"                 , "TOTAL"           , kNumLogComponents) \
     /**/
 // clang-format on

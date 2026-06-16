@@ -60,6 +60,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -281,6 +282,18 @@ TEST_F(OpMsgParser, FailsIfNoBody) {
     };
 
     ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MissingOpMsgBodySection);
+}
+
+TEST_F(OpMsgParser, FailsIfNoBodyAndEmitsMsgParseLog) {
+    unittest::LogCaptureGuard logs;
+
+    auto msg = OpMsgBytes{
+        kNoFlags,  //
+    };
+
+    ASSERT_THROWS_CODE(msg.parse(), AssertionException, ErrorCodes::MissingOpMsgBodySection);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("c" << "OP_MSG" << "id" << 22632)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("c" << "NETWORK" << "id" << 22632)), 0);
 }
 
 TEST_F(OpMsgParser, FailsIfNoBodyEvenWithSequence) {

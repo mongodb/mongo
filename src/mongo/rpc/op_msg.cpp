@@ -263,9 +263,10 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 
     return msg;
 } catch (const DBException& ex) {
-    LOGV2_DEBUG(
+    LOGV2_DEBUG_OPTIONS(
         22632,
         1,
+        {logv2::LogComponent::kOpMsg},
         "invalid message: {ex_code} {ex} -- {hexdump_message_singleData_view2ptr_message_size}",
         "ex_code"_attr = ex.code(),
         "ex"_attr = redact(ex),
