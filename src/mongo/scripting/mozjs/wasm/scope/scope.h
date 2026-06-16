@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
@@ -44,6 +45,17 @@ class WasmtimeImplScope : public Scope {
 public:
     WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
                       boost::optional<int> jsHeapLimitMB = boost::none);
+
+    // Constructor for reusing a pre-initialized bridge from the thread-local cache.
+    // init() calls resetRealm() for cross-request isolation, which invalidates all compiled
+    // function handles — cachedFunctions is accepted for API symmetry with
+    // parkBridgeForCurrentThread but is always discarded. Callers must not rely on it being
+    // preserved.
+    WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
+                      boost::optional<int> jsHeapLimitMB,
+                      std::unique_ptr<wasm::MozJSWasmBridge> idleBridge,
+                      FunctionCacheMap cachedFunctions);
+
     ~WasmtimeImplScope() override;
 
     int invoke(ScriptingFunction func,
@@ -87,13 +99,10 @@ public:
     bool isKillPending() const override;
 
     // The following methods are not meaningful for Wasmtime.
-    // Wasmtime does not have BSONObj wrapped into a JS object (BSONHolder) so these methods are
-    // meaningless.
     void advanceGeneration() override {}
     void requireOwnedObjects() override {}
 
-    // These methods are mongosh-specific and not needed as part of runtime. Probably could refactor
-    // to a separate interface if we wanted to implement mongosh support in Wasmtime.
+    // These methods are mongosh-specific and not needed for server runtime.
     bool exec(StringData code,
               const std::string& name,
               bool printResult,
@@ -114,6 +123,16 @@ protected:
     ScriptingFunction _createFunction(const char* code) override;
 
 private:
+    // useNewWasmRealm=true uses resetRealm() (once per request, for cross-request isolation);
+    // false uses resetEngine() (per-document fast scrub). Keep private: callers that accidentally
+    // pass false when true is required would silently skip cross-request isolation.
+    void init(const BSONObj* data, bool useNewWasmRealm);
+
+    // Returns the current opId as a correlation key in LOGV2 traces. Never load-bearing.
+    uint64_t _currentOpId() const {
+        return _opCtx ? static_cast<uint64_t>(_opCtx->getOpID()) : 0;
+    }
+
     // Rebuilt on reset() after a kill so engine-wide state (e.g. interrupt epoch) doesn't persist
     // across the pool handoff. Owned solely by this scope.
     std::shared_ptr<wasm::WasmEngineContext> _wasmEngineCtx;
@@ -129,9 +148,14 @@ private:
     void* _emitCallbackData = nullptr;
     OperationContext* _opCtx = nullptr;
 
-    // Cached return value from the last invoke call.  Avoids a WASM bridge round-trip in
-    // getXxx("__returnValue"): invoke() stores the result here directly instead of calling
-    // setGlobal("__returnValue", ...) and the getters read from this instead of getGlobal().
+    // setupEmit allocates ~117 MB of WASM linear memory each call; cache the last byte limit
+    // so we skip the WIT round-trip when it hasn't changed. Reset to 0 on bridge teardown/reset.
+    int64_t _emitSetupBytes = 0;
+
+    // Scope-local sequence number for LOGV2 correlation across scope.cpp and bridge.cpp.
+    uint64_t _invokeSeq = 0;
+
+    // Cached return value from the last invoke(); avoids a WASM round-trip in getXxx().
     BSONObj _lastReturnValue;
 };
 

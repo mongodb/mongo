@@ -130,6 +130,31 @@ static bool run_safely(F&& f, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err)
     }
 }
 
+// The canonical ABI lowers list/string arguments into this module's linear memory via
+// cabi_realloc and transfers ownership to the callee (us). The generated post-return
+// hooks free only *result* buffers, so every argument buffer must be freed here or it
+// leaks for the lifetime of the WASM instance. Linear memory never shrinks, so leaked
+// inputs accumulate until the wasmtime store cap traps with "cannot leave component
+// instance" (a reused bridge leaked ~333 KB of invoke-function args per
+// call until it hit the 1210 MB cap). Any BSONObj built over an argument buffer must be
+// copied with getOwned() before the guard frees it: the engine may create lazy BSON
+// proxies that read from the object after this call returns.
+struct ArgListGuard {
+    api_list_u8_t* list;
+    ~ArgListGuard() {
+        if (list)
+            api_list_u8_free(list);
+    }
+};
+
+struct ArgStringGuard {
+    api_string_t* str;
+    ~ArgStringGuard() {
+        if (str)
+            api_string_free(str);
+    }
+};
+
 // Returns false on allocation failure so callers can propagate OOM errors.
 static bool list_u8_dup(api_list_u8_t* out, const uint8_t* data, size_t len) {
     if (len == 0) {
@@ -226,6 +251,41 @@ extern "C" bool exports_mongo_mozjs_mozjs_shutdown_engine(
         err);
 }
 
+extern "C" bool exports_mongo_mozjs_mozjs_reset_engine(
+    exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            int64_t rc = mongo::mozjs::wasm::g_engine.reset(&e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                g_function_count = 0;
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
+}
+
+extern "C" bool exports_mongo_mozjs_mozjs_reset_realm(
+    exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            int64_t rc = mongo::mozjs::wasm::g_engine.resetRealm(&e);
+            if (rc == mongo::mozjs::wasm::SM_OK) {
+                // All function handles are invalid after a realm reset.
+                g_function_count = 0;
+                if (ret)
+                    *ret = 0;
+                return true;
+            }
+            return return_err(err, &e);
+        },
+        err);
+}
+
 extern "C" bool exports_mongo_mozjs_mozjs_interrupt_current_op(
     exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
@@ -248,6 +308,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_create_function(
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgListGuard sourceGuard{source};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             const uint8_t* bytes = source ? source->ptr : nullptr;
@@ -282,10 +343,12 @@ extern "C" bool exports_mongo_mozjs_mozjs_create_function(
 extern "C" bool exports_mongo_mozjs_mozjs_invoke_function(
     exports_mongo_mozjs_mozjs_function_handle_t handle,
     api_list_u8_t* bson,
-    exports_mongo_mozjs_mozjs_ok_t* ret,
+    bool ignore_return,
+    api_list_u8_t* ret,
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgListGuard bsonGuard{bson};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             if (handle == 0) {
@@ -298,16 +361,31 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_function(
                 if (!validate_bson(bson->ptr, bson->len, &e)) {
                     return return_err(err, &e);
                 }
-                argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr));
+                argsObj = mongo::BSONObj(reinterpret_cast<const char*>(bson->ptr)).getOwned();
             }
 
+            // When the caller doesn't need the return value, skip the JS->BSON conversion.
             mongo::BSONObj outBson;
+            mongo::BSONObj* outPtr = ignore_return ? nullptr : &outBson;
             auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokeFunction(
-                static_cast<uint64_t>(handle), std::move(argsObj), &outBson, &e));
+                static_cast<uint64_t>(handle), std::move(argsObj), outPtr, &e));
 
             if (rc == mongo::mozjs::wasm::SM_OK) {
-                if (ret)
-                    *ret = 0;
+                if (!ignore_return) {
+                    if (!list_u8_dup(ret,
+                                     reinterpret_cast<const uint8_t*>(outBson.objdata()),
+                                     static_cast<size_t>(outBson.objsize()))) {
+                        e.code = mongo::mozjs::wasm::SM_E_NOMEM;
+                        mongo::mozjs::wasm::set_string(
+                            &e.msg,
+                            &e.msg_len,
+                            "OOM: failed to allocate invoke-function BSON buffer");
+                        return return_err(err, &e);
+                    }
+                } else {
+                    ret->ptr = nullptr;
+                    ret->len = 0;
+                }
                 return true;
             }
             return return_err(err, &e);
@@ -346,6 +424,8 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global(
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgStringGuard nameGuard{name};
+            ArgListGuard valueGuard{bson_value};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             if (!name || name->len == 0) {
@@ -358,7 +438,8 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global(
                 if (!validate_bson(bson_value->ptr, bson_value->len, &e)) {
                     return return_err(err, &e);
                 }
-                valueObj = mongo::BSONObj(reinterpret_cast<const char*>(bson_value->ptr));
+                valueObj =
+                    mongo::BSONObj(reinterpret_cast<const char*>(bson_value->ptr)).getOwned();
             }
 
             auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobal(
@@ -378,6 +459,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_get_global(
     api_string_t* name, api_list_u8_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgStringGuard nameGuard{name};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             if (!name || name->len == 0) {
@@ -411,6 +493,8 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global_value(
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgStringGuard nameGuard{name};
+            ArgListGuard elementGuard{bson_element};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             if (!name || name->len == 0) {
@@ -423,7 +507,8 @@ extern "C" bool exports_mongo_mozjs_mozjs_set_global_value(
                 if (!validate_bson(bson_element->ptr, bson_element->len, &e)) {
                     return return_err(err, &e);
                 }
-                valueObj = mongo::BSONObj(reinterpret_cast<const char*>(bson_element->ptr));
+                valueObj =
+                    mongo::BSONObj(reinterpret_cast<const char*>(bson_element->ptr)).getOwned();
             }
 
             auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.setGlobalValue(
@@ -470,6 +555,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_predicate(
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgListGuard documentGuard{document};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             if (handle == 0) {
@@ -482,7 +568,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_predicate(
                 if (!validate_bson(document->ptr, document->len, &e)) {
                     return return_err(err, &e);
                 }
-                docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr));
+                docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr)).getOwned();
             }
 
             bool result = false;
@@ -506,6 +592,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_map(
     exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     return run_safely(
         [&]() -> bool {
+            ArgListGuard documentGuard{document};
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
 
             if (handle == 0) {
@@ -518,7 +605,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_map(
                 if (!validate_bson(document->ptr, document->len, &e)) {
                     return return_err(err, &e);
                 }
-                docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr));
+                docObj = mongo::BSONObj(reinterpret_cast<const char*>(document->ptr)).getOwned();
             }
 
             auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.invokeMap(
@@ -530,6 +617,29 @@ extern "C" bool exports_mongo_mozjs_mozjs_invoke_map(
                 return true;
             }
             return return_err(err, &e);
+        },
+        err);
+}
+
+extern "C" bool exports_mongo_mozjs_mozjs_get_memory_stats(
+    api_list_u8_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    return run_safely(
+        [&]() -> bool {
+            mongo::mozjs::wasm::wasm_mozjs_error_t e{};
+            mongo::BSONObj out;
+
+            auto rc = static_cast<int64_t>(mongo::mozjs::wasm::g_engine.getMemoryStats(&out, &e));
+            if (rc != mongo::mozjs::wasm::SM_OK) {
+                return return_err(err, &e);
+            }
+
+            if (!list_u8_dup(ret, reinterpret_cast<const uint8_t*>(out.objdata()), out.objsize())) {
+                e.code = mongo::mozjs::wasm::SM_E_NOMEM;
+                mongo::mozjs::wasm::set_string(
+                    &e.msg, &e.msg_len, "OOM: failed to allocate memory-stats buffer");
+                return return_err(err, &e);
+            }
+            return true;
         },
         err);
 }

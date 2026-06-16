@@ -57,6 +57,9 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "error.h"
@@ -76,7 +79,7 @@ extern uint32_t g_wasmJsHeapLimitMB;
 class ExecutionCheck;
 
 struct FunctionSlot {
-    JS::PersistentRootedObject fn;
+    JS::PersistentRootedValue fn;
     explicit FunctionSlot(JSContext* cx) : fn(cx) {}
 };
 
@@ -262,11 +265,26 @@ public:
                               const mongo::BSONObj& singleElementDoc,
                               wasm_mozjs_error_t* err);
 
+    /// Reset JS state without destroying the Store or JSContext.
+    /// Clears user-defined globals and emit buffer; preserves compiled function handles.
+    err_code_t reset(wasm_mozjs_error_t* err);
+
+    /// Create a fresh Realm (new global) on the existing JSContext, re-running
+    /// InitRealmStandardClasses + type install + freeze but NOT InitSelfHostedCode.
+    /// All cached function handles become invalid; g_function_count must be reset by caller.
+    err_code_t resetRealm(wasm_mozjs_error_t* err);
+
     /// Set up the emit() built-in for mapReduce. Resets the emit buffer.
     err_code_t setupEmit(int64_t byteLimit, bool hasByteLimit, wasm_mozjs_error_t* err);
 
     /// Drain the emit buffer: returns accumulated {k,v} pairs, then clears.
     err_code_t drainEmitBuffer(mongo::BSONObj* out, wasm_mozjs_error_t* err);
+
+    /// Diagnostic memory statistics as BSON:
+    /// {linearMemoryBytes: long, gcHeapBytes: long, gcNumber: long}.
+    /// linearMemoryBytes is the real WASM linear memory size (memory.size), which only
+    /// ever grows; gcHeapBytes is the GC-managed portion bounded by the JS heap limit.
+    err_code_t getMemoryStats(mongo::BSONObj* out, wasm_mozjs_error_t* err);
 
     // MozJSCommonRuntimeInterface implementation
     void gc() override;
@@ -306,10 +324,37 @@ private:
     // Returns false and populates `err` (if non-null) on failure; a JS exception is left pending.
     bool _parseFunctionSource(StringData raw, std::string* out, wasm_mozjs_error_t* err);
 
+    // Create a new global object, enter its Realm, run InitRealmStandardClasses, install
+    // MongoDB types, install Array helpers, snapshot init names/props, run freeze script.
+    // On success _global is updated to the new global.  Caller must hold no JSAutoRealm.
+    // Returns SM_OK on success; on failure the context is left in an uninitialized state
+    // and the caller should propagate the error.
+    err_code_t _setupNewGlobal(ExecutionCheck& chk, wasm_mozjs_error_t* err);
+
+    // Create a lightweight child realm in the same compartment as _parentGlobal.
+    // Cheaper than _setupNewGlobal: skips property snapshot, freeze script, and parse
+    // helper install (parse runs in the parent realm; the helper is copied here).
+    // On success _global is updated to the new child global.
+    // Caller must hold no JSAutoRealm and _parentGlobal must be initialized.
+    err_code_t _setupChildRealm(ExecutionCheck& chk, wasm_mozjs_error_t* err);
+
     bool _initialized = false;
+
+    // JS_Init() / JS_ShutDown() are once-per-runtime-lifetime calls. After the first
+    // init(), subsequent shutdown()+init() cycles must skip them and only do
+    // JS_DestroyContext / JS_NewContext so the SM runtime is not repeatedly torn down.
+    bool _smRuntimeInitialized = false;
 
     JSContext* _cx = nullptr;
     JSRuntime* _rt = nullptr;
+
+    // Parent realm: created once in init(), holds frozen built-ins, MongoDB types, Array
+    // helpers, and the parse helper.  Never reset; lives for the lifetime of the JSContext.
+    JS::PersistentRootedObject _parentGlobal;
+
+    // Child realm: lives in the same compartment as _parentGlobal (no CCW overhead).
+    // Holds user functions; replaced cheaply on resetRealm() without re-running
+    // InitSelfHostedCode or the freeze/snapshot scripts.
     JS::PersistentRootedObject _global;
 
     std::vector<FunctionSlot> _slots;
@@ -321,6 +366,38 @@ private:
     std::vector<mongo::BSONObj> _emitBuffer;
     int64_t _emitBytesUsed = 0;
     int64_t _emitByteLimit = 16 * 1024 * 1024;  // default 16 MB
+
+    // Host-supplied BSON bytes pinned by live BSONHolder proxies since the last GC.
+    // ValueReader wraps argument/global BSON in lazy proxies whose holders keep the
+    // owned buffer alive until the proxy is finalized — which only happens at GC.
+    // SpiderMonkey never sees these malloc bytes (no AddAssociatedMemory accounting),
+    // so without help the GC feels no pressure and dead proxies pin their buffers
+    // indefinitely. In WASM that pinned memory can never be returned to the OS (linear
+    // memory only grows), so we count it ourselves and force a GC at the thresholds
+    // below. See _notePinnedHostBytes().
+    int64_t _pinnedHostBytesSinceGc = 0;
+
+    // Mid-request bound: force a GC once this many argument bytes have been pinned.
+    // ~32 MB keeps the worst-case dead-proxy backlog under 3% of the 1210 MB store cap
+    // while amortising the ~1 ms full-GC cost over ~100 large-document invocations.
+    static constexpr int64_t kPinnedBytesGcThreshold = 32 * 1024 * 1024;
+
+    // Request-boundary bound: reset() skips its GC entirely for cheap scopes but runs
+    // one when at least this much pinned garbage may exist, so parked (reused) bridges
+    // return to a clean floor between requests.
+    static constexpr int64_t kPinnedBytesResetGcThreshold = 1024 * 1024;
+
+    // Adds nbytes to the pinned counter and runs a full GC at kPinnedBytesGcThreshold.
+    void _notePinnedHostBytes(int64_t nbytes);
+
+    // Snapshot of own property names on globalThis after init() completes.
+    // These are engine-installed names that must survive reset().
+    std::unordered_set<std::string> _initGlobalNames;
+
+    // For each init-time function-valued globalThis property, the set of own property
+    // names that function had at init time. reset() uses this to scrub only user-added
+    // properties, leaving engine-installed ones (e.g. Object.keys, Array.from) intact.
+    std::unordered_map<std::string, std::unordered_set<std::string>> _initFnProps;
 
     static mongo::BSONObj _emitCallback(const mongo::BSONObj& args, void* data);
 };

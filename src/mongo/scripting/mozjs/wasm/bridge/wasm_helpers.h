@@ -39,6 +39,7 @@
 
 #include <wasmtime.hh>
 
+#include <boost/optional.hpp>
 #include <wasmtime/component.hh>
 #include <wasmtime/component/val.h>
 
@@ -62,6 +63,14 @@ wc::Func getMozjsFunc(wc::Instance& instance,
                       wt::Store::Context ctx,
                       std::string_view ifaceName,
                       std::string_view funcName);
+
+// Like getMozjsFunc but returns boost::none when the function is not exported.
+// Used for optional WIT functions that may not be present in older modules.
+boost::optional<wc::Func> getMozjsFuncOptional(wc::Instance& instance,
+                                               wt::Store::Context ctx,
+                                               std::string_view ifaceName,
+                                               std::string_view funcName);
+
 
 wc::List makeListU8(const uint8_t* data, size_t len);
 

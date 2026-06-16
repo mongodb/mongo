@@ -29,10 +29,14 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/config_engine_gen.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cstring>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -41,6 +45,8 @@ namespace mongo::mozjs::wasm {
 constexpr std::string_view kMozjsWitInterface = "mongo:mozjs/mozjs";
 constexpr std::string_view kInitEngine = "initialize-engine";
 constexpr std::string_view kShutdownEngine = "shutdown-engine";
+constexpr std::string_view kResetEngine = "reset-engine";
+constexpr std::string_view kResetRealm = "reset-realm";
 constexpr std::string_view kCreateFunction = "create-function";
 constexpr std::string_view kInvokeFunction = "invoke-function";
 constexpr std::string_view kSetGlobal = "set-global";
@@ -51,6 +57,7 @@ constexpr std::string_view kInvokeMap = "invoke-map";
 constexpr std::string_view kDrainEmitBuffer = "drain-emit-buffer";
 constexpr std::string_view kGetGlobal = "get-global";
 constexpr std::string_view kGetReturnValueBson = "get-return-value-bson";
+constexpr std::string_view kGetMemoryStats = "get-memory-stats";
 constexpr std::string_view kReturnValue = "__returnValue";
 
 std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(const uint8_t* data,
@@ -66,22 +73,31 @@ std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(cons
     auto result = wc::Component::deserialize(engine, span);
     invariant(result);
 
+    // Build and configure the linker once per context. MozJSWasmBridge instances
+    // reuse this linker for instantiation, avoiding the add_wasip2() cost per bridge.
+    wc::Linker linker(engine);
+    invariant(linker.add_wasip2());
+
     return std::shared_ptr<WasmEngineContext>(
-        new WasmEngineContext(std::move(engine), result.ok()));
+        new WasmEngineContext(std::move(engine), result.ok(), std::move(linker)));
 }
 
 MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts)
     : _ctx(std::move(ctx)) {
     _store = wt::Store(_ctx->_engine);
+    _stats.createdAtMonoNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    std::chrono::steady_clock::now().time_since_epoch())
+                                    .count();
 
     invariant(opts.linearMemoryLimitMB > 0);
 
-    // The JS heap lives inside WASM linear memory alongside SpiderMonkey's
-    // runtime overhead (stack, GC metadata, self-hosted code, malloc arena).
-    // The store limit must exceed the heap limit to leave room for that overhead.
-    // Use the configured heap limit, or the in-WASM default (100 MB) when not set.
+    // The JS heap lives inside WASM linear memory alongside SpiderMonkey's runtime overhead
+    // (stack, GC metadata, self-hosted code, malloc arena). SpiderMonkey's C++ malloc arenas
+    // and compiled bytecode accumulate over the lifetime of a long-lived idle bridge; in
+    // practice >200 MB of overhead is needed for correctness on memory-heavy workloads.
     _jsHeapLimitMB =
         opts.jsHeapLimitMB > 0 ? opts.jsHeapLimitMB : static_cast<uint32_t>(gJSHeapLimitMB.load());
+    _storeLimitMB = opts.linearMemoryLimitMB;
     uint32_t minOverheadMB = std::max(64u, _jsHeapLimitMB / 10);
     uint32_t minStoreMB = _jsHeapLimitMB + minOverheadMB;
 
@@ -96,16 +112,6 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
 
     auto bytes = static_cast<int64_t>(opts.linearMemoryLimitMB) * 1024 * 1024;
 
-    // Store::limiter(memory_size, table_elements, instances, tables, memories).
-    // -1 keeps the wasmtime default for that dimension. We require an explicit
-    // memory_size (never -1) because that is the dimension we need to cap: it
-    // controls how large the single linear memory backing the
-    // JS heap can grow. 'memories' is distinct: it limits the *number* of
-    // linear-memory objects the store may create, not their size.
-    // The remaining dimensions are structural limits on the
-    // number of WASM objects (table slots, module instances, tables).
-    // Our component's structure is fixed at compile time and those counts don't
-    // grow with user workload, so the defaults (unlimited / 10,000) are fine.
     _store->limiter(bytes,
                     /*table_elements=*/-1,
                     /*instances=*/-1,
@@ -128,11 +134,8 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
     wasiConfig.inherit_stderr();
     invariant(storeCtx.set_wasi(std::move(wasiConfig)));
 
-    wc::Linker linker(_ctx->_engine);
-    invariant(linker.add_wasip2());
-
-    // Instantiate directly from the shared compiled component, no deserialization.
-    auto instanceResult = linker.instantiate(storeCtx, _ctx->_component);
+    // Use the per-context cached linker (already configured with add_wasip2).
+    auto instanceResult = _ctx->_linker.instantiate(storeCtx, _ctx->_component);
     if (!instanceResult) {
         uasserted(
             ErrorCodes::JSInterpreterFailure,
@@ -142,6 +145,7 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
 
     _initEngineFunc = _getFunc(kInitEngine);
     _shutdownEngineFunc = _getFunc(kShutdownEngine);
+    _resetEngineFunc = _getFunc(kResetEngine);
     _createFunctionFunc = _getFunc(kCreateFunction);
     _invokeFunctionFunc = _getFunc(kInvokeFunction);
     _setGlobalFunc = _getFunc(kSetGlobal);
@@ -152,6 +156,17 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
     _drainEmitBufferFunc = _getFunc(kDrainEmitBuffer);
     _getGlobalFunc = _getFunc(kGetGlobal);
     _getReturnValueBsonFunc = _getFunc(kGetReturnValueBson);
+
+    // reset-realm is optional: older pre-built WASM modules may not export it.
+    // Falls back gracefully to reset-engine when absent.
+    invariant(_instance);
+    _resetRealmFunc = wasm_helpers::getMozjsFuncOptional(
+        *_instance, getContext(), kMozjsWitInterface, kResetRealm);
+
+    // get-memory-stats is optional for the same reason; getMemoryStats() returns an
+    // empty object when the module doesn't export it.
+    _getMemoryStatsFunc = wasm_helpers::getMozjsFuncOptional(
+        *_instance, getContext(), kMozjsWitInterface, kGetMemoryStats);
 }
 
 void MozJSWasmBridge::_assertUsable() {
@@ -171,21 +186,72 @@ bool MozJSWasmBridge::_callFuncNoArgs(wc::Func& func, wc::Val* results, size_t n
     wt::Span<wc::Val> resultsSpan(results, numResults);
     wt::Result<std::monostate> callResult = func.call(getContext(), empty, resultsSpan);
     if (!callResult) {
-        _state.store(State::Trapped);
-        // If we are pending a kill we either timed out or got killed.
-        // Throw interrupted to indicate this to the caller.
-        if (isKillPending()) {
-            uasserted(ErrorCodes::Interrupted, callResult.err().message());
-        }
-        uasserted(kWasmtimeTrapErrorCode, callResult.err().message());
+        _throwAfterTrap(callResult.err().message());
     }
     auto postResult = func.post_return(getContext());
     return static_cast<bool>(postResult);
 }
 
+void MozJSWasmBridge::_throwAfterTrap(const std::string& trapMessage) {
+    _state.store(State::Trapped);
+
+    // If kill() was called on this bridge, map back to the real mongo ErrorCode by
+    // checking the current OperationContext rather than always throwing Interrupted (11601).
+    if (isKillPending()) {
+        auto* client = Client::getCurrent();
+        OperationContext* opCtx = client ? client->getOperationContext() : nullptr;
+        if (opCtx) {
+            // Falls through if the opCtx was not marked killed (e.g. kill via DeadlineMonitor).
+            opCtx->checkForInterrupt();
+        }
+        LOGV2_DEBUG(11542381,
+                    2,
+                    "WASM bridge trap with kill pending but no opCtx kill status; falling "
+                    "back to Interrupted",
+                    "trap"_attr = trapMessage);
+        uasserted(ErrorCodes::Interrupted, trapMessage);
+    }
+
+    // Full state dump on any trap for diagnostics.
+    int64_t ageNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count() -
+        _stats.createdAtMonoNanos;
+    LOGV2_WARNING(11542382,
+                  "WASM bridge trapped (no kill pending)",
+                  "trap"_attr = trapMessage,
+                  "state"_attr = static_cast<int>(_state.load()),
+                  "heapLimitMB"_attr = _jsHeapLimitMB,
+                  "storeLimitMB"_attr = _storeLimitMB,
+                  "ageMillis"_attr = ageNanos / 1'000'000,
+                  "stats"_attr = _stats.toBSON());
+    uasserted(kWasmtimeTrapErrorCode, trapMessage);
+}
+
+namespace {
+inline void recordBytes(Atomic<uint64_t>& total, Atomic<uint64_t>& peak, uint64_t bytes) {
+    total.fetchAndAdd(bytes);
+    uint64_t prev = peak.load();
+    while (bytes > prev && !peak.compareAndSwap(&prev, bytes)) {
+    }
+}
+// For the raw-u8 fast path we get exact size; slow path falls back to 0.
+inline uint64_t wcValByteSize(const wc::Val& v) {
+    const auto* raw = wc::Val::to_capi(&v);
+    if (raw->kind == WASMTIME_COMPONENT_RAW_U8_LIST) {
+        return raw->of.raw_u8_list.size;
+    }
+    return 0;
+}
+}  // namespace
+
 bool MozJSWasmBridge::initialize() {
     wc::Val result(wc::WitResult::ok(std::nullopt));
-    LOGV2_DEBUG(11542332, 2, "Wasm Bridge Initializing", "ok"_attr = isInitialized());
+    LOGV2(11542332,
+          "Wasm Bridge Initializing",
+          "ok"_attr = isInitialized(),
+          "heapLimitMB"_attr = _jsHeapLimitMB,
+          "storeLimitMB"_attr = _storeLimitMB);
     wc::Val optionsArg(wc::Record({{"heap-size-mb", wc::Val(_jsHeapLimitMB)}}));
     _callFunc(*_initEngineFunc, &result, 1, std::move(optionsArg));
     if (_assertWitResult(result)) {
@@ -204,15 +270,62 @@ bool MozJSWasmBridge::initialize() {
 void MozJSWasmBridge::shutdown() {
     _assertUsable();
     wc::Val result(wc::WitResult::ok(std::nullopt));
-    LOGV2_DEBUG(11542334, 2, "Wasm Bridge Shutting Down");
+    // Full state dump on shutdown to correlate per-bridge counters
+    // with any trap warning (11542382) on a subsequent scope.
+    int64_t ageNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count() -
+        _stats.createdAtMonoNanos;
+    LOGV2(11542334,
+          "Wasm Bridge Shutting Down",
+          "ageMillis"_attr = ageNanos / 1'000'000,
+          "stats"_attr = _stats.toBSON());
     _callFuncNoArgs(*_shutdownEngineFunc, &result, 1);
     _assertWitResult(result, "Wasm Bridge failed shutdown");
     LOGV2_DEBUG(11542333, 2, "Wasm Bridge Shutdown");
     _state.store(State::Uninitialized);
 }
 
+void MozJSWasmBridge::resetEngine() {
+    _assertUsable();
+    _refreshEpochDeadline();
+    const uint64_t seq = _stats.resetEngineCallCount.fetchAndAdd(1) + 1;
+    LOGV2_DEBUG(11542374,
+                2,
+                "WASM bridge resetEngine",
+                "seq"_attr = seq,
+                "totalInvokes"_attr = _stats.invokeFunctionCallCount.load() +
+                    _stats.invokeMapCallCount.load() + _stats.invokePredicateCallCount.load(),
+                "bytesInToWasm"_attr = _stats.bytesInToWasm.load());
+    wc::Val result(wc::WitResult::ok(std::nullopt));
+    _callFuncNoArgs(*_resetEngineFunc, &result, 1);
+    _assertWitResult(result, "Wasm Bridge failed reset-engine");
+}
+
+void MozJSWasmBridge::resetRealm() {
+    _assertUsable();
+    _refreshEpochDeadline();
+    if (!_resetRealmFunc) {
+        // Older WASM module without reset-realm: fall back to reset-engine.
+        resetEngine();
+        return;
+    }
+    const uint64_t seq = _stats.resetRealmCallCount.fetchAndAdd(1) + 1;
+    LOGV2_DEBUG(11542375,
+                2,
+                "WASM bridge resetRealm",
+                "seq"_attr = seq,
+                "totalInvokes"_attr = _stats.invokeFunctionCallCount.load() +
+                    _stats.invokeMapCallCount.load() + _stats.invokePredicateCallCount.load(),
+                "bytesInToWasm"_attr = _stats.bytesInToWasm.load());
+    wc::Val result(wc::WitResult::ok(std::nullopt));
+    _callFuncNoArgs(*_resetRealmFunc, &result, 1);
+    _assertWitResult(result, "Wasm Bridge failed reset-realm");
+}
+
 uint64_t MozJSWasmBridge::createFunction(std::string_view source) {
     _assertUsable();
+    _stats.createFunctionCallCount.fetchAndAdd(1);
     wc::Val srcArg(wasm_helpers::makeListU8(source));
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542310,
@@ -235,9 +348,16 @@ StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle,
                                                     wc::Val bsonVal,
                                                     bool ignoreReturn) {
     _assertUsable();
+    _stats.invokeFunctionCallCount.fetchAndAdd(1);
+    recordBytes(_stats.bytesInToWasm, _stats.maxSingleCallBytesIn, wcValByteSize(bsonVal));
     wc::Val arg0(handle);
     wc::Val result(wc::WitResult::ok(std::nullopt));
-    if (!_callFunc(*_invokeFunctionFunc, &result, 1, std::move(arg0), std::move(bsonVal))) {
+    if (!_callFunc(*_invokeFunctionFunc,
+                   &result,
+                   1,
+                   std::move(arg0),
+                   std::move(bsonVal),
+                   wc::Val(ignoreReturn))) {
         return Status{ErrorCodes::Error{11542313},
                       str::stream() << "Failed to call to invoke JS function number " << handle};
     }
@@ -245,11 +365,18 @@ StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle,
                      str::stream() << "Failed to invoke JS function :: function id = " << handle);
     if (ignoreReturn)
         return BSONObj();
-    return _getReturnValueBson();
+    auto extracted = _extractBSON(result);
+    recordBytes(_stats.bytesOutFromWasm,
+                _stats.maxSingleCallBytesOut,
+                static_cast<uint64_t>(extracted.objsize()));
+    return extracted;
 }
 
 void MozJSWasmBridge::setGlobal(std::string_view name, const BSONObj& value) {
     _assertUsable();
+    _stats.setGlobalCallCount.fetchAndAdd(1);
+    recordBytes(
+        _stats.bytesInToWasm, _stats.maxSingleCallBytesIn, static_cast<uint64_t>(value.objsize()));
     wc::Val nameArg = wasm_helpers::makeString(name);
     wc::Val valueArg = wasm_helpers::convertBsonToWcVal(value);
     wc::Val result(wc::WitResult::ok(std::nullopt));
@@ -265,6 +392,9 @@ void MozJSWasmBridge::setGlobal(std::string_view name, const BSONObj& value) {
 void MozJSWasmBridge::setGlobalValue(std::string_view name, const BSONObj& value) {
     _assertUsable();
     invariant(value.nFields() == 1);
+    _stats.setGlobalCallCount.fetchAndAdd(1);
+    recordBytes(
+        _stats.bytesInToWasm, _stats.maxSingleCallBytesIn, static_cast<uint64_t>(value.objsize()));
     wc::Val nameArg = wasm_helpers::makeString(name);
     wc::Val valueArg = wasm_helpers::convertBsonToWcVal(value);
     wc::Val result(wc::WitResult::ok(std::nullopt));
@@ -279,8 +409,26 @@ void MozJSWasmBridge::setGlobalValue(std::string_view name, const BSONObj& value
 
 void MozJSWasmBridge::setupEmit(boost::optional<int64_t> byteLimit) {
     _assertUsable();
+    // Every setupEmit allocates ~117 MB of WASM linear memory. Log the
+    // count so per-document regressions are detectable from logs alone.
+    const uint64_t seq = _stats.setupEmitCallCount.fetchAndAdd(1) + 1;
+    if (byteLimit) {
+        int64_t prev = _stats.maxEmitByteLimit.load();
+        while (*byteLimit > prev && !_stats.maxEmitByteLimit.compareAndSwap(&prev, *byteLimit)) {
+        }
+    }
+    LOGV2(11542370,
+          "WASM bridge setupEmit",
+          "seq"_attr = seq,
+          "byteLimit"_attr = byteLimit ? *byteLimit : -1,
+          "maxEmitByteLimit"_attr = _stats.maxEmitByteLimit.load(),
+          "heapLimitMB"_attr = _jsHeapLimitMB,
+          "storeLimitMB"_attr = _storeLimitMB,
+          "totalInvokes"_attr = _stats.invokeFunctionCallCount.load() +
+              _stats.invokeMapCallCount.load() + _stats.invokePredicateCallCount.load(),
+          "bytesInToWasm"_attr = _stats.bytesInToWasm.load(),
+          "bytesOutFromWasm"_attr = _stats.bytesOutFromWasm.load());
     wc::Val result(wc::WitResult::ok(std::nullopt));
-    // Translate boost::optional to std::optional for WitOption.
     std::optional<int64_t> stdArg = std::nullopt;  // NOLINT
     if (byteLimit) {
         stdArg = *byteLimit;
@@ -292,6 +440,15 @@ void MozJSWasmBridge::setupEmit(boost::optional<int64_t> byteLimit) {
 
 void MozJSWasmBridge::invokeMap(uint64_t handle, wc::Val bsonVal) {
     _assertUsable();
+    const uint64_t seq = _stats.invokeMapCallCount.fetchAndAdd(1) + 1;
+    recordBytes(_stats.bytesInToWasm, _stats.maxSingleCallBytesIn, wcValByteSize(bsonVal));
+    LOGV2_DEBUG(11542371,
+                4,
+                "WASM bridge invokeMap",
+                "seq"_attr = seq,
+                "func"_attr = handle,
+                "bytesIn"_attr = wcValByteSize(bsonVal),
+                "setupEmitCallCount"_attr = _stats.setupEmitCallCount.load());
     wc::Val arg0(handle);
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542319,
@@ -303,6 +460,8 @@ void MozJSWasmBridge::invokeMap(uint64_t handle, wc::Val bsonVal) {
 
 bool MozJSWasmBridge::invokePredicate(uint64_t handle, wc::Val bsonVal) {
     _assertUsable();
+    _stats.invokePredicateCallCount.fetchAndAdd(1);
+    recordBytes(_stats.bytesInToWasm, _stats.maxSingleCallBytesIn, wcValByteSize(bsonVal));
     wc::Val arg0(handle);
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542339,
@@ -321,7 +480,14 @@ void MozJSWasmBridge::kill() {
 
 void MozJSWasmBridge::_signalInterrupt() {
     _killPending.store(true);
+    _stats.killCount.fetchAndAdd(1);
     _ctx->_engine.increment_epoch();
+    LOGV2(11542376,
+          "WASM bridge kill signalled",
+          "killCount"_attr = _stats.killCount.load(),
+          "totalInvokes"_attr = _stats.invokeFunctionCallCount.load() +
+              _stats.invokeMapCallCount.load() + _stats.invokePredicateCallCount.load(),
+          "setupEmitCalls"_attr = _stats.setupEmitCallCount.load());
 }
 
 bool MozJSWasmBridge::isKillPending() const {
@@ -330,10 +496,15 @@ bool MozJSWasmBridge::isKillPending() const {
 
 BSONObj MozJSWasmBridge::drainEmitBuffer() {
     _assertUsable();
+    _stats.drainEmitBufferCallCount.fetchAndAdd(1);
     wc::Val result(wc::WitResult::ok(std::nullopt));
     _callFuncNoArgs(*_drainEmitBufferFunc, &result, 1);
     _assertWitResult(result, "Wasm Bridge failed to drain emit");
-    return _extractBSON(result);
+    auto extracted = _extractBSON(result);
+    recordBytes(_stats.bytesOutFromWasm,
+                _stats.maxSingleCallBytesOut,
+                static_cast<uint64_t>(extracted.objsize()));
+    return extracted;
 }
 
 BSONObj MozJSWasmBridge::getGlobal(std::string_view name, bool implicitNull) {
@@ -402,22 +573,52 @@ wc::Func MozJSWasmBridge::_getFunc(std::string_view funcName) {
 BSONObj MozJSWasmBridge::_extractBSON(const wc::Val& result) {
     const wc::Val* payload = result.get_result().payload();
     invariant(payload);
-    auto bytes = wasm_helpers::extractListU8(*payload);
-    invariant(bytes.size() >= BSONObj::kMinBSONLength);
-    // Copy into owned buffer for BSONObj
-    auto buf = SharedBuffer::allocate(bytes.size());
-    std::memcpy(buf.get(), bytes.data(), bytes.size());
+
+    // Fast path: with the MongoDB lift patch applied, list<u8> results arrive as
+    // WASMTIME_COMPONENT_RAW_U8_LIST so we can memcpy the entire BSON in one go
+    // rather than reading N×32-byte Val::U8 boxes.
+    const auto* rawPayload = wc::Val::to_capi(payload);
+    if (rawPayload->kind == WASMTIME_COMPONENT_RAW_U8_LIST) {
+        const auto& bv = rawPayload->of.raw_u8_list;
+        invariant(bv.size >= static_cast<size_t>(BSONObj::kMinBSONLength));
+        auto buf = SharedBuffer::allocate(bv.size);
+        std::memcpy(buf.get(), bv.data, bv.size);
+        auto returnVal = BSONObj(std::move(buf));
+        invariant(returnVal.isValid());
+        return returnVal;
+    }
+
+    const wc::List& list = payload->get_list();
+    size_t n = list.size();
+    invariant(n >= static_cast<size_t>(BSONObj::kMinBSONLength));
+    // Write directly into the SharedBuffer — no intermediate std::vector allocation.
+    auto buf = SharedBuffer::allocate(n);
+    auto* dst = reinterpret_cast<uint8_t*>(buf.get());
+    for (const wc::Val& elem : list) {
+        *dst++ = elem.get_u8();
+    }
     auto returnVal = BSONObj(std::move(buf));
     invariant(returnVal.isValid());
     return returnVal;
 }
 
 BSONObj MozJSWasmBridge::_getReturnValueBson() {
-    // Uses getGlobal which does not preserve JS array types (arrays become BSON objects with
-    // numeric keys). Use getReturnValueWrapped() when array type preservation matters.
-    // When the return value is undefined (e.g., a function with no return statement),
-    // getGlobal returns {"__value": null} via its implicitNull=true path rather than throwing.
+    // getGlobal does not preserve JS array types (arrays become BSON objects with numeric keys).
+    // Use getReturnValueWrapped() when array type preservation matters.
     return getGlobal(kReturnValue, true);
+}
+
+BSONObj MozJSWasmBridge::getMemoryStats() {
+    _assertUsable();
+    if (!_getMemoryStatsFunc) {
+        return BSONObj();
+    }
+    wc::Val result(wc::WitResult::ok(std::nullopt));
+    uassert(11542383,
+            "Failed to call get-memory-stats",
+            _callFuncNoArgs(*_getMemoryStatsFunc, &result, 1));
+    _assertWitResult(result, "Failed to get memory stats", ErrorCodes::Error{11542384});
+    return _extractBSON(result);
 }
 
 BSONObj MozJSWasmBridge::getReturnValueWrapped() {
