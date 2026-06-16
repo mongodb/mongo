@@ -5,7 +5,7 @@
  *
  * Modules included by this file are: danish, dutch, english, finnish, french,
  * german, hungarian, italian, norwegian, porter, portuguese, romanian,
- * russian, spanish, swedish, turkish
+ * russian, serbian, spanish, swedish, turkish
  */
 
 #include "../src_c/stem_UTF_8_danish.h"
@@ -21,6 +21,7 @@
 #include "../src_c/stem_UTF_8_portuguese.h"
 #include "../src_c/stem_UTF_8_romanian.h"
 #include "../src_c/stem_UTF_8_russian.h"
+#include "../src_c/stem_UTF_8_serbian.h"
 #include "../src_c/stem_UTF_8_spanish.h"
 #include "../src_c/stem_UTF_8_swedish.h"
 #include "../src_c/stem_UTF_8_turkish.h"
@@ -90,8 +91,11 @@ static struct stemmer_modules modules[] = {
   {"rum", ENC_UTF_8, romanian_UTF_8_create_env, romanian_UTF_8_close_env, romanian_UTF_8_stem},
   {"rus", ENC_UTF_8, russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem},
   {"russian", ENC_UTF_8, russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem},
+  {"serbian", ENC_UTF_8, serbian_UTF_8_create_env, serbian_UTF_8_close_env, serbian_UTF_8_stem},
   {"spa", ENC_UTF_8, spanish_UTF_8_create_env, spanish_UTF_8_close_env, spanish_UTF_8_stem},
   {"spanish", ENC_UTF_8, spanish_UTF_8_create_env, spanish_UTF_8_close_env, spanish_UTF_8_stem},
+  {"sr", ENC_UTF_8, serbian_UTF_8_create_env, serbian_UTF_8_close_env, serbian_UTF_8_stem},
+  {"srp", ENC_UTF_8, serbian_UTF_8_create_env, serbian_UTF_8_close_env, serbian_UTF_8_stem},
   {"sv", ENC_UTF_8, swedish_UTF_8_create_env, swedish_UTF_8_close_env, swedish_UTF_8_stem},
   {"swe", ENC_UTF_8, swedish_UTF_8_create_env, swedish_UTF_8_close_env, swedish_UTF_8_stem},
   {"swedish", ENC_UTF_8, swedish_UTF_8_create_env, swedish_UTF_8_close_env, swedish_UTF_8_stem},
@@ -114,6 +118,7 @@ static const char * algorithm_names[] = {
   "portuguese", 
   "romanian", 
   "russian", 
+  "serbian", 
   "spanish", 
   "swedish", 
   "turkish", 
