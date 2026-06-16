@@ -76,7 +76,7 @@ private:
 
 void MapReduceFixture::setUp() {
     ServiceContextMongoDTest::setUp();
-    ScriptEngine::setup(false);
+    ScriptEngine::setup(ExecutionEnvironment::Server, false /* disableLoadStored */);
 }
 
 void MapReduceFixture::tearDown() {

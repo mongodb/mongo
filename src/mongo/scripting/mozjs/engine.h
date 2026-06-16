@@ -48,7 +48,7 @@ class MozJSImplScope;
  */
 class MozJSScriptEngine final : public mongo::ScriptEngine {
 public:
-    MozJSScriptEngine(bool disableLoadStored);
+    MozJSScriptEngine(ExecutionEnvironment env, bool disableLoadStored);
     ~MozJSScriptEngine() override;
 
     mongo::Scope* createScope() override;
@@ -91,6 +91,10 @@ public:
         return _deadlineMonitor;
     }
 
+    ExecutionEnvironment executionEnvironment() const {
+        return _executionEnvironment;
+    }
+
 private:
     /**
      * This mutex protects _opToScopeMap
@@ -102,6 +106,7 @@ private:
                                    // _globalInterruptLock).
 
     DeadlineMonitor<MozJSImplScope> _deadlineMonitor;
+    ExecutionEnvironment _executionEnvironment;
     std::string _loadPath;
 };
 

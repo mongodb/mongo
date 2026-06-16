@@ -400,7 +400,14 @@ public:
 
     void setStatus(Status status);
 
-    ModuleLoader* getModuleLoader() const;
+    ModuleLoader& getModuleLoader() const;
+
+    /**
+     * JavaScript module loading is a shell-only feature. It is not supported in the server
+     * execution environment, where it would let server-side JavaScript (e.g. $function) read
+     * arbitrary host files via import().
+     */
+    bool supportsModules() const;
 
 private:
     template <typename ImplScopeFunction>
@@ -437,6 +444,14 @@ private:
     static bool _interruptCallback(JSContext* cx);
     static void _gcCallback(JSContext* rt, JSGCStatus status, JS::GCReason reason, void* data);
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
+
+    /**
+     * Returns true if a failed script compilation/execution should be retried as an ES module,
+     * based on the pending exception (a SyntaxError, or a top-level-await ReferenceError).
+     * Always false for the interactive shell. Note, returns false if modules are not supported
+     * (i.e in the server).
+     */
+    bool _shouldTryExecAsModule(const std::string& name, bool success) const;
 
     void installDBAccess();
     void installBSONTypes();
@@ -484,7 +499,7 @@ private:
 
     bool _inReportError;
 
-    std::unique_ptr<ModuleLoader> _moduleLoader;
+    const std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
     boost::optional<JS::RootedValue> _promiseResult;
 

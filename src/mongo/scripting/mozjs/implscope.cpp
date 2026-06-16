@@ -491,6 +491,11 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _requireOwnedObjects(false),
       _hasOutOfMemoryException(false),
       _inReportError(false),
+      _moduleLoader([&]() {
+          return engine->executionEnvironment() == ExecutionEnvironment::Server
+              ? nullptr
+              : std::make_unique<ModuleLoader>(_engine->executionEnvironment());
+      }()),
       _binDataProto(_context),
       _bsonProto(_context),
       _codeProto(_context),
@@ -526,11 +531,14 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 
         JSAutoRealm ac(_context, _global);
         _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
-        _moduleLoader = std::make_unique<ModuleLoader>();
-        uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
-        uassert(ErrorCodes::JSInterpreterFailure,
-                "Failed to initialize ModuleLoader",
-                _moduleLoader->init(_context, engine->getLoadPath()));
+
+        if (supportsModules()) {
+            uassert(
+                ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
+            uassert(ErrorCodes::JSInterpreterFailure,
+                    "Failed to initialize ModuleLoader",
+                    getModuleLoader().init(_context, engine->getLoadPath()));
+        }
 
         _checkErrorState(JS::InitRealmStandardClasses(_context));
 
@@ -932,7 +940,7 @@ int MozJSImplScope::invoke(ScriptingFunction func,
     });
 }
 
-bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success) {
+bool MozJSImplScope::_shouldTryExecAsModule(const std::string& name, bool success) const {
     if (name == MozJSImplScope::kInteractiveShellName) {
         return false;
     }
@@ -941,18 +949,22 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
         return false;
     }
 
-    JS::RootedValue ex(cx);
-    if (!JS_GetPendingException(cx, &ex)) {
+    if (!supportsModules()) {
         return false;
     }
 
-    JS::RootedObject obj(cx, ex.toObjectOrNull());
+    JS::RootedValue ex(_context);
+    if (!JS_GetPendingException(_context, &ex)) {
+        return false;
+    }
+
+    JS::RootedObject obj(_context, ex.toObjectOrNull());
     const JSClass* syntaxError = js::ProtoKeyToClass(JSProto_SyntaxError);
-    if (!JS_InstanceOf(cx, obj, syntaxError, nullptr)) {
+    if (!JS_InstanceOf(_context, obj, syntaxError, nullptr)) {
         return false;
     }
 
-    JSErrorReport* report = JS_ErrorFromException(cx, obj);
+    JSErrorReport* report = JS_ErrorFromException(_context, obj);
     if (!report) {
         return false;
     }
@@ -984,12 +996,12 @@ bool MozJSImplScope::exec(StringData code,
         success = scriptPtr != nullptr;
 
         JSObject* modulePtr = nullptr;
-        if (shouldTryExecAsModule(_context, name, success)) {
+        if (_shouldTryExecAsModule(name, success)) {
             // If we should run this as a module, we need to clear the previous exception in order
             // to catch stack traces for future exceptions.
             JS_ClearPendingException(_context);
 
-            modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
+            modulePtr = getModuleLoader().loadRootModuleFromSource(_context, name, code);
             success = modulePtr != nullptr;
         }
 
@@ -1278,8 +1290,15 @@ std::string MozJSImplScope::buildStackString() {
     }
 }
 
-ModuleLoader* MozJSImplScope::getModuleLoader() const {
-    return _moduleLoader.get();
+ModuleLoader& MozJSImplScope::getModuleLoader() const {
+    tassert(12883200,
+            "ModuleLoader not supported in this context.",
+            supportsModules() && _moduleLoader.get());
+    return *_moduleLoader;
+}
+
+bool MozJSImplScope::supportsModules() const {
+    return _engine->executionEnvironment() != ExecutionEnvironment::Server;
 }
 
 }  // namespace mozjs

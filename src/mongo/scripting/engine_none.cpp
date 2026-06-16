@@ -30,7 +30,7 @@
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
-void ScriptEngine::setup(bool disableLoadStored) {
+void ScriptEngine::setup(ExecutionEnvironment environment, bool disableLoadStored) {
     // noop
 }
 

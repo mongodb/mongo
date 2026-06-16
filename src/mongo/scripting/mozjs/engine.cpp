@@ -49,11 +49,11 @@ void DisableExtraThreads();
 
 namespace mongo {
 
-void ScriptEngine::setup(bool disableLoadStored) {
+void ScriptEngine::setup(ExecutionEnvironment environment, bool disableLoadStored) {
     if (getGlobalScriptEngine())
         return;
 
-    setGlobalScriptEngine(new mozjs::MozJSScriptEngine(disableLoadStored));
+    setGlobalScriptEngine(new mozjs::MozJSScriptEngine(environment, disableLoadStored));
 
     if (hasGlobalServiceContext()) {
         getGlobalServiceContext()->registerKillOpListener(getGlobalScriptEngine());
@@ -66,8 +66,10 @@ std::string ScriptEngine::getInterpreterVersionString() {
 
 namespace mozjs {
 
-MozJSScriptEngine::MozJSScriptEngine(bool disableLoadStored)
-    : ScriptEngine(disableLoadStored), _loadPath(boost::filesystem::current_path().string()) {
+MozJSScriptEngine::MozJSScriptEngine(ExecutionEnvironment environment, bool disableLoadStored)
+    : ScriptEngine(disableLoadStored),
+      _executionEnvironment(environment),
+      _loadPath(boost::filesystem::current_path().string()) {
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to JS_Init()", JS_Init());
     js::DisableExtraThreads();
 }

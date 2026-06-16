@@ -212,6 +212,8 @@ protected:
     bool _lastRetIsNativeCode;  // v8 only: set to true if eval'd script returns a native func
 };
 
+enum class ExecutionEnvironment { Server, TestRunner };
+
 class ScriptEngine : public KillOpListenerInterface {
     ScriptEngine(const ScriptEngine&) = delete;
     ScriptEngine& operator=(const ScriptEngine&) = delete;
@@ -255,7 +257,7 @@ public:
      * the function Scope::loadStored(), which would otherwise load stored procedures, to be
      * ignored.
      */
-    static void setup(bool disableLoadStored = true);
+    static void setup(ExecutionEnvironment environment, bool disableLoadStored = true);
     static void dropScopeCache();
 
     /** gets a scope from the pool or a new one if pool is empty

@@ -785,7 +785,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     startMongoSFTDC();
 
     if (mongosGlobalParams.scriptingEnabled) {
-        ScriptEngine::setup();
+        ScriptEngine::setup(ExecutionEnvironment::Server);
     }
 
     Status status = AuthorizationManager::get(serviceContext)->initialize(opCtx);

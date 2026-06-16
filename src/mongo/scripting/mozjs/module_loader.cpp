@@ -47,6 +47,12 @@
 namespace mongo {
 namespace mozjs {
 
+ModuleLoader::ModuleLoader(ExecutionEnvironment executionEnvironment) {
+    tassert(12883202,
+            "ModuleLoader must not be constructed in the server execution environment",
+            executionEnvironment != ExecutionEnvironment::Server);
+}
+
 bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
     _baseUrl = resolveBaseUrl(cx, loadPath);
     LOGV2_DEBUG(716281, 2, "Resolved module base url.", "baseUrl"_attr = _baseUrl.c_str());
@@ -110,7 +116,7 @@ JSObject* ModuleLoader::moduleResolveHook(JSContext* cx,
                                           JS::HandleObject moduleRequest) {
 
     auto scope = getScope(cx);
-    return scope->getModuleLoader()->resolveImportedModule(cx, referencingPrivate, moduleRequest);
+    return scope->getModuleLoader().resolveImportedModule(cx, referencingPrivate, moduleRequest);
 }
 
 JSObject* ModuleLoader::resolveImportedModule(JSContext* cx,
@@ -130,7 +136,7 @@ bool ModuleLoader::dynamicModuleImportHook(JSContext* cx,
                                            JS::HandleObject moduleRequest,
                                            JS::HandleObject promise) {
     auto scope = getScope(cx);
-    return scope->getModuleLoader()->importModuleDynamically(
+    return scope->getModuleLoader().importModuleDynamically(
         cx, referencingPrivate, moduleRequest, promise);
 }
 

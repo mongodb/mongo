@@ -49,7 +49,7 @@ namespace mozjs {
 class JSCustomAllocatorTest : public unittest::Test {
 protected:
     void setUp() override {
-        mongo::ScriptEngine::setup();
+        mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
         scope = std::unique_ptr<mongo::Scope>(
             mongo::getGlobalScriptEngine()->newScopeForCurrentThread(0));
 

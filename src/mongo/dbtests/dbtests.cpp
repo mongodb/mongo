@@ -249,7 +249,7 @@ int dbtestsMain(int argc, char** argv) {
         service, std::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
 
     AuthorizationManager::get(service)->setAuthEnabled(false);
-    ScriptEngine::setup();
+    ScriptEngine::setup(ExecutionEnvironment::Server);
     return mongo::dbtests::runDbTests(argc, argv);
 }
 

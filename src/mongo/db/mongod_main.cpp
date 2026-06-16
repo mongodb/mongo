@@ -688,7 +688,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         uassert(ErrorCodes::InvalidOptions,
                 "Scripting engine not supported in the serverless environment",
                 !gMultitenancySupport);
-        ScriptEngine::setup();
+        ScriptEngine::setup(ExecutionEnvironment::Server);
     }
 
     if (storageGlobalParams.upgrade) {
