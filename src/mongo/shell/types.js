@@ -514,6 +514,10 @@ if (typeof (DBPointer) != "undefined") {
         return this.id;
     };
 
+    DBPointer.prototype.toJSON = function() {
+        return {ns: this.ns, id: this.id};
+    };
+
     DBPointer.prototype.toString = function() {
         return "DBPointer(" + tojson(this.ns) + ", " + tojson(this.id) + ")";
     };
