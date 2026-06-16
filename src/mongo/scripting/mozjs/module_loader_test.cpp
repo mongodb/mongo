@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/scripting/mozjs/module_loader.h"
+
 #include <fmt/format.h>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -39,8 +42,10 @@
 #include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace mozjs {
@@ -184,6 +189,90 @@ TEST(ModuleLoaderTest, ParseSearchPathsIgnoresEmpty) {
     ASSERT_EQ(paths[1], "/opt/mongo/lib");
     unsetenv("MONGO_PATH");
 #endif
+}
+
+TEST(ModuleLoaderTest, ModulesNotSupportedInServerEnvironment) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        // Module loading is not supported in the server execution environment: the module loader is
+        // never constructed (so getModuleLoader() must not be called) and no filesystem-backed
+        // module hooks are registered. This is what prevents server-side JavaScript from reading
+        // host files via import().
+        ASSERT_FALSE(implscope->supportsModules());
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST(ModuleLoaderTest, ModulesSupportedInTestRunnerEnvironment) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+        ASSERT_TRUE(implscope != nullptr);
+
+        ASSERT_TRUE(implscope->supportsModules());
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+// These negative cases trip a tassert. Caught tasserts leave the tripwire counter set, which aborts
+// the binary at process exit, so they are written as DEATH_TESTs (MongoDB's convention for testing
+// tasserts) rather than ASSERT_THROWS_CODE catches.
+DEATH_TEST(ModuleLoaderDeathTest, GetModuleLoaderInServerEnvironment, "12883200") {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
+    std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+    auto* implscope = dynamic_cast<mongo::mozjs::MozJSImplScope*>(scope.get());
+    ASSERT_TRUE(implscope != nullptr);
+
+    // There is no module loader in the server environment, so reaching for it tasserts.
+    implscope->getModuleLoader();
+}
+
+DEATH_TEST(ModuleLoaderDeathTest, ConstructInServerEnvironment, "12883202") {
+    // The ModuleLoader constructor itself refuses the server execution environment, as a backstop
+    // against any caller that bypasses MozJSImplScope's gating.
+    [[maybe_unused]] ModuleLoader loader(ExecutionEnvironment::Server);
+}
+
+TEST(ModuleLoaderTest, ImportDisabledInServerEnvironment) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
+    std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
+
+    // Write a real file on disk that a malicious import would try to read (e.g. a keyFile or PEM).
+    static constexpr auto kSecret = "TOP_SECRET_FILE_CONTENTS_e3b0c44298"_sd;
+    auto modulePath = boost::filesystem::temp_directory_path() / "server_import_disabled_test.js";
+    {
+        std::ofstream out(modulePath.string());
+        out << "export const secret = '" << kSecret << "';\n";
+    }
+    ON_BLOCK_EXIT([&] { boost::filesystem::remove(modulePath); });
+
+    // On the server, module loading is not supported: a failed classic-script compilation is never
+    // retried as a module, so the import is never resolved and the file is never read. The original
+    // SyntaxError propagates instead. The scope itself was constructed successfully above, proving
+    // the self-contained server setup scripts load without the module loader.
+    auto code = fmt::format("import * as test from \"{}\"", modulePath.generic_string());
+    ASSERT_THROWS_WITH_CHECK(
+        scope->exec(StringData(code),
+                    "root_module",
+                    true /* printResult */,
+                    true /* reportError */,
+                    true /* assertOnError , timeout*/),
+        DBException,
+        [&](const auto& ex) {
+            ASSERT_STRING_CONTAINS(ex.what(),
+                                   "import declarations may only appear at top level of a module");
+            // The file contents must never have been read into the error or anywhere else.
+            ASSERT_EQ(std::string(ex.what()).find(std::string{kSecret}), std::string::npos);
+        });
+    scope.reset();
+    setGlobalScriptEngine(nullptr);
 }
 
 }  // namespace mozjs
