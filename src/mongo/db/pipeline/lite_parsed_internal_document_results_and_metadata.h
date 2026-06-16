@@ -30,15 +30,32 @@
 #pragma once
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
 
+#include <functional>
 #include <memory>
 #include <vector>
 
 namespace mongo {
+
+class ExpressionContext;
+
+/**
+ * Sort pattern for merge-sorting the document results stream across shards, and the merge pipeline
+ * for the metadata stream on the router. Provided by the extension source via a callback that
+ * survives the LiteParsed -> StageParams -> DocumentSource handoff.
+ */
+struct DocResultsShardedPlanSpec {
+    BSONObj resultsSortPattern;
+    std::vector<BSONObj> metaMergePipeline;
+};
+
+using DocResultsShardedPlanProvider =
+    std::function<const DocResultsShardedPlanSpec&(ExpressionContext*)>;
 
 /**
  * Stage params produced by InternalDocumentResultsAndMetadataLiteParsed and consumed by
@@ -48,10 +65,12 @@ class InternalDocumentResultsAndMetadataStageParams : public StageParams {
 public:
     InternalDocumentResultsAndMetadataStageParams(boost::optional<MetadataBindSpec> metadata,
                                                   bool returnCursor,
-                                                  OwnedLiteParsedPipeline sourcePipeline)
+                                                  OwnedLiteParsedPipeline sourcePipeline,
+                                                  DocResultsShardedPlanProvider shardedPlanProvider)
         : _metadata(std::move(metadata)),
           _returnCursor(returnCursor),
-          _sourcePipeline(std::move(sourcePipeline)) {}
+          _sourcePipeline(std::move(sourcePipeline)),
+          _shardedPlanProvider(std::move(shardedPlanProvider)) {}
 
     static const Id& id;
     Id getId() const final {
@@ -70,10 +89,17 @@ public:
         return _sourcePipeline;
     }
 
+    const DocResultsShardedPlanProvider& getShardedPlanProvider() const {
+        return _shardedPlanProvider;
+    }
+
 private:
     boost::optional<MetadataBindSpec> _metadata;
     bool _returnCursor;
     OwnedLiteParsedPipeline _sourcePipeline;
+    // Carries the extension's DPL callback through the LiteParsed -> StageParams handoff so the
+    // resulting DocumentSource can wire up its sharded plan logic. Null on non-extension paths.
+    DocResultsShardedPlanProvider _shardedPlanProvider;
 };
 
 /**
@@ -106,7 +132,14 @@ public:
         // Clone the inner sub-pipeline so any view info bound onto it via bindResolvedNamespace()
         // travels with the StageParams to DocumentSource construction.
         return std::make_unique<InternalDocumentResultsAndMetadataStageParams>(
-            _metadata, _returnCursor, OwnedLiteParsedPipeline(_pipelines.front()));
+            _metadata,
+            _returnCursor,
+            OwnedLiteParsedPipeline(_pipelines.front()),
+            _shardedPlanProvider);
+    }
+
+    void setShardedPlanProvider(DocResultsShardedPlanProvider provider) {
+        _shardedPlanProvider = std::move(provider);
     }
 
     FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
@@ -137,6 +170,11 @@ public:
 private:
     boost::optional<MetadataBindSpec> _metadata;
     bool _returnCursor;
+    // Set when this LiteParsed was constructed from a host-defined AST node carrying the
+    // extension's distributed-plan callback. Threaded through getStageParams() to the resulting
+    // DocumentSource so distributedPlanLogic() can produce a merge-sort pattern and metadata
+    // merge pipeline. Null when constructed via the BSON parse path.
+    DocResultsShardedPlanProvider _shardedPlanProvider;
 };
 
 }  // namespace mongo

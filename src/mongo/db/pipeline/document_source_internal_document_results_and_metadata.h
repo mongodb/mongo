@@ -83,14 +83,10 @@ public:
 
     // Sort pattern for merge-sorting the document results stream across shards, and the
     // merge pipeline for the metadata stream on the router. Provided by the configured
-    // source stage via the merge plan provider callback.
-    struct ShardedPlanSpec {
-        BSONObj resultsSortPattern;
-        std::vector<BSONObj> metaMergePipeline;
-    };
-
-    // Provided by the source stage to supply its merge-sort and metadata merge info.
-    using ShardedPlanProvider = std::function<const ShardedPlanSpec&(ExpressionContext*)>;
+    // source stage via the merge plan provider callback. The type lives in the LiteParsed
+    // header so both layers can carry the provider through the desugar handoff.
+    using ShardedPlanSpec = DocResultsShardedPlanSpec;
+    using ShardedPlanProvider = DocResultsShardedPlanProvider;
 
     /**
      * Creates a DocumentSource from StageParams produced by the LiteParsed layer.
@@ -122,6 +118,9 @@ public:
 
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
+
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);

@@ -150,8 +150,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.sameMembers(result, expected, {result, nShards});
     });
 
-    // TODO SERVER-128789: Re-enable once sharded DRM execution works.
-    it.skip("[sharded] globally merge-sorts doc results by score across shards", function () {
+    it("[sharded] globally merge-sorts doc results by score across shards", function () {
         if (!isSharded) return;
         const result = coll
             .aggregate([
@@ -172,9 +171,8 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.eq(result, expected, {result, nShards});
     });
 
-    // TODO SERVER-128789: Re-enable once sharded DRM execution works.
-    it.skip("[sharded] merge-sorts uneven per-shard distributions correctly", function () {
-        if (!isSharded) return;
+    it("[sharded] merge-sorts uneven per-shard distributions correctly", function () {
+        if (!isSharded || nShards < 2) return;
         // Make shard 0 produce 10 docs, shard 1 produce 2 docs, by keying byShard on shardId.
         const byShard = {[shardIds[0]]: {numDocs: 10}, [shardIds[1]]: {numDocs: 2}};
         const result = coll
@@ -192,8 +190,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.eq(result, expected, {result});
     });
 
-    // TODO SERVER-128789: Re-enable once sharded DRM execution works.
-    it.skip("[sharded] handles one shard producing 0 documents", function () {
+    it("[sharded] handles one shard producing 0 documents", function () {
         if (!isSharded) return;
         const byShard = {[shardIds[0]]: {numDocs: 5}, [shardIds[1]]: {numDocs: 0}};
         const result = coll
@@ -212,8 +209,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.eq(result, expected, {result});
     });
 
-    // TODO SERVER-128789: Re-enable once sharded DRM execution works.
-    it.skip("[sharded] router re-sorts merged results by name with $sort", function () {
+    it("[sharded] router re-sorts merged results by name with $sort", function () {
         if (!isSharded) return;
         const result = coll
             .aggregate([
@@ -234,7 +230,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.eq(result, expected, {result, nShards});
     });
 
-    // TODO SERVER-128789: Re-enable once sharded DRM execution works.
+    // TODO SERVER-128809: Re-enable once the Exchange double-dispose guard is implemented.
     it.skip("[sharded] pushes $limit to shards and merges to global top-N", function () {
         if (!isSharded) return;
         const result = coll
@@ -251,9 +247,8 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         }
     });
 
-    // TODO SERVER-128789: Re-enable once sharded DRM execution works.
-    it.skip("[sharded] aggregates per-shard metadata via $group merge pipeline", function () {
-        if (!isSharded) return;
+    it("[sharded] aggregates per-shard metadata via $group merge pipeline", function () {
+        if (!isSharded || nShards < 2) return;
         // Each shard emits a different per-shard metadata document. The merge pipeline groups them
         // into a single summed-count metadata document for $$SEARCH_META.
         const metaA = {count: {lowerBound: 10}};
@@ -289,8 +284,6 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
     });
 
     it("allows accessing $$SEARCH_META inside a $facet subpipeline", function () {
-        // TODO SERVER-128789: Remove this guard once sharded DRM execution works.
-        if (isSharded) return;
         const result = coll
             .aggregate([
                 {$extensionMultiStream: {numDocs: 3, meta: expectedMeta}},

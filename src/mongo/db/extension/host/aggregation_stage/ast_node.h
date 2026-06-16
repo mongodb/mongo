@@ -77,9 +77,10 @@ public:
 
     /**
      * Re-parses this node into an owned LiteParsedDocumentSource using the expansion-time nss and
-     * options.
+     * options. The default re-parses buildStageBson(); subclasses may override to inject node-held
+     * state (e.g. an extension DPL callback) that cannot survive the BSON round-trip.
      */
-    std::unique_ptr<LiteParsedDocumentSource> expandToLiteParsed(
+    virtual std::unique_ptr<LiteParsedDocumentSource> expandToLiteParsed(
         const NamespaceString& nss, const LiteParserOptions& options) const;
 
     /**
@@ -184,11 +185,19 @@ public:
 
     std::unique_ptr<AggStageAstNode> clone() const override;
 
+    std::unique_ptr<LiteParsedDocumentSource> expandToLiteParsed(
+        const NamespaceString& nss, const LiteParserOptions& options) const override;
+
     std::list<boost::intrusive_ptr<DocumentSource>> expandToDocumentSource(
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const override;
 
 private:
     BSONObj buildStageBson() const override;
+
+    // Wraps the shared DPL callback owner into a ShardedPlanProvider closure. Shared by both
+    // expansion paths so the wrapping logic (capture-by-shared-owner, getOrInvoke) lives in one
+    // place.
+    DocResultsShardedPlanProvider makeShardedPlanProvider() const;
 
     std::string _stageName;
     BSONObj _stageBson;

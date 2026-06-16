@@ -214,8 +214,14 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
         metadata = metaSpec;
     }
 
-    return {make_intrusive<DocumentSourceInternalDocumentResultsAndMetadata>(
-        expCtx, std::move(sourceStage), std::move(metadata), params.getReturnCursor())};
+    auto stage = make_intrusive<DocumentSourceInternalDocumentResultsAndMetadata>(
+        expCtx, std::move(sourceStage), std::move(metadata), params.getReturnCursor());
+    // The extension's distributed-plan callback is carried through the LiteParsed -> StageParams
+    // handoff and attached here so distributedPlanLogic() can produce a sharded merge plan.
+    if (const auto& provider = params.getShardedPlanProvider()) {
+        stage->setShardedPlanProvider(provider);
+    }
+    return {std::move(stage)};
 }
 
 StageConstraints DocumentSourceInternalDocumentResultsAndMetadata::constraints(
@@ -235,6 +241,16 @@ Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
     spec.setMetadata(_metadata);
     spec.setReturnCursor(_returnCursor);
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDocumentResultsAndMetadata::clone(
+    const intrusive_ptr<ExpressionContext>& expCtx) const {
+    auto cloned = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, _sourceStage->clone(expCtx), _metadata, _returnCursor);
+    if (_shardedPlanProvider) {
+        cloned->setShardedPlanProvider(_shardedPlanProvider);
+    }
+    return cloned;
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetadata::optimizeAt(
@@ -284,6 +300,13 @@ DocumentSourceInternalDocumentResultsAndMetadata::distributedPlanLogic(
     // No metadata: only merge-sort is needed, no merging pipeline for metadata stream.
     if (!_metadata) {
         return logic;
+    }
+
+    // Flip _returnCursor so the shard-side stage stashes the metadata stream as a secondary cursor
+    // that the router reads, rather than consuming it in-process via $setVariableFromSubPipeline.
+    // Only flip on real execution, since explain paths pass nullptr and must not mutate state.
+    if (ctx != nullptr) {
+        _returnCursor = true;
     }
 
     // Wrap the merge pipeline in $setVariableFromSubPipeline to bind

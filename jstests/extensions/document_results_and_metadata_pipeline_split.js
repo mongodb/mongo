@@ -37,9 +37,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
         return coll.explain().aggregate(pipeline).splitPipeline;
     }
 
-    // TODO SERVER-128789: $match doesn't declare preservesOrderAndMetadata so canMovePastDuringSplit
-    // returns false and it stays on the router.
-    it.skip("$match without $$SEARCH_META reference moves to router", function () {
+    it("$match without $$SEARCH_META reference moves to router", function () {
         const split = getSplit([
             {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
             {$match: {score: {$gt: 3}}},
@@ -49,8 +47,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
         assert(!stageNames(split.shardsPart).includes("$match"), {split});
     });
 
-    // TODO SERVER-128789: Re-enable once DPL callback reaches the router's DRM stage.
-    it.skip("$project referencing $$SEARCH_META stays on router", function () {
+    it("$project referencing $$SEARCH_META stays on router", function () {
         // DRM uses returnCursor:true in sharded mode so $$SEARCH_META is only bound at the
         // router (via the metadata merge pipeline). Downstream stages that reference $$SEARCH_META
         // cannot run on shards and must stay on the router side of the split.
@@ -63,8 +60,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
         assert(!stageNames(split.shardsPart).includes("$project"), {split});
     });
 
-    // TODO SERVER-128789: Re-enable once DPL callback reaches the router's DRM stage.
-    it.skip("$sort moves to router for global ordering", function () {
+    it("$sort moves to router for global ordering", function () {
         const split = getSplit([
             {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
             {$sort: {name: 1}},
@@ -82,9 +78,7 @@ describe("$_internalDocumentResultsAndMetadata pipeline split", function () {
         assert.contains("$limit", stageNames(split.shardsPart), {split});
     });
 
-    // TODO SERVER-128789: $project doesn't declare preservesOrderAndMetadata so canMovePastDuringSplit
-    // returns false and it moves to the router.
-    it.skip("$project without $$SEARCH_META reference moves to router with shard-side dependency projection", function () {
+    it("$project without $$SEARCH_META reference moves to router with shard-side dependency projection", function () {
         const split = getSplit([
             {$extensionMultiStream: {numDocs: 5, meta: expectedMeta}},
             {$project: {name: 1}},

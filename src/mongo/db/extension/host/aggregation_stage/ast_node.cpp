@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 #include "mongo/util/assert_util.h"
 
@@ -164,6 +165,35 @@ std::unique_ptr<AggStageAstNode> DocumentResultsAndMetadataAstNode::clone() cons
     return std::make_unique<DocumentResultsAndMetadataAstNode>(_stageBson, _dplOwner);
 }
 
+DocResultsShardedPlanProvider DocumentResultsAndMetadataAstNode::makeShardedPlanProvider() const {
+    if (!_dplOwner.hasCallback()) {
+        return {};
+    }
+    // Capture a copy of the shared owner so it (and its cached single invocation) outlives this
+    // AST node, which is destroyed after expansion but before the planner queries
+    // distributedPlanLogic().
+    return [owner = _dplOwner](ExpressionContext* expCtx) -> const auto& {
+        return owner.getOrInvoke(expCtx);
+    };
+}
+
+std::unique_ptr<LiteParsedDocumentSource> DocumentResultsAndMetadataAstNode::expandToLiteParsed(
+    const NamespaceString& nss, const LiteParserOptions& options) const {
+    auto lpds = AggStageAstNode::expandToLiteParsed(nss, options);
+    auto provider = makeShardedPlanProvider();
+    if (!provider) {
+        return lpds;
+    }
+    // Carry the provider on the LiteParsed object so it survives the LiteParsed -> StageParams ->
+    // DocumentSource handoff used by the LiteParsedDesugarer expansion path.
+    auto* drmLp = dynamic_cast<InternalDocumentResultsAndMetadataLiteParsed*>(lpds.get());
+    tassert(12878900,
+            "Expected InternalDocumentResultsAndMetadataLiteParsed from AggStageAstNode expansion",
+            drmLp != nullptr);
+    drmLp->setShardedPlanProvider(std::move(provider));
+    return lpds;
+}
+
 std::list<boost::intrusive_ptr<DocumentSource>>
 DocumentResultsAndMetadataAstNode::expandToDocumentSource(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
@@ -171,7 +201,8 @@ DocumentResultsAndMetadataAstNode::expandToDocumentSource(
     // resulting stage. The opaque callback cannot survive the BSON round-trip, so it is attached
     // here rather than threaded through a bespoke BSON factory.
     auto stages = AggStageAstNode::expandToDocumentSource(expCtx);
-    if (!_dplOwner.hasCallback()) {
+    auto provider = makeShardedPlanProvider();
+    if (!provider) {
         return stages;
     }
     tassert(12728602,
@@ -182,12 +213,7 @@ DocumentResultsAndMetadataAstNode::expandToDocumentSource(
     tassert(12728603,
             "expanded $_internalDocumentResultsAndMetadata stage has unexpected type",
             drm != nullptr);
-    // Wrap the single-use extension callback into the stage's sharded-plan provider. Capture a copy
-    // of the shared owner so it (and its cached, single invocation) outlives this AST node, which
-    // is destroyed after expansion but before the planner queries distributedPlanLogic().
-    drm->setShardedPlanProvider([owner = _dplOwner](ExpressionContext* expCtx) -> const auto& {
-        return owner.getOrInvoke(expCtx);
-    });
+    drm->setShardedPlanProvider(std::move(provider));
     return stages;
 }
 
