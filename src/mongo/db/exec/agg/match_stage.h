@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/match_processor.h"
 #include "mongo/util/modules.h"
 
@@ -53,6 +54,10 @@ private:
     GetNextResult doGetNext() override;
 
     std::shared_ptr<MatchProcessor> _matchProcessor;
+
+    // Tracks memory used while evaluating the match expression. Reports to the operation-wide
+    // tracker so all stages contribute to the operation memory total.
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 
 }  // namespace agg

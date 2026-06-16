@@ -30,7 +30,9 @@
 #include "mongo/db/exec/agg/match_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 
 namespace mongo {
 
@@ -53,15 +55,24 @@ MatchStage::MatchStage(StringData stageName,
                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                        const std::shared_ptr<MatchProcessor>& matchProcessor,
                        bool isTextQuery)
-    : Stage(stageName, pExpCtx), _matchProcessor(matchProcessor) {
+    : Stage(stageName, pExpCtx),
+      _matchProcessor(matchProcessor),
+      _memoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !isTextQuery);
 }
 
 GetNextResult MatchStage::doGetNext() {
+    // Only charge expression evaluation against the memory tracker when both the stage-level and
+    // expression-level memory tracking feature flags are enabled.
+    const bool trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    const EvaluationContext evalCtx =
+        trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-        if (_matchProcessor->process(nextInput.getDocument())) {
+        if (_matchProcessor->process(nextInput.getDocument(), evalCtx)) {
             return nextInput;
         }
 

@@ -46,7 +46,7 @@ MatchProcessor::MatchProcessor(std::unique_ptr<MatchExpression> expr,
     tassert(10422701, "expecting 'predicate' to be owned", _predicate.isOwned());
 }
 
-bool MatchProcessor::process(const Document& input) const {
+bool MatchProcessor::process(const Document& input, const EvaluationContext& ctx) const {
     // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
     // only serialize the fields we need to do the match. Specify BSONObj::LargeSizeTrait so
     // that matching against a large document mid-pipeline does not throw a BSON max-size error.
@@ -67,7 +67,7 @@ bool MatchProcessor::process(const Document& input) const {
             BSONObj::LargeSizeTrait,
             /* PathsHaveUniqueFirstFields */ false>(input, _dependencies.fields);
     }();
-    return exec::matcher::matchesBSON(_expression.get(), toMatch);
+    return exec::matcher::matchesBSON(_expression.get(), toMatch, /*details*/ nullptr, ctx);
 }
 
 bool MatchProcessor::dependenciesHaveUniqueFirstFields(const OrderedPathSet& paths) {

@@ -44,24 +44,26 @@ MONGO_FAIL_POINT_DEFINE(ExprMatchExpressionMatchesReturnsFalseOnException);
 
 namespace exec::matcher {
 
-Value evaluateExpression(const ExprMatchExpression* expr, const MatchableDocument* doc) {
+Value evaluateExpression(const ExprMatchExpression* expr,
+                         const MatchableDocument* doc,
+                         const EvaluationContext& ctx) {
     Document document(doc->toBSON());
 
     // 'Variables' is not thread safe, and ExprMatchExpression may be used in a validator which
     // processes documents from multiple threads simultaneously. Hence we make a copy of the
     // 'Variables' object per-caller.
     Variables variables = expr->getExpressionContext()->variables;
-    return expr->getExpression()->evaluate(document, &variables);
+    return expr->getExpression()->evaluate(document, &variables, ctx);
 }
 
 void MatchExpressionEvaluator::visit(const ExprMatchExpression* expr) {
     if (expr->getRewriteResult() && expr->getRewriteResult()->matchExpression() &&
-        !matches(expr->getRewriteResult()->matchExpression(), _doc, _details)) {
+        !matches(expr->getRewriteResult()->matchExpression(), _doc, _details, _ctx)) {
         _result = false;
         return;
     }
     try {
-        _result = evaluateExpression(expr, _doc).coerceToBool();
+        _result = evaluateExpression(expr, _doc, _ctx).coerceToBool();
     } catch (const DBException&) {
         if (MONGO_unlikely(ExprMatchExpressionMatchesReturnsFalseOnException.shouldFail())) {
             _result = false;
@@ -86,9 +88,9 @@ void MatchExpressionEvaluator::visit(const InternalEqHashedKey* expr) {
 }
 
 void MatchExpressionEvaluator::visit(const InternalSchemaCondMatchExpression* expr) {
-    _result = matches(expr->condition(), _doc, _details)
-        ? matches(expr->thenBranch(), _doc, _details)
-        : matches(expr->elseBranch(), _doc, _details);
+    _result = matches(expr->condition(), _doc, _details, _ctx)
+        ? matches(expr->thenBranch(), _doc, _details, _ctx)
+        : matches(expr->elseBranch(), _doc, _details, _ctx);
 }
 
 void MatchExpressionEvaluator::visit(const InternalSchemaMaxPropertiesMatchExpression* expr) {
@@ -102,7 +104,7 @@ void MatchExpressionEvaluator::visit(const InternalSchemaMinPropertiesMatchExpre
 }
 
 void MatchExpressionEvaluator::visit(const InternalSchemaXorMatchExpression* expr) {
-    MatchExpressionEvaluator childVisitor(_doc, nullptr);
+    MatchExpressionEvaluator childVisitor(_doc, nullptr, _ctx);
     bool found = false;
     for (auto&& child : expr->getChildren()) {
         child->acceptVisitor(&childVisitor);
@@ -118,7 +120,7 @@ void MatchExpressionEvaluator::visit(const InternalSchemaXorMatchExpression* exp
 }
 
 void MatchExpressionEvaluator::visit(const NotMatchExpression* expr) {
-    _result = !matches(expr->getChild(0), _doc, nullptr);
+    _result = !matches(expr->getChild(0), _doc, nullptr, _ctx);
 }
 
 void MatchExpressionEvaluator::visitPathExpression(const PathMatchExpression* expr) {

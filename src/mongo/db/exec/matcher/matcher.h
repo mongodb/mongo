@@ -53,6 +53,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/util/modules.h"
 
 // TODO SERVER-113198: Remove external dependencies on this header.
@@ -62,8 +63,10 @@ namespace exec::matcher {
 
 class MatchExpressionEvaluator : public MatchExpressionConstVisitor {
 public:
-    MatchExpressionEvaluator(const MatchableDocument* doc, MatchDetails* details = nullptr)
-        : _doc(doc), _details(details), _result(false) {}
+    MatchExpressionEvaluator(const MatchableDocument* doc,
+                             MatchDetails* details = nullptr,
+                             const EvaluationContext& ctx = {})
+        : _doc(doc), _details(details), _ctx(ctx), _result(false) {}
 
     void visit(const AlwaysFalseMatchExpression* expr) override {
         _result = false;
@@ -200,7 +203,7 @@ public:
         visitPathExpression(expr);
     }
     void visit(const NorMatchExpression* expr) override {
-        MatchExpressionEvaluator childVisitor(_doc, nullptr);
+        MatchExpressionEvaluator childVisitor(_doc, nullptr, _ctx);
         for (auto&& child : expr->getChildren()) {
             child->acceptVisitor(&childVisitor);
             if (childVisitor.getResult()) {
@@ -212,7 +215,7 @@ public:
     }
     void visit(const NotMatchExpression* expr) override;
     void visit(const OrMatchExpression* expr) override {
-        MatchExpressionEvaluator childVisitor(_doc, nullptr);
+        MatchExpressionEvaluator childVisitor(_doc, nullptr, _ctx);
         for (auto&& child : expr->getChildren()) {
             child->acceptVisitor(&childVisitor);
             if (childVisitor.getResult()) {
@@ -252,6 +255,7 @@ private:
 
     const MatchableDocument* _doc;
     MatchDetails* _details;
+    EvaluationContext _ctx;
     bool _result;
 };
 
@@ -422,29 +426,37 @@ private:
 };
 
 //
-// Determine if a document satisfies the tree-predicate.
+// Determine if a document satisfies the tree-predicate. The optional 'ctx' parameter carries
+// evaluation state (see EvaluationContext) and is forwarded to Expression::evaluate() invoked from
+// any $expr sub-clause, so that memory consumed while evaluating those expressions can be charged
+// against the caller's memory tracker.
 //
 inline bool matches(const MatchExpression* expr,
                     const MatchableDocument* doc,
-                    MatchDetails* details = nullptr) {
-    MatchExpressionEvaluator evaluator(doc, details);
+                    MatchDetails* details = nullptr,
+                    const EvaluationContext& ctx = {}) {
+    MatchExpressionEvaluator evaluator(doc, details, ctx);
     expr->acceptVisitor(&evaluator);
     return evaluator.getResult();
 }
 
 inline bool matchesBSON(const MatchExpression* expr,
                         const BSONObj& doc,
-                        MatchDetails* details = nullptr) {
+                        MatchDetails* details = nullptr,
+                        const EvaluationContext& ctx = {}) {
     BSONMatchableDocument mydoc(doc);
-    return matches(expr, &mydoc, details);
+    return matches(expr, &mydoc, details, ctx);
 }
 
-inline bool matches(const Matcher* matcher, const BSONObj& doc, MatchDetails* details = nullptr) {
+inline bool matches(const Matcher* matcher,
+                    const BSONObj& doc,
+                    MatchDetails* details = nullptr,
+                    const EvaluationContext& ctx = {}) {
     if (!matcher->getMatchExpression()) {
         return true;
     }
 
-    return matchesBSON(matcher->getMatchExpression(), doc, details);
+    return matchesBSON(matcher->getMatchExpression(), doc, details, ctx);
 }
 
 /**
@@ -456,9 +468,10 @@ inline bool matches(const Matcher* matcher, const BSONObj& doc, MatchDetails* de
  */
 inline bool matchesBSONElement(const MatchExpression* expr,
                                BSONElement elem,
-                               MatchDetails* details = nullptr) {
+                               MatchDetails* details = nullptr,
+                               const EvaluationContext& ctx = {}) {
     BSONElementViewMatchableDocument matchableDoc(elem);
-    return matches(expr, &matchableDoc, details);
+    return matches(expr, &matchableDoc, details, ctx);
 }
 
 /**
@@ -474,9 +487,13 @@ inline bool matchesSingleElement(const MatchExpression* expr,
 }
 
 /**
- * Evaluates the Expression stored in a ExprMatchExpression using the proper configuration.
+ * Evaluates the Expression stored in a ExprMatchExpression using the proper configuration. The
+ * optional 'ctx' parameter carries evaluation state (see EvaluationContext) and is forwarded to
+ * Expression::evaluate().
  */
-Value evaluateExpression(const ExprMatchExpression* expr, const MatchableDocument* doc);
+Value evaluateExpression(const ExprMatchExpression* expr,
+                         const MatchableDocument* doc,
+                         const EvaluationContext& ctx = {});
 
 
 /**

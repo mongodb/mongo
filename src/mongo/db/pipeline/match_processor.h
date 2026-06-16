@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -50,8 +51,10 @@ public:
                    BSONObj&& predicate);
 
     // Processes the given document and returns true if it matches the conditions specified in
-    // the MatchExpression.
-    bool process(const Document& input) const;
+    // the MatchExpression. The optional 'ctx' parameter carries evaluation state (see
+    // EvaluationContext); when it holds a memory tracker, memory usage observed while evaluating
+    // any $expr sub-expressions within the match expression is accumulated against it.
+    bool process(const Document& input, const EvaluationContext& ctx = {}) const;
 
     std::unique_ptr<MatchExpression>& getExpression() {
         return _expression;
