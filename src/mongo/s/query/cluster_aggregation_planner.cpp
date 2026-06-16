@@ -729,8 +729,7 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
     // Document metadata ourselves.
     return ClusterClientCursorImpl::make(
         opCtx,
-        std::make_unique<RouterStageRemoveMetadataFields>(
-            opCtx, std::move(root), Document::allMetadataFieldNames),
+        std::make_unique<RouterStageRemoveMetadataFields>(opCtx, std::move(root)),
         std::move(cursorParams));
 }
 

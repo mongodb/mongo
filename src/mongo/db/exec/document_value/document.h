@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <array>
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional/optional.hpp>
@@ -59,7 +60,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 class BSONObj;
@@ -128,11 +128,28 @@ public:
     static constexpr StringData metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
     static constexpr StringData metaFieldScore = "$score"_sd;
     static constexpr StringData metaFieldScoreDetails = "$scoreDetails"_sd;
+    static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
+                                                      metaFieldRandVal,
+                                                      metaFieldSortKey,
+                                                      metaFieldGeoNearDistance,
+                                                      metaFieldGeoNearPoint,
+                                                      metaFieldSearchScore,
+                                                      metaFieldSearchHighlights,
+                                                      metaFieldSearchScoreDetails,
+                                                      metaFieldSearchSortValues,
+                                                      metaFieldIndexKey,
+                                                      metaFieldVectorSearchScore,
+                                                      metaFieldSearchSequenceToken,
+                                                      metaFieldScore,
+                                                      metaFieldScoreDetails};
 
-    static const StringDataSet allMetadataFieldNames;
+private:
+    static bool isMetadataFieldName_cold(StringData fieldName);
 
+public:
+    // Returns true iff 'fieldName' is one of the reserved '$'-prefixed metadata field names.
     static bool isMetadataFieldName(StringData fieldName) {
-        return fieldName.starts_with('$') && allMetadataFieldNames.contains(fieldName);
+        return fieldName.starts_with('$') && isMetadataFieldName_cold(fieldName);
     }
 
     static bool isMetadataFieldName(HashedFieldName fieldName) {
