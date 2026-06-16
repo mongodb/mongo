@@ -88,6 +88,7 @@ public:
     void setIncludeQueryStatsMetricsForOpIndexIfRequested(OperationContext* opCtx,
                                                           int opIndex,
                                                           WriteOpEntry& writeOpEntry) {
+        tassert(12808101, "opIndex must be >= 0", opIndex >= 0);
         CurOp* curOp = CurOp::get(opCtx);
         if (!shouldSetIncludeQueryStatsMetricsField(opCtx, curOp)) {
             return;

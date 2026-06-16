@@ -368,6 +368,7 @@ structs:
             includeQueryStatsMetricsForOpIndex:
                 description: "When present, tells shards to add metrics to response for the op at the given index."
                 type: int
+                validator: {gte: 0}
                 optional: true
                 stability: internal
 
@@ -406,6 +407,7 @@ structs:
             includeQueryStatsMetricsForOpIndex:
                 description: "When present, tells shards to add metrics to response for the op at the given index."
                 type: int
+                validator: {gte: 0}
                 optional: true
                 stability: internal
 

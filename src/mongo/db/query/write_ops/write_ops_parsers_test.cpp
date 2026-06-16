@@ -204,6 +204,30 @@ TEST(CommandWriteOpsParsers, BadArrayFiltersElementInUpdateDoc) {
     }
 }
 
+TEST(CommandWriteOpsParsers, NegativeIncludeQueryStatsMetricsForOpIndexInUpdateDoc) {
+    auto cmd =
+        BSON("update" << "bar"
+                      << "updates"
+                      << BSON_ARRAY(BSON("q" << BSONObj() << "u" << BSONObj()
+                                             << "includeQueryStatsMetricsForOpIndex" << -1)));
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg("foo", cmd, seq);
+        ASSERT_THROWS_CODE(UpdateOp::parse(request), AssertionException, ErrorCodes::BadValue);
+    }
+}
+
+TEST(CommandWriteOpsParsers, NegativeIncludeQueryStatsMetricsForOpIndexInDeleteDoc) {
+    auto cmd =
+        BSON("delete" << "bar"
+                      << "deletes"
+                      << BSON_ARRAY(BSON("q" << BSONObj() << "limit" << 0
+                                             << "includeQueryStatsMetricsForOpIndex" << -1)));
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg("foo", cmd, seq);
+        ASSERT_THROWS_CODE(DeleteOp::parse(request), AssertionException, ErrorCodes::BadValue);
+    }
+}
+
 TEST(CommandWriteOpsParsers, SingleInsert) {
     const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj obj = BSON("x" << 1);
@@ -293,32 +317,44 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     const BSONObj collation = BSON("locale" << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
+    std::vector<boost::optional<int>> opIndexes{0, 100, boost::none};
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            auto rawUpdate =
-                BSON("q" << query << "u" << update << "arrayFilters" << BSON_ARRAY(arrayFilter)
-                         << "multi" << multi << "upsert" << upsert << "collation" << collation);
-            auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
-            for (bool seq : {false, true}) {
-                auto request = toOpMsg(ns.db_forTest(), cmd, seq);
-                auto op = UpdateOp::parse(request);
-                ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
-                ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
-                ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
-                ASSERT_EQ(op.getUpdates().size(), 1u);
-                ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
+            for (auto opIndex : opIndexes) {
+                BSONObjBuilder rawUpdateBuilder;
+                rawUpdateBuilder << "q" << query << "u" << update << "arrayFilters"
+                                 << BSON_ARRAY(arrayFilter) << "multi" << multi << "upsert"
+                                 << upsert << "collation" << collation;
+                if (opIndex) {
+                    rawUpdateBuilder << "includeQueryStatsMetricsForOpIndex" << *opIndex;
+                }
+                auto rawUpdate = rawUpdateBuilder.obj();
+                auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
+                for (bool seq : {false, true}) {
+                    auto request = toOpMsg(ns.db_forTest(), cmd, seq);
+                    auto op = UpdateOp::parse(request);
+                    ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
+                    ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
+                    ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
+                    ASSERT_EQ(op.getUpdates().size(), 1u);
+                    ASSERT_BSONOBJ_EQ(op.getUpdates()[0].getQ(), query);
 
-                const auto& updateMod = op.getUpdates()[0].getU();
-                ASSERT(updateMod.type() == write_ops::UpdateModification::Type::kModifier);
-                ASSERT_BSONOBJ_EQ(updateMod.getUpdateModifier(), update);
+                    const auto& updateMod = op.getUpdates()[0].getU();
+                    ASSERT(updateMod.type() == write_ops::UpdateModification::Type::kModifier);
+                    ASSERT_BSONOBJ_EQ(updateMod.getUpdateModifier(), update);
 
-                ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getUpdates()[0]), collation);
-                ASSERT_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).size(), 1u);
-                ASSERT_BSONOBJ_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).front(),
-                                  arrayFilter);
-                ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
-                ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
-                ASSERT_BSONOBJ_EQ(op.getUpdates()[0].toBSON(), rawUpdate);
+                    ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getUpdates()[0]), collation);
+                    ASSERT_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).size(), 1u);
+                    ASSERT_BSONOBJ_EQ(write_ops::arrayFiltersOf(op.getUpdates()[0]).front(),
+                                      arrayFilter);
+                    ASSERT_EQ(op.getUpdates()[0].getUpsert(), upsert);
+                    ASSERT_EQ(op.getUpdates()[0].getMulti(), multi);
+                    if (opIndex) {
+                        ASSERT_EQ(op.getUpdates()[0].getIncludeQueryStatsMetricsForOpIndex(),
+                                  *opIndex);
+                    }
+                    ASSERT_BSONOBJ_EQ(op.getUpdates()[0].toBSON(), rawUpdate);
+                }
             }
         }
     }
@@ -363,21 +399,32 @@ TEST(CommandWriteOpsParsers, Remove) {
     const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj query = BSON("x" << 1);
     const BSONObj collation = BSON("locale" << "en_US");
+    std::vector<boost::optional<int>> opIndexes{0, 100, boost::none};
     for (bool multi : {false, true}) {
-        auto rawDelete =
-            BSON("q" << query << "limit" << (multi ? 0 : 1) << "collation" << collation);
-        auto cmd = BSON("delete" << ns.coll() << "deletes" << BSON_ARRAY(rawDelete));
-        for (bool seq : {false, true}) {
-            auto request = toOpMsg(ns.db_forTest(), cmd, seq);
-            auto op = DeleteOp::parse(request);
-            ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
-            ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
-            ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
-            ASSERT_EQ(op.getDeletes().size(), 1u);
-            ASSERT_BSONOBJ_EQ(op.getDeletes()[0].getQ(), query);
-            ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getDeletes()[0]), collation);
-            ASSERT_EQ(op.getDeletes()[0].getMulti(), multi);
-            ASSERT_BSONOBJ_EQ(op.getDeletes()[0].toBSON(), rawDelete);
+        for (auto opIndex : opIndexes) {
+            BSONObjBuilder rawDeleteBuilder;
+            rawDeleteBuilder << "q" << query << "limit" << (multi ? 0 : 1) << "collation"
+                             << collation;
+            if (opIndex) {
+                rawDeleteBuilder << "includeQueryStatsMetricsForOpIndex" << *opIndex;
+            }
+            auto rawDelete = rawDeleteBuilder.obj();
+            auto cmd = BSON("delete" << ns.coll() << "deletes" << BSON_ARRAY(rawDelete));
+            for (bool seq : {false, true}) {
+                auto request = toOpMsg(ns.db_forTest(), cmd, seq);
+                auto op = DeleteOp::parse(request);
+                ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
+                ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
+                ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
+                ASSERT_EQ(op.getDeletes().size(), 1u);
+                ASSERT_BSONOBJ_EQ(op.getDeletes()[0].getQ(), query);
+                ASSERT_BSONOBJ_EQ(write_ops::collationOf(op.getDeletes()[0]), collation);
+                ASSERT_EQ(op.getDeletes()[0].getMulti(), multi);
+                if (opIndex) {
+                    ASSERT_EQ(op.getDeletes()[0].getIncludeQueryStatsMetricsForOpIndex(), *opIndex);
+                }
+                ASSERT_BSONOBJ_EQ(op.getDeletes()[0].toBSON(), rawDelete);
+            }
         }
     }
 }
