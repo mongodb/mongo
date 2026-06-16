@@ -974,6 +974,34 @@ TEST(ExpressionConvertTest, CanRoundTripFloatArrayBigEndian) {
     ASSERT_VALUE_EQ(originalArray, finalArray);
 }
 
+// Builds a PACKED_BIT BinData vector (subtype 9) backed by 'numDataBytes' of all-ones data, which
+// expands to numDataBytes * 8 boolean elements when converted to an array.
+BSONBinData makePackedBitVector(int numDataBytes) {
+    static std::vector<unsigned char> payload;
+    payload.assign(numDataBytes + 2, 0xFF);
+    payload[0] = 0x10;  // PACKED_BIT dtype byte.
+    payload[1] = 0x00;  // No padding.
+    return BSONBinData(payload.data(), static_cast<int>(payload.size()), BinDataType::Vector);
+}
+
+TEST(ExpressionConvertTest, ConvertBinDataVectorToArrayRejectsOversizedResult) {
+    RAIIServerParameterControllerForTest convertFlag{"featureFlagConvertBinDataVectors", true};
+    // Cap the output at 100 bytes (~6 Values) so a tiny payload exceeds it.
+    RAIIServerParameterControllerForTest memLimit{"internalQueryMaxExpressionOutputBytes", 100};
+    auto expCtx = ExpressionContextForTest{};
+
+    // 16 data bytes expand to 128 booleans, far above the cap.
+    auto exprBinToArray = Expression::parseExpression(
+        &expCtx,
+        BSON("$convert" << BSON("input" << makePackedBitVector(16) << "to"
+                                        << BSON("type" << "array"))),
+        expCtx.variablesParseState);
+
+    ASSERT_THROWS_CODE(exprBinToArray->evaluate({}, &expCtx.variables),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
 }  // namespace convert
 
 }  // namespace expression_evaluation_test

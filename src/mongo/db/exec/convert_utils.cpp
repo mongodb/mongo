@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/overloaded_visitor.h"
 
 #include <cstdint>
@@ -272,8 +273,41 @@ std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEn
             "Padding must be between 0 and 7 for PACKED_BIT vectors, or 0 otherwise",
             padding == 0 || (dTypeCur == dType::PACKED_BIT && padding <= 7));
 
+    // Each element converts to a bool/int/double, which Value stores inline, so
+    // getApproximateSize() is exactly sizeof(Value) and the output size is elementCount *
+    // sizeof(Value). tassert that so any future dtype whose elements heap-allocate is forced
+    // to revisit this accounting.
+    tassert(12858400,
+            "BinData vector to array conversion expects bool/int/double elements",
+            dTypeCur == dType::PACKED_BIT || dTypeCur == dType::INT8 || dTypeCur == dType::FLOAT32);
+
+    // Reject up front, before allocating, when the materialized array would exceed the
+    // per-expression output budget, to avoid unbounded memory amplification.
+    const int dataLength = binData.length - 2;
+    size_t elementCount = 0;
+    if (dataLength > 0) {
+        switch (dTypeCur) {
+            case dType::PACKED_BIT:
+                elementCount = static_cast<size_t>(dataLength) * 8 - padding;
+                break;
+            case dType::INT8:
+                elementCount = static_cast<size_t>(dataLength);
+                break;
+            case dType::FLOAT32:
+                elementCount = static_cast<size_t>(dataLength) / sizeof(float);
+                break;
+        }
+    }
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+    const size_t outputBytes = elementCount * sizeof(Value);
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << "Converting a BinData vector to an array would use too much memory ("
+                          << outputBytes << " bytes). Memory limit: " << maxMemoryBytes << " bytes",
+            outputBytes <= maxMemoryBytes);
+
     // The rest of the binData vector is the elements.
     std::vector<Value> results;
+    results.reserve(elementCount);
     int i = 2;
     while (i < binData.length) {
         uassert(10506602,

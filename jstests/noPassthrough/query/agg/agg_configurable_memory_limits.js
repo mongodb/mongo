@@ -1,4 +1,6 @@
 // Tests that certain aggregation operators have configurable memory limits.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
@@ -164,6 +166,10 @@ assert.commandWorked(bulk.execute());
         [{$project: {a: {$setUnion: largeArrayOfArrays}}}],
         [{$project: {a: {$zip: {inputs: largeArrayOfArrays}}}}],
     ];
+
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "ConvertBinDataVectors")) {
+        pipelines.push([{$project: {a: {$convert: {input: HexData(9, "1000" + "ff".repeat(20)), to: "array"}}}}]);
+    }
 
     for (const pipeline of pipelines) {
         assert.doesNotThrow(() => coll.aggregate(pipeline), [], tojson(pipeline));

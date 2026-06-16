@@ -273,6 +273,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:query_knobs",
         "//src/third_party/nlohmann-json:json",
     ],
 )
