@@ -72,6 +72,23 @@ BSONObj generateSkewedBsonObj(size_t numberOfLeaves) {
     return result;
 }
 
+/**
+ * Generates a flat BSON object with the given number of top-level string fields, each named
+ * '<fieldPrefix><i>'. Unlike generateSkewedBsonObj(), this exercises the per-top-level-field work
+ * in toBsonStrippingMetadata(), which checks every field name against isMetadataFieldName(). The
+ * prefix controls which isMetadataFieldName() branch each field hits: a plain prefix short-circuits
+ * on the leading-'$' check, while a '$' prefix forces the full set lookup (a miss, since these are
+ * not real metadata names, so the fields are still serialized rather than stripped).
+ */
+BSONObj generateFlatBsonObj(size_t numberOfFields, StringData fieldPrefix) {
+    static const std::string leafValue(128, 'A');
+    BSONObjBuilder bb;
+    for (size_t i = 0; i < numberOfFields; ++i) {
+        bb.append(std::string{fieldPrefix} + std::to_string(i), leafValue);
+    }
+    return bb.obj();
+}
+
 }  // namespace
 
 /**
@@ -102,6 +119,69 @@ void BM_FieldNameHasher(benchmark::State& state) {
 }
 
 BENCHMARK(BM_FieldNameHasher)->RangeMultiplier(2)->Range(1, 1 << 8);
+
+/**
+ * Compares plain Document::toBson() against Document::toBsonStrippingMetadata() over the *same*
+ * flat document, so the delta between the two isolates the per-top-level-field
+ * isMetadataFieldName() scan that stripping adds. Both overloads serialize field-by-field
+ * (toBson(BSONObjBuilder*) bypasses the trivial copy), so the only difference is the metadata
+ * check. range(0): number of top-level fields. range(1): 0 = toBson() (no stripping), 1 =
+ * toBsonStrippingMetadata(). range(2): 0 = plain field names (scan short-circuits on the
+ * leading-'$' check), 1 = '$'-prefixed field names (scan does a full set lookup that misses).
+ * Compare strip vs plain at the same field-name style: 'dollar' shows the worst-case per-field
+ * scan cost, 'user' the common short-circuit case.
+ */
+void BM_documentToBsonStrippingMetadata(benchmark::State& state) {
+    const bool strip = state.range(1);
+    const bool dollarFields = state.range(2);
+    state.SetLabel(std::string{dollarFields ? "dollar/" : "user/"} + (strip ? "strip" : "plain"));
+    Document doc{generateFlatBsonObj(state.range(0), dollarFields ? "$field" : "field")};
+    for (auto _ : state) {
+        BSONObjBuilder bb;
+        if (strip) {
+            doc.toBsonStrippingMetadata(&bb);
+        } else {
+            doc.toBson(&bb);
+        }
+        BSONObj result = bb.obj();
+        benchmark::DoNotOptimize(result);
+    }
+    state.counters["objsize"] = doc.toBson().objsize();
+}
+
+BENCHMARK(BM_documentToBsonStrippingMetadata)
+    ->ArgsProduct({{1, 10, 50, 100, 500}, {0, 1}, {0, 1}})
+    ->Unit(benchmark::kNanosecond);
+
+void BM_isMetadataFieldName(benchmark::State& state) {
+    std::string name;
+    switch (state.range(0)) {
+        case 0:
+            name = "offering.startDate";
+            state.SetLabel("user-field");
+            break;
+        case 1:
+            name = std::string{Document::metaFieldSearchScore};
+            state.SetLabel("metadata-hit");
+            break;
+        case 2:
+            name = "$notAMetadataField";
+            state.SetLabel("dollar-miss");
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    for (auto _ : state) {
+        StringData fieldName{name};
+        // Prevent the compiler from constant-folding the known input away.
+        benchmark::DoNotOptimize(fieldName);
+        bool result = Document::isMetadataFieldName(fieldName);
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+BENCHMARK(BM_isMetadataFieldName)->Arg(0)->Arg(1)->Arg(2)->Unit(benchmark::kNanosecond);
 
 
 }  // namespace mongo
