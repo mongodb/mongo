@@ -113,7 +113,6 @@ def run_prettier(
     try:
         command = [
             str(prettier),
-            "--cache",
             "--log-level",
             "warn",
             # Changed-files mode may include extensions prettier does not parse (for example .py, .sky).
@@ -128,13 +127,33 @@ def run_prettier(
         else:
             command += files_to_format
         command += list(force_exclude_dirs)
+        write_command = command + ["--no-cache", "--write"]
+        check_command = command + ["--no-cache", "--check"]
         if check:
-            command.append("--check")
-        else:
-            command.append("--write")
-        print("Running prettier")
-        subprocess.run(command, check=True)
-    except subprocess.CalledProcessError:
+            print("Running prettier")
+            subprocess.run(check_command, check=True)
+        else:  # write mode
+            # Run without --cache and loop until prettier converges. Prettier is not always
+            # idempotent: a single pass may produce output that a second pass would reformat
+            # differently. Looping ensures write mode always reaches the fixed point.
+
+            for _ in range(
+                3  # this should only take 2 runs at most, but cap it at 3 to be flexible (and not infinite if something goes wrong)
+            ):
+                print("Running prettier")
+                subprocess.run(write_command, check=True)
+                result = subprocess.run(check_command, capture_output=True)
+                if result.returncode == 0:
+                    break
+            else:
+                raise subprocess.CalledProcessError(
+                    result.returncode, check_command, result.stdout, result.stderr
+                )
+    except subprocess.CalledProcessError as e:
+        if e.stdout:
+            print(e.stdout.decode())
+        if e.stderr:
+            print(e.stderr.decode())
         print("Found formatting errors. Run 'bazel run //:format' to fix")
         print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
         print("python buildscripts/install_bazel.py")
