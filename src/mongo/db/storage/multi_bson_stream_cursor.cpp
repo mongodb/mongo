@@ -29,6 +29,7 @@
 
 #include "mongo/db/storage/multi_bson_stream_cursor.h"
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/storage/record_store.h"
 
@@ -134,6 +135,18 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
     }
 
     // All cases are now collapsed to Case 1: the full object is in the buffer at '_bufBegin'.
+
+    // Validate nested element structure before exposing external BSON to the query engine.
+    // Top-level size checks above are insufficient — a crafted document can embed negative element
+    // sizes that cause signed-to-unsigned overflow downstream.
+    const char* objBuf = _buffer.get() + _bufBegin;
+    const auto maxLen = static_cast<uint64_t>(_bufEnd - _bufBegin);
+    if (auto s = validateBSON(objBuf, maxLen); !s.isOK()) {
+        uasserted(12849400,
+                  "Invalid BSON in external data source {}: {}"_format(
+                      _vopts.dataSources[_streamIdx].url, s.reason()));
+    }
+
     // 'recordData.data' includes the size in the first four bytes.
     boost::optional<RecordData> recordData = RecordData{(_buffer.get() + _bufBegin), bsonSize};
     _bufBegin += bsonSize;
