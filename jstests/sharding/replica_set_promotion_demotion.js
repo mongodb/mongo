@@ -36,6 +36,11 @@ describe("promote and demote replicaset to sharded cluster", function () {
                         remember: false,
                     });
                 });
+                // Wait for this secondary to complete initial sync before stopping
+                // the next. Stopping both simultaneously creates a circular deadlock:
+                // neither can pass waitingForSyncSourceStableTs because the primary
+                // has no majority votes and its stable timestamp cannot advance.
+                rs.awaitSecondaryNodes(rs.timeoutMS, [rs.nodes[id]]);
             }
 
             const primaryId = rs.getNodeId(rs.getPrimary());
