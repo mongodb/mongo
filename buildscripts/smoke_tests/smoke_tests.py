@@ -15,7 +15,6 @@
 #
 
 import hashlib
-import json
 import os
 import shutil
 import subprocess
@@ -431,12 +430,6 @@ component_name_to_test_tag = {
     "streams": "streams-smoke",
 }
 
-for _metadata_path in ROOT.glob("buildscripts/modules/*/smoke_tests/smoke_tests_metadata.json"):
-    with _metadata_path.open() as _f:
-        for _component, _data in json.load(_f).items():
-            component_name_to_formal_name[_component] = _data["formal_name"]
-            component_name_to_test_tag[_component] = _data["test_tag"]
-
 
 def run_smoke_tests(
     *,
@@ -555,7 +548,7 @@ def main():
     p.add_argument(
         "component",
         type=str,
-        help="Component that you wish to run the smoke test suite for. The available components are: catalog-and-routing, server-integration, replication, server-bsoncolumn, server-collection-write-path, server-external-sorter, server-index-builds, server-storage-engine-integration, server-timeseries-bucket-catalog, server-tracking-allocator, server-ttl. Additional components may be available depending on which modules are checked out.",
+        help="Component that you wish to run the smoke test suite for. The available components are: catalog-and-routing, server-integration, replication, server-bsoncolumn, server-collection-write-path, server-external-sorter, server-index-builds, server-storage-engine-integration, server-timeseries-bucket-catalog, server-tracking-allocator, server-ttl",
     )
 
     p.add_argument(

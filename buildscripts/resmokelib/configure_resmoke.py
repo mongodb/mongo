@@ -91,20 +91,20 @@ def _set_up_modules():
     # loop through all modules, we need to act on both enabled and disabled modules
     for module in module_configs.keys():
         module_config = module_configs[module]
+        all_paths_present = True
+        for key in ("fixture_dirs", "hook_dirs", "suite_dirs", "jstest_dirs"):
+            if key not in module_config:
+                continue
+            assert (
+                type(module_config[key]) == list
+            ), f"{key} in {module} did not have the expected type of list"
+            for module_dir in module_config[key]:
+                if not os.path.exists(module_dir):
+                    all_paths_present = False
+                    break
 
-        # A module is considered "present" when the dirs that are actually imported
-        # (fixture_dirs and hook_dirs) all exist.  suite_dirs and jstest_dirs are
-        # optional path hints: if they exist they are surfaced; if they don't (e.g.
-        # in a Bazel sandbox where only declared data deps are present) the module
-        # still loads its Python code correctly.
-        loading_dirs_present = all(
-            os.path.exists(d)
-            for key in ("fixture_dirs", "hook_dirs")
-            for d in module_config.get(key, [])
-        )
-
-        if module in _config.MODULES and loading_dirs_present:
-            # both the fixtures and the hooks just need to be loaded once for resmoke to recognize them
+        if module in _config.MODULES and all_paths_present:
+            # both the fixures and the hooks just need to be loaded once for resmoke to recognize them
             for resource_dir in module_config.get("fixture_dirs", []) + module_config.get(
                 "hook_dirs", []
             ):
@@ -113,11 +113,10 @@ def _set_up_modules():
                 autoloader.load_all_modules(package, [norm_path])
 
             for suite_dir in module_config.get("suite_dirs", []):
-                if os.path.exists(suite_dir):
-                    _config.MODULE_SUITE_DIRS.append(suite_dir)
+                _config.MODULE_SUITE_DIRS.append(suite_dir)
 
             for suite_dir in module_config.get("matrix_suite_dirs", []):
-                if suite_dir not in _config.MODULE_MATRIX_SUITE_DIRS and os.path.exists(suite_dir):
+                if suite_dir not in _config.MODULE_MATRIX_SUITE_DIRS:
                     _config.MODULE_MATRIX_SUITE_DIRS.append(suite_dir)
         else:
             for jstest_dir in module_config.get("jstest_dirs", []):
