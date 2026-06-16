@@ -43,6 +43,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <iterator>
 
 #include <boost/optional/optional.hpp>
@@ -158,7 +159,7 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
 }
 
 AccumulatorMinMaxN::AccumulatorMinMaxN(ExpressionContext* const expCtx, MinMaxSense sense)
-    : AccumulatorN(expCtx), _set(createMultiSet()), _sense(sense) {
+    : AccumulatorN(expCtx), _sense(sense) {
     _memUsageTracker.set(sizeof(*this));
 }
 
@@ -251,44 +252,54 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
 }
 
 void AccumulatorMinMaxN::_processValue(const Value& val) {
-    // Ignore nullish values.
     if (val.nullish()) {
         return;
     }
+    // For kMin we maintain a max-heap (largest value at front) so we can quickly evict the worst
+    // kept element. For kMax we maintain a min-heap (smallest value at front) for the same reason.
+    auto heapComp = [&](const std::pair<Value, int64_t>& a, const std::pair<Value, int64_t>& b) {
+        return _valueComp.compare(a.first, b.first) * _sense < 0;
+    };
 
-    // Only compare if we have 'n' elements.
-    if (static_cast<long long>(_set.size()) == *_n) {
-        // Get an iterator to the element we want to compare against.
-        auto cmpElem = _sense == MinMaxSense::kMin ? std::prev(_set.end()) : _set.begin();
+    auto sz = static_cast<int64_t>(val.getApproximateSize());
 
-        auto cmp =
-            getExpressionContext()->getValueComparator().compare(cmpElem->value(), val) * _sense;
-        if (cmp > 0) {
-            _set.erase(cmpElem);
-        } else {
-            return;
-        }
+    if (static_cast<long long>(_heap.size()) < *_n) {
+        _heap.push_back({val, sz});
+        std::push_heap(_heap.begin(), _heap.end(), heapComp);
+        _memUsageTracker.add(sz);
+        checkMemUsage();
+    } else if (_valueComp.compare(_heap.front().first, val) * _sense > 0) {
+        // The heap root is strictly worse than val (larger for kMin, smaller for kMax), so evict
+        // it and insert val. Adjust memory before modifying the heap so the tracker stays
+        // consistent if checkMemUsage throws.
+        std::pop_heap(_heap.begin(), _heap.end(), heapComp);
+        _memUsageTracker.add(sz - _heap.back().second);
+        _heap.back() = {val, sz};
+        std::push_heap(_heap.begin(), _heap.end(), heapComp);
+        checkMemUsage();
     }
-
-    _set.emplace(SimpleMemoryUsageToken{val.getApproximateSize(), &_memUsageTracker}, val);
-    checkMemUsage();
-}
-
-AccumulatorMinMaxN::MultiSet AccumulatorMinMaxN::createMultiSet() const {
-    return MultiSet(MemoryTokenValueComparator(&getExpressionContext()->getValueComparator()));
 }
 
 Value AccumulatorMinMaxN::getValue(bool toBeMerged) {
-    // Return the values in ascending order for 'kMin' and descending order for 'kMax'.
-    if (_sense == MinMaxSense::kMin) {
-        return convertToValueFromMemoryTokenWithValue(_set.begin(), _set.end(), _set.size());
-    } else {
-        return convertToValueFromMemoryTokenWithValue(_set.rbegin(), _set.rend(), _set.size());
+    std::vector<Value> vals;
+    vals.reserve(_heap.size());
+    for (auto& entry : _heap) {
+        vals.push_back(entry.first);
     }
+    // vals is a valid heap by Value compare: the heap property is preserved.
+    std::sort_heap(vals.begin(), vals.end(), [&](const Value& a, const Value& b) {
+        return _valueComp.compare(a, b) * _sense < 0;
+    });
+    return Value{std::move(vals)};
 }
 
 void AccumulatorMinMaxN::reset() {
-    _set = createMultiSet();
+    for (auto& entry : _heap) {
+        _memUsageTracker.add(-entry.second);
+    }
+    _heap.clear();
+    // Reserve space is not tracked by _memUsageTracker, so get rid of it.
+    _heap.shrink_to_fit();
 }
 
 const char* AccumulatorMinN::getName() {

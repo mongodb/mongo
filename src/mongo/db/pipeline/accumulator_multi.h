@@ -51,6 +51,7 @@
 #include <map>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -165,11 +166,14 @@ public:
 private:
     void _processValue(const Value& val) final;
 
-    using MultiSet = std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator>;
+    // Each entry stores the value and its precomputed approximate size.
+    // We avoid using SimpleMemoryUsageTokenWith here because we avoid
+    // significant overhead in the SMUTW move assignment operator when
+    // bubbling up new values inside the heap.
+    using Heap = std::vector<std::pair<Value, int64_t>>;
 
-    MultiSet createMultiSet() const;
-
-    MultiSet _set;
+    const ValueComparator _valueComp = getExpressionContext()->getValueComparator();
+    Heap _heap;
     MinMaxSense _sense;
 };
 

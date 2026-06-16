@@ -208,7 +208,7 @@ protected:
     bool _needsInput = true;
 
 private:
-    ExpressionContext* _expCtx;
+    ExpressionContext* const _expCtx;
 };
 
 class AccumulatorAddToSet final : public AccumulatorState {
