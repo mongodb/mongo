@@ -283,6 +283,8 @@ selector:
   # Inserts documents that are too large for a timeseries collection.
   - jstests/core/query/bson_size_limit.js
   - jstests/core/**/*_pbt.js
+  # Lookup query runs classic, contrary to test's expectation.
+  - jstests/core/query/lookup_resume_token_not_sbe.js
 
   exclude_with_any_tags:
   - requires_sharding

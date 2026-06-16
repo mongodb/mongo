@@ -1473,6 +1473,11 @@ bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery&
         return false;
     }
 
+    // Tailable and resumed scans are not supported either.
+    if (expCtx->isTailable() || cq.getFindCommandRequest().getRequestResumeToken()) {
+        return false;
+    }
+
     const auto& sortPattern = cq.getSortPattern();
     return !sortPattern || isSortSbeCompatible(*sortPattern);
 }
