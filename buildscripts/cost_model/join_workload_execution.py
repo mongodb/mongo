@@ -40,6 +40,11 @@ class JoinExplainResult(NamedTuple):
     used_disk: bool | None
     algorithm: str
     cost_estimate: float
+    left_input_cost: float
+    right_input_cost: float | None  # None for INLJ
+    mackert_lohman_case: int | None
+    sequential_io_pages: float | None
+    random_io_pages: float | None
 
 
 class CachedExecutionTime(NamedTuple):
@@ -48,6 +53,12 @@ class CachedExecutionTime(NamedTuple):
 
 
 CachedTimes = dict[tuple[str, str, int], CachedExecutionTime]
+
+MACKERT_LOHMAN_CASES = {
+    "collection-fits-cache": 1,
+    "returned-docs-fit-cache": 2,
+    "partial-eviction": 3,
+}
 
 
 def load_execution_times(csv_paths: list[str]) -> CachedTimes:
@@ -92,11 +103,18 @@ async def run_join_explain(
         exec_time_ms = stats["executionTimeNanos"] / 1e6
         used_disk = stats["inputStage"].get("usedDisk")
     query_plan = cursor["queryPlanner"]["winningPlan"]["queryPlan"]
+    join_cost_components = query_plan.get("joinCostComponents", {})
 
     assert query_plan["leftEmbeddingField"] == "none", f"Expected {collection_name} as outer table"
+
     return JoinExplainResult(
         exec_time_ms=exec_time_ms,
         used_disk=used_disk,
         algorithm=abbreviate_stage(query_plan["stage"]),
         cost_estimate=query_plan["costEstimate"],
+        left_input_cost=query_plan["inputStages"][0]["costEstimate"],
+        right_input_cost=query_plan["inputStages"][1].get("costEstimate"),
+        mackert_lohman_case=MACKERT_LOHMAN_CASES.get(join_cost_components.get("mackertLohmanCase")),
+        sequential_io_pages=join_cost_components.get("sequentialIOPages"),
+        random_io_pages=join_cost_components.get("randomIOPages"),
     )

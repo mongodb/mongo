@@ -38,6 +38,8 @@ import argparse
 import asyncio
 import os
 import random
+from collections import Counter
+from statistics import mean
 
 from data_generator import DataGenerator
 from database_instance import get_database_parameter
@@ -47,7 +49,12 @@ from join_calibration_settings import (
     join_database,
 )
 from join_plotting import plot_cost_vs_time
-from join_workload_execution import CachedTimes, load_execution_times, run_join_explain
+from join_workload_execution import (
+    CachedTimes,
+    JoinExplainResult,
+    load_execution_times,
+    run_join_explain,
+)
 from mongod_manager import MongodManager
 from scipy.stats import trim_mean
 
@@ -318,7 +325,9 @@ async def calibrate_join_algorithms(
     header = (
         f"{'join_field':<16} {'pred':<8} {'optimizer_picks':<24} "
         f"{'INLJ_ms':>10} {'HJ_ms':>10} {'faster':>8} {'correct':>10} "
-        f"{'INLJ_cost':>12} {'HJ_cost':>12}"
+        f"{'INLJ_cost (L+J=T)':>19} "
+        f"{'HJ_cost (L+R+J=T)':>25} {'HJ_spill':>8} "
+        f"{'HJ_seqIO':>10} {'INLJ_seqIO':>11} {'INLJ_randIO':>12} {'ML':>6}"
     )
     separator = "-" * len(header)
     print(header)
@@ -326,8 +335,65 @@ async def calibrate_join_algorithms(
 
     results = []
 
+    async def run_with_join_method(
+        join_method: str, pipeline: list, verbosity: str
+    ) -> list[JoinExplainResult]:
+        if cached_times is None:
+            manager.restart_cold(extra_start_args=cache_args)
+        await manager.database.set_parameter("internalJoinMethod", join_method)
+        run_results = []
+        for _ in range(num_runs):
+            result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
+            if join_method != "any":
+                assert (
+                    result.algorithm == join_method
+                ), f"Expected {join_method} run, got {result.algorithm}"
+            run_results.append(result)
+        return run_results
+
     if cached_times is not None:
         manager.restart_cold(extra_start_args=cache_args)
+
+    def format_join_result_row(
+        join_field,
+        pred_const,
+        optimizer_picks_str,
+        inlj_mean,
+        hj_mean,
+        faster,
+        correct,
+        inlj_cost_parts,
+        hj_cost_parts,
+        hj_actual_spilling,
+        hj_seq_io_mean,
+        inlj_seq_io_mean,
+        inlj_rand_io_mean,
+        inlj_ml_cases,
+    ) -> str:
+        def fmt(value, width: int = 10, decimals: int = 1) -> str:
+            return f"{value:>{width}.{decimals}f}" if value is not None else f"{'-':>{width}}"
+
+        def fmt_cost_equation(cost_parts, width: int) -> str:
+            total, *input_costs = cost_parts
+            rounded_inputs = [round(cost) for cost in input_costs if cost is not None]
+            total_rounded = round(total)
+            join_rounded = total_rounded - sum(rounded_inputs)
+
+            terms = [*rounded_inputs, join_rounded]
+            return f"{'+'.join(map(str, terms))}={total_rounded}".rjust(width)
+
+        def fmt_set(values, render=str) -> str:
+            return "/".join(render(v) for v in sorted(set(values))) or "-"
+
+        return (
+            f"{join_field:<16} {pred_const:<8} {optimizer_picks_str:<24} "
+            f"{fmt(inlj_mean)} {fmt(hj_mean)} {faster:>8} {correct:>10} "
+            f"{fmt_cost_equation(inlj_cost_parts, 19)} "
+            f"{fmt_cost_equation(hj_cost_parts, 25)} "
+            f"{fmt_set(hj_actual_spilling, lambda v: 'Y' if v else 'N'):>8} "
+            f"{fmt(hj_seq_io_mean)} {fmt(inlj_seq_io_mean, 11)} {fmt(inlj_rand_io_mean, 12)} "
+            f"{fmt_set(inlj_ml_cases):>6}"
+        )
 
     for join_field in join_fields:
         for pred_const in predicate_constants:
@@ -352,52 +418,38 @@ async def calibrate_join_algorithms(
             )
             verbosity = "queryPlanner" if cached_times or skip_execution else "executionStats"
 
-            # Using the algorithm which the optimizer picks
-            if cached_times is None:
-                manager.restart_cold(extra_start_args=cache_args)
-            await manager.database.set_parameter("internalJoinMethod", "any")
-            algo_freqs: dict[str, int] = {}
-            for _ in range(num_runs):
-                result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
-                algo_freqs[result.algorithm] = algo_freqs.get(result.algorithm, 0) + 1
+            # Using the algorithm which the optimizer picks and forcing INLJ/HJ
+            optimizer_results = await run_with_join_method("any", pipeline, verbosity)
+            inlj_results = await run_with_join_method("INLJ", pipeline, verbosity)
+            hj_results = await run_with_join_method("HJ", pipeline, verbosity)
 
+            algo_freqs = Counter(r.algorithm for r in optimizer_results)
             optimizer_picks_str = " ".join(
-                f"{algo} {freq}/{num_runs}"
-                for algo, freq in sorted(algo_freqs.items(), key=lambda x: -x[1])
+                f"{algo} {freq}/{num_runs}" for algo, freq in algo_freqs.most_common()
             )
-            majority_algo = max(algo_freqs, key=algo_freqs.get)
+            majority_algo = algo_freqs.most_common(1)[0][0]
 
-            inlj_mean, hj_mean = None, None
-            inlj_cost_mean, hj_cost_mean = None, None
+            inlj_times = [r.exec_time_ms for r in inlj_results if r.exec_time_ms is not None]
+            hj_times = [r.exec_time_ms for r in hj_results if r.exec_time_ms is not None]
 
-            # Forcing INLJ
-            if cached_times is None:
-                manager.restart_cold(extra_start_args=cache_args)
-            await manager.database.set_parameter("internalJoinMethod", "INLJ")
+            inlj_cost_mean = mean(r.cost_estimate for r in inlj_results)
+            hj_cost_mean = mean(r.cost_estimate for r in hj_results)
+            inlj_cost_parts = (
+                inlj_cost_mean,
+                mean(r.left_input_cost for r in inlj_results),
+                None,
+            )
+            hj_cost_parts = (
+                hj_cost_mean,
+                mean(r.left_input_cost for r in hj_results),
+                mean(r.right_input_cost for r in hj_results),
+            )
 
-            inlj_times, inlj_costs = [], []
-            for _ in range(num_runs):
-                result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
-                assert result.algorithm == "INLJ", f"Expected INLJ but got {result.algorithm}"
-                inlj_costs.append(result.cost_estimate)
-                if result.exec_time_ms is not None:
-                    inlj_times.append(result.exec_time_ms)
-
-            # Forcing HJ
-            if cached_times is None:
-                manager.restart_cold(extra_start_args=cache_args)
-            await manager.database.set_parameter("internalJoinMethod", "HJ")
-
-            hj_times, hj_costs = [], []
-            for _ in range(num_runs):
-                result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
-                assert result.algorithm == "HJ", f"Expected HJ but got {result.algorithm}"
-                hj_costs.append(result.cost_estimate)
-                if result.exec_time_ms is not None:
-                    hj_times.append(result.exec_time_ms)
-
-            inlj_cost_mean = sum(inlj_costs) / len(inlj_costs)
-            hj_cost_mean = sum(hj_costs) / len(hj_costs)
+            hj_actual_spilling = [r.used_disk for r in hj_results if r.used_disk is not None]
+            inlj_ml_cases = [r.mackert_lohman_case for r in inlj_results]
+            hj_seq_io_mean = mean(r.sequential_io_pages for r in hj_results)
+            inlj_seq_io_mean = mean(r.sequential_io_pages for r in inlj_results)
+            inlj_rand_io_mean = mean(r.random_io_pages for r in inlj_results)
 
             inlj_mean = (
                 cached.inlj_time_ms
@@ -418,13 +470,23 @@ async def calibrate_join_algorithms(
             faster = "INLJ" if inlj_mean and hj_mean and inlj_mean <= hj_mean else "HJ"
             correct = "✓" if majority_algo == faster else "✗"
 
-            def fmt(v, width=10, decimals=1):
-                return f"{v:>{width}.{decimals}f}" if v is not None else f"{'-':>{width}}"
-
             print(
-                f"{join_field[0]:<16} {pred_const:<8} {optimizer_picks_str:<24} "
-                f"{fmt(inlj_mean)} {fmt(hj_mean)} {faster:>8} {correct:>10} "
-                f"{fmt(inlj_cost_mean, 12, 2)} {fmt(hj_cost_mean, 12, 2)}"
+                format_join_result_row(
+                    join_field[0],
+                    pred_const,
+                    optimizer_picks_str,
+                    inlj_mean,
+                    hj_mean,
+                    faster,
+                    correct,
+                    inlj_cost_parts,
+                    hj_cost_parts,
+                    hj_actual_spilling,
+                    hj_seq_io_mean,
+                    inlj_seq_io_mean,
+                    inlj_rand_io_mean,
+                    inlj_ml_cases,
+                )
             )
 
             results.append(
@@ -488,6 +550,8 @@ async def main():
             "internalMeasureQueryExecutionTimeInNanoseconds=true",
             "--setParameter",
             "internalEnableJoinOptimization=true",
+            "--setParameter",
+            "internalQueryExplainJoinCostComponents=true",
             "--setParameter",
             "featureFlagPathArrayness=true",
         ],
