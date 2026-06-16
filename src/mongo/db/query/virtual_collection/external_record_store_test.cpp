@@ -594,5 +594,76 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
     ASSERT_EQ(objsRead, objsWritten)
         << fmt::format("Expected objsRead == {} but got {}", objsWritten, objsRead);
 }
+
+// A crafted document with a valid top-level size can embed a negative int32 as the size of a nested
+// array element. Make sure that we reject this when validating the BSON.
+TEST_F(ExternalRecordStoreTest, RejectsNegativeEmbeddedArraySize) {
+    // Minimal malformed BSON: total_size=12, array element "a" with embedded size=-4 (0xFFFFFFFC).
+    // clang-format off
+    static constexpr char kMalformedBson[] = {
+        '\x0C', '\x00', '\x00', '\x00',  // total_size = 12
+        '\x04',                          // type: array
+        '\x61', '\x00',                  // key: "a\0"
+        '\xFC', '\xFF', '\xFF', '\xFF',  // embedded array size = -4
+        '\x00',                          // top-level document terminator
+    };
+    // clang-format on
+    static_assert(sizeof(kMalformedBson) == 12);
+
+    PipeWaiter pw;
+    const auto pipePath = createPipeFilename("RejectsNegativeEmbeddedArraySizePipe");
+    stdx::thread producer([&] {
+        NamedPipeOutput pipeWriter(pipePath);
+        pw.notify();
+        pipeWriter.open();
+        pipeWriter.write(kMalformedBson, sizeof(kMalformedBson));
+        pipeWriter.close();
+    });
+    ON_BLOCK_EXIT([&] { producer.join(); });
+    pw.wait();
+
+    VirtualCollectionOptions vopts;
+    ExternalDataSourceMetadata meta(
+        fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePath),
+        StorageTypeEnum::pipe,
+        FileTypeEnum::bson);
+    vopts.dataSources.emplace_back(meta);
+    MultiBsonStreamCursor msbc(vopts);
+
+    ASSERT_THROWS_CODE(msbc.next(), DBException, 12849400);
+}
+
+// Similar to the test above, we reject BSON whose top-level size is negative.
+TEST_F(ExternalRecordStoreTest, RejectsNegativeTopLevelSize) {
+    // clang-format off
+    static constexpr char kNegativeSizeBson[] = {
+        '\xFC', '\xFF', '\xFF', '\xFF',  // total_size = -4
+        '\x00',                          // one byte of body
+    };
+    // clang-format on
+
+    PipeWaiter pw;
+    const auto pipePath = createPipeFilename("RejectsNegativeTopLevelSizePipe");
+    stdx::thread producer([&] {
+        NamedPipeOutput pipeWriter(pipePath);
+        pw.notify();
+        pipeWriter.open();
+        pipeWriter.write(kNegativeSizeBson, sizeof(kNegativeSizeBson));
+        pipeWriter.close();
+    });
+    ON_BLOCK_EXIT([&] { producer.join(); });
+    pw.wait();
+
+    VirtualCollectionOptions vopts;
+    ExternalDataSourceMetadata meta(
+        fmt::format("{}{}", ExternalDataSourceMetadata::kUrlProtocolFile, pipePath),
+        StorageTypeEnum::pipe,
+        FileTypeEnum::bson);
+    vopts.dataSources.emplace_back(meta);
+    MultiBsonStreamCursor msbc(vopts);
+
+    ASSERT_THROWS_CODE(msbc.next(), DBException, 12849400);
+}
+
 }  // namespace
 }  // namespace mongo
