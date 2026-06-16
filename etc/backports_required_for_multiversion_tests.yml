@@ -538,6 +538,8 @@ last-continuous:
       ticket: SERVER-120668
     - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
       ticket: SERVER-121822
+    - test_file: jstests/aggregation/expressions/expression_function.js
+      ticket: SERVER-128473
   suites: null
 last-lts:
   all:
@@ -1133,4 +1135,6 @@ last-lts:
       ticket: SERVER-121822
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/aggregation/expressions/expression_function.js
+      ticket: SERVER-128473
   suites: null
