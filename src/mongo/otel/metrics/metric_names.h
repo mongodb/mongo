@@ -158,6 +158,7 @@ public:
         MetricNameMaker::make("serverStatus.connections.rejected");
     static constexpr MetricName kConnectionsActive =
         MetricNameMaker::make("serverStatus.connections.active");
+    static constexpr MetricName kMongoDBBuildInfo = MetricNameMaker::make("mongodb.build.info");
 
     // Query Execution Team Metrics
     static constexpr MetricName kChangeStreamCursorsTotalOpened =

@@ -25,6 +25,23 @@ export function findMetricsFiles(directory, fileSuffix = "-metrics.jsonl") {
 }
 
 /**
+ * Returns all metrics from an OTLP record as a flat array.
+ * @param {Object} record - A raw OTLP JSON record.
+ * @returns {Array<Object>} A flat array of metric objects across all resource and scope metrics.
+ */
+export function getFlatMetricsList(record) {
+    let metrics = [];
+    for (const resourceMetric of record?.resourceMetrics ?? []) {
+        for (const scopeMetric of resourceMetric.scopeMetrics ?? []) {
+            for (const metric of scopeMetric.metrics ?? []) {
+                metrics.push(metric);
+            }
+        }
+    }
+    return metrics;
+}
+
+/**
  * Reads and parses a JSONL (JSON Lines) file.
  * @param {string} filePath - The path to the JSONL file.
  * @returns {Array<Object>} An array of parsed JSON objects, one per line in the file.
@@ -69,14 +86,10 @@ function safeConvertToNumber(value) {
  */
 function latestTime(record) {
     let allPoints = [];
-    for (const resourceMetric of record?.resourceMetrics ?? []) {
-        for (const scopeMetric of resourceMetric.scopeMetrics ?? []) {
-            for (const metric of scopeMetric.metrics ?? []) {
-                allPoints.push(...(metric.sum?.dataPoints ?? []));
-                allPoints.push(...(metric.gauge?.dataPoints ?? []));
-                allPoints.push(...(metric.histogram?.dataPoints ?? []));
-            }
-        }
+    for (const metric of getFlatMetricsList(record)) {
+        allPoints.push(...(metric.sum?.dataPoints ?? []));
+        allPoints.push(...(metric.gauge?.dataPoints ?? []));
+        allPoints.push(...(metric.histogram?.dataPoints ?? []));
     }
     return allPoints.length > 0
         ? Math.max(
@@ -141,14 +154,8 @@ export function getLatestMetrics(directory) {
         return null;
     }
 
-    let metrics = [];
-    for (const resourceMetric of record.resourceMetrics ?? []) {
-        for (const scopeMetric of resourceMetric.scopeMetrics ?? []) {
-            for (const metric of scopeMetric.metrics ?? []) {
-                metrics.push(metric);
-            }
-        }
-    }
+    const metrics = getFlatMetricsList(record);
+
     let result = Object.fromEntries(
         metrics.map((metric) => {
             let result = {};
@@ -182,20 +189,42 @@ export function getLatestMetrics(directory) {
 export function getHistogramCount(metricsDir, metricName, attrKey, attrValue) {
     const record = getLatestRawRecord(metricsDir);
     if (!record) return 0;
-    for (const resourceMetric of record.resourceMetrics ?? []) {
-        for (const scopeMetric of resourceMetric.scopeMetrics ?? []) {
-            for (const metric of scopeMetric.metrics ?? []) {
-                if (metric.name !== metricName) continue;
-                for (const dp of metric.histogram?.dataPoints ?? []) {
-                    const match = (dp.attributes ?? []).some(
-                        (a) => a.key === attrKey && a.value?.stringValue === attrValue,
-                    );
-                    if (match) return Number(dp.count ?? 0);
-                }
-            }
+    for (const metric of getFlatMetricsList(record)) {
+        if (metric.name !== metricName) continue;
+        for (const dp of metric.histogram?.dataPoints ?? []) {
+            const match = (dp.attributes ?? []).some(
+                (a) => a.key === attrKey && a.value?.stringValue === attrValue,
+            );
+            if (match) return Number(dp.count ?? 0);
         }
     }
     return 0;
+}
+
+/**
+ * Extracts the label set (datapoint-level attributes)of a metric line from Prometheus text
+ * format as a plain object.
+ * @param {string} metricsText - The text of the metrics file.
+ * @param {string} metricName - The OTel metric name (dots are converted to underscores).
+ * @returns {Object|null} An object mapping label keys to string values, or null if not found.
+ */
+export function extractPrometheusMetricLabels(metricsText, metricName) {
+    const leadingWhitespaceRe = "(?:^|\\s)+";
+    const metricNameRe = metricName.replace(/\./g, "_");
+    const unitSuffixRe = "(?:_[a-zA-Z]+)+";
+    const labelSetRe = '(\\{(?:\\w+="[^"]*"(?:,\\s*\\w+="[^"]*")*)?\\})';
+
+    const regexp = new RegExp(leadingWhitespaceRe + metricNameRe + unitSuffixRe + labelSetRe, "m");
+    const match = metricsText && metricsText.match(regexp);
+    if (!match) return null;
+
+    const attrs = {};
+    const labelRe = /(\w+)="([^"]*)"/g;
+    let m;
+    while ((m = labelRe.exec(match[1])) !== null) {
+        attrs[m[1]] = m[2];
+    }
+    return attrs;
 }
 
 /**
@@ -212,11 +241,11 @@ export function extractPrometheusMetricIntValue(metricsText, metricName) {
     const leadingWhitespaceRe = "(?:^|\\s)+";
     const metricNameRe = metricName.replace(/\./g, "_");
     const unitSuffixRe = "(?:_[a-zA-Z]+)+";
-    const scopeRe = '\\{(?:\\w+\\="\\w+")?\\}';
+    const labelSetRe = '\\{(?:\\w+="[^"]*"(?:,\\s*\\w+="[^"]*")*)?\\}';
     const valueRe = "\\s+(\\d+)";
 
     const regexp = new RegExp(
-        leadingWhitespaceRe + metricNameRe + unitSuffixRe + scopeRe + valueRe,
+        leadingWhitespaceRe + metricNameRe + unitSuffixRe + labelSetRe + valueRe,
         "m",
     );
     const match = metricsText && metricsText.match(regexp);

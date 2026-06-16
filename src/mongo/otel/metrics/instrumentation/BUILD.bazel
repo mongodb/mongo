@@ -182,6 +182,18 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "mongodb_build_info_metrics",
+    srcs = ["mongodb_build_info_metrics.cpp"],
+    hdrs = ["mongodb_build_info_metrics.h"],
+    deps = [
+        "//src/mongo/db:server_options",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_library(
     name = "metrics_installer",
     srcs = ["metrics_installer.cpp"],
     hdrs = ["metrics_installer.h"],
@@ -190,6 +202,7 @@ mongo_cc_library(
         ":disk_metrics",
         ":global_lock_metrics",
         ":index_build_metrics",
+        ":mongodb_build_info_metrics",
         ":system_health_metrics",
         ":system_mount_metrics",
     ],

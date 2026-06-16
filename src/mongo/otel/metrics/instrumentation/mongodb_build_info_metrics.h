@@ -27,34 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
+#pragma once
 
-#include "mongo/otel/metrics/instrumentation/connections_metrics.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
-#include "mongo/otel/metrics/instrumentation/mongodb_build_info_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_health_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-void installCommonOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installSystemHealthOtelMetrics(svcCtx);
-    installMongoDBBuildInfoMetrics();
-}
-
-void installMongodOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-    installConnectionsOtelMetrics(svcCtx);
-}
-
-void installMongosOtelMetrics(ServiceContext* svcCtx) {
-    installCommonOtelMetrics(svcCtx);
-}
+MONGO_MOD_PUBLIC void installMongoDBBuildInfoMetrics();
 
 }  // namespace mongo
