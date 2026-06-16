@@ -549,7 +549,7 @@ stitch_support_v1_projection_apply(stitch_support_v1_projection* const projectio
         mongo::BSONObj document(mongo::fromInterfaceType(documentBSON));
 
         auto outputObj =
-            projection->projectionExec->applyTransformation(mongo::Document{document}).toBson();
+            projection->projectionExec->applyTransformation(mongo::Document{document}, {}).toBson();
         auto outputSize = static_cast<size_t>(outputObj.objsize());
         auto output = new (std::nothrow) char[outputSize];
 

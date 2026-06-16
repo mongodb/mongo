@@ -92,7 +92,7 @@ public:
         return _docsNeeded;
     }
 
-    Document applyTransformation(const Document& input) const final;
+    Document applyTransformation(const Document& input, const EvaluationContext& ctx) const final;
 
     void optimize() final;
 

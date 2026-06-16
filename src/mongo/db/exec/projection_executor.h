@@ -94,10 +94,11 @@ public:
     /**
      * Apply the projection transformation.
      */
-    Document applyTransformation(const Document& input) const override {
-        auto output = applyProjection(input);
+    Document applyTransformation(const Document& input,
+                                 const EvaluationContext& ctx) const override {
+        auto output = applyProjection(input, ctx);
         if (_rootReplacementExpression) {
-            return _applyRootReplacementExpression(input, output);
+            return _applyRootReplacementExpression(input, output, ctx);
         }
         return output;
     }
@@ -135,9 +136,11 @@ protected:
               _expCtx->variablesParseState.defineVariable(kProjectionPostImageVarName)} {}
 
     /**
-     * Apply the projection to 'input'.
+     * Apply the projection to 'input'. The 'ctx' parameter carries evaluation state (see
+     * EvaluationContext); when it holds a memory tracker, memory usage observed while evaluating
+     * any expressions is accumulated against it.
      */
-    virtual Document applyProjection(const Document& input) const = 0;
+    virtual Document applyProjection(const Document& input, const EvaluationContext& ctx) const = 0;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
@@ -146,9 +149,11 @@ protected:
     boost::intrusive_ptr<Expression> _rootReplacementExpression;
 
 private:
-    Document _applyRootReplacementExpression(const Document& input, const Document& output) const {
+    Document _applyRootReplacementExpression(const Document& input,
+                                             const Document& output,
+                                             const EvaluationContext& ctx) const {
         _expCtx->variables.setValue(_projectionPostImageVarId, Value{output});
-        auto val = _rootReplacementExpression->evaluate(input, &_expCtx->variables);
+        auto val = _rootReplacementExpression->evaluate(input, &_expCtx->variables, ctx);
         uassert(51254,
                 fmt::format("Root-replacement expression must return a document, but got {}",
                             typeName(val.getType())),

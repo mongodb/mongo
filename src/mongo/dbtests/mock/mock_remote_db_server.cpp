@@ -202,7 +202,7 @@ BSONObj MockRemoteDBServer::project(projection_executor::ProjectionExecutor* pro
     if (!projectionExecutor)
         return o.copy();
     Document doc(o);
-    auto projectedDoc = projectionExecutor->applyTransformation(doc);
+    auto projectedDoc = projectionExecutor->applyTransformation(doc, {});
     return projectedDoc.toBson().getOwned();
 }
 

@@ -42,12 +42,13 @@
 
 namespace mongo::projection_executor {
 
-Document FastPathEligibleExclusionNode::applyToDocument(const Document& inputDoc) const {
+Document FastPathEligibleExclusionNode::applyToDocument(const Document& inputDoc,
+                                                        const EvaluationContext& ctx) const {
     if (auto outputDoc = tryApplyFastPathProjection(inputDoc)) {
         return outputDoc.get();
     }
     // A fast-path projection is not feasible, fall back to default implementation.
-    return ExclusionNode::applyToDocument(inputDoc);
+    return ExclusionNode::applyToDocument(inputDoc, ctx);
 }
 
 std::pair<BSONObj, bool> ExclusionNode::extractProjectOnFieldAndRename(StringData oldName,

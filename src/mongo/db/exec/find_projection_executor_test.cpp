@@ -90,7 +90,7 @@ protected:
             path,
             std::move(matchExpr));
         executor->setRootReplacementExpression(expr);
-        return executor->applyTransformation(input);
+        return executor->applyTransformation(input, {});
     }
 };
 
@@ -111,7 +111,7 @@ protected:
             skip,
             limit);
         executor->setRootReplacementExpression(expr);
-        return executor->applyTransformation(input);
+        return executor->applyTransformation(input, {});
     }
 };
 
@@ -229,7 +229,7 @@ TEST_F(SliceProjectionExecutionTest, CanApplySliceAndPositionalProjectionsTogeth
 
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{foo: [3], bar: [6]}")},
-        executor->applyTransformation(Document{fromjson("{foo: [1,2,3,4], bar: [5,6,7,8]}")}));
+        executor->applyTransformation(Document{fromjson("{foo: [1,2,3,4], bar: [5,6,7,8]}")}, {}));
 }
 
 TEST_F(SliceProjectionExecutionTest, CanApplySliceWithExclusionProjection) {

@@ -40,10 +40,11 @@ SingleDocumentTransformationProcessor::SingleDocumentTransformationProcessor(
     std::unique_ptr<TransformerInterface> parsedTransform)
     : _parsedTransform(std::move(parsedTransform)) {}
 
-Document SingleDocumentTransformationProcessor::process(const Document& input) const {
+Document SingleDocumentTransformationProcessor::process(const Document& input,
+                                                        const EvaluationContext& ctx) const {
     dassert(_parsedTransform);
     // Apply and return the document with added fields.
-    return _parsedTransform->applyTransformation(input);
+    return _parsedTransform->applyTransformation(input, ctx);
 }
 
 }  // namespace mongo

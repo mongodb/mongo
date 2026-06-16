@@ -129,13 +129,14 @@ ProjectionNode* ProjectionNode::getChild(const std::string& field) const {
     return childIt == _children.end() ? nullptr : childIt->second.get();
 }
 
-Document ProjectionNode::applyToDocument(const Document& inputDoc) const {
+Document ProjectionNode::applyToDocument(const Document& inputDoc,
+                                         const EvaluationContext& ctx) const {
     // Defer to the derived class to initialize the output document, then apply.
     MutableDocument outputDoc{initializeOutputDocument(inputDoc)};
     applyProjections(inputDoc, &outputDoc);
 
     if (_subtreeContainsComputedFields) {
-        applyExpressions(inputDoc, &outputDoc);
+        applyExpressions(inputDoc, &outputDoc, ctx);
     }
 
     // Make sure that we always pass through any metadata present in the input doc.
@@ -215,7 +216,9 @@ void ProjectionNode::outputProjectedField(StringData field, Value val, MutableDo
     doc->setField(field, val);
 }
 
-void ProjectionNode::applyExpressions(const Document& root, MutableDocument* outputDoc) const {
+void ProjectionNode::applyExpressions(const Document& root,
+                                      MutableDocument* outputDoc,
+                                      const EvaluationContext& ctx) const {
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
@@ -225,7 +228,7 @@ void ProjectionNode::applyExpressions(const Document& root, MutableDocument* out
             const auto pos = doc.positionOf(StringData{field});
             Value currentValue = pos.found() ? doc.getField(pos) : Value{};
             Value newValue =
-                childIt->second->applyExpressionsToValue(root, std::move(currentValue));
+                childIt->second->applyExpressionsToValue(root, std::move(currentValue), ctx);
             if (pos.found()) {
                 outputDoc->setField(pos, std::move(newValue));
             } else {
@@ -239,21 +242,23 @@ void ProjectionNode::applyExpressions(const Document& root, MutableDocument* out
             outputDoc->setField(
                 field,
                 expressionIt->second->evaluate(
-                    root, &expressionIt->second->getExpressionContext()->variables));
+                    root, &expressionIt->second->getExpressionContext()->variables, ctx));
         }
     }
 }
 
-Value ProjectionNode::applyExpressionsToValue(const Document& root, Value inputValue) const {
+Value ProjectionNode::applyExpressionsToValue(const Document& root,
+                                              Value inputValue,
+                                              const EvaluationContext& ctx) const {
     if (inputValue.getType() == BSONType::object) {
         MutableDocument outputDoc(inputValue.getDocument());
-        applyExpressions(root, &outputDoc);
+        applyExpressions(root, &outputDoc, ctx);
         return outputDoc.freezeToValue();
     } else if (inputValue.getType() == BSONType::array) {
         std::vector<Value> values;
         values.reserve(inputValue.getArrayLength());
         for (const auto& input : inputValue.getArray()) {
-            auto value = applyExpressionsToValue(root, input);
+            auto value = applyExpressionsToValue(root, input, ctx);
             if (!value.missing()) {
                 values.push_back(std::move(value));
             }
@@ -265,7 +270,7 @@ Value ProjectionNode::applyExpressionsToValue(const Document& root, Value inputV
             // document of all the computed values. This case represents applying a projection like
             // {"a.b": {$literal: 1}} to the document {a: 1}. This should yield {a: {b: 1}}.
             MutableDocument outputDoc;
-            applyExpressions(root, &outputDoc);
+            applyExpressions(root, &outputDoc, ctx);
             return outputDoc.freezeToValue();
         }
         // We didn't have any expressions, so just skip this value.

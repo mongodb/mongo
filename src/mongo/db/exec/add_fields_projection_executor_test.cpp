@@ -345,12 +345,12 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsNewFieldToEndOfDocument) {
     addition.parse(BSON("c" << 3));
 
     // There are no fields in the document.
-    auto result = addition.applyProjection(Document{});
+    auto result = addition.applyProjection(Document{}, {});
     auto expectedResult = Document{{"c", 3}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are fields in the document but none of them are the added field.
-    result = addition.applyProjection(Document{{"a", 1}, {"b", 2}});
+    result = addition.applyProjection(Document{{"a", 1}, {"b", 2}}, {});
     expectedResult = Document{{"a", 1}, {"b", 2}, {"c", 3}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -360,12 +360,12 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddingEmptySpecResultsInNoOp) {
     AddFieldsProjectionExecutor addition(expCtx);
 
     // There are no fields in the document.
-    auto result = addition.applyProjection(Document{});
+    auto result = addition.applyProjection(Document{}, {});
     auto expectedResult = Document{{}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are fields in the document but none of them are the added field.
-    result = addition.applyProjection(Document{{"a", 1}, {"b", 2}});
+    result = addition.applyProjection(Document{{"a", 1}, {"b", 2}}, {});
     expectedResult = Document{{"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -378,12 +378,12 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ReplacesFieldThatAlreadyExistsInD
     addition.parse(BSON("c" << 3));
 
     // Specified field is the only field in the document, and is replaced.
-    auto result = addition.applyProjection(Document{{"c", 1}});
+    auto result = addition.applyProjection(Document{{"c", 1}}, {});
     auto expectedResult = Document{{"c", 3}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is one of the fields in the document, and is replaced in its existing order.
-    result = addition.applyProjection(Document{{"c", 1}, {"b", 2}});
+    result = addition.applyProjection(Document{{"c", 1}, {"b", 2}}, {});
     expectedResult = Document{{"c", 3}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -396,7 +396,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
     addition.parse(BSON("second" << "SECOND"
                                  << "first"
                                  << "FIRST"));
-    auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
+    auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
     auto expectedResult = Document{{"first", "FIRST"_sd}, {"second", "SECOND"_sd}, {"third", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -408,7 +408,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsNewFieldsAfterExistingFieldsI
     addition.parse(BSON("firstComputed" << "FIRST"
                                         << "secondComputed"
                                         << "SECOND"));
-    auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
+    auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
     auto expectedResult = Document{{"first", 0},
                                    {"second", 1},
                                    {"third", 2},
@@ -426,7 +426,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
     addition.parse(BSON("firstComputed" << "FIRST"
                                         << "second"
                                         << "SECOND"));
-    auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
+    auto result = addition.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
     auto expectedResult = Document{
         {"first", 0}, {"second", "SECOND"_sd}, {"third", 2}, {"firstComputed", "FIRST"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -438,11 +438,11 @@ TEST(AddFieldsProjectionExecutorExecutionTest, IdFieldIsKeptInOrderItAppearsInIn
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddFieldsProjectionExecutor addition(expCtx);
     addition.parse(BSON("newField" << "computedVal"));
-    auto result = addition.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}});
+    auto result = addition.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}}, {});
     auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}, {"newField", "computedVal"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"_sd}});
+    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"_sd}}, {});
     expectedResult = Document{{"a", 1}, {"_id", "ID"_sd}, {"newField", "computedVal"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -452,15 +452,15 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ShouldReplaceIdWithComputedId) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddFieldsProjectionExecutor addition(expCtx);
     addition.parse(BSON("_id" << "newId"));
-    auto result = addition.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}});
+    auto result = addition.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}}, {});
     auto expectedResult = Document{{"_id", "newId"_sd}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"_sd}});
+    result = addition.applyProjection(Document{{"a", 1}, {"_id", "ID"_sd}}, {});
     expectedResult = Document{{"a", 1}, {"_id", "newId"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
-    result = addition.applyProjection(Document{{"a", 1}});
+    result = addition.applyProjection(Document{{"a", 1}}, {});
     expectedResult = Document{{"a", 1}, {"_id", "newId"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -477,22 +477,22 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
     addition.parse(BSON("a.b" << true));
 
     // More than one field in sub document.
-    auto result = addition.applyProjection(Document{{"a", Document{{"b", 1}, {"c", 2}}}});
+    auto result = addition.applyProjection(Document{{"a", Document{{"b", 1}, {"c", 2}}}}, {});
     auto expectedResult = Document{{"a", Document{{"b", true}, {"c", 2}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is the only field in the sub document.
-    result = addition.applyProjection(Document{{"a", Document{{"b", 1}}}});
+    result = addition.applyProjection(Document{{"a", Document{{"b", 1}}}}, {});
     expectedResult = Document{{"a", Document{{"b", true}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the sub document.
-    result = addition.applyProjection(Document{{"a", Document{{"c", 1}}}});
+    result = addition.applyProjection(Document{{"a", Document{{"c", 1}}}}, {});
     expectedResult = Document{{"a", Document{{"c", 1}, {"b", true}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in sub document.
-    result = addition.applyProjection(Document{{"a", Document{}}});
+    result = addition.applyProjection(Document{{"a", Document{}}}, {});
     expectedResult = Document{{"a", Document{{"b", true}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -504,12 +504,12 @@ TEST(AddFieldsProjectionExecutorExecutionTest, CreatesSubDocIfDottedAddedFieldDo
     addition.parse(BSON("sub.target" << true));
 
     // Should add the path if it doesn't exist.
-    auto result = addition.applyProjection(Document{});
+    auto result = addition.applyProjection(Document{}, {});
     auto expectedResult = Document{{"sub", Document{{"target", true}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace the second part of the path if that part already exists.
-    result = addition.applyProjection(Document{{"sub", "notADocument"_sd}});
+    result = addition.applyProjection(Document{{"sub", "notADocument"_sd}}, {});
     expectedResult = Document{{"sub", Document{{"target", true}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -528,7 +528,8 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AppliesDottedAdditionToEachElemen
                                                       Document{{"b", 1}},
                                                       Document{{"b", 1}, {"c", 2}},
                                                       vector<Value>{},
-                                                      {1, Document{{"c", 1}}}}}});
+                                                      {1, Document{{"c", 1}}}}}},
+                                           {});
     // Adds the field "b" to every object in the array. Recurses on non-empty nested arrays.
     auto expectedResult = Document{{"a",
                                     {Document{{"b", true}},
@@ -547,13 +548,13 @@ TEST(AddFieldsProjectionExecutorExecutionTest, CreatesNestedSubDocumentsAllTheWa
     addition.parse(BSON("a.b.c.d" << "computedVal"));
 
     // Should add the path if it doesn't exist.
-    auto result = addition.applyProjection(Document{});
+    auto result = addition.applyProjection(Document{}, {});
     auto expectedResult =
         Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"_sd}}}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace non-documents with documents.
-    result = addition.applyProjection(Document{{"a", Document{{"b", "other"_sd}}}});
+    result = addition.applyProjection(Document{{"a", Document{{"b", "other"_sd}}}}, {});
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -563,7 +564,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsSubFieldsOfId) {
     AddFieldsProjectionExecutor addition(expCtx);
     addition.parse(BSON("_id.X" << true << "_id.Z"
                                 << "NEW"));
-    auto result = addition.applyProjection(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}});
+    auto result = addition.applyProjection(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}}, {});
     auto expectedResult = Document{{"_id", Document{{"X", true}, {"Y", 2}, {"Z", "NEW"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -584,9 +585,11 @@ TEST(AddFieldsProjectionExecutorExecutionTest, ShouldAllowMixedNestedAndDottedFi
                                           << "Y"
                                           << "Z"
                                           << "Z")));
-    auto result = addition.applyProjection(Document{
-        {"a",
-         Document{{"b", "b"_sd}, {"c", "c"_sd}, {"d", "d"_sd}, {"e", "e"_sd}, {"f", "f"_sd}}}});
+    auto result = addition.applyProjection(
+        Document{
+            {"a",
+             Document{{"b", "b"_sd}, {"c", "c"_sd}, {"d", "d"_sd}, {"e", "e"_sd}, {"f", "f"_sd}}}},
+        {});
     auto expectedResult = Document{{"a",
                                     Document{{"b", true},
                                              {"c", true},
@@ -607,7 +610,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AddsNestedAddedFieldsInOrderSpeci
     addition.parse(BSON("b.d" << "FIRST"
                               << "b.c"
                               << "SECOND"));
-    auto result = addition.applyProjection(Document{});
+    auto result = addition.applyProjection(Document{}, {});
     auto expectedResult = Document{{"b", Document{{"d", "FIRST"_sd}, {"c", "SECOND"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -627,7 +630,7 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AlwaysKeepsMetadataFromOriginalDo
     inputDocBuilder.metadata().setTextScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
-    auto result = addition.applyProjection(inputDoc);
+    auto result = addition.applyProjection(inputDoc, {});
 
     MutableDocument expectedDoc(Document{{"a", true}});
     expectedDoc.copyMetaDataFrom(inputDoc);

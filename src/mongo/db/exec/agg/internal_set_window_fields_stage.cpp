@@ -173,7 +173,7 @@ DocumentSource::GetNextResult InternalSetWindowFieldsStage::doGetNext() {
             break;
     }
 
-    return _projExec->applyProjection(*curDoc);
+    return _projExec->applyProjection(*curDoc, {});
 }
 
 void InternalSetWindowFieldsStage::doDispose() {

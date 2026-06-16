@@ -31,12 +31,14 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
+
 /**
  * This class defines the minimal interface that every parser wishing to take advantage of
  * DocumentSourceSingleDocumentTransformation must implement.
@@ -58,7 +60,15 @@ public:
         kSetMetadata,
     };
     virtual ~TransformerInterface() = default;
-    virtual Document applyTransformation(const Document& input) const = 0;
+    /**
+     * Apply the transformation to 'input'. The optional 'ctx' parameter carries evaluation state
+     * (see EvaluationContext) and defaults to an empty context; when it holds a memory tracker,
+     * memory usage observed while evaluating any expressions involved in the transformation is
+     * accumulated against it. Implementations should forward 'ctx' when invoking
+     * Expression::evaluate().
+     */
+    virtual Document applyTransformation(const Document& input,
+                                         const EvaluationContext& ctx = {}) const = 0;
     virtual TransformerType getType() const = 0;
     virtual void optimize() = 0;
     virtual DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,

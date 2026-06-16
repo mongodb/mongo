@@ -221,10 +221,11 @@ void AddFieldsProjectionExecutor::parse(const BSONObj& spec) {
     }
 }
 
-Document AddFieldsProjectionExecutor::applyProjection(const Document& inputDoc) const {
+Document AddFieldsProjectionExecutor::applyProjection(const Document& inputDoc,
+                                                      const EvaluationContext& ctx) const {
     // The output doc is the same as the input doc, with the added fields.
     MutableDocument output(inputDoc);
-    _root->applyExpressions(inputDoc, &output);
+    _root->applyExpressions(inputDoc, &output, ctx);
 
     // Pass through the metadata.
     output.copyMetaDataFrom(inputDoc);

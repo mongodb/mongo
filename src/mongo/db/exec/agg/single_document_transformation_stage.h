@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/single_document_transformation_processor.h"
 #include "mongo/util/modules.h"
 
@@ -68,6 +69,10 @@ private:
     // lifetime of the stage.
     std::string _ownedStageName;
     std::shared_ptr<SingleDocumentTransformationProcessor> _transformationProcessor;
+
+    // Tracks memory used while evaluating the transformation expressions. Reports to the
+    // operation-wide tracker so all stages contribute to the operation memory total.
+    SimpleMemoryUsageTracker _memoryTracker;
 };
 }  // namespace agg
 }  // namespace exec

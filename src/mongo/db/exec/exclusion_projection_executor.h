@@ -136,7 +136,7 @@ private:
 public:
     using Base::Base;
 
-    Document applyToDocument(const Document& inputDoc) const final;
+    Document applyToDocument(const Document& inputDoc, const EvaluationContext& ctx) const final;
 
 protected:
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
@@ -208,8 +208,8 @@ public:
     /**
      * Exclude the fields specified.
      */
-    Document applyProjection(const Document& inputDoc) const final {
-        return _root->applyToDocument(inputDoc);
+    Document applyProjection(const Document& inputDoc, const EvaluationContext& ctx) const final {
+        return _root->applyToDocument(inputDoc, ctx);
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {

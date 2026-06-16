@@ -43,8 +43,11 @@ class MONGO_MOD_PUBLIC SingleDocumentTransformationProcessor {
 public:
     SingleDocumentTransformationProcessor(std::unique_ptr<TransformerInterface> parsedTransform);
 
-    // Processes the given document and returns the transformed document.
-    Document process(const Document& input) const;
+    // Processes the given document and returns the transformed document. The optional 'ctx'
+    // parameter carries evaluation state (see EvaluationContext) and defaults to an empty context;
+    // when it holds a memory tracker, memory usage observed while evaluating any expressions
+    // involved in the transformation is accumulated against it.
+    Document process(const Document& input, const EvaluationContext& ctx = {}) const;
 
     const auto& getTransformer() const {
         return *_parsedTransform;

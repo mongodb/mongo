@@ -57,7 +57,7 @@ bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor
         field, false /* precomputeHashes */, !skipValidation /* validateFieldNames */};
     MutableDocument md;
     md.setNestedField(fp, Value{1.0});
-    auto output = executor->applyTransformation(md.freeze());
+    auto output = executor->applyTransformation(md.freeze(), {});
     return !output.getNestedField(fp).missing();
 }
 

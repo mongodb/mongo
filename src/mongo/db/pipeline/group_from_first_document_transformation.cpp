@@ -36,11 +36,13 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-Document GroupFromFirstDocumentTransformation::applyTransformation(const Document& input) const {
+Document GroupFromFirstDocumentTransformation::applyTransformation(
+    const Document& input, const EvaluationContext& ctx) const {
     MutableDocument output(_accumulatorExprs.size());
 
     for (auto&& expr : _accumulatorExprs) {
-        auto value = expr.second->evaluate(input, &expr.second->getExpressionContext()->variables);
+        auto value =
+            expr.second->evaluate(input, &expr.second->getExpressionContext()->variables, ctx);
         output.addField(expr.first, value.missing() ? Value(BSONNULL) : std::move(value));
     }
 

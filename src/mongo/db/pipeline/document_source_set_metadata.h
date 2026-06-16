@@ -56,7 +56,7 @@ public:
         return _metaType;
     }
 
-    Document applyTransformation(const Document& input) const final;
+    Document applyTransformation(const Document& input, const EvaluationContext& ctx) const final;
 
     void optimize() final;
 

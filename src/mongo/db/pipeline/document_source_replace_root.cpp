@@ -60,9 +60,10 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-Document ReplaceRootTransformation::applyTransformation(const Document& input) const {
+Document ReplaceRootTransformation::applyTransformation(const Document& input,
+                                                        const EvaluationContext& ctx) const {
     // Extract subdocument in the form of a Value.
-    Value newRoot = _newRoot->evaluate(input, &_expCtx->variables);
+    Value newRoot = _newRoot->evaluate(input, &_expCtx->variables, ctx);
     // The newRoot expression, if it exists, must evaluate to an object.
     uassert(40228,
             fmt::format(kErrorTemplate.data(),

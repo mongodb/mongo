@@ -385,7 +385,7 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         postElems};
 
     keyEncoder.traverseWildcard(
-        _proj.exec()->applyTransformation(Document{inputDoc}).toBson(), false, &rootPath);
+        _proj.exec()->applyTransformation(Document{inputDoc}, {}).toBson(), false, &rootPath);
 
     // If no key is generated for this index at this point, that means the document doesn't have any
     // field that is indexed by the wildcard field. We should still add index keys for this

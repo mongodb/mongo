@@ -199,22 +199,22 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeTopLevelField) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << false));
 
     // More than one field in document.
-    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}});
+    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}}, {});
     auto expectedResult = Document{{"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is the only field in the document.
-    result = exclusion->applyTransformation(Document{{"a", 1}});
+    result = exclusion->applyTransformation(Document{{"a", 1}}, {});
     expectedResult = Document{};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the document.
-    result = exclusion->applyTransformation(Document{{"c", 1}});
+    result = exclusion->applyTransformation(Document{{"c", 1}}, {});
     expectedResult = Document{{"c", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in the document.
-    result = exclusion->applyTransformation(Document{});
+    result = exclusion->applyTransformation(Document{}, {});
     expectedResult = Document{};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -223,8 +223,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON(
         "a" << Value(0) << "b" << Value(0LL) << "c" << Value(0.0) << "d" << Value(Decimal128(0))));
 
-    auto result =
-        exclusion->applyTransformation(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}});
+    auto result = exclusion->applyTransformation(
+        Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}}, {});
     auto expectedResult = Document{{"_id", "ID"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -232,14 +232,15 @@ TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
 TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("second" << false));
     auto result =
-        exclusion->applyTransformation(Document{{"first", 0}, {"second", 1}, {"third", 2}});
+        exclusion->applyTransformation(Document{{"first", 0}, {"second", 1}, {"third", 2}}, {});
     auto expectedResult = Document{{"first", 0}, {"third", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << false));
-    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    auto result =
+        exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
     auto expectedResult = Document{{"b", 2}, {"_id", "ID"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -247,14 +248,16 @@ TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(BSON("a" << false << "_id" << false));
-    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    auto result =
+        exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
     auto expectedResult = Document{{"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdAndKeepAllOtherFields) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("_id" << false));
-    auto result = exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    auto result =
+        exclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}}, {});
     auto expectedResult = Document{{"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -267,7 +270,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeSubFieldsOfId) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(
         BSON("_id.x" << false << "_id" << BSON("y" << false)));
     auto result = exclusion->applyTransformation(
-        Document{{"_id", Document{{"x", 1}, {"y", 2}, {"z", 3}}}, {"a", 1}});
+        Document{{"_id", Document{{"x", 1}, {"y", 2}, {"z", 3}}}, {"a", 1}}, {});
     auto expectedResult = Document{{"_id", Document{{"z", 3}}}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -276,22 +279,22 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeSimpleDottedFieldFromSubDoc)
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a.b" << false));
 
     // More than one field in sub document.
-    auto result = exclusion->applyTransformation(Document{{"a", Document{{"b", 1}, {"c", 2}}}});
+    auto result = exclusion->applyTransformation(Document{{"a", Document{{"b", 1}, {"c", 2}}}}, {});
     auto expectedResult = Document{{"a", Document{{"c", 2}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is the only field in the sub document.
-    result = exclusion->applyTransformation(Document{{"a", Document{{"b", 1}}}});
+    result = exclusion->applyTransformation(Document{{"a", Document{{"b", 1}}}}, {});
     expectedResult = Document{{"a", Document{}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the sub document.
-    result = exclusion->applyTransformation(Document{{"a", Document{{"c", 1}}}});
+    result = exclusion->applyTransformation(Document{{"a", Document{{"c", 1}}}}, {});
     expectedResult = Document{{"a", Document{{"c", 1}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in sub document.
-    result = exclusion->applyTransformation(Document{{"a", Document{}}});
+    result = exclusion->applyTransformation(Document{{"a", Document{}}}, {});
     expectedResult = Document{{"a", Document{}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -300,12 +303,12 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFiel
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("sub.target" << false));
 
     // Should not add the path if it doesn't exist.
-    auto result = exclusion->applyTransformation(Document{});
+    auto result = exclusion->applyTransformation(Document{}, {});
     auto expectedResult = Document{};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should not replace non-documents with documents.
-    result = exclusion->applyTransformation(Document{{"sub", "notADocument"_sd}});
+    result = exclusion->applyTransformation(Document{{"sub", "notADocument"_sd}}, {});
     expectedResult = Document{{"sub", "notADocument"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -319,7 +322,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldApplyDottedExclusionToEachElementIn
                                                             Document{{"b", 1}},
                                                             Document{{"b", 1}, {"c", 2}},
                                                             vector<Value>{},
-                                                            {1, Document{{"c", 1}, {"b", 1}}}}}});
+                                                            {1, Document{{"c", 1}, {"b", 1}}}}}},
+                                                 {});
     auto expectedResult = Document{{"a",
                                     {1,
                                      Document{},
@@ -335,7 +339,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(
         BSON("a.b" << false << "a.c" << false << "a" << BSON("d" << false << "e" << false)));
     auto result = exclusion->applyTransformation(
-        Document{{"a", Document{{"b", 1}, {"c", 2}, {"d", 3}, {"e", 4}, {"f", 5}}}});
+        Document{{"a", Document{{"b", 1}, {"c", 2}, {"d", 3}, {"e", 4}, {"f", 5}}}}, {});
     auto expectedResult = Document{{"a", Document{{"f", 5}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -348,7 +352,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
     inputDocBuilder.metadata().setTextScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
-    auto result = exclusion->applyTransformation(inputDoc);
+    auto result = exclusion->applyTransformation(inputDoc, {});
 
     MutableDocument expectedDoc(Document{{"_id", "ID"_sd}});
     expectedDoc.copyMetaDataFrom(inputDoc);
@@ -389,7 +393,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     inputDocBuilder.metadata().setSearchRootDocumentId(Value{10.0});
     Document inputDoc = inputDocBuilder.freeze();
 
-    auto result = exclusion->applyTransformation(inputDoc);
+    auto result = exclusion->applyTransformation(inputDoc, {});
 
     ASSERT_DOCUMENT_EQ(result,
                        Document{fromjson("{b: 2, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
@@ -491,7 +495,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
 TEST(ExclusionProjectionExecutionTest, ShouldIncludeIdByDefault) {
     auto exclusion = makeExclusionProjectionWithDefaultPolicies(BSON("a" << false));
 
-    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}});
+    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}}, {});
     auto expectedResult = Document{{"_id", 2}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -500,7 +504,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldIncludeIdByDefault) {
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdWithExplicitPolicy) {
     auto exclusion = makeExclusionProjectionWithDefaultIdExclusion(BSON("a" << false));
 
-    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}});
+    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}}, {});
     auto expectedResult = Document{};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -510,7 +514,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldOverrideIncludePolicyWithExplicitEx
     auto exclusion =
         makeExclusionProjectionWithDefaultPolicies(BSON("_id" << false << "a" << false));
 
-    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}});
+    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}}, {});
     auto expectedResult = Document{};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -520,7 +524,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldOverrideExcludePolicyWithExplicitIn
     auto exclusion =
         makeExclusionProjectionWithDefaultIdExclusion(BSON("_id" << true << "a" << false));
 
-    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}, {"b", 4}});
+    auto result = exclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}, {"b", 4}}, {});
     auto expectedResult = Document{{"_id", 2}, {"b", 4}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -531,7 +535,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowExclusionOfIdSubfieldWithDefau
         makeExclusionProjectionWithDefaultPolicies(BSON("_id.id1" << false << "a" << false));
 
     auto result = exclusion->applyTransformation(
-        Document{{"_id", Document{{"id1", 1}, {"id2", 2}}}, {"a", 3}, {"b", 4}});
+        Document{{"_id", Document{{"id1", 1}, {"id2", 2}}}, {"a", 3}, {"b", 4}}, {});
     auto expectedResult = Document{{"_id", Document{{"id2", 2}}}, {"b", 4}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -542,7 +546,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowExclusionOfIdSubfieldWithDefau
         makeExclusionProjectionWithDefaultIdExclusion(BSON("_id.id1" << false << "a" << false));
 
     auto result = exclusion->applyTransformation(
-        Document{{"_id", Document{{"id1", 1}, {"id2", 2}}}, {"a", 3}, {"b", 4}});
+        Document{{"_id", Document{{"id1", 1}, {"id2", 2}}}, {"a", 3}, {"b", 4}}, {});
     auto expectedResult = Document{{"_id", Document{{"id2", 2}}}, {"b", 4}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -553,7 +557,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowLimitedDollarPrefixedFields) {
         BSON("$id" << false << "$db" << false << "$ref" << false << "$sortKey" << false));
 
     auto result = exclusion->applyTransformation(
-        Document{{"$id", 5}, {"$db", 3}, {"$ref", 4}, {"$sortKey", 5}, {"someField", 6}});
+        Document{{"$id", 5}, {"$db", 3}, {"$ref", 4}, {"$sortKey", 5}, {"someField", 6}}, {});
     auto expectedResult = Document{{"someField", 6}};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -571,7 +575,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldRecurseNestedArraysByDefault) {
                                                            {1,
                                                             Document{{"b", 2}, {"c", 3}},
                                                             vector{Document{{"b", 4}, {"c", 5}}},
-                                                            Document{{"d", 6}}}}});
+                                                            Document{{"d", 6}}}}},
+                                                 {});
 
     auto expectedResult =
         Document{{"a", {1, Document{{"c", 3}}, vector{Document{{"c", 5}}}, Document{{"d", 6}}}}};
@@ -588,7 +593,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotRecurseNestedArraysForNoRecurseP
                                                            {1,
                                                             Document{{"b", 2}, {"c", 3}},
                                                             vector{Document{{"b", 4}, {"c", 5}}},
-                                                            Document{{"d", 6}}}}});
+                                                            Document{{"d", 6}}}}},
+                                                 {});
 
     auto expectedResult = Document{
         {"a", {1, Document{{"c", 3}}, vector{Document{{"b", 4}, {"c", 5}}}, Document{{"d", 6}}}}};
@@ -606,7 +612,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotRetainNestedArraysIfNoRecursionN
                                      vector{Document{{"b", 4}, {"c", 5}}},
                                      Document{{"d", 6}}}}};
 
-    auto result = exclusion->applyTransformation(inputDoc);
+    auto result = exclusion->applyTransformation(inputDoc, {});
     const auto expectedResult = Document{};
 
     ASSERT_DOCUMENT_EQ(result, expectedResult);

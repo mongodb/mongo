@@ -48,9 +48,10 @@ SetMetadataTransformation::SetMetadataTransformation(
     DocumentMetadataFields::MetaType metaType)
     : _expCtx(expCtx), _metadataExpression(std::move(metadataExpression)), _metaType(metaType) {}
 
-Document SetMetadataTransformation::applyTransformation(const Document& input) const {
+Document SetMetadataTransformation::applyTransformation(const Document& input,
+                                                        const EvaluationContext& ctx) const {
     // Compute new metadata.
-    Value metaVal = _metadataExpression->evaluate(input, &_expCtx->variables);
+    Value metaVal = _metadataExpression->evaluate(input, &_expCtx->variables, ctx);
 
     // The document must be mutable to modify metadata.
     MutableDocument newDoc(input);

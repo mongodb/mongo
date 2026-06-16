@@ -86,7 +86,8 @@ TEST(ProjectionNodeHashReuse, InclusionProjectionRetainsCorrectFields) {
     auto executor =
         makeInclusionExecutor(expCtx, BSON("_id" << 0 << "a" << 1 << "b" << 1 << "c" << 1));
 
-    auto result = executor->applyTransformation(Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}});
+    auto result =
+        executor->applyTransformation(Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}}, {});
     ASSERT_DOCUMENT_EQ(result, (Document{{"a", 1}, {"b", 2}, {"c", 3}}));
 }
 
@@ -96,7 +97,7 @@ TEST(ProjectionNodeHashReuse, InclusionProjectionExcludesNonProjectedFields) {
     auto executor = makeInclusionExecutor(expCtx, BSON("_id" << 0 << "x" << 1));
 
     auto result = executor->applyTransformation(
-        Document{{"x", 10}, {"y", 20}, {"z", 30}, {"w", 40}, {"v", 50}});
+        Document{{"x", 10}, {"y", 20}, {"z", 30}, {"w", 40}, {"v", 50}}, {});
     ASSERT_DOCUMENT_EQ(result, (Document{{"x", 10}}));
 }
 
@@ -105,8 +106,8 @@ TEST(ProjectionNodeHashReuse, ExclusionProjectionRemovesSpecifiedFields) {
     auto expCtx = makeExpCtx();
     auto executor = makeExclusionExecutor(expCtx, BSON("d" << 0 << "e" << 0));
 
-    auto result =
-        executor->applyTransformation(Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"e", 5}});
+    auto result = executor->applyTransformation(
+        Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"e", 5}}, {});
     ASSERT_DOCUMENT_EQ(result, (Document{{"a", 1}, {"b", 2}, {"c", 3}}));
 }
 
@@ -159,7 +160,7 @@ TEST(ProjectionNodeMaxFieldsEarlyExit, InclusionProjectionOnWideDocument) {
 
     // Document has many extra fields; the projection should only retain a and b.
     auto result = executor->applyTransformation(
-        Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"e", 5}, {"f", 6}, {"g", 7}});
+        Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"e", 5}, {"f", 6}, {"g", 7}}, {});
     ASSERT_DOCUMENT_EQ(result, (Document{{"a", 1}, {"b", 2}}));
 }
 
@@ -170,7 +171,7 @@ TEST(ProjectionNodeMaxFieldsEarlyExit, InclusionProjectionRetainsAllProjectedFie
         expCtx, BSON("_id" << 0 << "a" << 1 << "b" << 1 << "c" << 1 << "d" << 1));
 
     auto result = executor->applyTransformation(
-        Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"extra1", 5}, {"extra2", 6}});
+        Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}, {"extra1", 5}, {"extra2", 6}}, {});
     ASSERT_DOCUMENT_EQ(result, (Document{{"a", 1}, {"b", 2}, {"c", 3}, {"d", 4}}));
 }
 
@@ -179,7 +180,7 @@ TEST(ProjectionNodeMaxFieldsEarlyExit, InclusionProjectionWithMissingFields) {
     auto expCtx = makeExpCtx();
     auto executor = makeInclusionExecutor(expCtx, BSON("_id" << 0 << "a" << 1 << "missing" << 1));
 
-    auto result = executor->applyTransformation(Document{{"a", 1}, {"b", 2}, {"c", 3}});
+    auto result = executor->applyTransformation(Document{{"a", 1}, {"b", 2}, {"c", 3}}, {});
     ASSERT_DOCUMENT_EQ(result, (Document{{"a", 1}}));
 }
 
@@ -196,12 +197,12 @@ TEST(ProjectionNodePositionBasedAccess, NestedComputedFieldFastPath) {
 
     // Fallback path (no optimize).
     auto execFallback = AddFieldsProjectionExecutor::create(expCtx, spec);
-    auto resultFallback = execFallback->applyProjection(inputDoc);
+    auto resultFallback = execFallback->applyProjection(inputDoc, {});
 
     // Fast path (with optimize, builds _orderedAdditions with child entries).
     auto execFast = AddFieldsProjectionExecutor::create(expCtx, spec);
     execFast->optimize();
-    auto resultFast = execFast->applyProjection(inputDoc);
+    auto resultFast = execFast->applyProjection(inputDoc, {});
 
     ASSERT_DOCUMENT_EQ(resultFallback, resultFast);
     // The inner field should be set to 100 (from $src).
@@ -215,11 +216,11 @@ TEST(ProjectionNodePositionBasedAccess, NestedComputedFieldOnMissingParent) {
     const Document inputDoc{{"x", 7}};
 
     auto execFallback = AddFieldsProjectionExecutor::create(expCtx, spec);
-    auto resultFallback = execFallback->applyProjection(inputDoc);
+    auto resultFallback = execFallback->applyProjection(inputDoc, {});
 
     auto execFast = AddFieldsProjectionExecutor::create(expCtx, spec);
     execFast->optimize();
-    auto resultFast = execFast->applyProjection(inputDoc);
+    auto resultFast = execFast->applyProjection(inputDoc, {});
 
     ASSERT_DOCUMENT_EQ(resultFallback, resultFast);
     ASSERT_VALUE_EQ(resultFast["newNested"]["value"], Value{7});
@@ -235,11 +236,11 @@ TEST(ProjectionNodePositionBasedAccess, MultipleNestedComputedFieldsSiblings) {
     const Document inputDoc{{"a", 10}, {"b", 20}};
 
     auto execFallback = AddFieldsProjectionExecutor::create(expCtx, spec);
-    auto resultFallback = execFallback->applyProjection(inputDoc);
+    auto resultFallback = execFallback->applyProjection(inputDoc, {});
 
     auto execFast = AddFieldsProjectionExecutor::create(expCtx, spec);
     execFast->optimize();
-    auto resultFast = execFast->applyProjection(inputDoc);
+    auto resultFast = execFast->applyProjection(inputDoc, {});
 
     ASSERT_DOCUMENT_EQ(resultFallback, resultFast);
     ASSERT_VALUE_EQ(resultFast["obj"]["p"], Value{10});

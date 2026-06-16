@@ -188,7 +188,7 @@ private:
 public:
     using Base::Base;
 
-    Document applyToDocument(const Document& inputDoc) const final;
+    Document applyToDocument(const Document& inputDoc, const EvaluationContext& ctx) const final;
 
 protected:
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const final {
@@ -324,8 +324,8 @@ public:
      * Arrays will be traversed, with any dotted/nested exclusions or computed fields applied to
      * each element in the array.
      */
-    Document applyProjection(const Document& inputDoc) const final {
-        return _root->applyToDocument(inputDoc);
+    Document applyProjection(const Document& inputDoc, const EvaluationContext& ctx) const final {
+        return _root->applyToDocument(inputDoc, ctx);
     }
 
     /**

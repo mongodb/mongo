@@ -108,13 +108,18 @@ public:
 
     /**
      * Applies all projections and expressions, if applicable, and returns the resulting document.
+     * The 'ctx' parameter carries evaluation state (see EvaluationContext); when it holds a memory
+     * tracker, memory usage observed while evaluating any expressions in the projection is
+     * accumulated against it.
      */
-    virtual Document applyToDocument(const Document& inputDoc) const;
+    virtual Document applyToDocument(const Document& inputDoc, const EvaluationContext& ctx) const;
 
     /**
      * Recursively evaluates all expressions in the projection, writing the results to 'outputDoc'.
      */
-    void applyExpressions(const Document& root, MutableDocument* outputDoc) const;
+    void applyExpressions(const Document& root,
+                          MutableDocument* outputDoc,
+                          const EvaluationContext& ctx) const;
 
     /**
      * Reports dependencies on any fields that are required by this projection.
@@ -261,7 +266,9 @@ private:
 
     // Helpers for the 'applyProjections' and 'applyExpressions' methods. Applies the transformation
     // recursively to each element of any arrays, and ensures primitives are handled appropriately.
-    Value applyExpressionsToValue(const Document& root, Value inputVal) const;
+    Value applyExpressionsToValue(const Document& root,
+                                  Value inputVal,
+                                  const EvaluationContext& ctx) const;
     Value applyProjectionsToValue(Value inputVal) const;
 
     // Adds a new ProjectionNode as a child. 'field' cannot be dotted.

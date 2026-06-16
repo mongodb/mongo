@@ -43,12 +43,13 @@
 namespace mongo::projection_executor {
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;
 
-Document FastPathEligibleInclusionNode::applyToDocument(const Document& inputDoc) const {
+Document FastPathEligibleInclusionNode::applyToDocument(const Document& inputDoc,
+                                                        const EvaluationContext& ctx) const {
     if (auto outputDoc = tryApplyFastPathProjection(inputDoc)) {
         return outputDoc.get();
     }
     // A fast-path projection is not feasible, fall back to default implementation.
-    return InclusionNode::applyToDocument(inputDoc);
+    return InclusionNode::applyToDocument(inputDoc, ctx);
 }
 
 namespace {

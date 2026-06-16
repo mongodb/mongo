@@ -220,9 +220,10 @@ void ProjectionStageDefault::transform(WorkingSetMember* member) const {
     // has been applied.
     auto projected = _requestedMetadata.any()
         ? attachMetadataToWorkingSetMember(
-              _executor->applyTransformation(attachMetadataToDocument(std::move(input), member)),
+              _executor->applyTransformation(attachMetadataToDocument(std::move(input), member),
+                                             {}),
               member)
-        : _executor->applyTransformation(input);
+        : _executor->applyTransformation(input, {});
 
     // An exclusion projection can return an unowned object since the output document is
     // constructed from the input one backed by BSON which is owned by the storage system, so we

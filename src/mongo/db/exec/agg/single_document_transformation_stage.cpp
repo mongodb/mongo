@@ -30,7 +30,9 @@
 #include "mongo/db/exec/agg/single_document_transformation_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 
 namespace mongo {
 
@@ -69,7 +71,9 @@ SingleDocumentTransformationStage::SingleDocumentTransformationStage(
     const std::shared_ptr<SingleDocumentTransformationProcessor>& transformationProcessor)
     : Stage(stageName, pExpCtx),
       _ownedStageName(stageName),
-      _transformationProcessor(transformationProcessor) {
+      _transformationProcessor(transformationProcessor),
+      _memoryTracker(
+          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     _commonStats.stageTypeStr = _ownedStageName;
 }
 
@@ -85,8 +89,14 @@ GetNextResult SingleDocumentTransformationStage::doGetNext() {
         return input;
     }
 
-    // Apply and return the document with added fields.
-    return _transformationProcessor->process(input.releaseDocument());
+    // Apply and return the document with added fields. Only charge expression evaluation against
+    // the memory tracker when both the stage-level and expression-level memory tracking feature
+    // flags are enabled.
+    const bool trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
+    return _transformationProcessor->process(
+        input.releaseDocument(),
+        trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{});
 }
 
 void SingleDocumentTransformationStage::doDispose() {
