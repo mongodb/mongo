@@ -27,25 +27,45 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/otel/metrics/metrics_settings.h"
 
-#include "mongo/otel/utils/bson_to_http_headers.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/bson/json.h"
+#include "mongo/otel/metrics/metrics_settings_gen.h"
 
-#include <string>
-#include <vector>
 
-namespace mongo::otel::traces {
+namespace mongo::otel::metrics {
 
-/**
- * Returns the HTTP export headers parsed from openTelemetryTracingHttpExportHeaders.
- * Each key maps to a list of values to support duplicate header names.
- */
-[[nodiscard]] const HttpHeaderMap& getTracingHttpExportHeaders();
+namespace {
+HttpHeaderMap& httpExportHeaders() {
+    static HttpHeaderMap headers;
+    return headers;
+}
+}  // namespace
 
-/**
- * Returns the OTel resource attributes applied to all exported spans.
- */
-[[nodiscard]] const stdx::unordered_map<std::string, std::string>& getTracingResourceAttributes();
+const HttpHeaderMap& getMetricsHttpExportHeaders() {
+    return httpExportHeaders();
+}
 
-}  // namespace mongo::otel::traces
+Status OpenTelemetryMetricsHttpExportHeaders::set(const BSONElement& newValueElement,
+                                                  const boost::optional<TenantId>&) {
+    auto new_headers = parseHttpHeadersFromBson(newValueElement);
+    if (!new_headers.isOK()) {
+        // Status is refcounted so this is "cheap" (though a move API would be great)
+        return new_headers.getStatus();
+    }
+
+    httpExportHeaders() = std::move(new_headers.getValue());
+    return Status::OK();
+}
+
+Status OpenTelemetryMetricsHttpExportHeaders::setFromString(
+    StringData s, const boost::optional<TenantId>& tenant) {
+    try {
+        auto b = BSON("v" << fromjson(s));
+        return set(b.firstElement(), tenant);
+    } catch (std::exception& e) {
+        return Status(ErrorCodes::BadValue,
+                      fmt::format("Failed to convert string to BSON object: {}", e.what()));
+    }
+}
+}  // namespace mongo::otel::metrics

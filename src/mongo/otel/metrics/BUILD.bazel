@@ -18,11 +18,13 @@ mongo_cc_library(
     name = "metrics_initialization",
     srcs = [
         "metrics_initialization.cpp",
+        "metrics_settings.cpp",
         "metrics_settings_gen",
     ],
     deps = [
         ":otel_metrics_service",
         "//src/mongo/db:server_base",
+        "//src/mongo/otel/utils:bson_to_http_headers",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -61,6 +63,17 @@ mongo_cc_unit_test(
         ":in_memory_metrics_exporter",
         ":metrics_initialization",
         ":metrics_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "metrics_settings_test",
+    srcs = [
+        "metrics_settings_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":metrics_initialization",
     ],
 )
 

@@ -36,6 +36,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metrics_prometheus_file_exporter.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/metrics_settings.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 
 #include <chrono>
@@ -92,6 +93,11 @@ Status initializeHttp(const std::string& endpoint, const std::string& compressio
     otlp::OtlpHttpMetricExporterOptions hmeOpts;
     hmeOpts.url = endpoint;
     hmeOpts.compression = compression;
+    for (const auto& [key, vals] : getMetricsHttpExportHeaders()) {
+        for (const auto& val : vals) {
+            hmeOpts.http_headers.emplace(key, val);
+        }
+    }
 
     auto exporter = otlp::OtlpHttpMetricExporterFactory::Create(hmeOpts);
 
@@ -245,6 +251,13 @@ Status initialize() {
             !prometheusExporterParamaterSet) {
             LOGV2(10500903, "Not initializing OpenTelemetry metrics");
             return Status::OK();
+        }
+
+        if (!httpEndpointParameterSet && !getMetricsHttpExportHeaders().empty()) {
+            LOGV2_WARNING(
+                12745900,
+                "openTelemetryMetricsHttpExportHeaders is set but will be ignored because "
+                "the HTTP exporter is not configured");
         }
 
         auto status = [&]() {

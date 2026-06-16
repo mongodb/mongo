@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/util/str.h"
 
@@ -40,7 +41,6 @@
 
 namespace mongo::otel::traces {
 namespace {
-using HttpHeaderMap = stdx::unordered_map<std::string, std::vector<std::string>>;
 using AttributeMap = stdx::unordered_map<std::string, std::string>;
 
 HttpHeaderMap& httpExportHeaders() {
@@ -63,49 +63,25 @@ const AttributeMap& getTracingResourceAttributes() {
 
 Status OpenTelemetryTracingHttpExportHeaders::set(const BSONElement& newValueElement,
                                                   const boost::optional<TenantId>&) {
-    if (newValueElement.type() != BSONType::object) {
-        return Status(ErrorCodes::BadValue,
-                      "openTelemetryTracingHttpExportHeaders must be a BSON document");
+    auto new_headers = parseHttpHeadersFromBson(newValueElement);
+    if (!new_headers.isOK()) {
+        // Status is refcounted so this is "cheap" (though a move API would be great)
+        return new_headers.getStatus();
     }
 
-    HttpHeaderMap headers;
-
-    for (const BSONElement& elem : newValueElement.Obj()) {
-        auto [it, inserted] = headers.try_emplace(elem.fieldName());
-        if (!inserted) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "openTelemetryTracingHttpExportHeaders contains duplicate key: '"
-                              << elem.fieldName() << "'");
-        }
-        std::vector<std::string>& values = it->second;
-        if (elem.type() == BSONType::string) {
-            values.push_back(elem.String());
-        } else if (elem.type() == BSONType::array) {
-            for (BSONElement& val : elem.Array()) {
-                if (val.type() != BSONType::string) {
-                    return Status(
-                        ErrorCodes::BadValue,
-                        "openTelemetryTracingHttpExportHeaders array values must be strings");
-                }
-                values.push_back(val.String());
-            }
-        } else {
-            return Status(ErrorCodes::BadValue,
-                          "openTelemetryTracingHttpExportHeaders values must be strings or arrays "
-                          "of strings");
-        }
-    }
-
-    httpExportHeaders() = std::move(headers);
+    httpExportHeaders() = std::move(new_headers.getValue());
     return Status::OK();
 }
 
-Status OpenTelemetryTracingHttpExportHeaders::setFromString(StringData,
-                                                            const boost::optional<TenantId>&) {
-    return Status(ErrorCodes::BadValue,
-                  "openTelemetryTracingHttpExportHeaders cannot be set via string; "
-                  "provide a BSON document");
+Status OpenTelemetryTracingHttpExportHeaders::setFromString(
+    StringData s, const boost::optional<TenantId>& tenant) {
+    try {
+        auto b = BSON("v" << fromjson(s));
+        return set(b.firstElement(), tenant);
+    } catch (std::exception& e) {
+        return Status(ErrorCodes::BadValue,
+                      fmt::format("Failed to convert string to BSON object: {}", e.what()));
+    }
 }
 
 void OpenTelemetryTracingResourceAttributes::append(OperationContext*,
