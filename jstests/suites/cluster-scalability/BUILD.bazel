@@ -37,7 +37,7 @@ resmoke_suite_test(
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 20,
+    shard_count = 40,
     tags = [
         "ci-release-critical",
         "jscore",
@@ -133,7 +133,7 @@ resmoke_suite_test(
         "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
     ] + CORE_DATA,
-    shard_count = 20,
+    shard_count = 50,
     tags = [
         "ci-release-critical",
         "common",
@@ -283,6 +283,26 @@ resmoke_suite_test(
         "jscore",
         "multi_stmt",
         "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_jscore_txns_without_snapshot",
+    config = "//buildscripts/resmokeconfig:suites/sharded_jscore_txns.yml",
+    resmoke_args = [
+        "--excludeWithAnyTags=uses_snapshot_read_concern",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "jscore",
+        "sharding",
+        "wo_snapshot",
     ],
     deps = [
         "//src/mongo/db:mongod",
