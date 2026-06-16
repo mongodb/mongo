@@ -81,3 +81,9 @@ ff6b2194e3617a338d83597d96710b1b92a18940
 
 # SERVER-105050: IncludeBlocks: Regroup for clang-format
 5abd171fa9d539578d5f1d3d4417a4ca4606c078
+
+# SERVER-108478: JS formatted by prettier
+6c8f6aded47f260aa4f7c231b17dae3302cb1e04
+
+# SERVER-127993: Set JS line width to 100
+cb41b1a4790cc38c85f7eb2c9581a2e7eed9fc12
