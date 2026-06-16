@@ -8,102 +8,104 @@
  * @tags: [
  *  featureFlagExtensionsAPI,
  *  featureFlagExtensionsInsideHybridSearch,
- *  # TODO SERVER-128454: drop when sharded-aware scenarios are added.
- *  assumes_unsharded_collection,
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("$_internalDocumentResultsAndMetadata basic document-only behavior", function () {
     let coll;
+    let nShards;
 
     before(function () {
         coll = db[jsTestName()];
         assertDropCollection(db, coll.getName());
         assert.commandWorked(coll.insertOne({placeholder: true}));
+        nShards = FixtureHelpers.numberOfShardsForCollection(coll);
     });
 
-    it("returns 5 documents in source-defined order", function () {
+    it("returns all docs from every shard", function () {
         const result = coll.aggregate([{$extensionMultiStream: {numDocs: 5}}]).toArray();
-        assert.docEq(
-            [
-                {_id: 0, score: 5, name: "doc_0"},
-                {_id: 1, score: 4, name: "doc_1"},
-                {_id: 2, score: 3, name: "doc_2"},
-                {_id: 3, score: 2, name: "doc_3"},
-                {_id: 4, score: 1, name: "doc_4"},
-            ],
-            result,
-            {result},
-        );
+        const perShardDocs = [
+            {_id: 0, score: 5, name: "doc_0"},
+            {_id: 1, score: 4, name: "doc_1"},
+            {_id: 2, score: 3, name: "doc_2"},
+            {_id: 3, score: 2, name: "doc_3"},
+            {_id: 4, score: 1, name: "doc_4"},
+        ];
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
     });
 
     it("returns empty result set when source produces 0 documents", function () {
         const result = coll.aggregate([{$extensionMultiStream: {numDocs: 0}}]).toArray();
-        assert.eq(result.length, 0, {result});
+        assert.eq(result, [], {result});
     });
 
     it("filters documents with a downstream $match", function () {
         const result = coll
             .aggregate([{$extensionMultiStream: {numDocs: 5}}, {$match: {score: {$gt: 3}}}])
             .toArray();
-        assert.docEq(
-            [
-                {_id: 0, score: 5, name: "doc_0"},
-                {_id: 1, score: 4, name: "doc_1"},
-            ],
-            result,
-            {result},
-        );
+        const perShardDocs = [
+            {_id: 0, score: 5, name: "doc_0"},
+            {_id: 1, score: 4, name: "doc_1"},
+        ];
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
     });
 
     it("projects fields correctly with a downstream $project", function () {
         const result = coll
             .aggregate([{$extensionMultiStream: {numDocs: 3}}, {$project: {name: 1, score: 1}}])
             .toArray();
-        assert.docEq(
-            [
-                {_id: 0, score: 3, name: "doc_0"},
-                {_id: 1, score: 2, name: "doc_1"},
-                {_id: 2, score: 1, name: "doc_2"},
-            ],
-            result,
-            {result},
-        );
+        const perShardDocs = [
+            {_id: 0, score: 3, name: "doc_0"},
+            {_id: 1, score: 2, name: "doc_1"},
+            {_id: 2, score: 1, name: "doc_2"},
+        ];
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
     });
 
     it("re-sorts documents with a downstream $sort", function () {
         const result = coll
             .aggregate([{$extensionMultiStream: {numDocs: 5}}, {$sort: {name: 1}}])
             .toArray();
-        assert.eq(result.length, 5, {result});
-        for (let i = 0; i < result.length - 1; i++) {
-            assert.lte(result[i].name, result[i + 1].name, {result});
-        }
+        const perShardDocs = [
+            {_id: 0, score: 5, name: "doc_0"},
+            {_id: 1, score: 4, name: "doc_1"},
+            {_id: 2, score: 3, name: "doc_2"},
+            {_id: 3, score: 2, name: "doc_3"},
+            {_id: 4, score: 1, name: "doc_4"},
+        ];
+        // After $sort, every per-shard doc appears nShards times.
+        const expected = perShardDocs.flatMap((d) => Array(nShards).fill(d));
+        assert.eq(result, expected, {result, nShards});
     });
 
     it("returns all documents across getMore batches when source produces >101 docs", function () {
         const numDocs = 150;
         const result = coll.aggregate([{$extensionMultiStream: {numDocs}}]).toArray();
-        assert.eq(result.length, numDocs, {result});
-        for (const [i, doc] of result.entries()) {
-            assert.eq(doc._id, i, {result});
-        }
+        const perShardDocs = Array.from({length: numDocs}, (_, i) => ({
+            _id: i,
+            score: numDocs - i,
+            name: `doc_${i}`,
+        }));
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
     });
 
     it("preserves user-owned _streamType field in output documents", function () {
         const result = coll
             .aggregate([{$extensionMultiStream: {numDocs: 3, addStreamTypeField: true}}])
             .toArray();
-        assert.docEq(
-            [
-                {_id: 0, score: 3, name: "doc_0", _streamType: -1},
-                {_id: 1, score: 2, name: "doc_1", _streamType: -1},
-                {_id: 2, score: 1, name: "doc_2", _streamType: -1},
-            ],
-            result,
-            {result},
-        );
+        const perShardDocs = [
+            {_id: 0, score: 3, name: "doc_0", _streamType: -1},
+            {_id: 1, score: 2, name: "doc_1", _streamType: -1},
+            {_id: 2, score: 1, name: "doc_2", _streamType: -1},
+        ];
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
     });
 });
