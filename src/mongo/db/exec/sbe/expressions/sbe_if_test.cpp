@@ -44,8 +44,8 @@ namespace mongo::sbe {
 
 class SBEIfTest : public GoldenEExpressionTestFixture {
 protected:
-    std::vector<TypedValue> boolTestValues = {makeNothing(), makeBool(false), makeBool(true)};
-    ValueVectorGuard boolTestValuesGuard{boolTestValues};
+    std::vector<value::TagValueOwned> boolTestValues =
+        makeOwnedVector({makeNothing(), makeBool(false), makeBool(true)});
 };
 
 TEST_F(SBEIfTest, SimpleIf) {
@@ -64,8 +64,8 @@ TEST_F(SBEIfTest, SimpleIf) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues) {
-        condAccessor.reset(cond.first, cond.second);
+    for (const auto& cond : boolTestValues) {
+        condAccessor.reset(cond.tag(), cond.value());
         executeAndPrintVariation(os, *compiledExpr);
     }
 }
@@ -90,8 +90,8 @@ TEST_F(SBEIfTest, NestedIfCond) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues) {
-        condAccessor.reset(cond.first, cond.second);
+    for (const auto& cond : boolTestValues) {
+        condAccessor.reset(cond.tag(), cond.value());
         executeAndPrintVariation(os, *compiledExpr);
     }
 }
@@ -118,10 +118,10 @@ TEST_F(SBEIfTest, NestedIfThen) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues)
-        for (auto cond2 : boolTestValues) {
-            condAccessor.reset(cond.first, cond.second);
-            cond2Accessor.reset(cond2.first, cond2.second);
+    for (const auto& cond : boolTestValues)
+        for (const auto& cond2 : boolTestValues) {
+            condAccessor.reset(cond.tag(), cond.value());
+            cond2Accessor.reset(cond2.tag(), cond2.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
 }
@@ -148,10 +148,10 @@ TEST_F(SBEIfTest, NestedIfElse) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues)
-        for (auto cond2 : boolTestValues) {
-            condAccessor.reset(cond.first, cond.second);
-            cond2Accessor.reset(cond2.first, cond2.second);
+    for (const auto& cond : boolTestValues)
+        for (const auto& cond2 : boolTestValues) {
+            condAccessor.reset(cond.tag(), cond.value());
+            cond2Accessor.reset(cond2.tag(), cond2.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
 }
@@ -178,10 +178,10 @@ TEST_F(SBEIfTest, IfWithLogicAnd) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues)
-        for (auto cond2 : boolTestValues) {
-            condAccessor.reset(cond.first, cond.second);
-            cond2Accessor.reset(cond2.first, cond2.second);
+    for (const auto& cond : boolTestValues)
+        for (const auto& cond2 : boolTestValues) {
+            condAccessor.reset(cond.tag(), cond.value());
+            cond2Accessor.reset(cond2.tag(), cond2.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
 }
@@ -207,10 +207,10 @@ TEST_F(SBEIfTest, IfWithLogicOr) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues)
-        for (auto cond2 : boolTestValues) {
-            condAccessor.reset(cond.first, cond.second);
-            cond2Accessor.reset(cond2.first, cond2.second);
+    for (const auto& cond : boolTestValues)
+        for (const auto& cond2 : boolTestValues) {
+            condAccessor.reset(cond.tag(), cond.value());
+            cond2Accessor.reset(cond2.tag(), cond2.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
 }
@@ -232,8 +232,8 @@ TEST_F(SBEIfTest, IfWithLogicNot) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues) {
-        condAccessor.reset(cond.first, cond.second);
+    for (const auto& cond : boolTestValues) {
+        condAccessor.reset(cond.tag(), cond.value());
         executeAndPrintVariation(os, *compiledExpr);
     }
 }
@@ -259,10 +259,10 @@ TEST_F(SBEIfTest, IfWithFillEmpty) {
     printCompiledExpression(os, *compiledExpr);
 
     // Verify input variations.
-    for (auto cond : boolTestValues)
-        for (auto cond2 : boolTestValues) {
-            condAccessor.reset(cond.first, cond.second);
-            cond2Accessor.reset(cond2.first, cond2.second);
+    for (const auto& cond : boolTestValues)
+        for (const auto& cond2 : boolTestValues) {
+            condAccessor.reset(cond.tag(), cond.value());
+            cond2Accessor.reset(cond2.tag(), cond2.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
 }

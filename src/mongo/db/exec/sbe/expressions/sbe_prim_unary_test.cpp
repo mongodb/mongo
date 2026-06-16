@@ -47,7 +47,9 @@ namespace mongo::sbe {
 
 class SBEPrimUnaryTest : public GoldenEExpressionTestFixture {
 public:
-    void runUnaryOpTest(std::ostream& os, EPrimUnary::Op op, std::vector<TypedValue>& testValues) {
+    void runUnaryOpTest(std::ostream& os,
+                        EPrimUnary::Op op,
+                        const std::vector<value::TagValueOwned>& testValues) {
         value::ViewOfValueAccessor lhsAccessor;
 
         auto lhsSlot = bindAccessor(&lhsAccessor);
@@ -59,34 +61,34 @@ public:
         printCompiledExpression(os, *compiledExpr);
 
         // Verify the operator table
-        for (auto lhs : testValues) {
-            lhsAccessor.reset(lhs.first, lhs.second);
+        for (const auto& lhs : testValues) {
+            lhsAccessor.reset(lhs.tag(), lhs.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
     }
 
 protected:
-    std::vector<TypedValue> boolTestValues = {makeNothing(), makeBool(false), makeBool(true)};
-    ValueVectorGuard boolTestValuesGuard{boolTestValues};
+    std::vector<value::TagValueOwned> boolTestValues =
+        makeOwnedVector({makeNothing(), makeBool(false), makeBool(true)});
 
-    std::vector<TypedValue> numericTestValues = {makeNothing(),
-                                                 makeInt32(0),
-                                                 makeInt32(12),
-                                                 makeInt32(23),
-                                                 makeInt64(123),
-                                                 makeDouble(123.5),
-                                                 value::makeCopyDecimal(Decimal128(223.5))};
-    ValueVectorGuard numericTestValuesGuard{numericTestValues};
+    std::vector<value::TagValueOwned> numericTestValues =
+        makeOwnedVector({makeNothing(),
+                         makeInt32(0),
+                         makeInt32(12),
+                         makeInt32(23),
+                         makeInt64(123),
+                         makeDouble(123.5),
+                         value::makeCopyDecimal(Decimal128(223.5))});
 
-    std::vector<TypedValue> mixedTestValues = {makeNothing(),
-                                               makeNull(),
-                                               makeBool(false),
-                                               makeBool(true),
-                                               makeInt32(12),
-                                               value::makeCopyDecimal(Decimal128(223.5)),
-                                               value::makeNewString("abc"_sd),
-                                               makeTimestamp(Timestamp(1668792433))};
-    ValueVectorGuard mixedTestValuesGuard{mixedTestValues};
+    std::vector<value::TagValueOwned> mixedTestValues =
+        makeOwnedVector({makeNothing(),
+                         makeNull(),
+                         makeBool(false),
+                         makeBool(true),
+                         makeInt32(12),
+                         value::makeCopyDecimal(Decimal128(223.5)),
+                         value::makeNewString("abc"_sd),
+                         makeTimestamp(Timestamp(1668792433))});
 };
 
 TEST_F(SBEPrimUnaryTest, LogicNotBool) {

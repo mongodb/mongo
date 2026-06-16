@@ -320,19 +320,16 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
 
     // The expected results are the results without forceSpill.
     std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> expectedResults;
-    std::vector<std::pair<value::TypeTags, value::Value>> flatValues;
+    std::vector<value::TagValueOwned> flatValues;
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         std::vector<std::pair<value::TypeTags, value::Value>> results{};
         results.reserve(resultAccessors.size());
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
-            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
-            results.emplace_back(flatValues.back());
+            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue());
+            results.emplace_back(flatValues.back().view());
         }
         expectedResults.emplace_back(std::move(results));
     }
-
-    // This is used to release the values when the test is done.
-    ValueVectorGuard resultsGuard{flatValues};
 
     // Close the stage and execute again with spilling.
     lookupStage->close();
@@ -430,27 +427,23 @@ TEST_F(HashLookupUnwindStageTest, InnerJoinIncludeIndex) {
     lookupSlots.push_back(*indexSlot);
     auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
 
-    std::vector<std::pair<value::TypeTags, value::Value>> outerDocs{
-        stage_builder::makeValue(BSON("_id" << 1)),
-        stage_builder::makeValue(BSON("_id" << 2)),
-        stage_builder::makeValue(BSON("_id" << 3)),
-        stage_builder::makeValue(BSON("_id" << 4)),
-        stage_builder::makeValue(BSON("_id" << 5))};
-    ValueVectorGuard outerDocsGuard{outerDocs};
-    std::vector<std::pair<value::TypeTags, value::Value>> innerDocs{
-        stage_builder::makeValue(BSON("_id" << 11)),
-        stage_builder::makeValue(BSON("_id" << 12)),
-        stage_builder::makeValue(BSON("_id" << 13)),
-        stage_builder::makeValue(BSON("_id" << 14))};
-    ValueVectorGuard innerDocsGuard{innerDocs};
+    auto outerDocs = makeOwnedVector({stage_builder::makeValue(BSON("_id" << 1)),
+                                      stage_builder::makeValue(BSON("_id" << 2)),
+                                      stage_builder::makeValue(BSON("_id" << 3)),
+                                      stage_builder::makeValue(BSON("_id" << 4)),
+                                      stage_builder::makeValue(BSON("_id" << 5))});
+    auto innerDocs = makeOwnedVector({stage_builder::makeValue(BSON("_id" << 11)),
+                                      stage_builder::makeValue(BSON("_id" << 12)),
+                                      stage_builder::makeValue(BSON("_id" << 13)),
+                                      stage_builder::makeValue(BSON("_id" << 14))});
     // Expected output: each outer doc has one or more inner doc matches.
     std::vector<std::vector<sbe::value::Value>> expected{
-        {outerDocs[0].second, innerDocs[0].second, 0},
-        {outerDocs[1].second, innerDocs[1].second, 0},
-        {outerDocs[1].second, innerDocs[3].second, 1},
-        {outerDocs[2].second, innerDocs[1].second, 0},
-        {outerDocs[2].second, innerDocs[3].second, 1},
-        {outerDocs[3].second, innerDocs[2].second, 0}};
+        {outerDocs[0].value(), innerDocs[0].value(), 0},
+        {outerDocs[1].value(), innerDocs[1].value(), 0},
+        {outerDocs[1].value(), innerDocs[3].value(), 1},
+        {outerDocs[2].value(), innerDocs[1].value(), 0},
+        {outerDocs[2].value(), innerDocs[3].value(), 1},
+        {outerDocs[3].value(), innerDocs[2].value(), 0}};
     int i = 0;
     for (auto st = lookupStage->getNext(); st == PlanState::ADVANCED;
          st = lookupStage->getNext(), i++) {
@@ -511,16 +504,14 @@ TEST_F(HashLookupUnwindStageTest, LeftJoinIncludeIndex) {
 
     // Expected output: each outer doc has no match, but it's part of the results due to left join
     // being used.
-    std::vector<std::pair<value::TypeTags, value::Value>> expected{
-        stage_builder::makeValue(BSON("_id" << 1))};
-    ValueVectorGuard expectedGuard{expected};
+    auto expected = makeOwnedVector({stage_builder::makeValue(BSON("_id" << 1))});
     int i = 0;
     for (auto st = lookupStage->getNext(); st == PlanState::ADVANCED;
          st = lookupStage->getNext(), i++) {
         ASSERT_LT(i, expected.size());
 
         auto [outerTag, outerVal] = resultAccessors[0]->getViewOfValue();
-        assertValuesEqual(outerTag, outerVal, value::TypeTags::bsonObject, expected[i].second);
+        assertValuesEqual(outerTag, outerVal, value::TypeTags::bsonObject, expected[i].value());
 
         auto [innerTag, innerVal] = resultAccessors[1]->getViewOfValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::Nothing, 0);

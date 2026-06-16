@@ -921,14 +921,18 @@ TEST_F(SBEBlockTopBottomTest, TestArgMinMaxFastPath) {
 }
 
 TEST_F(SBEBlockTopBottomTest, TopBottomNOracleTest) {
-    auto input = makeInterestingValues();
-    auto output = makeInterestingValues();
-    ValueVectorGuard inputGuard{input};
-    ValueVectorGuard outputGuard{output};
+    std::vector<value::TagValueOwned> input;
+    for (const auto& tv : makeInterestingValues()) {
+        input.emplace_back(tv);
+    }
+    std::vector<value::TagValueOwned> output;
+    for (const auto& tv : makeInterestingValues()) {
+        output.emplace_back(tv);
+    }
 
     std::vector<TypedValues> outVals;
-    for (auto outVal : output) {
-        outVals.push_back(TypedValues{value::copyValue(outVal.first, outVal.second)});
+    for (const auto& outVal : output) {
+        outVals.push_back(TypedValues{value::copyValue(outVal.tag(), outVal.value())});
     }
 
     // bitset logic is tested by "handwritten" tests.
@@ -943,8 +947,8 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNOracleTest) {
         // All values are top level fields.
 
         std::vector<TypedValues> inputKeys;
-        for (auto inVal : input) {
-            inputKeys.push_back(TypedValues{value::copyValue(inVal.first, inVal.second)});
+        for (const auto& inVal : input) {
+            inputKeys.push_back(TypedValues{value::copyValue(inVal.tag(), inVal.value())});
         }
 
         runOracleTest(inputKeys);
@@ -956,9 +960,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNOracleTest) {
         // All values are in nested fields.
 
         std::vector<TypedValues> inputKeys;
-        for (auto inVal : input) {
+        for (const auto& inVal : input) {
             UniqueBSONObjBuilder bob;
-            bson::appendValueToBsonObj(bob, "b"_sd, inVal.first, inVal.second);
+            bson::appendValueToBsonObj(bob, "b"_sd, inVal.tag(), inVal.value());
             bob.doneFast();
             inputKeys.push_back(
                 TypedValues{std::pair{value::TypeTags::bsonObject,
@@ -974,9 +978,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNOracleTest) {
         // All values are in top level arrays.
 
         std::vector<TypedValues> inputKeys;
-        for (auto inVal : input) {
+        for (const auto& inVal : input) {
             UniqueBSONArrayBuilder bab;
-            bson::appendValueToBsonArr(bab, inVal.first, inVal.second);
+            bson::appendValueToBsonArr(bab, inVal.tag(), inVal.value());
             bab.doneFast();
             inputKeys.push_back(
                 TypedValues{std::pair{value::TypeTags::bsonArray,

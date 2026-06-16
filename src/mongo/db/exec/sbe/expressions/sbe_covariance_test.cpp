@@ -46,16 +46,11 @@ enum class CovarianceOp { kAdd, kRemove };
 
 class SBECovarianceTest : public EExpressionTestFixture {
 public:
-    void runAndAssertExpression(
-        std::vector<std::pair<value::TypeTags, value::Value>>& inputValuesX,
-        std::vector<std::pair<value::TypeTags, value::Value>>& inputValuesY,
-        std::vector<CovarianceOp>& operations,
-        std::vector<std::pair<value::TypeTags, value::Value>>& expValuesSamp,
-        std::vector<std::pair<value::TypeTags, value::Value>>& expValuesPop) {
-        ValueVectorGuard inputGuardX{inputValuesX};
-        ValueVectorGuard inputGuardY{inputValuesY};
-        ValueVectorGuard expGuardSamp{expValuesSamp};
-        ValueVectorGuard expGuardPop{expValuesPop};
+    void runAndAssertExpression(const std::vector<value::TagValueOwned>& inputValuesX,
+                                const std::vector<value::TagValueOwned>& inputValuesY,
+                                const std::vector<CovarianceOp>& operations,
+                                const std::vector<value::TagValueOwned>& expValuesSamp,
+                                const std::vector<value::TagValueOwned>& expValuesPop) {
         value::ViewOfValueAccessor inputAccessorX;
         auto inputSlotX = bindAccessor(&inputAccessorX);
 
@@ -95,8 +90,8 @@ public:
                 compiledExpr = compiledCovarianceRemove.get();
                 idx = removeIdx++;
             }
-            inputAccessorX.reset(inputValuesX[idx].first, inputValuesX[idx].second);
-            inputAccessorY.reset(inputValuesY[idx].first, inputValuesY[idx].second);
+            inputAccessorX.reset(inputValuesX[idx].tag(), inputValuesX[idx].value());
+            inputAccessorY.reset(inputValuesY[idx].tag(), inputValuesY[idx].value());
             auto [runTag, runVal] = runCompiledExpression(compiledExpr);
 
             aggAccessor.reset(runTag, runVal);
@@ -106,59 +101,59 @@ public:
             value::ValueGuard guardPop{outPop.first, outPop.second};
 
             const double precisionLimit = 0.0001;
-            ASSERT_THAT(outSamp, ValueRoughEq(expValuesSamp[i], precisionLimit));
-            ASSERT_THAT(outPop, ValueRoughEq(expValuesPop[i], precisionLimit));
+            ASSERT_THAT(outSamp, ValueRoughEq(expValuesSamp[i].raw(), precisionLimit));
+            ASSERT_THAT(outPop, ValueRoughEq(expValuesPop[i].raw(), precisionLimit));
         }
     }
 };
 
 TEST_F(SBECovarianceTest, BasicTest1) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesX = {
+    auto inputValuesX = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesY = {
+    auto inputValuesY = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
-    };
+    });
 
     std::vector<CovarianceOp> covarianceOps = {
         CovarianceOp::kAdd, CovarianceOp::kAdd, CovarianceOp::kRemove, CovarianceOp::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesSamp = {
+    auto expValuesSamp = makeOwnedVector({
         {value::TypeTags::Null, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0)},
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesPop = {
+    auto expValuesPop = makeOwnedVector({
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::Null, 0},
-    };
+    });
 
     runAndAssertExpression(inputValuesX, inputValuesY, covarianceOps, expValuesSamp, expValuesPop);
 }
 
 TEST_F(SBECovarianceTest, BasicTest2) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesX = {
+    auto inputValuesX = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(12)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(18)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(23)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(45)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesY = {
+    auto inputValuesY = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(8)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(18)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(20)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(28)},
-    };
+    });
 
     std::vector<CovarianceOp> covarianceOps = {
         CovarianceOp::kAdd,
@@ -173,7 +168,7 @@ TEST_F(SBECovarianceTest, BasicTest2) {
         CovarianceOp::kRemove,
     };
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesSamp = {
+    auto expValuesSamp = makeOwnedVector({
         {value::TypeTags::Null, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(21)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(51.6667)},
@@ -184,9 +179,9 @@ TEST_F(SBECovarianceTest, BasicTest2) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(88)},
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesPop = {
+    auto expValuesPop = makeOwnedVector({
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.5)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(34.4444)},
@@ -197,27 +192,27 @@ TEST_F(SBECovarianceTest, BasicTest2) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(44)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::Null, 0},
-    };
+    });
 
     runAndAssertExpression(inputValuesX, inputValuesY, covarianceOps, expValuesSamp, expValuesPop);
 }
 
 TEST_F(SBECovarianceTest, MixedTypeTest) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesX = {
+    auto inputValuesX = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(12)},
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128(18.0)).second},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(23.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(45.0)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesY = {
+    auto inputValuesY = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(8)},
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128(18.0)).second},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(20.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(28.0)},
-    };
+    });
 
     std::vector<CovarianceOp> covarianceOps = {
         CovarianceOp::kAdd,
@@ -232,7 +227,7 @@ TEST_F(SBECovarianceTest, MixedTypeTest) {
         CovarianceOp::kRemove,
     };
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesSamp = {
+    auto expValuesSamp = makeOwnedVector({
         {value::TypeTags::Null, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(21)},
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128(51.6667)).second},
@@ -243,9 +238,9 @@ TEST_F(SBECovarianceTest, MixedTypeTest) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(88)},
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesPop = {
+    auto expValuesPop = makeOwnedVector({
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.5)},
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128(34.4444)).second},
@@ -256,48 +251,48 @@ TEST_F(SBECovarianceTest, MixedTypeTest) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(44)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::Null, 0},
-    };
+    });
 
     runAndAssertExpression(inputValuesX, inputValuesY, covarianceOps, expValuesSamp, expValuesPop);
 }
 
 TEST_F(SBECovarianceTest, NonNumericTypeTest) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesX = {
+    auto inputValuesX = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::StringSmall, value::makeSmallString("a").second},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesY = {
+    auto inputValuesY = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)},
         {value::TypeTags::StringSmall, value::makeSmallString("a").second},
-    };
+    });
 
     std::vector<CovarianceOp> covarianceOps = {
         CovarianceOp::kAdd, CovarianceOp::kAdd, CovarianceOp::kAdd, CovarianceOp::kAdd};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesSamp = {
+    auto expValuesSamp = makeOwnedVector({
         {value::TypeTags::Null, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesPop = {
+    auto expValuesPop = makeOwnedVector({
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0)},
-    };
+    });
 
     runAndAssertExpression(inputValuesX, inputValuesY, covarianceOps, expValuesSamp, expValuesPop);
 }
 
 TEST_F(SBECovarianceTest, InfNanTest) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesX = {
+    auto inputValuesX = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberDouble,
@@ -310,9 +305,9 @@ TEST_F(SBECovarianceTest, InfNanTest) {
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValuesY = {
+    auto inputValuesY = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
@@ -325,7 +320,7 @@ TEST_F(SBECovarianceTest, InfNanTest) {
          value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
-    };
+    });
 
     std::vector<CovarianceOp> covarianceOps = {
         CovarianceOp::kAdd,
@@ -348,7 +343,7 @@ TEST_F(SBECovarianceTest, InfNanTest) {
         CovarianceOp::kRemove,
     };
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesSamp = {
+    auto expValuesSamp = makeOwnedVector({
         {value::TypeTags::Null, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0)},
         {value::TypeTags::NumberDouble,
@@ -381,9 +376,9 @@ TEST_F(SBECovarianceTest, InfNanTest) {
         {value::TypeTags::NumberDouble,
          value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValuesPop = {
+    auto expValuesPop = makeOwnedVector({
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0)},
         {value::TypeTags::NumberDouble,
@@ -416,7 +411,7 @@ TEST_F(SBECovarianceTest, InfNanTest) {
         {value::TypeTags::NumberDouble,
          value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0)},
-    };
+    });
 
     runAndAssertExpression(inputValuesX, inputValuesY, covarianceOps, expValuesSamp, expValuesPop);
 }

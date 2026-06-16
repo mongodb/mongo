@@ -330,19 +330,16 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
     auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
 
     std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> expectedResults;
-    std::vector<std::pair<value::TypeTags, value::Value>> flatValues;
+    std::vector<value::TagValueOwned> flatValues;
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         std::vector<std::pair<value::TypeTags, value::Value>> results{};
         results.reserve(resultAccessors.size());
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
-            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
-            results.emplace_back(flatValues.back());
+            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue());
+            results.emplace_back(flatValues.back().view());
         }
         expectedResults.emplace_back(std::move(results));
     }
-
-    // This is used to release the values when the test is done.
-    ValueVectorGuard resultsGuard{flatValues};
 
     // Close the stage and execute again with spilling.
     lookupStage->close();
@@ -439,30 +436,27 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
     lookupSlots.push_back(lookupStageOutputSlot);
     auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
 
-    std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> actualResults;
-    std::vector<std::pair<value::TypeTags, value::Value>> flatValues;
+    std::vector<std::vector<value::TagValueOwned>> actualResults;
     while (lookupStage->getNext() == PlanState::ADVANCED) {
-        std::vector<std::pair<value::TypeTags, value::Value>> results{};
+        std::vector<value::TagValueOwned> results;
         results.reserve(resultAccessors.size());
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
-            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
-            results.emplace_back(flatValues.back());
+            results.emplace_back(resultAccessors[i]->getCopyOfValue());
         }
         actualResults.emplace_back(std::move(results));
     }
 
-    ValueVectorGuard resultsGuard{flatValues};
     lookupStage->close();
 
     ASSERT_EQ(actualResults.size(), 1);
     ASSERT_EQ(actualResults[0].size(), 2);
-    ASSERT_EQ(value::compareValue(actualResults[0][0].first,
-                                  actualResults[0][0].second,
+    ASSERT_EQ(value::compareValue(actualResults[0][0].tag(),
+                                  actualResults[0][0].value(),
                                   value::TypeTags::bsonObject,
                                   value::bitcastFrom<const char*>(lookupInput.objdata())),
               std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
-    ASSERT_EQ(value::compareValue(actualResults[0][1].first,
-                                  actualResults[0][1].second,
+    ASSERT_EQ(value::compareValue(actualResults[0][1].tag(),
+                                  actualResults[0][1].value(),
                                   value::TypeTags::bsonArray,
                                   value::bitcastFrom<const char*>(lookupOutput.objdata())),
               std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
@@ -533,18 +527,17 @@ TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
     auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
 
     std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> actualResultView;
-    std::vector<std::pair<value::TypeTags, value::Value>> ownedValues;
+    std::vector<value::TagValueOwned> ownedValues;
     while (lookupStage->getNext() == PlanState::ADVANCED) {
         std::vector<std::pair<value::TypeTags, value::Value>> results{};
         results.reserve(resultAccessors.size());
         for (size_t i = 0; i < resultAccessors.size(); ++i) {
-            ownedValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
-            results.emplace_back(ownedValues.back());
+            ownedValues.emplace_back(resultAccessors[i]->getCopyOfValue());
+            results.emplace_back(ownedValues.back().view());
         }
         actualResultView.emplace_back(std::move(results));
     }
 
-    ValueVectorGuard resultsGuard{ownedValues};
     lookupStage->close();
 
     ASSERT_EQ(actualResultView.size(), kStringCount);

@@ -46,11 +46,9 @@ enum class RemovablePushOp { kAdd, kRemove };
 
 class SBERemovablePushTest : public EExpressionTestFixture {
 public:
-    void runAndAssertExpression(std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
-                                std::vector<RemovablePushOp>& operations,
-                                std::vector<std::pair<value::TypeTags, value::Value>>& expValues) {
-        ValueVectorGuard inputGuard{inputValues};
-        ValueVectorGuard expGuard{expValues};
+    void runAndAssertExpression(const std::vector<value::TagValueOwned>& inputValues,
+                                const std::vector<RemovablePushOp>& operations,
+                                const std::vector<value::TagValueOwned>& expValues) {
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -82,27 +80,27 @@ public:
                 compiledExpr = compiledRemovablePushRemove.get();
                 idx = removeIdx++;
             }
-            inputAccessor.reset(inputValues[idx].first, inputValues[idx].second);
+            inputAccessor.reset(inputValues[idx].tag(), inputValues[idx].value());
             auto [runTag, runVal] = runCompiledExpression(compiledExpr);
 
             aggAccessor.reset(runTag, runVal);
             auto out = runCompiledExpression(compiledRemovablePushFinalize.get());
             value::ValueGuard outGuard{out.first, out.second};
 
-            ASSERT_EQ(out.first, expValues[i].first);
-            ASSERT_THAT(out, ValueEq(expValues[i]));
+            ASSERT_EQ(out.first, expValues[i].tag());
+            ASSERT_THAT(out, ValueEq(expValues[i].view()));
         }
     }
 };
 
 TEST_F(SBERemovablePushTest, BasicTest) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(5)},
-    };
+    });
 
     std::vector<RemovablePushOp> removablePushOps = {RemovablePushOp::kAdd,
                                                      RemovablePushOp::kAdd,
@@ -115,7 +113,7 @@ TEST_F(SBERemovablePushTest, BasicTest) {
                                                      RemovablePushOp::kRemove,
                                                      RemovablePushOp::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+    auto expValues = makeOwnedVector({
         value::makeValue(Value(BSON_ARRAY(1))),
         value::makeValue(Value(BSON_ARRAY(1 << 2))),
         value::makeValue(Value(BSON_ARRAY(1 << 2 << 3))),
@@ -126,17 +124,17 @@ TEST_F(SBERemovablePushTest, BasicTest) {
         value::makeValue(Value(BSON_ARRAY(4 << 5))),
         value::makeValue(Value(BSON_ARRAY(5))),
         value::makeNewArray(),
-    };
+    });
 
     runAndAssertExpression(inputValues, removablePushOps, expValues);
 }
 
 TEST_F(SBERemovablePushTest, TestWithEmptyFields) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::Nothing, 0},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
-    };
+    });
 
     std::vector<RemovablePushOp> removablePushOps = {RemovablePushOp::kAdd,
                                                      RemovablePushOp::kAdd,
@@ -145,14 +143,14 @@ TEST_F(SBERemovablePushTest, TestWithEmptyFields) {
                                                      RemovablePushOp::kRemove,
                                                      RemovablePushOp::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+    auto expValues = makeOwnedVector({
         value::makeValue(Value(BSON_ARRAY(1))),
         value::makeValue(Value(BSON_ARRAY(1))),
         value::makeValue(Value(BSON_ARRAY(1 << 2))),
         value::makeValue(Value(BSON_ARRAY(2))),
         value::makeValue(Value(BSON_ARRAY(2))),
         value::makeNewArray(),
-    };
+    });
 
     runAndAssertExpression(inputValues, removablePushOps, expValues);
 }

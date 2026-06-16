@@ -136,23 +136,6 @@ MATCHER_P2(ValueRoughEq, v, limit, "") {
     return equal;
 }
 
-class ValueVectorGuard {
-    ValueVectorGuard() = delete;
-    ValueVectorGuard& operator=(const ValueVectorGuard&) = delete;
-
-public:
-    ValueVectorGuard(std::vector<TypedValue>& values) : _values(values) {}
-
-    ~ValueVectorGuard() {
-        for (auto p : _values) {
-            value::releaseValue(p.first, p.second);
-        }
-    }
-
-private:
-    std::vector<TypedValue>& _values;
-};
-
 static std::pair<value::TypeTags, value::Value> makeBsonArray(const BSONArray& ba) {
     return value::copyValue(value::TypeTags::bsonArray,
                             value::bitcastFrom<const char*>(ba.objdata()));
@@ -287,6 +270,15 @@ static std::pair<value::TypeTags, value::Value> makeBool(bool value) {
 
 static std::pair<value::TypeTags, value::Value> makeTimestamp(Timestamp timestamp) {
     return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(timestamp.asULL())};
+}
+
+static std::vector<value::TagValueOwned> makeOwnedVector(std::initializer_list<TypedValue> values) {
+    std::vector<value::TagValueOwned> owned;
+    owned.reserve(values.size());
+    for (const auto& tv : values) {
+        owned.emplace_back(tv);
+    }
+    return owned;
 }
 
 static std::pair<value::TypeTags, value::Value> makeEmptyState(

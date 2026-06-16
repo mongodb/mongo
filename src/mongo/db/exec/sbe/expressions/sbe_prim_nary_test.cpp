@@ -53,7 +53,9 @@ public:
         return sbe::makeE<EPrimNary>(op, std::move(args));
     }
 
-    void runNaryOpTest(std::ostream& os, EPrimNary::Op op, std::vector<TypedValue>& testValues) {
+    void runNaryOpTest(std::ostream& os,
+                       EPrimNary::Op op,
+                       const std::vector<value::TagValueOwned>& testValues) {
         value::ViewOfValueAccessor lhsAccessor;
         value::ViewOfValueAccessor rhsAccessor;
         auto lhsSlot = bindAccessor(&lhsAccessor);
@@ -67,17 +69,17 @@ public:
         printCompiledExpression(os, *compiledExpr);
 
         // Verify the operator table
-        for (auto lhs : testValues)
-            for (auto rhs : testValues) {
-                lhsAccessor.reset(lhs.first, lhs.second);
-                rhsAccessor.reset(rhs.first, rhs.second);
+        for (const auto& lhs : testValues)
+            for (const auto& rhs : testValues) {
+                lhsAccessor.reset(lhs.tag(), lhs.value());
+                rhsAccessor.reset(rhs.tag(), rhs.value());
                 executeAndPrintVariation(os, *compiledExpr);
             }
     }
 
 protected:
-    std::vector<TypedValue> boolTestValues = {makeNothing(), makeBool(false), makeBool(true)};
-    ValueVectorGuard boolTestValuesGuard{boolTestValues};
+    std::vector<value::TagValueOwned> boolTestValues =
+        makeOwnedVector({makeNothing(), makeBool(false), makeBool(true)});
 };
 
 /* Logic Operators */

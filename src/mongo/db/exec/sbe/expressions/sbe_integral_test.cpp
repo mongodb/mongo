@@ -109,14 +109,11 @@ public:
     }
 
     void runAndAssertExpression(boost::optional<int64_t> unitMillis,
-                                std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
-                                std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
-                                std::vector<IntegralOp>& operations,
-                                std::vector<std::pair<value::TypeTags, value::Value>>& expValues,
+                                const std::vector<value::TagValueOwned>& inputValues,
+                                const std::vector<value::TagValueOwned>& sortByValues,
+                                const std::vector<IntegralOp>& operations,
+                                const std::vector<value::TagValueOwned>& expValues,
                                 bool isNonRemovable = false) {
-        ValueVectorGuard inputGuard{inputValues};
-        ValueVectorGuard sortByGuard{sortByValues};
-        ValueVectorGuard expGuard{expValues};
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -156,30 +153,28 @@ public:
                 compiledExpr = compiledIntegralRemove.get();
                 idx = removeIdx++;
             }
-            inputAccessor.reset(inputValues[idx].first, inputValues[idx].second);
-            sortByAccessor.reset(sortByValues[idx].first, sortByValues[idx].second);
+            inputAccessor.reset(inputValues[idx].tag(), inputValues[idx].value());
+            sortByAccessor.reset(sortByValues[idx].tag(), sortByValues[idx].value());
             auto [runTag, runVal] = runCompiledExpression(compiledExpr);
 
             aggAccessor.reset(runTag, runVal);
             auto [outTag, outVal] = runCompiledExpression(compiledIntegralFinalize.get());
             value::ValueGuard outGuard{outTag, outVal};
 
-            ASSERT_EQ(expValues[i].first, outTag);
+            ASSERT_EQ(expValues[i].tag(), outTag);
             auto [compareTag, compareVal] =
-                value::compareValue(expValues[i].first, expValues[i].second, outTag, outVal);
+                value::compareValue(expValues[i].tag(), expValues[i].value(), outTag, outVal);
             ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
             ASSERT_EQ(value::bitcastTo<int32_t>(compareVal), 0);
         }
     }
 
     void runAndAssertErrorCode(boost::optional<int64_t> unitMillis,
-                               std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
-                               std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
-                               std::vector<IntegralOp>& operations,
+                               const std::vector<value::TagValueOwned>& inputValues,
+                               const std::vector<value::TagValueOwned>& sortByValues,
+                               const std::vector<IntegralOp>& operations,
                                int expErrCode,
                                bool isNonRemovable = false) {
-        ValueVectorGuard inputGuard{inputValues};
-        ValueVectorGuard sortByGuard{sortByValues};
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -219,8 +214,8 @@ public:
                         compiledExpr = compiledIntegralRemove.get();
                         idx = removeIdx++;
                     }
-                    inputAccessor.reset(inputValues[idx].first, inputValues[idx].second);
-                    sortByAccessor.reset(sortByValues[idx].first, sortByValues[idx].second);
+                    inputAccessor.reset(inputValues[idx].tag(), inputValues[idx].value());
+                    sortByAccessor.reset(sortByValues[idx].tag(), sortByValues[idx].value());
                     auto [runTag, runVal] = runCompiledExpression(compiledExpr);
                     aggAccessor.reset(runTag, runVal);
                 }
@@ -235,16 +230,15 @@ public:
 };
 
 TEST_F(SBEIntegralTest, IntegralAddRemoveOverDate) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.95)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.7)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.6)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.98)}};
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
-        {value::TypeTags::Date, 1589811030000LL},
-        {value::TypeTags::Date, 1589811060000LL},
-        {value::TypeTags::Date, 1589811090000LL},
-        {value::TypeTags::Date, 1589811120000LL}};
+    auto inputValues =
+        makeOwnedVector({{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.95)},
+                         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.7)},
+                         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.6)},
+                         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.98)}});
+    auto sortByValues = makeOwnedVector({{value::TypeTags::Date, 1589811030000LL},
+                                         {value::TypeTags::Date, 1589811060000LL},
+                                         {value::TypeTags::Date, 1589811090000LL},
+                                         {value::TypeTags::Date, 1589811120000LL}});
 
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd,
                                            IntegralOp::kAdd,
@@ -254,22 +248,22 @@ TEST_F(SBEIntegralTest, IntegralAddRemoveOverDate) {
                                            IntegralOp::kRemove,
                                            IntegralOp::kRemove,
                                            IntegralOp::kRemove};
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.023541666666666666)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.045625)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.068875)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.045333333333333337)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.02325)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0)},
-        {value::TypeTags::Null, 0}};
+    auto expValues = makeOwnedVector(
+        {{value::TypeTags::NumberDouble, value::bitcastFrom<double>(0)},
+         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.023541666666666666)},
+         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.045625)},
+         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.068875)},
+         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.045333333333333337)},
+         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.02325)},
+         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(0)},
+         {value::TypeTags::Null, 0}});
 
     boost::optional<int64_t> unitMillis = 60LL * 60LL * 1000LL;  // hour unit
     runAndAssertExpression(unitMillis, inputValues, sortByValues, integralOps, expValues);
 }
 
 TEST_F(SBEIntegralTest, IntegralWithMixedTypes) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
@@ -277,9 +271,9 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypes) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2l)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0)},
@@ -287,7 +281,7 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypes) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(5.0)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6ll)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(7)},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd,
                                            IntegralOp::kAdd,
@@ -304,7 +298,7 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypes) {
                                            IntegralOp::kRemove,
                                            IntegralOp::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+    auto expValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(20.0)},
@@ -319,13 +313,13 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypes) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
         {value::TypeTags::NumberInt32, 0},
         {value::TypeTags::Null, 0},
-    };
+    });
 
     runAndAssertExpression(boost::none, inputValues, sortByValues, integralOps, expValues);
 }
 
 TEST_F(SBEIntegralTest, IntegralWithMixedTypesNonRemovable) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
@@ -333,9 +327,9 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypesNonRemovable) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2l)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0)},
@@ -343,7 +337,7 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypesNonRemovable) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(5.0)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6ll)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(7)},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd,
                                            IntegralOp::kAdd,
@@ -353,7 +347,7 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypesNonRemovable) {
                                            IntegralOp::kAdd,
                                            IntegralOp::kAdd};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+    auto expValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, 0},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(10.0)},
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(20.0)},
@@ -361,13 +355,13 @@ TEST_F(SBEIntegralTest, IntegralWithMixedTypesNonRemovable) {
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{40.0}).second},
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{50.0}).second},
         {value::TypeTags::NumberDecimal, value::makeCopyDecimal(Decimal128{60.0}).second},
-    };
+    });
 
     runAndAssertExpression(boost::none, inputValues, sortByValues, integralOps, expValues, true);
 }
 
 TEST_F(SBEIntegralTest, IntegralWithNaNAndInfinityValues) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt64, 10},
         {value::TypeTags::NumberDouble,
          value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
@@ -379,9 +373,9 @@ TEST_F(SBEIntegralTest, IntegralWithNaNAndInfinityValues) {
          value::makeCopyDecimal(Decimal128::kNegativeInfinity).second},
         {value::TypeTags::NumberInt64, 30},
         {value::TypeTags::NumberInt64, 40},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(2)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(3)},
@@ -390,7 +384,7 @@ TEST_F(SBEIntegralTest, IntegralWithNaNAndInfinityValues) {
         {value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(6)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(7)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(8)},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd,
                                            IntegralOp::kAdd,
@@ -409,7 +403,7 @@ TEST_F(SBEIntegralTest, IntegralWithNaNAndInfinityValues) {
                                            IntegralOp::kRemove,
                                            IntegralOp::kRemove};
 
-    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+    auto expValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, 0},
         {value::TypeTags::NumberDouble,
          value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())},
@@ -436,17 +430,17 @@ TEST_F(SBEIntegralTest, IntegralWithNaNAndInfinityValues) {
         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(35.0)},
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)},
         {value::TypeTags::Null, 0},
-    };
+    });
 
     runAndAssertExpression(boost::none, inputValues, sortByValues, integralOps, expValues);
 }
 
 TEST_F(SBEIntegralTest, IntegralWithDatesAndNoUnit) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.95)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.98)}};
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
-        {value::TypeTags::Date, 1589811030000LL}, {value::TypeTags::Date, 1589811060000LL}};
+    auto inputValues =
+        makeOwnedVector({{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.95)},
+                         {value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.98)}});
+    auto sortByValues = makeOwnedVector(
+        {{value::TypeTags::Date, 1589811030000LL}, {value::TypeTags::Date, 1589811060000LL}});
 
     std::vector<IntegralOp> integralOps = {
         IntegralOp::kAdd, IntegralOp::kAdd, IntegralOp::kRemove, IntegralOp::kRemove};
@@ -455,15 +449,15 @@ TEST_F(SBEIntegralTest, IntegralWithDatesAndNoUnit) {
 }
 
 TEST_F(SBEIntegralTest, IntegralWithNumbersAndUnit) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2l)},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {
         IntegralOp::kAdd, IntegralOp::kAdd, IntegralOp::kRemove, IntegralOp::kRemove};
@@ -473,13 +467,13 @@ TEST_F(SBEIntegralTest, IntegralWithNumbersAndUnit) {
 }
 
 TEST_F(SBEIntegralTest, IntegralWithIncorrectTypes1) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::StringSmall, value::makeSmallString("a").second},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd};
 
@@ -487,13 +481,13 @@ TEST_F(SBEIntegralTest, IntegralWithIncorrectTypes1) {
 }
 
 TEST_F(SBEIntegralTest, IntegralWithIncorrectTypes2) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::StringSmall, value::makeSmallString("a").second},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {IntegralOp::kAdd};
 
@@ -501,15 +495,15 @@ TEST_F(SBEIntegralTest, IntegralWithIncorrectTypes2) {
 }
 
 TEST_F(SBEIntegralTest, IntegralRemoveWithNonRemovable) {
-    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+    auto inputValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10ll)},
-    };
+    });
 
-    std::vector<std::pair<value::TypeTags, value::Value>> sortByValues = {
+    auto sortByValues = makeOwnedVector({
         {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
         {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2l)},
-    };
+    });
 
     std::vector<IntegralOp> integralOps = {
         IntegralOp::kAdd, IntegralOp::kAdd, IntegralOp::kRemove, IntegralOp::kRemove};

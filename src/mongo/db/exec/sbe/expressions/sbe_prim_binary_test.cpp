@@ -64,7 +64,7 @@ public:
 
     void runBinaryOpTest(std::ostream& os,
                          EPrimBinary::Op op,
-                         std::vector<TypedValue>& testValues) {
+                         const std::vector<value::TagValueOwned>& testValues) {
         value::ViewOfValueAccessor lhsAccessor;
         value::ViewOfValueAccessor rhsAccessor;
         auto lhsSlot = bindAccessor(&lhsAccessor);
@@ -78,18 +78,18 @@ public:
         printCompiledExpression(os, *compiledExpr);
 
         // Verify the operator table
-        for (auto lhs : testValues)
-            for (auto rhs : testValues) {
-                lhsAccessor.reset(lhs.first, lhs.second);
-                rhsAccessor.reset(rhs.first, rhs.second);
+        for (const auto& lhs : testValues)
+            for (const auto& rhs : testValues) {
+                lhsAccessor.reset(lhs.tag(), lhs.value());
+                rhsAccessor.reset(rhs.tag(), rhs.value());
                 executeAndPrintVariation(os, *compiledExpr);
             }
     }
 
     void runBinaryOpCollationTest(std::ostream& os,
                                   EPrimBinary::Op op,
-                                  std::vector<TypedValue>& testValues,
-                                  std::vector<TypedValue>& collValues) {
+                                  const std::vector<value::TagValueOwned>& testValues,
+                                  const std::vector<value::TagValueOwned>& collValues) {
         value::ViewOfValueAccessor lhsAccessor;
         value::ViewOfValueAccessor rhsAccessor;
         value::ViewOfValueAccessor collAccessor;
@@ -106,52 +106,51 @@ public:
         printCompiledExpression(os, *compiledExpr);
 
         // Verify the operator table.
-        for (auto lhs : testValues)
-            for (auto rhs : testValues)
-                for (auto coll : collValues) {
-                    lhsAccessor.reset(lhs.first, lhs.second);
-                    rhsAccessor.reset(rhs.first, rhs.second);
-                    collAccessor.reset(coll.first, coll.second);
+        for (const auto& lhs : testValues)
+            for (const auto& rhs : testValues)
+                for (const auto& coll : collValues) {
+                    lhsAccessor.reset(lhs.tag(), lhs.value());
+                    rhsAccessor.reset(rhs.tag(), rhs.value());
+                    collAccessor.reset(coll.tag(), coll.value());
                     executeAndPrintVariation(os, *compiledExpr);
                 }
     }
 
 protected:
-    std::vector<TypedValue> boolTestValues = {makeNothing(), makeBool(false), makeBool(true)};
-    ValueVectorGuard boolTestValuesGuard{boolTestValues};
+    std::vector<value::TagValueOwned> boolTestValues =
+        makeOwnedVector({makeNothing(), makeBool(false), makeBool(true)});
 
-    std::vector<TypedValue> numericTestValues = {makeNothing(),
-                                                 makeInt32(12),
-                                                 makeInt32(23),
-                                                 makeInt64(123),
-                                                 makeDouble(123.5),
-                                                 value::makeCopyDecimal(Decimal128(223.5))};
-    ValueVectorGuard numericTestValuesGuard{numericTestValues};
+    std::vector<value::TagValueOwned> numericTestValues =
+        makeOwnedVector({makeNothing(),
+                         makeInt32(12),
+                         makeInt32(23),
+                         makeInt64(123),
+                         makeDouble(123.5),
+                         value::makeCopyDecimal(Decimal128(223.5))});
 
-    std::vector<TypedValue> mixedTestValues = {makeNothing(),
-                                               makeNull(),
-                                               makeBool(false),
-                                               makeBool(true),
-                                               makeInt32(12),
-                                               value::makeCopyDecimal(Decimal128(223.5)),
-                                               value::makeNewString("abc"_sd),
-                                               makeTimestamp(Timestamp(1668792433))};
-    ValueVectorGuard mixedTestValuesGuard{mixedTestValues};
+    std::vector<value::TagValueOwned> mixedTestValues =
+        makeOwnedVector({makeNothing(),
+                         makeNull(),
+                         makeBool(false),
+                         makeBool(true),
+                         makeInt32(12),
+                         value::makeCopyDecimal(Decimal128(223.5)),
+                         value::makeNewString("abc"_sd),
+                         makeTimestamp(Timestamp(1668792433))});
 
-    std::vector<TypedValue> stringTestValues = {makeNothing(),
-                                                value::makeNewString("abc"),
-                                                value::makeNewString("ABC"),
-                                                value::makeNewString("abcdefghijkop"),
-                                                value::makeNewString("ABCDEFGHIJKOP")};
-    ValueVectorGuard stringTestValuesGuard{stringTestValues};
+    std::vector<value::TagValueOwned> stringTestValues =
+        makeOwnedVector({makeNothing(),
+                         value::makeNewString("abc"),
+                         value::makeNewString("ABC"),
+                         value::makeNewString("abcdefghijkop"),
+                         value::makeNewString("ABCDEFGHIJKOP")});
 
-    std::vector<TypedValue> collTestValues = {
-        makeNothing(),
-        value::makeCopyCollator(
-            CollatorInterfaceMock(CollatorInterfaceMock::MockType::kAlwaysEqual)),
-        value::makeCopyCollator(
-            CollatorInterfaceMock(CollatorInterfaceMock::MockType::kToLowerString))};
-    ValueVectorGuard collTestValuesGuard{collTestValues};
+    std::vector<value::TagValueOwned> collTestValues =
+        makeOwnedVector({makeNothing(),
+                         value::makeCopyCollator(
+                             CollatorInterfaceMock(CollatorInterfaceMock::MockType::kAlwaysEqual)),
+                         value::makeCopyCollator(CollatorInterfaceMock(
+                             CollatorInterfaceMock::MockType::kToLowerString))});
 };
 
 /* Logic Operators */
@@ -459,34 +458,32 @@ TEST_F(SBEPrimBinaryTest, Cmp3wString) {
 
 TEST_F(SBEPrimBinaryTest, FillEmpty) {
     auto& os = gctx->outStream();
-    std::vector<TypedValue> testValues = {
-        makeNothing(), makeNull(), makeBool(false), makeBool(true)};
+    auto testValues = makeOwnedVector({makeNothing(), makeNull(), makeBool(false), makeBool(true)});
     runBinaryOpTest(os, EPrimBinary::Op::fillEmpty, testValues);
 }
 
 TEST_F(SBEPrimBinaryTest, FillEmptyWithConstant) {
     auto& os = gctx->outStream();
 
-    std::vector<TypedValue> testValues = {
-        makeNothing(), makeNull(), makeBool(true), makeBool(true)};
-    for (auto rhs : testValues) {
+    auto testValues = makeOwnedVector({makeNothing(), makeNull(), makeBool(true), makeBool(true)});
+    for (const auto& rhs : testValues) {
 
-        os << "== VARIATION rhs constant: " << rhs << std::endl;
+        os << "== VARIATION rhs constant: " << rhs.view() << std::endl;
 
         value::ViewOfValueAccessor lhsAccessor;
         auto lhsSlot = bindAccessor(&lhsAccessor);
 
         auto expr = sbe::makeE<EPrimBinary>(
-            EPrimBinary::Op::fillEmpty, makeE<EVariable>(lhsSlot), makeC(rhs));
+            EPrimBinary::Op::fillEmpty, makeE<EVariable>(lhsSlot), makeC(rhs.tag(), rhs.value()));
         printInputExpression(os, *expr);
 
         auto compiledExpr = compileExpression(*expr);
         printCompiledExpression(os, *compiledExpr);
 
         // Verify the combination table.
-        for (auto lhs : testValues) {
+        for (const auto& lhs : testValues) {
 
-            lhsAccessor.reset(lhs.first, lhs.second);
+            lhsAccessor.reset(lhs.tag(), lhs.value());
             executeAndPrintVariation(os, *compiledExpr);
         }
     }
