@@ -230,8 +230,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
         assert.eq(result, expected, {result, nShards});
     });
 
-    // TODO SERVER-128809: Re-enable once the Exchange double-dispose guard is implemented.
-    it.skip("[sharded] pushes $limit to shards and merges to global top-N", function () {
+    it("[sharded] pushes $limit to shards and merges to global top-N", function () {
         if (!isSharded) return;
         const result = coll
             .aggregate([

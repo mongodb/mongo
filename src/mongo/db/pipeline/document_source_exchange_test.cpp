@@ -54,6 +54,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -372,6 +373,79 @@ TEST_F(DocumentSourceExchangeTest, ExchangeNConsumerEarlyout) {
 
     for (auto& h : handles)
         _executor->wait(h);
+}
+
+TEST_F(DocumentSourceExchangeTest, DisposeIsIdempotentPerConsumer) {
+    const size_t nDocs = 10;
+    auto source = getMockSource(nDocs);
+
+    const size_t nConsumers = 2;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(nConsumers);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, Pipeline::create({source}, getExpCtx()));
+
+    // Without the guard, the second call here would bump _disposeRunDown to getConsumers() and
+    // call ExchangeBuffer::dispose() a second time, which invariants on !_disposed.
+    ex->dispose(opCtx, 0);
+    ex->dispose(opCtx, 0);
+    ex->dispose(opCtx, 0);
+
+    // The remaining consumer must still drive the rundown counter to getConsumers() and tear down
+    // the inner pipeline exactly once. Without the guard, _disposeRunDown would already be at
+    // getConsumers() and this call would trip invariant(_disposeRunDown < getConsumers()).
+    ex->dispose(opCtx, 1);
+    ex->dispose(opCtx, 1);
+}
+
+// When a consumer throws while loading the next batch, it latches the error in
+// _errorInLoadNextBatch and becomes the _loadingThreadId. Disposal then takes a different path:
+// only the loading thread tears down the inner pipeline, and the per-consumer rundown counter no
+// longer gates that teardown. Verify disposal is correct (and still double-dispose safe) in that
+// error state.
+TEST_F(DocumentSourceExchangeTest, DisposeAfterErrorInLoadNextBatch) {
+    const size_t nDocs = 10;
+    auto source = getMockSource(nDocs);
+
+    const size_t nConsumers = 2;
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(nConsumers);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, spec, Pipeline::create({source}, getExpCtx()));
+
+    {
+        // Force the first load to throw. The throwing consumer (0) becomes the loading thread and
+        // latches the error into _errorInLoadNextBatch.
+        FailPointEnableBlock fp("exchangeFailLoadNextBatch");
+        ASSERT_THROWS_CODE(
+            ex->getNext(opCtx, 0, nullptr), AssertionException, ErrorCodes::FailPointEnabled);
+
+        // Now that the error is latched, any other consumer observes it as a passthrough error
+        // rather than attempting to load again.
+        ASSERT_THROWS_CODE(
+            ex->getNext(opCtx, 1, nullptr), AssertionException, ErrorCodes::ExchangePassthrough);
+    }
+
+    // Disposal in the error state must succeed. The non-loading consumer (1) does not tear down the
+    // inner pipeline; the loading consumer (0) does. Neither over-runs the rundown counter.
+    ex->dispose(opCtx, 1);
+    ex->dispose(opCtx, 0);
+
+    // The double-dispose guard must also hold in the error path: both consumers have now disposed
+    // once, so _disposeRunDown == getConsumers(). Without the guard, this repeat would trip
+    // invariant(_disposeRunDown < getConsumers()).
+    ex->dispose(opCtx, 0);
+    ex->dispose(opCtx, 1);
 }
 
 TEST_F(DocumentSourceExchangeTest, BroadcastExchangeNConsumer) {

@@ -489,6 +489,12 @@ void Exchange::updateMemoryTrackingForDispose(OperationContext* opCtx) {
 void Exchange::dispose(OperationContext* opCtx, size_t consumerId) {
     std::lock_guard<std::mutex> lk(_mutex);
 
+    // Some stages (e.g. $limit) proactively dispose their source when satisfied. Guard the rundown
+    // counter and inner-pipeline teardown against double-dispose for the same consumer.
+    if (_consumers[consumerId]->isDisposed()) {
+        return;
+    }
+
     invariant(_disposeRunDown < getConsumers());
 
     ++_disposeRunDown;

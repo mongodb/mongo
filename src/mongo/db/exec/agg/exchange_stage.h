@@ -178,6 +178,10 @@ private:
             _bytesInBuffer = 0;
         }
 
+        bool isDisposed() const {
+            return _disposed;
+        }
+
     private:
         size_t _bytesInBuffer{0};
         std::deque<DocumentSource::GetNextResult> _buffer;
