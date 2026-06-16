@@ -80,7 +80,7 @@ structs:
                 description: "The sessionId and txnNumber of this transaction."
                 cpp_name: id
             participants:
-                type: array<shard_id>
+                type: array<shard_ref>
                 description: "The list of transaction participants."
             decision:
                 optional: true

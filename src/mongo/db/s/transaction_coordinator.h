@@ -125,7 +125,7 @@ public:
      *
      * Subsequent calls will not re-run the commit process.
      */
-    void runCommit(OperationContext* opCtx, std::vector<ShardId> participantShards);
+    void runCommit(OperationContext* opCtx, std::vector<ShardRef> participantShards);
 
     /**
      * To be used to continue coordinating a transaction on step up.

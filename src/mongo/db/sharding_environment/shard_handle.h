@@ -77,6 +77,28 @@ public:
         }
     }
 
+    bool operator<(const ShardHandle& other) const {
+        if (_name != other._name)
+            return _name < other._name;
+        // Consistent with == operator -> if names are equal and one of them has no uuid, they are
+        // equal.
+        if (!_uuid.has_value() || !other._uuid.has_value())
+            return false;
+        return *_uuid < *other._uuid;
+    }
+
+    bool operator>(const ShardHandle& other) const {
+        return other < *this;
+    }
+
+    bool operator<=(const ShardHandle& other) const {
+        return !(other < *this);
+    }
+
+    bool operator>=(const ShardHandle& other) const {
+        return !(*this < other);
+    }
+
     bool operator==(const ShardHandle& other) const {
         // If one shard handle is missing a UUID, it compares as equal to another shard handle with
         // a UUID to allow for comparisons across FCV upgrade/downgrade.

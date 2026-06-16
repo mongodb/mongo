@@ -97,7 +97,7 @@ public:
         OperationContext* opCtx,
         LogicalSessionId lsid,
         TxnNumberAndRetryCounter txnNumberAndRetryCounter,
-        const std::set<ShardId>& participantList);
+        const std::set<ShardRef>& participantList);
 
     /**
      * If a coordinator for the (lsid, txnNumber, txnRetryCounter) exists, returns a Future that

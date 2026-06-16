@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/util/modules.h"
 
 
@@ -46,7 +47,7 @@
 namespace mongo {
 namespace txn {
 
-using ParticipantsList = std::vector<ShardId>;
+using ParticipantsList = std::vector<ShardRef>;
 
 enum class PrepareVote {
     kCommit,

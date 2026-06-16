@@ -65,8 +65,8 @@
 namespace mongo {
 namespace {
 
-HostAndPort makeHostAndPort(const ShardId& shardId) {
-    return HostAndPort(str::stream() << shardId << ":123");
+HostAndPort makeHostAndPort(const ShardHandle& shardHandle) {
+    return HostAndPort(str::stream() << shardHandle.name() << ":123");
 }
 
 }  // namespace
@@ -78,10 +78,12 @@ void TransactionCoordinatorTestFixture::setUp() {
                   ->get("logComponentVerbosity")
                   ->setFromString("{transaction: {verbosity: 3}}", boost::none));
 
-    for (const auto& shardId : kThreeShardIdList) {
+    for (const auto& shardHandle : kThreeShardHandleList) {
         auto shardTargeter = RemoteCommandTargeterMock::get(
-            uassertStatusOK(shardRegistry()->getShard(operationContext(), shardId))->getTargeter());
-        shardTargeter->setFindHostReturnValue(makeHostAndPort(shardId));
+            uassertStatusOK(shardRegistry()->getShard(operationContext(),
+                                                      shardHandle.toShardRef(operationContext())))
+                ->getTargeter());
+        shardTargeter->setFindHostReturnValue(makeHostAndPort(shardHandle));
     }
 
     WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
@@ -97,15 +99,16 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
 
     class StaticCatalogClient final : public ShardingCatalogClientMock {
     public:
-        StaticCatalogClient(std::vector<ShardId> shardIds) : _shardIds(std::move(shardIds)) {}
+        StaticCatalogClient(std::vector<ShardHandle> shardHandles)
+            : _shardHandles(std::move(shardHandles)) {}
 
         repl::OpTimeWith<std::vector<ShardType>> getAllShards(OperationContext* opCtx,
                                                               repl::ReadConcernLevel readConcern,
                                                               BSONObj filter) override {
             std::vector<ShardType> shardTypes;
-            for (const auto& shardId : _shardIds) {
-                const ConnectionString cs =
-                    ConnectionString::forReplicaSet(shardId.toString(), {makeHostAndPort(shardId)});
+            for (const auto& shardHandle : _shardHandles) {
+                const ConnectionString cs = ConnectionString::forReplicaSet(
+                    shardHandle.name(), {makeHostAndPort(shardHandle)});
                 ShardType sType;
                 sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
                 sType.setHost(cs.toString());
@@ -115,10 +118,10 @@ TransactionCoordinatorTestFixture::makeShardingCatalogClient() {
         }
 
     private:
-        const std::vector<ShardId> _shardIds;
+        const std::vector<ShardHandle> _shardHandles;
     };
 
-    return std::make_unique<StaticCatalogClient>(kThreeShardIdList);
+    return std::make_unique<StaticCatalogClient>(kThreeShardHandleList);
 }
 
 void TransactionCoordinatorTestFixture::assertCommandSentAndRespondWith(
