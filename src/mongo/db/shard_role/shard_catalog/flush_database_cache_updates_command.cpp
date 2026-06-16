@@ -175,7 +175,7 @@ public:
                     !dbName.isAdminDB() && !dbName.isConfigDB());
 
             if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
-                    VersionContext::getDecoration(opCtx),
+                    kVersionContextIgnored_UNSAFE,
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 // When the `AuthoritativeShardsCRUD` feature flag is enabled, this method
                 // should no longer be used, as nodes start relying on the `config.shard.catalog`

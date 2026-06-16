@@ -35,12 +35,14 @@
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/remote_command_request.h"
@@ -51,6 +53,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -263,6 +266,33 @@ TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
     ASSERT_EQ(stats.getIntField("recoverersCreated"), 1);
     ASSERT_EQ(stats.getIntField("versionResolvedAfterRecovery"), 1);
+}
+
+// Refresh uses the node FCV, not the operation's OFCV (see SERVER-128194 for details).
+TEST_F(AuthoritativeRefreshFixture, RefreshUsesGlobalFCVRatherThanOperationFCV) {
+    auto* opCtx = operationContext();
+
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
+    populateDiskCatalog(opCtx, collType, chunks);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+        csr->setAuthoritative();
+    }
+
+    // Set OFCV=kUpgrading, so refreshes should still be non-authoritative according to OFCV.
+    // (Generic FCV reference): used for testing.
+    const auto savedFCV = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ON_BLOCK_EXIT([&] { serverGlobalParams.mutableFCV.setVersion(savedFCV); });
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+    VersionContext::FixedOperationFCVRegion fixedOperationFcvRegion(opCtx);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+
+    // Despite the OFCV, the refresh recovers authoritatively (from disk) per the node FCV.
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
+    ASSERT_EQ(getStatistics(opCtx).getIntField("diskRecoveriesPerformed"), 1);
 }
 
 TEST_F(AuthoritativeRefreshFixture,

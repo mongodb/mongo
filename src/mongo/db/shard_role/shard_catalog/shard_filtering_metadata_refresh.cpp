@@ -1315,7 +1315,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
             uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
                     "Authoritative collection metadata refresh can't proceed: FCV has changed",
                     sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                        VersionContext::getDecoration(opCtx), guard->acquireFCVSnapshot()) ==
+                        kVersionContextIgnored_UNSAFE, guard->acquireFCVSnapshot()) ==
                         AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
 
             // cancellationToken needs to be checked under the CSR lock before overwriting the
@@ -1795,7 +1795,7 @@ FilteringMetadataRefreshTracker::Acquisition FilteringMetadataRefreshTracker::ac
     // Check the feature flag inside the mutex in order to serialize with calls to
     // `interruptIncompatibleRefreshes` during FCV transitions.
     auto kind = forceKind.value_or(feature_flags::gAuthoritativeShardsCRUD.isEnabled(
-                                       VersionContext::getDecoration(opCtx),
+                                       kVersionContextIgnored_UNSAFE,
                                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
                                        ? FilteringMetadataRefreshKind::kAuthoritative
                                        : FilteringMetadataRefreshKind::kNonAuthoritative);
