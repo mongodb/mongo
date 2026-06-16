@@ -50,13 +50,13 @@ struct SpanNameHelper;
 template <>
 struct SpanNameHelper<SpanNameApi> {
     static SpanName name1() {
-        return SpanNames::kTest1;
+        return span_names::kTest1;
     }
     static SpanName name2() {
-        return SpanNames::kTest2;
+        return span_names::kTest2;
     }
     static SpanName name3() {
-        return SpanNames::kTest3;
+        return span_names::kTest3;
     }
     static std::string toString(SpanName n) {
         return std::string(n.getName());
@@ -66,13 +66,13 @@ struct SpanNameHelper<SpanNameApi> {
 template <>
 struct SpanNameHelper<StringApi> {
     static std::string name1() {
-        return std::string(SpanNames::kTest1.getName());
+        return std::string(span_names::kTest1.getName());
     }
     static std::string name2() {
-        return std::string(SpanNames::kTest2.getName());
+        return std::string(span_names::kTest2.getName());
     }
     static std::string name3() {
-        return std::string(SpanNames::kTest3.getName());
+        return std::string(span_names::kTest3.getName());
     }
     static std::string toString(const std::string& n) {
         return n;

@@ -82,118 +82,96 @@ private:
     SampledByDefault _sampledByDefault;
 };
 
-namespace span_names_details {
-/** Absolutely no calls to this function should be made from code that is NOT owned by N&O team. */
-MONGO_MOD_FILE_PRIVATE constexpr SpanName make(StringData name,
-                                               SampledByDefault sampledByDefault = SampledByDefault{
-                                                   false}) {
-    return SpanName{SpanName::passkeyForNetworkingAndObservabilityOnly, name, sampledByDefault};
-}
-}  // namespace span_names_details
-
 /**
  * Central registry of OpenTelemetry span names used in the server. When adding a new span to the
- * server, please add an entry to SpanNames grouped under your team name.
+ * server, please add an entry to span_names grouped under your team name.
  *
  * This ensures that the N&O team has full ownership over new OTel spans in the server for
  * centralized collaboration with downstream OTel consumers.
  */
-class MONGO_MOD_PUBLIC SpanNames {
-private:
-    /** Wraps span_name_details::make to make the definitions below less verbose. */
-    static constexpr auto make = []<typename... Args>(Args&&... args) {
-        return span_names_details::make(std::forward<Args>(args)...);
-    };
+namespace span_names {
 
-public:
-    // Test-only
-    static constexpr SpanName kTest1 = make("test_only.span1");
-    static constexpr SpanName kTest2 = make("test_only.span2");
-    static constexpr SpanName kTest3 = make("test_only.span3");
+#define SPAN_NAME_(id, name)                              \
+    MONGO_MOD_PUBLIC inline constexpr auto id = SpanName( \
+        SpanName::passkeyForNetworkingAndObservabilityOnly, name, SampledByDefault{false})
 
-    // Resharding spans
-    static constexpr SpanName kReshardCollectionCmdInvocationTypedRun =
-        make("ReshardCollectionCmd::Invocation::typedRun");
-    static constexpr SpanName kReshardingCoordinatorRun = make("ReshardingCoordinator::run");
-    static constexpr SpanName kReshardingCoordinatorRunUntilReadyToCommit =
-        make("ReshardingCoordinator::_runUntilReadyToCommit");
-    static constexpr SpanName kReshardingCoordinatorCommitting =
-        make("ReshardingCoordinator::committing");
-    static constexpr SpanName kReshardingCoordinatorAfterFinish =
-        make("ReshardingCoordinator::afterFinish");
-    static constexpr SpanName kReshardingCoordinatorWaitForCommitMonitor =
-        make("ReshardingCoordinator::waitForCommitMonitor");
-    static constexpr SpanName kReshardingCoordinatorFinalize =
-        make("ReshardingCoordinator::finalize");
-    static constexpr SpanName kReshardingCoordinatorRecipientPostCloningDeltaCollector =
-        make("ReshardingCoordinator::RecipientPostCloningDeltaCollector");
-    static constexpr SpanName kReshardingCoordinatorAwaitAllDonorsReadyToDonate =
-        make("ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
-    static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsCloning =
-        make("ReshardingCoordinator::_awaitAllRecipientsCloning");
-    static constexpr SpanName kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors =
-        make("ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
-    static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsFinishedCloning =
-        make("ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
-    static constexpr SpanName kReshardingCoordinatorTellAllDonorsToRefresh =
-        make("ReshardingCoordinator::_tellAllDonorsToRefresh");
-    static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsFinishedApplying =
-        make("ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
-    static constexpr SpanName kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit =
-        make("ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
-    static constexpr SpanName kReshardingCoordinatorAwaitAllRecipientsInStrictConsistency =
-        make("ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
-    static constexpr SpanName kReshardingDonorStateMachineRun =
-        make("ReshardingDonorService::DonorStateMachine::run");
-    static constexpr SpanName kReshardingCoordinatorDonorPostCloningDeltaCollector =
-        make("ReshardingCoordinator::DonorPostCloningDeltaCollector");
-    static constexpr SpanName
-        kReshardingDonorOnPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData =
-            make(
-                "ReshardingDonorService::_onPreparingToDonate"
-                "CalculateTimestampThenTransitionToDonatingInitialData");
-    static constexpr SpanName
-        kReshardingDonorAwaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries = make(
-            "ReshardingDonorService::_awaitAllRecipientsDoneCloning"
-            "ThenTransitionToDonatingOplogEntries");
-    static constexpr SpanName kReshardingDonorCreateAndStartChangeStreamsMonitor =
-        make("ReshardingDonorService::_createAndStartChangeStreamsMonitor");
-    static constexpr SpanName
-        kReshardingDonorAwaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites = make(
-            "ReshardingDonorService::_awaitAllRecipientsDoneApplying"
-            "ThenTransitionToPreparingToBlockWrites");
-    static constexpr SpanName
-        kReshardingDonorWriteTransactionOplogEntryThenTransitionToBlockingWrites = make(
-            "ReshardingDonorService::_writeTransactionOplogEntry"
-            "ThenTransitionToBlockingWrites");
-    static constexpr SpanName kReshardingDonorRunUntilBlockingWritesOrErrored =
-        make("ReshardingDonorService::_runUntilBlockingWritesOrErrored");
-    static constexpr SpanName kReshardingDonorNotifyCoordinatorAndAwaitDecision =
-        make("ReshardingDonorService::_notifyCoordinatorAndAwaitDecision");
-    static constexpr SpanName kReshardingRecipientRun = make("ReshardingRecipientService::run");
-    static constexpr SpanName
-        kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection = make(
-            "ReshardingRecipientService::_awaitAllDonorsPreparedToDonate"
-            "ThenTransitionToCreatingCollection");
-    static constexpr SpanName
-        kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning = make(
-            "ReshardingRecipientService::_createTemporaryReshardingCollection"
-            "ThenTransitionToCloning");
-    static constexpr SpanName kReshardingRecipientCloneThenTransitionToBuildingIndex =
-        make("ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
-    static constexpr SpanName kReshardingRecipientBuildIndexThenTransitionToApplying =
-        make("ReshardingRecipientService::_buildIndexThenTransitionToApplying");
-    static constexpr SpanName kReshardingRecipientCreateAndStartChangeStreamsMonitor =
-        make("ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
-    static constexpr SpanName
-        kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency = make(
-            "ReshardingRecipientService::_awaitAllDonorsBlockingWrites"
-            "ThenTransitionToStrictConsistency");
-    static constexpr SpanName kReshardingRecipientRunUntilStrictConsistencyOrErrored =
-        make("ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
-    static constexpr SpanName kReshardingRecipientNotifyCoordinatorAndAwaitDecision =
-        make("ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
-};
+// Test-only
+SPAN_NAME_(kTest1, "test_only.span1");
+SPAN_NAME_(kTest2, "test_only.span2");
+SPAN_NAME_(kTest3, "test_only.span3");
+
+// Resharding spans
+SPAN_NAME_(kReshardCollectionCmdInvocationTypedRun, "ReshardCollectionCmd::Invocation::typedRun");
+SPAN_NAME_(kReshardingCoordinatorRun, "ReshardingCoordinator::run");
+SPAN_NAME_(kReshardingCoordinatorRunUntilReadyToCommit,
+           "ReshardingCoordinator::_runUntilReadyToCommit");
+SPAN_NAME_(kReshardingCoordinatorCommitting, "ReshardingCoordinator::committing");
+SPAN_NAME_(kReshardingCoordinatorAfterFinish, "ReshardingCoordinator::afterFinish");
+SPAN_NAME_(kReshardingCoordinatorWaitForCommitMonitor,
+           "ReshardingCoordinator::waitForCommitMonitor");
+SPAN_NAME_(kReshardingCoordinatorFinalize, "ReshardingCoordinator::finalize");
+SPAN_NAME_(kReshardingCoordinatorRecipientPostCloningDeltaCollector,
+           "ReshardingCoordinator::RecipientPostCloningDeltaCollector");
+SPAN_NAME_(kReshardingCoordinatorAwaitAllDonorsReadyToDonate,
+           "ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
+SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsCloning,
+           "ReshardingCoordinator::_awaitAllRecipientsCloning");
+SPAN_NAME_(kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors,
+           "ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
+SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsFinishedCloning,
+           "ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
+SPAN_NAME_(kReshardingCoordinatorTellAllDonorsToRefresh,
+           "ReshardingCoordinator::_tellAllDonorsToRefresh");
+SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsFinishedApplying,
+           "ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
+SPAN_NAME_(kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit,
+           "ReshardingCoordinator::tellAllParticipantsReshardingReadyToCommit");
+SPAN_NAME_(kReshardingCoordinatorAwaitAllRecipientsInStrictConsistency,
+           "ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
+SPAN_NAME_(kReshardingDonorStateMachineRun, "ReshardingDonorService::DonorStateMachine::run");
+SPAN_NAME_(kReshardingCoordinatorDonorPostCloningDeltaCollector,
+           "ReshardingCoordinator::DonorPostCloningDeltaCollector");
+SPAN_NAME_(kReshardingDonorOnPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData,
+           "ReshardingDonorService::_onPreparingToDonate"
+           "CalculateTimestampThenTransitionToDonatingInitialData");
+SPAN_NAME_(kReshardingDonorAwaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries,
+           "ReshardingDonorService::_awaitAllRecipientsDoneCloning"
+           "ThenTransitionToDonatingOplogEntries");
+SPAN_NAME_(kReshardingDonorCreateAndStartChangeStreamsMonitor,
+           "ReshardingDonorService::_createAndStartChangeStreamsMonitor");
+SPAN_NAME_(kReshardingDonorAwaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites,
+           "ReshardingDonorService::_awaitAllRecipientsDoneApplying"
+           "ThenTransitionToPreparingToBlockWrites");
+SPAN_NAME_(kReshardingDonorWriteTransactionOplogEntryThenTransitionToBlockingWrites,
+           "ReshardingDonorService::_writeTransactionOplogEntry"
+           "ThenTransitionToBlockingWrites");
+SPAN_NAME_(kReshardingDonorRunUntilBlockingWritesOrErrored,
+           "ReshardingDonorService::_runUntilBlockingWritesOrErrored");
+SPAN_NAME_(kReshardingDonorNotifyCoordinatorAndAwaitDecision,
+           "ReshardingDonorService::_notifyCoordinatorAndAwaitDecision");
+SPAN_NAME_(kReshardingRecipientRun, "ReshardingRecipientService::run");
+SPAN_NAME_(kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection,
+           "ReshardingRecipientService::_awaitAllDonorsPreparedToDonate"
+           "ThenTransitionToCreatingCollection");
+SPAN_NAME_(kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning,
+           "ReshardingRecipientService::_createTemporaryReshardingCollection"
+           "ThenTransitionToCloning");
+SPAN_NAME_(kReshardingRecipientCloneThenTransitionToBuildingIndex,
+           "ReshardingRecipientService::_cloneThenTransitionToBuildingIndex");
+SPAN_NAME_(kReshardingRecipientBuildIndexThenTransitionToApplying,
+           "ReshardingRecipientService::_buildIndexThenTransitionToApplying");
+SPAN_NAME_(kReshardingRecipientCreateAndStartChangeStreamsMonitor,
+           "ReshardingRecipientService::_createAndStartChangeStreamsMonitor");
+SPAN_NAME_(kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency,
+           "ReshardingRecipientService::_awaitAllDonorsBlockingWrites"
+           "ThenTransitionToStrictConsistency");
+SPAN_NAME_(kReshardingRecipientRunUntilStrictConsistencyOrErrored,
+           "ReshardingRecipientService::_runUntilStrictConsistencyOrErrored");
+SPAN_NAME_(kReshardingRecipientNotifyCoordinatorAndAwaitDecision,
+           "ReshardingRecipientService::_notifyCoordinatorAndAwaitDecision");
+
+#undef SPAN_NAME_
+}  // namespace span_names
 
 /**
  * Registers a span name for a `mongo::Command`. Must only be called from `Command`'s constructor.

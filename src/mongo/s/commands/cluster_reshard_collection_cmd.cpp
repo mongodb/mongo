@@ -85,7 +85,7 @@ public:
             const auto& nss = ns();
 
             auto span = otel::traces::Span::start(
-                opCtx, otel::traces::SpanNames::kReshardCollectionCmdInvocationTypedRun);
+                opCtx, otel::traces::span_names::kReshardCollectionCmdInvocationTypedRun);
 
             ShardsvrReshardCollection shardsvrReshardCollection(nss);
             shardsvrReshardCollection.setDbName(request().getDbName());

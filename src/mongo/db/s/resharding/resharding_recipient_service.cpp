@@ -151,7 +151,7 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-using otel::traces::SpanNames;
+namespace span_names = otel::traces::span_names;
 using resharding::ensureFulfilledPromise;
 
 /**
@@ -372,7 +372,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        SpanNames::
+                        span_names::
                             kReshardingRecipientAwaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection);
                     return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
                         executor, factory);
@@ -380,32 +380,32 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        SpanNames::
+                        span_names::
                             kReshardingRecipientCreateTemporaryReshardingCollectionThenTransitionToCloning);
                     _createTemporaryReshardingCollectionThenTransitionToCloning(factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        SpanNames::kReshardingRecipientCloneThenTransitionToBuildingIndex);
+                        span_names::kReshardingRecipientCloneThenTransitionToBuildingIndex);
                     return _cloneThenTransitionToBuildingIndex(executor, factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        SpanNames::kReshardingRecipientBuildIndexThenTransitionToApplying);
+                        span_names::kReshardingRecipientBuildIndexThenTransitionToApplying);
                     return _buildIndexThenTransitionToApplying(executor, factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        SpanNames::kReshardingRecipientCreateAndStartChangeStreamsMonitor);
+                        span_names::kReshardingRecipientCreateAndStartChangeStreamsMonitor);
                     return _createAndStartChangeStreamsMonitor(executor, factory);
                 })
                 .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
-                        SpanNames::
+                        span_names::
                             kReshardingRecipientAwaitAllDonorsBlockingWritesThenTransitionToStrictConsistency);
                     return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor,
                                                                                           factory);
@@ -661,7 +661,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     auto telemetryCtx = _metadata.getTelemetryContext()
         ? otel::traces::TelemetryContextSerializer::fromBSON(*_metadata.getTelemetryContext())
         : otel::traces::Span::createTelemetryContext();
-    auto span = _startSpan(telemetryCtx, SpanNames::kReshardingRecipientRun);
+    auto span = _startSpan(telemetryCtx, span_names::kReshardingRecipientRun);
 
     _cancelState.attachStepdownToken(stepdownToken);
     _markKilledExecutor->startup();
@@ -679,12 +679,12 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         .then([this, executor] { return _startMetrics(executor); })
         .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
             auto span = _startSpan(
-                telemetryCtx, SpanNames::kReshardingRecipientRunUntilStrictConsistencyOrErrored);
+                telemetryCtx, span_names::kReshardingRecipientRunUntilStrictConsistencyOrErrored);
             return _runUntilStrictConsistencyOrErrored(executor, telemetryCtx);
         })
         .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
             auto span = _startSpan(
-                telemetryCtx, SpanNames::kReshardingRecipientNotifyCoordinatorAndAwaitDecision);
+                telemetryCtx, span_names::kReshardingRecipientNotifyCoordinatorAndAwaitDecision);
             return _notifyCoordinatorAndAwaitDecision(executor);
         })
         .onCompletion(

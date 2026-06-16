@@ -83,7 +83,7 @@ bool getKeepSpan(const std::shared_ptr<TelemetryContext>& context) {
 
 TEST_F(TelemetryContextSerializationTest, SerializeTraceContext) {
     auto context = traces::Span::createTelemetryContext();
-    auto span = traces::Span::start(context, traces::SpanNames::kTest1);
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
     BSONObj fullBson = TelemetryContextSerializer::toBSON(context);
     BSONObj traceContextBson = serializeTraceContextOnly(context);
     ASSERT(!traceContextBson.isEmpty());
@@ -96,7 +96,7 @@ TEST_F(TelemetryContextSerializationTest, SerializeTraceContext) {
 
 TEST_F(TelemetryContextSerializationTest, SerializeBaggage) {
     auto context = traces::Span::createTelemetryContext();
-    auto span = traces::Span::start(context, traces::SpanNames::kTest1);
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
     BSONObj fullBson = TelemetryContextSerializer::toBSON(context);
     BSONObj baggageBson = serializeBaggageOnly(context);
     ASSERT(!baggageBson.isEmpty());
@@ -109,7 +109,7 @@ TEST_F(TelemetryContextSerializationTest, SerializeBaggage) {
 
 TEST_F(TelemetryContextSerializationTest, RoundTrip) {
     auto context = traces::Span::createTelemetryContext();
-    auto span = traces::Span::start(context, traces::SpanNames::kTest1);
+    auto span = traces::Span::start(context, traces::span_names::kTest1);
     BSONObj bson = TelemetryContextSerializer::toBSON(context);
     auto rehydratedContext = TelemetryContextSerializer::fromBSON(bson);
     ASSERT_BSONOBJ_EQ_UNORDERED(bson, TelemetryContextSerializer::toBSON(rehydratedContext));
@@ -118,7 +118,7 @@ TEST_F(TelemetryContextSerializationTest, RoundTrip) {
 TEST_F(TelemetryContextSerializationTest, KeepSpan) {
     auto context = traces::Span::createTelemetryContext();
     ASSERT_FALSE(getKeepSpan(context));
-    auto span = traces::Span::start(context, traces::SpanNames::kTest1, true);
+    auto span = traces::Span::start(context, traces::span_names::kTest1, true);
     ASSERT_TRUE(getKeepSpan(context));
     context = performRoundTrip(context);
     ASSERT_TRUE(getKeepSpan(context));

@@ -517,7 +517,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span =
                            _startSpan(telemetryCtx,
-                                      otel::traces::SpanNames::
+                                      otel::traces::span_names::
                                           kReshardingCoordinatorAwaitAllDonorsReadyToDonate);
                        return _awaitAllDonorsReadyToDonate(executor);
                    })
@@ -525,7 +525,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
                            auto span =
                                _startSpan(telemetryCtx,
-                                          otel::traces::SpanNames::
+                                          otel::traces::span_names::
                                               kReshardingCoordinatorAwaitAllRecipientsCloning);
                            if (resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
                                    resharding::getVersionContextOrDefault(_forwardableOpMetadata),
@@ -540,14 +540,14 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span =
                            _startSpan(telemetryCtx,
-                                      otel::traces::SpanNames::
+                                      otel::traces::span_names::
                                           kReshardingCoordinatorAwaitAllRecipientsFinishedCloning);
                        return _awaitAllRecipientsFinishedCloning(executor);
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kApplying) {
                            auto span = _startSpan(telemetryCtx,
-                                                  otel::traces::SpanNames::
+                                                  otel::traces::span_names::
                                                       kReshardingCoordinatorTellAllDonorsToRefresh);
                            if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
                                    .isEnabled(resharding::getVersionContextOrDefault(
@@ -563,7 +563,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span =
                            _startSpan(telemetryCtx,
-                                      otel::traces::SpanNames::
+                                      otel::traces::span_names::
                                           kReshardingCoordinatorAwaitAllRecipientsFinishedApplying);
                        return _awaitAllRecipientsFinishedApplying(executor);
                    })
@@ -571,7 +571,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kBlockingWrites) {
                            auto span = _startSpan(
                                telemetryCtx,
-                               otel::traces::SpanNames::
+                               otel::traces::span_names::
                                    kReshardingCoordinatorTellAllParticipantsReshardingReadyToCommit);
                            if (resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites
                                    .isEnabled(resharding::getVersionContextOrDefault(
@@ -600,7 +600,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span = _startSpan(
                            telemetryCtx,
-                           otel::traces::SpanNames::
+                           otel::traces::span_names::
                                kReshardingCoordinatorAwaitAllRecipientsInStrictConsistency);
                        return _awaitAllRecipientsInStrictConsistency(executor);
                    })
@@ -814,7 +814,7 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
         ? otel::traces::TelemetryContextSerializer::fromBSON(*_coordinatorDoc.getTelemetryContext())
         : otel::traces::Span::createTelemetryContext();
 
-    auto span = _startSpan(telemetryCtx, otel::traces::SpanNames::kReshardingCoordinatorRun);
+    auto span = _startSpan(telemetryCtx, otel::traces::span_names::kReshardingCoordinatorRun);
 
     auto abortRequest = [&] {
         std::lock_guard<std::mutex> lk(_abortRequestMutex);
@@ -906,20 +906,21 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
     std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     return _initializeCoordinator(executor)
         .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
-            auto span = _startSpan(
-                telemetryCtx, otel::traces::SpanNames::kReshardingCoordinatorRunUntilReadyToCommit);
+            auto span =
+                _startSpan(telemetryCtx,
+                           otel::traces::span_names::kReshardingCoordinatorRunUntilReadyToCommit);
             return _runUntilReadyToCommit(executor, std::move(telemetryCtx));
         })
         .then([this, executor, telemetryCtx = telemetryCtx->clone()](
                   const ReshardingCoordinatorDocument& updatedCoordinatorDoc) mutable {
-            auto span =
-                _startSpan(telemetryCtx, otel::traces::SpanNames::kReshardingCoordinatorCommitting);
+            auto span = _startSpan(telemetryCtx,
+                                   otel::traces::span_names::kReshardingCoordinatorCommitting);
             return _commitAndFinishReshardOperation(executor, updatedCoordinatorDoc);
         })
         .onCompletion([this, executor, telemetryCtx = telemetryCtx->clone()](
                           Status status) mutable {
             auto span = _startSpan(telemetryCtx,
-                                   otel::traces::SpanNames::kReshardingCoordinatorAfterFinish);
+                                   otel::traces::span_names::kReshardingCoordinatorAfterFinish);
             auto opCtx = _makeOperationContext();
             reshardingPauseCoordinatorBeforeCompletion.executeIf(
                 [&](const BSONObj&) {
@@ -964,7 +965,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
         .onCompletion([this, telemetryCtx = telemetryCtx->clone()](Status outerStatus) mutable {
             auto span = _startSpan(
-                telemetryCtx, otel::traces::SpanNames::kReshardingCoordinatorWaitForCommitMonitor);
+                telemetryCtx, otel::traces::span_names::kReshardingCoordinatorWaitForCommitMonitor);
             // Wait for the commit monitor to halt. We ignore any errors because the
             // ReshardingCoordinator instance is already exiting at this point.
             return _commitMonitorQuiesced
@@ -975,7 +976,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         .onCompletion([this, self = shared_from_this(), telemetryCtx = telemetryCtx->clone()](
                           Status status) mutable {
             auto span =
-                _startSpan(telemetryCtx, otel::traces::SpanNames::kReshardingCoordinatorFinalize);
+                _startSpan(telemetryCtx, otel::traces::span_names::kReshardingCoordinatorFinalize);
             _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
             _logStatsOnCompletion(status.isOK());
 
@@ -1460,7 +1461,7 @@ void ReshardingCoordinator::_launchDonorValidations(
 
     // Launch the documentsToCopy fetch from donors concurrently with recipient cloning.
     auto span = _startSpan(telemetryCtx,
-                           otel::traces::SpanNames::
+                           otel::traces::span_names::
                                kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors);
     _fetchNumDocumentsToCopyFuture =
         _fetchAndPersistNumDocumentsToCloneFromDonors(executor).share();
@@ -2469,7 +2470,7 @@ void ReshardingCoordinator::_launchDonorPostCloningDeltaCollector(
     _donorDeltaFuture = _donorDeltaCollector->launch(
         executor,
         _startSpan(telemetryCtx,
-                   otel::traces::SpanNames::kReshardingCoordinatorDonorPostCloningDeltaCollector));
+                   otel::traces::span_names::kReshardingCoordinatorDonorPostCloningDeltaCollector));
 }
 
 void ReshardingCoordinator::_launchRecipientDeltaCollector(
@@ -2492,7 +2493,7 @@ void ReshardingCoordinator::_launchRecipientDeltaCollector(
         executor,
         _startSpan(
             telemetryCtx,
-            otel::traces::SpanNames::kReshardingCoordinatorRecipientPostCloningDeltaCollector));
+            otel::traces::span_names::kReshardingCoordinatorRecipientPostCloningDeltaCollector));
 }
 
 void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& nss) {

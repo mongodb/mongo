@@ -329,7 +329,7 @@ public:
 
     otel::traces::Span makeSpanForCollector() {
         auto telemetryCtx = otel::traces::Span::createTelemetryContext();
-        return otel::traces::Span::start(telemetryCtx, otel::traces::SpanNames::kTest1);
+        return otel::traces::Span::start(telemetryCtx, otel::traces::span_names::kTest1);
     }
 
 private:
