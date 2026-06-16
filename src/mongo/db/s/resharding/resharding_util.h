@@ -57,6 +57,7 @@
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/version_context.h"
@@ -534,25 +535,28 @@ void verifyIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
                            InputIterator2 localIndexSpecsBegin,
                            InputIterator2 localIndexSpecsEnd) {
     stdx::unordered_map<std::string, BSONObj> localIndexSpecMap;
-    std::transform(
-        localIndexSpecsBegin,
-        localIndexSpecsEnd,
-        std::inserter(localIndexSpecMap, localIndexSpecMap.end()),
-        [](const auto& spec) { return std::pair(std::string{spec.getStringField("name")}, spec); });
+    std::transform(localIndexSpecsBegin,
+                   localIndexSpecsEnd,
+                   std::inserter(localIndexSpecMap, localIndexSpecMap.end()),
+                   [](const auto& spec) {
+                       return std::pair(
+                           std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)},
+                           spec);
+                   });
 
     UnorderedFieldsBSONObjComparator bsonCmp;
     for (auto it = sourceIndexSpecsBegin; it != sourceIndexSpecsEnd; ++it) {
         auto spec = *it;
-        auto specName = std::string{spec.getStringField("name")};
+        auto specName = std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
+        auto localIt = localIndexSpecMap.find(specName);
         uassert(9365601,
                 str::stream() << "Resharded collection missing source collection index: "
                               << specName,
-                localIndexSpecMap.find(specName) != localIndexSpecMap.end());
+                localIt != localIndexSpecMap.end());
         uassert(9365602,
                 str::stream() << "Resharded collection created non-matching index. Source spec: "
-                              << spec << " Resharded collection spec: "
-                              << localIndexSpecMap.find(specName)->second,
-                bsonCmp.evaluate(spec == localIndexSpecMap.find(specName)->second));
+                              << spec << " Resharded collection spec: " << localIt->second,
+                bsonCmp.evaluate(spec == localIt->second));
     }
 }
 
