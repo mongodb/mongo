@@ -144,14 +144,14 @@ bool isMongotStage(DocumentSource* stage);
 
 /**
  * Check if this is a $vectorSearch-as-an-extension stage.
- * TODO SERVER-116021 Remove this function when the extension can do this through
+ * TODO SERVER-121094 Remove this function when the extension can do this through
  * bindResolvedNamespace().
  */
 bool isExtensionVectorSearchStage(StringData stageName);
 
 /**
  * Check if this is a $search or $searchMeta extension stage.
- * TODO SERVER-116021 Remove this function when the extension can do this through
+ * TODO SERVER-121094 Remove this function when the extension can do this through
  * bindResolvedNamespace().
  */
 bool isExtensionSearchStage(StringData stageName);
