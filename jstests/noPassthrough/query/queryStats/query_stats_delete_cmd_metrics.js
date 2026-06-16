@@ -36,8 +36,8 @@ function testSingleDelete(testDB, coll, collName) {
     });
 }
 
-// Simple _id queries skip parsing during normal delete processing (IDHACK optimization), but should still record
-// metrics correctly.
+// Simple _id queries skip parsing during normal delete processing (IDHACK optimization), but should
+// still record metrics correctly.
 function testIdDelete(testDB, coll, collName) {
     assert.commandWorked(coll.insert({_id: 999, v: 1}));
     assert.commandWorked(
@@ -135,6 +135,53 @@ describeWriteCmdQueryStatsReplicaSetTests(
                     null,
                     "Document should be deleted after successful retry",
                 ),
+        });
+
+        describe("skip unsupported command types", function () {
+            it("should not record delete stats for findAndModify with remove", function () {
+                const {testDB, coll, collName, conn} = ctxFn();
+                assert.commandWorked(
+                    testDB.runCommand({findAndModify: collName, query: {v: 1}, remove: true}),
+                );
+                assert.eq(
+                    0,
+                    getQueryStatsDeleteCmd(conn, {collName}).length,
+                    "Expected no delete stats for findAndModify remove",
+                );
+            });
+
+            it("should not record delete stats for bulkWrite delete op", function () {
+                const {testDB, coll, collName, conn} = ctxFn();
+                assert.commandWorked(
+                    testDB.adminCommand({
+                        bulkWrite: 1,
+                        ops: [{delete: 0, filter: {v: 2}, multi: false}],
+                        nsInfo: [{ns: coll.getFullName()}],
+                    }),
+                );
+                assert.eq(
+                    0,
+                    getQueryStatsDeleteCmd(conn, {collName}).length,
+                    "Expected no delete stats for bulkWrite delete",
+                );
+            });
+
+            it("should not record delete stats for applyOps delete op", function () {
+                const {testDB, coll, collName, conn} = ctxFn();
+                assert.commandWorked(coll.insert({_id: "applyOpsDeleteTest"}));
+                assert.commandWorked(
+                    testDB.adminCommand({
+                        applyOps: [
+                            {op: "d", ns: coll.getFullName(), o: {_id: "applyOpsDeleteTest"}},
+                        ],
+                    }),
+                );
+                assert.eq(
+                    0,
+                    getQueryStatsDeleteCmd(conn, {collName}).length,
+                    "Expected no delete stats for applyOps delete",
+                );
+            });
         });
     },
 );

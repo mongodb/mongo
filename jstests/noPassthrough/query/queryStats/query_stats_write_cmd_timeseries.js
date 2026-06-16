@@ -1,9 +1,18 @@
 /**
- * Test that query stats properly handles time-series collections:
- * 1. Inserts on time-series collections should NOT be recorded as update commands in query stats.
- * 2. Explicit updates on time-series collections should be properly recorded in query stats.
+ * Tests query stats handling on time-series collections.
+ * Currently query stats collection on updates, inserts, and deletes is disabled on the router
+ * (TODO SERVER-119643)
+ *
+ * 1. Inserts on time-series collections should NOT be recorded as update commands in query stats,
+ *    and should be correctly recorded on mongos.
+ * 2. Updates on time-series collections are only allowed when updating the metafield. These should
+ *    be recorded in query stats on mongos.
+ * 3. Deletes on time-series collections should be recorded as delete commands in query stats on
+ *    mongos.
  *
  * @tags: [
+ *   featureFlagQueryStatsInsert,
+ *   featureFlagQueryStatsDelete,
  *   requires_fcv_90,
  * ]
  */
@@ -11,7 +20,10 @@ import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js
 import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
+    getQueryStatsDeleteCmd,
+    getQueryStatsInsertCmd,
     getQueryStatsUpdateCmd,
+    getQueryStatsMultipleCmds,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -39,7 +51,7 @@ function createTimeseriesCollectionWithData(testDB, collName) {
     return coll;
 }
 
-function testInsertNotRecorded(testDB, coll, collName) {
+function testInsert(testDB, coll, collName, expectRecorded) {
     assert.commandWorked(
         coll.insert({[timeField]: ISODate("2021-05-18T03:00:00.000Z"), v: 4, [metaField]: "c"}),
     );
@@ -51,9 +63,47 @@ function testInsertNotRecorded(testDB, coll, collName) {
         "Time-series inserts should NOT be recorded as update commands. Found: " +
             tojson(updateStats),
     );
+    const insertStats = getQueryStatsInsertCmd(testDB, {collName: collName});
+    if (!expectRecorded) {
+        assert.eq(
+            0,
+            insertStats.length,
+            "Time-series inserts should NOT be recorded. Found: " + tojson(insertStats),
+        );
+        return;
+    }
+
+    assert.eq(1, insertStats.length);
+    const entry = insertStats[0];
+    assertAggregatedMetricsSingleExec(entry, {
+        keysExamined: 0,
+        docsExamined: 0,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false,
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: 1,
+            nUpdateOps: 0,
+            nDeleteOps: 0,
+        },
+    });
+    assertExpectedResults({
+        results: entry,
+        expectedQueryStatsKey: entry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 0,
+        expectedDocsReturnedMax: 0,
+        expectedDocsReturnedMin: 0,
+        expectedDocsReturnedSumOfSq: 0,
+    });
 }
 
-function testBulkInsertNotRecorded(testDB, coll, collName) {
+function testBulkWriteNotRecorded(testDB, coll, collName) {
     assert.commandWorked(
         testDB.adminCommand({
             bulkWrite: 1,
@@ -79,17 +129,93 @@ function testBulkInsertNotRecorded(testDB, coll, collName) {
         }),
     );
 
-    const updateStats = getQueryStatsUpdateCmd(testDB, {collName: collName});
+    // bulkWrite shouldn't generate any type of query stats entry
+    const writeStats = getQueryStatsMultipleCmds(["update", "insert", "bulkWrite"], testDB, {
+        collName: collName,
+    });
     assert.eq(
         0,
-        updateStats.length,
-        "Time-series bulk inserts should NOT be recorded as update commands. Found: " +
-            tojson(updateStats),
+        writeStats.length,
+        "Time-series bulk inserts should NOT be recorded. Found: " + tojson(writeStats),
     );
 }
 
-// On standalone mongod, the timeseries rewrite transforms the update into an internal operation,
-// so it should not appear in query stats.
+function testDelete(testDB, coll, collName, expectRecorded) {
+    assert.commandWorked(
+        coll.insertMany([
+            {
+                [timeField]: ISODate("2021-05-18T08:00:00.000Z"),
+                v: 7,
+                [metaField]: "deleteMetaField",
+            },
+            {
+                [timeField]: ISODate("2021-05-18T09:00:00.000Z"),
+                v: 8,
+                [metaField]: "deleteMetaField",
+            },
+            {
+                [timeField]: ISODate("2021-05-18T09:00:00.000Z"),
+                v: 8,
+                [metaField]: "deleteMetaField3",
+            },
+        ]),
+    );
+    assert.commandWorked(
+        testDB.runCommand({
+            delete: collName,
+            deletes: [{q: {[metaField]: "deleteMetaField"}, limit: 0}],
+        }),
+    );
+    const deleteStats = getQueryStatsDeleteCmd(testDB, {collName: collName});
+    if (!expectRecorded) {
+        assert.eq(
+            0,
+            deleteStats.length,
+            "Time-series deletes should NOT be recorded as delete commands",
+            {
+                deleteStats,
+            },
+        );
+        return;
+    }
+
+    assert.eq(1, deleteStats.length);
+    const entry = deleteStats[0];
+
+    // TODO SERVER-121266: On sharded timeseries, the delete is processed via an internal
+    // transaction path at the shard, which does not propagate write metrics back to the router.
+    // The entry is recorded with (nDeleteOps: 1), but keysExamined, docsExamined, and nDeleted all
+    // read as 0 from the router's perspective.
+    assertAggregatedMetricsSingleExec(entry, {
+        keysExamined: 0,
+        docsExamined: 0,
+        hasSortStage: false,
+        usedDisk: false,
+        fromMultiPlanner: false,
+        fromPlanCache: false,
+        writes: {
+            nMatched: 0,
+            nUpserted: 0,
+            nModified: 0,
+            nDeleted: 0,
+            nInserted: 0,
+            nUpdateOps: 0,
+            nDeleteOps: 1,
+        },
+    });
+    assertExpectedResults({
+        results: entry,
+        expectedQueryStatsKey: entry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 0,
+        expectedDocsReturnedMax: 0,
+        expectedDocsReturnedMin: 0,
+        expectedDocsReturnedSumOfSq: 0,
+    });
+}
+
+// On standalone mongod, the timeseries update is rewritten into an internal internal format, and we
+// skip query stats to avoid the discrepancy (TODO SERVER-119643).
 function testMetaFieldUpdateNotRecordedOnMongod(testDB, coll, collName) {
     assert.commandWorked(
         coll.insertMany([
@@ -205,12 +331,16 @@ describe("time-series query stats (standalone)", function () {
         resetQueryStatsStore(conn, "1MB");
     });
 
-    it("should not record time-series inserts as update commands", function () {
-        testInsertNotRecorded(testDB, coll, collName);
+    it("should not record time-series inserts on mongod", function () {
+        testInsert(testDB, coll, collName, false /* expectRecorded */);
     });
 
-    it("should not record bulk time-series inserts as update commands", function () {
-        testBulkInsertNotRecorded(testDB, coll, collName);
+    it("should not record time-series bulkWrites", function () {
+        testBulkWriteNotRecorded(testDB, coll, collName);
+    });
+
+    it("should not record time-series deletes on mongod", function () {
+        testDelete(testDB, coll, collName, false /* expectRecorded */);
     });
 
     // TODO SERVER-119643 Combine Standalone test with sharded test.
@@ -253,15 +383,19 @@ describe("time-series query stats (sharded)", function () {
             coll = createTimeseriesCollectionWithData(testDB, collName);
         });
 
-        it("should not record time-series inserts as update commands", function () {
-            testInsertNotRecorded(testDB, coll, collName);
+        it("should correctly record time-series inserts on mongos", function () {
+            testInsert(testDB, coll, collName, true /* expectRecorded */);
         });
 
-        it("should not record bulk time-series inserts as update commands", function () {
-            testBulkInsertNotRecorded(testDB, coll, collName);
+        it("should not record time-series bulkWrites", function () {
+            testBulkWriteNotRecorded(testDB, coll, collName, false /* expectRecorded */);
         });
 
-        it("should record explicit meta field update in query stats", function () {
+        it("should correctly record time-series deletes on mongos", function () {
+            testDelete(testDB, coll, collName, true /* expectRecorded */);
+        });
+
+        it("should record explicit meta field update in query stats on mongos", function () {
             testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName);
         });
     });

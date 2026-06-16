@@ -198,6 +198,10 @@ export function getQueryStatsCountCmd(conn, options = kDefaultQueryStatsOptions)
     return getQueryStatsForCommand("count", conn, options);
 }
 
+export function getQueryStatsMultipleCmds(commands, conn, options = kDefaultQueryStatsOptions) {
+    return getQueryStatsForCommand({$in: commands}, conn, options);
+}
+
 function getQueryStatsForCommand(command, conn, options) {
     let matchExpr = {
         "key.queryShape.command": command,
