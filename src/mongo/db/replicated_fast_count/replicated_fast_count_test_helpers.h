@@ -34,7 +34,11 @@
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/util/uuid.h"
+
+#include <list>
+#include <utility>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
@@ -233,6 +237,37 @@ void deleteDocsByIDRange(OperationContext* opCtx,
                          int64_t startingCount,
                          int64_t startingSize,
                          const BSONObj& sampleDoc);
+
+/**
+ * Allows explicit control over the contents of the "oplog" used to aggregate size and count. This
+ * test cursor does not have visibility rules specific to the oplog, but should suffice for
+ * targeted testing of aggregation logic.
+ */
+class OplogCursorMock : public SeekableRecordCursor {
+public:
+    OplogCursorMock(std::list<repl::OplogEntry> entries);
+
+    ~OplogCursorMock() override {}
+
+    boost::optional<Record> next() override;
+
+    boost::optional<Record> seekExact(const RecordId& id) override;
+
+    void save() override {}
+    bool restore(RecoveryUnit&, bool) override {
+        return true;
+    }
+    void detachFromOperationContext() override {}
+    void reattachToOperationContext(OperationContext*) override {}
+    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
+
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override;
+
+private:
+    bool _initialized = false;
+    std::list<std::pair<RecordId, BSONObj>> _records;
+    std::list<std::pair<RecordId, BSONObj>>::const_iterator _it;
+};
 
 /**
  * Return all oplog entries matching 'predicate'.

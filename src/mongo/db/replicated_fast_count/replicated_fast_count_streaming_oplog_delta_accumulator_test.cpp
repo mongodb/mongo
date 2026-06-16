@@ -40,80 +40,6 @@
 namespace mongo::replicated_fast_count {
 namespace {
 
-/**
- * In-memory oplog-cursor stub for driving StreamingOplogDeltaAccumulator from a list of
- * pre-built OplogEntries. Mirrors the cursor's iteration order; does not model oplog visibility.
- */
-class OplogCursorMock : public SeekableRecordCursor {
-public:
-    OplogCursorMock(std::list<repl::OplogEntry> entries) {
-        for (const auto& entry : entries) {
-            _records.emplace_back(RecordId(entry.getTimestamp().asULL()),
-                                  entry.getEntry().toBSON().getOwned());
-        }
-    }
-
-    ~OplogCursorMock() override {}
-
-    boost::optional<Record> next() override {
-        if (_records.empty()) {
-            return boost::none;
-        }
-
-        if (!_initialized) {
-            _initialized = true;
-            _it = _records.cbegin();
-        } else {
-            ++_it;
-        }
-
-        if (_it == _records.cend()) {
-            _initialized = false;
-            return boost::none;
-        }
-
-        return Record{_it->first, RecordData(_it->second.objdata(), _it->second.objsize())};
-    }
-
-    boost::optional<Record> seekExact(const RecordId& id) override {
-        for (auto it = _records.cbegin(); it != _records.cend(); ++it) {
-            if (it->first == id) {
-                _initialized = true;
-                _it = it;
-                return Record{it->first, RecordData(it->second.objdata(), it->second.objsize())};
-            }
-        }
-        _initialized = false;
-        return boost::none;
-    }
-
-    void save() override {}
-    bool restore(RecoveryUnit&, bool) override {
-        return true;
-    }
-    void detachFromOperationContext() override {}
-    void reattachToOperationContext(OperationContext*) override {}
-    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
-
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
-        invariant(boundInclusion == BoundInclusion::kExclude);
-        for (auto it = _records.cbegin(); it != _records.cend(); ++it) {
-            if (it->first > start) {
-                _initialized = true;
-                _it = it;
-                return Record{it->first, RecordData(it->second.objdata(), it->second.objsize())};
-            }
-        }
-        _initialized = false;
-        return {};
-    }
-
-private:
-    bool _initialized = false;
-    std::list<std::pair<RecordId, BSONObj>> _records;
-    std::list<std::pair<RecordId, BSONObj>>::const_iterator _it;
-};
-
 class StreamingOplogDeltaAccumulatorTest : public CatalogTestFixture {
 protected:
     static constexpr int64_t kTestTerm = 1;
@@ -148,7 +74,7 @@ protected:
 
     OplogScanResult runAccumulator(StreamingOplogDeltaAccumulator::Options opts,
                                    std::list<repl::OplogEntry> entries) {
-        OplogCursorMock cursor(std::move(entries));
+        test_helpers::OplogCursorMock cursor(std::move(entries));
         StreamingOplogDeltaAccumulator acc(std::move(opts));
         while (auto rec = cursor.next()) {
             acc.consumeRecord(*rec);

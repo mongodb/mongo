@@ -1014,83 +1014,10 @@ void assertExpectedAggregateDelta(const AggregateDeltaExpectation& expected,
     EXPECT_EQ(filteredDeltas.lastTimestamp, expected.lastTimestamp);
 }
 
-/**
- * Allows explicit control over the contents of the "oplog" used to aggregate size and count. This
- * test cursor does not have visibility rules specific to the oplog, but should suffice for
- * targeted testing of aggregation logic.
- */
-class OplogCursorMock : public SeekableRecordCursor {
-public:
-    OplogCursorMock(std::list<repl::OplogEntry> entries) {
-        for (const auto& entry : entries) {
-            _records.emplace_back(RecordId(entry.getTimestamp().asULL()),
-                                  entry.getEntry().toBSON().getOwned());
-        }
-    }
-
-    ~OplogCursorMock() override {}
-
-    boost::optional<Record> next() override {
-        if (_records.empty()) {
-            return boost::none;
-        }
-
-        if (!_initialized) {
-            _initialized = true;
-            _it = _records.cbegin();
-        } else {
-            ++_it;
-        }
-
-        if (_it == _records.cend()) {
-            _initialized = false;
-            return boost::none;
-        }
-
-        return Record{_it->first, RecordData(_it->second.objdata(), _it->second.objsize())};
-    }
-
-    boost::optional<Record> seekExact(const RecordId& id) override {
-        for (auto it = _records.cbegin(); it != _records.cend(); ++it) {
-            if (it->first == id) {
-                _initialized = true;
-                _it = it;
-                return Record{it->first, RecordData(it->second.objdata(), it->second.objsize())};
-            }
-        }
-        _initialized = false;
-        return boost::none;
-    }
-
-    void save() override {}
-    bool restore(RecoveryUnit&, bool) override {
-        return true;
-    }
-    void detachFromOperationContext() override {}
-    void reattachToOperationContext(OperationContext*) override {}
-    void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}
-
-    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
-        invariant(boundInclusion == BoundInclusion::kExclude);
-        for (auto it = _records.cbegin(); it != _records.cend(); ++it) {
-            if (it->first > start) {
-                _initialized = true;
-                _it = it;
-                return Record{it->first, RecordData(it->second.objdata(), it->second.objsize())};
-            }
-        }
-        _initialized = false;
-        return {};
-    }
-
-private:
-    bool _initialized = false;
-    std::list<std::pair<RecordId, BSONObj>> _records;
-    std::list<std::pair<RecordId, BSONObj>>::const_iterator _it;
-};
-
 class AggregateSizeCountFromOplogTest : public CatalogTestFixture {
 protected:
+    using OplogCursorMock = test_helpers::OplogCursorMock;
+
     /**
      * Describes one inner op to synthesize inside an applyOps oplog entry.
      * For CRUD ops (kInsert/kUpdate/kDelete), set sizeDelta and includeSizeMetadata.

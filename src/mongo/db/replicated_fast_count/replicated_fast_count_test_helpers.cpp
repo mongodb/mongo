@@ -266,6 +266,59 @@ void deleteDocsByIDRange(OperationContext* opCtx,
     checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
 }
 
+OplogCursorMock::OplogCursorMock(std::list<repl::OplogEntry> entries) {
+    for (const auto& entry : entries) {
+        _records.emplace_back(RecordId(entry.getTimestamp().asULL()),
+                              entry.getEntry().toBSON().getOwned());
+    }
+}
+
+boost::optional<Record> OplogCursorMock::next() {
+    if (_records.empty()) {
+        return boost::none;
+    }
+
+    if (!_initialized) {
+        _initialized = true;
+        _it = _records.cbegin();
+    } else {
+        ++_it;
+    }
+
+    if (_it == _records.cend()) {
+        _initialized = false;
+        return boost::none;
+    }
+
+    return Record{_it->first, RecordData(_it->second.objdata(), _it->second.objsize())};
+}
+
+boost::optional<Record> OplogCursorMock::seekExact(const RecordId& id) {
+    for (auto it = _records.cbegin(); it != _records.cend(); ++it) {
+        if (it->first == id) {
+            _initialized = true;
+            _it = it;
+            return Record{it->first, RecordData(it->second.objdata(), it->second.objsize())};
+        }
+    }
+    _initialized = false;
+    return boost::none;
+}
+
+boost::optional<Record> OplogCursorMock::seek(const RecordId& start,
+                                              BoundInclusion boundInclusion) {
+    invariant(boundInclusion == BoundInclusion::kExclude);
+    for (auto it = _records.cbegin(); it != _records.cend(); ++it) {
+        if (it->first > start) {
+            _initialized = true;
+            _it = it;
+            return Record{it->first, RecordData(it->second.objdata(), it->second.objsize())};
+        }
+    }
+    _initialized = false;
+    return {};
+}
+
 std::vector<repl::OplogEntry> getOplogEntriesMatching(
     OperationContext* opCtx, std::function<bool(const repl::OplogEntry&)> predicate) {
 
