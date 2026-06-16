@@ -12,7 +12,7 @@ import unittest
 from typing import Optional
 from unittest import TestCase
 
-from git import Repo
+from git import Git, Repo
 from git.exc import GitCommandError
 from gitdb.exc import BadName
 
@@ -31,7 +31,12 @@ def _commit(repo: Repo, message: str, filename: str = "f", content: Optional[str
 
 def _init_repo(repo: str) -> Repo:
     # Make commits deterministic and not dependent on the host's git config.
-    r = Repo.init(repo, b="master")
+    # git init -b was added in git 2.28; fall back to symbolic-ref on older versions.
+    if Git().version_info >= (2, 28):
+        r = Repo.init(repo, b="master")
+    else:
+        r = Repo.init(repo)
+        r.git.symbolic_ref("HEAD", "refs/heads/master")
     with r.config_writer() as cfg:
         cfg.set_value("user", "email", "test@example.com")
         cfg.set_value("user", "name", "Test")
