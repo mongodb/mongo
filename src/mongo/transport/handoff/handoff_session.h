@@ -175,12 +175,6 @@ private:
     static Status _pollForRead(int fd, int timeoutMs);
 
     /**
-     * Applies the current _timeout to fd via SO_RCVTIMEO and SO_SNDTIMEO. A nullopt timeout
-     * sets both options to zero, which disables the timeout.
-     */
-    Status _applyTimeout(int fd);
-
-    /**
      * Reads exactly `len` bytes into `buf` from the current fd using blocking I/O.
      * Returns NetworkTimeout if SO_RCVTIMEO fires before all bytes are read.
      */
@@ -229,7 +223,6 @@ private:
     RestrictionEnvironment _restrictionEnvironment;
     struct s2n_connection* _s2nConnection;
     struct s2n_config* _s2nConfig;
-    boost::optional<Milliseconds> _timeout;
     // The downstream client's source address from the PROXY v2 header. Set in prelude(). Stored as
     // SockAddr for RestrictionEnvironment construction in _updateEndpointsForClientFd().
     boost::optional<SockAddr> _proxiedSrcAddr;

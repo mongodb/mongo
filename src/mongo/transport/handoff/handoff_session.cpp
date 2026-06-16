@@ -143,12 +143,8 @@ bool HandoffSession::isConnected() {
     return true;
 }
 
-void HandoffSession::setTimeout(boost::optional<Milliseconds> timeout) {
-    _timeout = timeout;
-    int fd = _fd.load();
-    if (fd >= 0) {
-        uassertStatusOK(_applyTimeout(fd));
-    }
+void HandoffSession::setTimeout(boost::optional<Milliseconds>) {
+    MONGO_UNREACHABLE;
 }
 
 Status HandoffSession::_pollForRead(int fd, int timeoutMs) {
@@ -178,26 +174,6 @@ Status HandoffSession::_pollForRead(int fd, int timeoutMs) {
     return Status::OK();
 }
 
-Status HandoffSession::_applyTimeout(int fd) {
-    // Zero disables the timeout. Non-zero sets a deadline for blocking recv/send calls.
-    struct timeval tv = {0, 0};
-    if (_timeout) {
-        auto ms = durationCount<Milliseconds>(*_timeout);
-        tv.tv_sec = ms / 1000;
-        tv.tv_usec = (ms % 1000) * 1000;
-    }
-    if (::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0) {
-        return Status(
-            ErrorCodes::InternalError,
-            fmt::format("setsockopt SO_RCVTIMEO failed: {}", errorMessage(lastSocketError())));
-    }
-    if (::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) != 0) {
-        return Status(
-            ErrorCodes::InternalError,
-            fmt::format("setsockopt SO_SNDTIMEO failed: {}", errorMessage(lastSocketError())));
-    }
-    return Status::OK();
-}
 
 StatusWith<size_t> HandoffSession::_syncRead(char* buf, size_t len) {
     size_t totalRead = 0;
@@ -434,12 +410,6 @@ Status HandoffSession::_handleSessionHandoff(const Message& msg, int clientFd) {
     // Do all setup on clientFd before updating _fd so any failure still leaves us able to
     // close both fds cleanly via the ScopeGuard.
 
-    // Apply any active timeout to the client fd so blocking s2n_recv/s2n_send respect it.
-    status = _applyTimeout(clientFd);
-    if (!status.isOK()) {
-        return status;
-    }
-
     status = s2nCheck(s2n_connection_set_fd(_s2nConnection, clientFd), "s2n_connection_set_fd"_sd);
     if (!status.isOK()) {
         return status;
@@ -508,8 +478,7 @@ const HostAndPort& HandoffSession::getSourceRemoteEndpoint() const {
 transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
     int fd = _fd.load();
 
-    // Apply the proxy header read timeout for the duration of this call, then restore the
-    // session timeout on return.
+    // Apply the proxy header read timeout for the duration of this call only.
     const int64_t proxyTimeoutSecs = gProxyProtocolTimeoutSecs.load();
 
     {
@@ -525,12 +494,9 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
                             errorMessage(lastSocketError())),
                 ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
     }
-    ON_BLOCK_EXIT([this, fd] {
-        if (auto status = _applyTimeout(fd); !status.isOK()) {
-            LOGV2_WARNING(12823503,
-                          "Failed to restore session timeout after proxy header read",
-                          "error"_attr = status);
-        }
+    ON_BLOCK_EXIT([fd] {
+        struct timeval tv = {0, 0};
+        ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     });
 
     int timeoutMs = static_cast<int>(
@@ -718,8 +684,7 @@ Status HandoffSession::waitForData() {
     if (fd < 0) {
         return Status(ErrorCodes::SocketException, "Session is not connected");
     }
-    int timeoutMs = _timeout ? durationCount<Milliseconds>(*_timeout) : -1;
-    return _pollForRead(fd, timeoutMs);
+    return _pollForRead(fd, /*timeoutMs=*/-1);
 }
 
 Future<void> HandoffSession::asyncWaitForData() {

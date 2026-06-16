@@ -308,6 +308,12 @@ DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
     session->setIsLoadBalancerPeer(false);
 }
 
+DEATH_TEST_F(HandoffSessionPropertiesDeathTest,
+             SetTimeoutIsUnsupported,
+             "Hit a MONGO_UNREACHABLE") {
+    makeSession()->setTimeout(Milliseconds{100});
+}
+
 //
 // Pre-handoff: message behavior in Cleartext mode.
 //
@@ -512,69 +518,6 @@ TEST_F(HandoffSessionPreHandoffMessageTest, SinkMessageFailsOnPeerDisconnect) {
     ASSERT_EQ(session->sinkMessage(makeMessage(dbMsg, BSON("ping" << 1))).code(),
               ErrorCodes::SocketException);
     ASSERT_FALSE(session->isConnected());
-}
-
-//
-// Pre-handoff: timeout behavior in Cleartext mode.
-//
-
-class HandoffSessionPreHandoffTimeoutTest : public HandoffSessionCleartextFixture {
-protected:
-    // Short deadline used by all timeout tests. It is small enough to keep the suite fast and
-    // large enough to be reliably detected on a slow machine.
-    static constexpr Milliseconds kTestTimeout{50};
-};
-
-/** waitForData() reports NetworkTimeout when no data arrives. */
-TEST_F(HandoffSessionPreHandoffTimeoutTest, WaitForDataTimesOut) {
-    auto session = makeSession();
-    session->setTimeout(kTestTimeout);
-
-    // The peer is connected but sends no data.
-    ASSERT_EQ(session->waitForData().code(), ErrorCodes::NetworkTimeout);
-}
-
-/** sourceMessage() times out when no data arrives. */
-TEST_F(HandoffSessionPreHandoffTimeoutTest, SourceMessageRespectsTimeout) {
-    auto session = makeSession();
-    session->setTimeout(kTestTimeout);
-
-    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::NetworkTimeout);
-}
-
-/** sourceMessage() times out when the header arrives but the body is withheld. */
-TEST_F(HandoffSessionPreHandoffTimeoutTest, SourceMessageRespectsTimeoutAfterHeader) {
-    auto session = makeSession();
-    session->setTimeout(kTestTimeout);
-
-    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
-    writeAll(proxyFd(), msg.buf(), sizeof(MSGHEADER::Value));
-
-    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::NetworkTimeout);
-}
-
-/**
- * Clearing the timeout with setTimeout(boost::none) restores blocking behavior. A message that
- * arrives after a short delay is received successfully rather than rejected as timed out.
- */
-TEST_F(HandoffSessionPreHandoffTimeoutTest, ClearingTimeoutRestoresBlockingBehavior) {
-    auto session = makeSession();
-    session->setTimeout(kTestTimeout);
-    session->setTimeout(boost::none);
-
-    // Deliver a message from a thread after a brief delay. The session must not time out.
-    Message msg = makeMessage(dbMsg, BSON("hello" << 1));
-    std::thread sender([&] {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        writeAll(proxyFd(), msg.buf(), msg.size());
-    });
-
-    auto result = session->sourceMessage();
-    sender.join();
-
-    ASSERT_OK(result.getStatus());
-    ASSERT_EQ(result.getValue().size(), msg.size());
-    ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
 }
 
 //
@@ -1186,30 +1129,6 @@ TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
 }
 
 /**
- * A timeout set before handoff is propagated to the client TLS fd during handoff and is
- * respected by post-handoff sourceMessage() calls.
- */
-TEST_F(HandoffSessionHandoffTransitionTest, TimeoutSetBeforeHandoffIsRespectedAfterHandoff) {
-    static constexpr Milliseconds timeout{50};
-    session->setTimeout(timeout);
-
-    Message handoffMsg = buildSessionHandoffMessage(serializedState);
-    sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
-    ::close(proxyTlsFd);
-    proxyTlsFd = -1;
-
-    StatusWith<Message> firstResult = Status(ErrorCodes::InternalError, "not set");
-    std::thread t([&] { firstResult = session->sourceMessage(); });
-    waitForSessionHandoff();
-    clientSend(makeMessage(dbMsg, BSON("ping" << 1)));
-    t.join();
-    ASSERT_OK(firstResult.getStatus());
-
-    // No data sent after handoff. The timeout set before handoff must still fire.
-    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::NetworkTimeout);
-}
-
-/**
  * Fixture for post-handoff tests. Inherits HandoffSessionTLSFixture and drives the handoff to
  * completion in setUp. Tests communicate with the session via clientConn.
  */
@@ -1406,64 +1325,6 @@ TEST_F(HandoffSessionPostHandoffMessageTest, SinkMessageFailsOnPeerDisconnect) {
     ASSERT_EQ(session->sinkMessage(makeMessage(dbMsg, BSON("ping" << 1))).code(),
               ErrorCodes::SocketException);
     ASSERT_FALSE(session->isConnected());
-}
-
-//
-// Post-handoff: timeout behavior in TLS mode.
-//
-
-class HandoffSessionPostHandoffTimeoutTest : public HandoffSessionPostHandoffFixture {
-protected:
-    static constexpr Milliseconds kTestTimeout{50};
-};
-
-/** waitForData() reports NetworkTimeout when no data arrives. */
-TEST_F(HandoffSessionPostHandoffTimeoutTest, WaitForDataTimesOut) {
-    session->setTimeout(kTestTimeout);
-
-    // The peer is connected but sends no data.
-    ASSERT_EQ(session->waitForData().code(), ErrorCodes::NetworkTimeout);
-}
-
-/** sourceMessage() times out when no data arrives. */
-TEST_F(HandoffSessionPostHandoffTimeoutTest, SourceMessageRespectsTimeout) {
-    session->setTimeout(kTestTimeout);
-    ASSERT_EQ(session->sourceMessage().getStatus().code(), ErrorCodes::NetworkTimeout);
-}
-
-/** sourceMessage() times out when the header arrives but the body is withheld. */
-TEST_F(HandoffSessionPostHandoffTimeoutTest, SourceMessageRespectsTimeoutAfterHeader) {
-    session->setTimeout(kTestTimeout);
-
-    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
-    std::thread sender([&] { clientSend(msg.buf(), sizeof(MSGHEADER::Value)); });
-
-    auto result = session->sourceMessage();
-    sender.join();
-
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::NetworkTimeout);
-}
-
-/**
- * Clearing the timeout with setTimeout(boost::none) restores blocking behavior. A message that
- * arrives after a short delay is received successfully rather than rejected as timed out.
- */
-TEST_F(HandoffSessionPostHandoffTimeoutTest, ClearingTimeoutRestoresBlockingBehavior) {
-    session->setTimeout(kTestTimeout);
-    session->setTimeout(boost::none);
-
-    Message msg = makeMessage(dbMsg, BSON("hello" << 1));
-    std::thread sender([&] {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        clientSend(msg);
-    });
-
-    auto result = session->sourceMessage();
-    sender.join();
-
-    ASSERT_OK(result.getStatus());
-    ASSERT_EQ(result.getValue().size(), msg.size());
-    ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
 }
 
 //
@@ -1967,32 +1828,28 @@ TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfSocketIsEmp
 }
 
 /**
- * A session timeout set before prelude() must still be honoured after prelude() returns.
+ * The proxy protocol read timeout must not outlive prelude(). A short proxyProtocolTimeoutSecs
+ * must not cause sourceMessage() to return NetworkTimeout after prelude() succeeds.
  */
-TEST_F(HandoffSessionProxyHeaderTest, SessionTimeoutRestoredAfterPrelude) {
-    // Make the proxy protocol timeout larger than the session timeout so the proxy header read
-    // cannot time out before the session does, but small enough that wait_for() below detects
-    // the bug promptly if the session timeout was not restored.
-    constexpr int kProxyTimeoutSecs = 2;
-    unittest::ServerParameterGuard proxyTimeout{"proxyProtocolTimeoutSecs", kProxyTimeoutSecs};
-    Milliseconds sessionTimeout{100};
-    session->setTimeout(sessionTimeout);
+TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutNotLeftOnSocketAfterPrelude) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
 
     auto header = buildProxyHeader(
         /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
     writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
     ASSERT_NO_THROW(session->prelude());
 
-    // Send only the message header so sourceMessage() blocks waiting for the body. If the session
-    // timeout was not restored after prelude(), sourceMessage() will block for up to
-    // proxyProtocolTimeoutSecs rather than returning promptly.
     Message msg = makeMessage(dbMsg, BSON("ping" << 1));
-    writeAll(proxyUdsFd, msg.buf(), sizeof(MSGHEADER::Value));
-
     auto fut = std::async(std::launch::async, [&] { return session->sourceMessage(); });
-    ASSERT_EQ(fut.wait_for(std::chrono::seconds(kProxyTimeoutSecs + 1)), std::future_status::ready)
-        << "sourceMessage() did not return. Session timeout was not restored after prelude()";
-    ASSERT_EQ(fut.get().getStatus().code(), ErrorCodes::NetworkTimeout);
+
+    // Give sourceMessage() time to block waiting for the message. If the proxy protocol timeout
+    // was not cleared, it would return early instead.
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    ASSERT_EQ(fut.wait_for(std::chrono::milliseconds(0)), std::future_status::timeout)
+        << "sourceMessage() returned early after prelude()";
+
+    writeAll(proxyUdsFd, msg.buf(), msg.size());
+    ASSERT_OK(fut.get().getStatus());
 }
 
 /**
