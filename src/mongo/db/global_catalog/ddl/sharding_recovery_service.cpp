@@ -116,9 +116,6 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
     } else {
         scopedCsr->clearCollectionMetadata(opCtx);
     }
-    // TODO (SERVER-128176): Remove this `setNonAuthoritative` once all DDL operations are made
-    // shard-authoritative and all DDL operations do not clear collection metadata at release.
-    scopedCsr->setNonAuthoritative();
 }
 
 ShardingRecoveryService* ShardingRecoveryService::get(ServiceContext* serviceContext) {
@@ -138,8 +135,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     const NamespaceString& nss,
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
-    bool clearDbMetadata,
-    bool clearCollMetadata,
+    bool clearShardCatalogCache,
     boost::optional<Milliseconds> lockAcquisitionTimeout,
     const CriticalSectionLockContendAction& criticalSectionLockContendAction) {
     LOGV2_DEBUG(5656600,
@@ -245,8 +241,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // - Otherwise this call will fail and the CS won't be taken (neither persisted nor
         // in-mem)
         CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
-        newDoc.setClearDbInfo(clearDbMetadata);
-        newDoc.setClearCollMetadata(clearCollMetadata);
+        newDoc.setClearShardCatalogCache(clearShardCatalogCache);
 
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(

@@ -680,12 +680,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         // does not exist, it will be later released by the rename participant. In
                         // the collection exists, the critical section can be released right away as
                         // the participant will re-acquire it when needed.
+                        const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
                         auto criticalSection = ShardingRecoveryService::get(opCtx);
                         criticalSection->acquireRecoverableCriticalSectionBlockWrites(
                             opCtx,
                             toNss,
                             criticalSectionReason,
-                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+                            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                            !isAuthoritative /* clearShardCatalogCache */);
                         criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             toNss,
@@ -823,30 +826,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto acquireCriticalSectionOnParticipantsFor = [&](const NamespaceString& nss) {
                     LOGV2_DEBUG(10488800, 2, "Acquiring critical section", "nss"_attr = nss);
 
-                    ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);
-                    blockCRUDOperationsRequest.setBlockType(
-                        mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
-                    blockCRUDOperationsRequest.setReason(reason);
-
-                    // When shards are authoritative, there is no need to clear the filtering
-                    // metadata upon releasing the critical section; the commit phase is responsible
-                    // for updating the shard catalog with current information. This flag is
-                    // evaluated at insertion time because on secondaries, metadata is cleared
-                    // during the onDelete of the critical section document.
-                    bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
-                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-                    if (isDDLAuthoritative) {
-                        blockCRUDOperationsRequest.setClearCollMetadata(false);
-                    }
-
-                    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
-                    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
-                                                                   getNewSession(opCtx));
-                    auto opts =
-                        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                            **executor, token, blockCRUDOperationsRequest);
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(
-                        opCtx, opts, Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx));
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+                        opCtx,
+                        nss,
+                        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+                        mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites,
+                        reason,
+                        _doc.getAuthoritativeMetadataAccessLevel(),
+                        session,
+                        executor,
+                        token);
 
                     LOGV2_DEBUG(10488801, 2, "Acquired critical section", "nss"_attr = nss);
                 };

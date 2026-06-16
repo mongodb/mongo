@@ -393,29 +393,21 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
                     hasTimeseriesOptions(_request)) {
-                    ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
-                    blockCRUDOperationsRequest.setBlockType(
-                        CriticalSectionBlockTypeEnum::kReadsAndWrites);
-
-                    // When shards are authoritative, there is no need to clear the filtering
-                    // metadata upon releasing the critical section; the commit phase is responsible
-                    // for updating the shard catalog with current information. This flag is
-                    // evaluated at insertion time because on secondaries, metadata is cleared
-                    // during the onDelete of the critical section document.
-                    if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                        blockCRUDOperationsRequest.setClearCollMetadata(false);
-                    }
-
-                    auto opts =
-                        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                            **executor, token, blockCRUDOperationsRequest);
                     std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
                     if (_shardingInfo->isPrimaryOwningChunks) {
                         shards.push_back(_shardingInfo->primaryShard);
                     }
-                    sendAuthenticatedCommandWithOsiToShards(
-                        opCtx, opts, shards, getNewSession(opCtx));
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+                        opCtx,
+                        _collInfo->nsForTargeting,
+                        shards,
+                        CriticalSectionBlockTypeEnum::kReadsAndWrites,
+                        boost::none /* reason */,
+                        _doc.getAuthoritativeMetadataAccessLevel(),
+                        session,
+                        executor,
+                        token);
                 }
             }))
         .then(_buildPhaseHandler(

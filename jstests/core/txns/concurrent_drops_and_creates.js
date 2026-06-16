@@ -12,6 +12,7 @@
  * ]
  */
 import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName1 = "test1";
 const dbName2 = "test2";
@@ -29,6 +30,8 @@ const sessionDB1 = session.getDatabase(dbName1);
 const sessionDB2 = session.getDatabase(dbName2);
 const sessionCollA = sessionDB1[collNameA];
 const sessionCollB = sessionDB2[collNameB];
+
+const shardsAreAuthoritative = FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardsCRUD");
 
 //
 // A transaction with snapshot read concern cannot write to a collection that has been dropped
@@ -51,7 +54,6 @@ withAbortAndRetryOnTransientTxnError(session, () => {
     sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
     assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
-    // This test cause a StaleConfig error on sharding so no command will succeed.
     if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
         // We can perform reads on the dropped collection as it existed when we started the
         // transaction.
@@ -68,13 +70,18 @@ withAbortAndRetryOnTransientTxnError(session, () => {
         );
     } else {
         // TODO (SERVER-39704): See if we can match the replicaset behaviour.
+        // On a sharded cluster the snapshot read of the dropped collection does not return the
+        // pre-drop data like a replica set does; it fails the snapshot/placement check (StaleConfig
+        // when non-authoritative, SnapshotUnavailable when authoritative). So we only assert on the
+        // write. With authoritative shards the critical section release no longer clears the
+        // filtering metadata, so the write fails with WriteConflict rather than StaleConfig.
         assert.commandFailedWithCode(
             sessionDB2.runCommand({
                 findAndModify: sessionCollB.getName(),
                 update: {a: 1},
                 upsert: true,
             }),
-            ErrorCodes.StaleConfig,
+            shardsAreAuthoritative ? ErrorCodes.WriteConflict : ErrorCodes.StaleConfig,
         );
     }
 

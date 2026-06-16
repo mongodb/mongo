@@ -239,11 +239,15 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kAcquireCriticalSectionOnCoordinator,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
                 ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
                     opCtx,
                     nss(),
                     _critSecReason,
-                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                    !isAuthoritative /* clearShardCatalogCache */);
 
                 // Check preconditions again under the critical section because we're guaranteed no
                 // catalog changes can happen at this point.
@@ -303,8 +307,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             Phase::kAcquireCriticalSectionOnDataShard,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (*_doc.getDataShard() != ShardingState::get(opCtx)->shardId()) {
-                    _enterCriticalSectionOnDataShard(
-                        opCtx, executor, token, CriticalSectionBlockTypeEnum::kReadsAndWrites);
+                    _enterCriticalSectionOnDataShard(opCtx, executor, token);
                 }
             }))
         .then(_buildPhaseHandler(
@@ -595,52 +598,35 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
 void ConvertToCappedCoordinator::_enterCriticalSectionOnDataShard(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token,
-    CriticalSectionBlockTypeEnum blockType) {
-    ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
-    blockCRUDOperationsRequest.setBlockType(blockType);
-    blockCRUDOperationsRequest.setReason(_critSecReason);
-
-    // When shards are authoritative, there is no need to clear the filtering metadata upon
-    // releasing the critical section; the commit phase is responsible for updating the shard
-    // catalog with current information. This flag is evaluated at insertion time because on
-    // secondaries, metadata is cleared during the onDelete of the critical section document.
-    if (_doc.getAuthoritativeMetadataAccessLevel() >=
-        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-        blockCRUDOperationsRequest.setClearCollMetadata(false);
-    }
-
-    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, blockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {*_doc.getDataShard()});
+    const CancellationToken& token) {
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        nss(),
+        {*_doc.getDataShard()},
+        CriticalSectionBlockTypeEnum::kReadsAndWrites,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token);
 }
 
 void ConvertToCappedCoordinator::_exitCriticalSectionOnDataShard(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
-    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-    unblockCRUDOperationsRequest.setReason(_critSecReason);
-
-    // When shards are authoritative, there is no need to clear the filtering metadata upon
-    // releasing the critical section; the commit phase is responsible for updating the shard
-    // catalog (both durable and in-memory) with current information on both primary and secondary
-    // nodes.
-    if (_doc.getAuthoritativeMetadataAccessLevel() >=
-        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-        unblockCRUDOperationsRequest.setClearCollMetadata(false);
-    }
-
-    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, unblockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {*_doc.getDataShard()});
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        nss(),
+        {*_doc.getDataShard()},
+        CriticalSectionBlockTypeEnum::kUnblock,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token);
 }
 
 logv2::DynamicAttributes ConvertToCappedCoordinator::getCoordinatorLogAttrs() const {

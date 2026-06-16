@@ -1235,7 +1235,8 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
             doc.getSourceNss(),
             BSON("command" << "resharding_donor"
                            << "collection" << doc.getSourceNss().toString_forTest()),
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     notifyReshardingCommitting(opCtx.get(), *donor, doc);
@@ -1293,7 +1294,8 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
             doc.getSourceNss(),
             BSON("command" << "resharding_donor"
                            << "collection" << doc.getSourceNss().toString_forTest()),
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     ASSERT_OK(donor->awaitChangeStreamsMonitorStarted().getNoThrow());

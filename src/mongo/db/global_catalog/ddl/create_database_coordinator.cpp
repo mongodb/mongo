@@ -125,20 +125,17 @@ void CreateDatabaseCoordinator::_enterCriticalSection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
-    ShardsvrParticipantBlock blockCRUDOperationsRequest(
-        NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()));
-    blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
-    blockCRUDOperationsRequest.setReason(_critSecReason);
-    blockCRUDOperationsRequest.setClearDbInfo(_doc.getAuthoritativeMetadataAccessLevel() ==
-                                              AuthoritativeMetadataAccessLevelEnum::kNone);
-
-    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, blockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, {_doc.getPrimaryShard().get()});
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()),
+        {_doc.getPrimaryShard().get()},
+        mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token);
 }
 
 void CreateDatabaseCoordinator::_storeDBVersion(OperationContext* opCtx, const DatabaseType& db) {
@@ -156,21 +153,18 @@ void CreateDatabaseCoordinator::_exitCriticalSection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     bool throwIfReasonDiffers) {
-    ShardsvrParticipantBlock unblockCRUDOperationsRequest(
-        NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()));
-    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-    unblockCRUDOperationsRequest.setReason(_critSecReason);
-    unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
-    unblockCRUDOperationsRequest.setClearDbInfo(_doc.getAuthoritativeMetadataAccessLevel() ==
-                                                AuthoritativeMetadataAccessLevelEnum::kNone);
-
-    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, unblockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, {_doc.getPrimaryShard().get()});
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(nss().dbName()),
+        {_doc.getPrimaryShard().get()},
+        CriticalSectionBlockTypeEnum::kUnblock,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token,
+        throwIfReasonDiffers);
 }
 
 DatabaseType CreateDatabaseCoordinator::_commitClusterCatalog(OperationContext* opCtx) {

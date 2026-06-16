@@ -270,28 +270,18 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                     performCausalityBarrier(opCtx, barrier);
                 }
 
-                ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
-                blockCRUDOperationsRequest.setBlockType(
-                    CriticalSectionBlockTypeEnum::kReadsAndWrites);
-                blockCRUDOperationsRequest.setReason(_critSecReason);
-
-                // When shards are authoritative, there is no need to clear the filtering metadata
-                // upon releasing the critical section; the commit phase is responsible for updating
-                // the shard catalog with current information. This flag is evaluated at insertion
-                // time because on secondaries, metadata is cleared during the onDelete of the
-                // critical section document.
-                if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    blockCRUDOperationsRequest.setClearCollMetadata(false);
-                }
-
-                generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
-                generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
-                                                               getNewSession(opCtx));
-                auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                    **executor, token, blockCRUDOperationsRequest);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, opts, getDataShardsAndDbPrimaryShard(opCtx, nss()));
+                const auto shardIds = getDataShardsAndDbPrimaryShard(opCtx, nss());
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+                    opCtx,
+                    nss(),
+                    shardIds,
+                    CriticalSectionBlockTypeEnum::kReadsAndWrites,
+                    _critSecReason,
+                    _doc.getAuthoritativeMetadataAccessLevel(),
+                    session,
+                    executor,
+                    token);
 
                 // Once there are no writes in the cluster, select an epoch and a timestamp.
                 if (!_doc.getNewEpoch()) {
@@ -452,28 +442,18 @@ void RefineCollectionShardKeyCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
-    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-    unblockCRUDOperationsRequest.setReason(_critSecReason);
-
-    // When shards are authoritative, there is no need to clear the filtering metadata upon
-    // releasing the critical section; the commit phase is responsible for updating the shard
-    // catalog (both durable and in-memory) with current information on both primary and secondary
-    // nodes.
-    bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
-        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-    if (isDDLAuthoritative) {
-        unblockCRUDOperationsRequest.setClearCollMetadata(false);
-    }
-
-    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, unblockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, getDataShardsAndDbPrimaryShard(opCtx, nss()));
+    const auto shardIds = getDataShardsAndDbPrimaryShard(opCtx, nss());
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        nss(),
+        shardIds,
+        CriticalSectionBlockTypeEnum::kUnblock,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token);
 }
 
 }  // namespace mongo

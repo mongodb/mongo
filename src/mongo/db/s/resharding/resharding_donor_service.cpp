@@ -509,6 +509,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                     scopedCsr->setNonAuthoritative();
                 }
 
+                // TODO (SERVER-128449): Use NoCustomAction once resharding is authoritative.
                 const auto onReleaseCriticalSectionAction =
                     _externalState->getOnReleaseCriticalSectionCustomAction(mustClearMetadata);
 
@@ -908,12 +909,15 @@ void ReshardingDonorService::DonorStateMachine::
         auto opCtx = _makeOperationContext(factory);
         _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
 
+        // TODO (SERVER-128449): Remove the clearShardCatalogCache flag once resharding is
+        // authoritative.
         ShardingRecoveryService::get(opCtx.get())
             ->acquireRecoverableCriticalSectionBlockWrites(
                 opCtx.get(),
                 _metadata.getSourceNss(),
                 _critSecReason,
-                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                true /* clearShardCatalogCache */);
 
         _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                               resharding::getCurrentTime());

@@ -96,7 +96,11 @@ void acquireCriticalSection(OperationContext* opCtx,
                             const BSONObj& critSecReason) {
     auto svc = ShardingRecoveryService::get(opCtx);
     svc->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+        opCtx,
+        nss,
+        critSecReason,
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        false /* clearShardCatalogCache */);
     svc->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }

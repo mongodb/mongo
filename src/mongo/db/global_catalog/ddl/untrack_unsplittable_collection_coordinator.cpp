@@ -102,7 +102,6 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
     auto service = ShardingRecoveryService::get(opCtx);
     const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
         AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-    const bool clearCollectionMetadata = !isAuthoritative;
 
     // The critical-section document controls what secondaries do when they observe the release.
     // With shard-authoritative collection metadata, the commit phase removes the shard catalog
@@ -113,8 +112,7 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
         nss(),
         _critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearDbMetadata: untrack only changes collection metadata */,
-        clearCollectionMetadata);
+        !isAuthoritative /* clearShardCatalogCache */);
     service->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         nss(),

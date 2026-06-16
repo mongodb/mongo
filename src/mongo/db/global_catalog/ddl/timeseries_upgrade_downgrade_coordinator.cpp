@@ -238,25 +238,17 @@ void TimeseriesUpgradeDowngradeCoordinator::_releaseCriticalSectionFor(
     const CancellationToken& token,
     const std::vector<ShardId>& participants,
     const NamespaceString& nss) {
-    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
-    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-    unblockCRUDOperationsRequest.setReason(_critSecReason);
-    // When shards are authoritative, there is no need to clear the filtering metadata upon
-    // releasing the critical section; the commit phase is responsible for updating the shard
-    // catalog with current information. This flag is evaluated at insertion time because on
-    // secondaries, metadata is cleared during the onDelete of the critical section document.
-    if (_doc.getAuthoritativeMetadataAccessLevel() >=
-        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-        unblockCRUDOperationsRequest.setClearCollMetadata(false);
-    }
-
-    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, unblockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        nss,
+        participants,
+        CriticalSectionBlockTypeEnum::kUnblock,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token);
 }
 
 ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
@@ -320,28 +312,17 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                 auto participants = getParticipantShards(opCtx, isTracked);
 
                 auto acquireCriticalSectionFor = [&](const NamespaceString& ns) {
-                    ShardsvrParticipantBlock blockCRUDOperationsRequest(ns);
-                    blockCRUDOperationsRequest.setBlockType(
-                        CriticalSectionBlockTypeEnum::kReadsAndWrites);
-                    blockCRUDOperationsRequest.setReason(_critSecReason);
-                    // When shards are authoritative, there is no need to clear the filtering
-                    // metadata upon releasing the critical section; the commit phase is responsible
-                    // for updating the shard catalog with current information. This flag is
-                    // evaluated at insertion time because on secondaries, metadata is cleared
-                    // during the onDelete of the critical section document.
-                    if (_doc.getAuthoritativeMetadataAccessLevel() >=
-                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                        blockCRUDOperationsRequest.setClearCollMetadata(false);
-                    }
-
-                    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
-                    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
-                                                                   getNewSession(opCtx));
-
-                    auto opts =
-                        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                            **executor, token, blockCRUDOperationsRequest);
-                    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, participants);
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+                        opCtx,
+                        ns,
+                        participants,
+                        CriticalSectionBlockTypeEnum::kReadsAndWrites,
+                        _critSecReason,
+                        _doc.getAuthoritativeMetadataAccessLevel(),
+                        session,
+                        executor,
+                        token);
                 };
 
                 // Acquire critical section on both user namespace and bucket namespace

@@ -391,7 +391,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnDatabase
             operationContext(),
             dbName,
             dbOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -445,14 +446,16 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
             operationContext(),
             dbName,
             dbOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
             operationContext(),
             dbName,
             dbOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(dbName);
@@ -524,14 +527,16 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             operationContext(),
             dbName,
             dbOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
             operationContext(),
             dbName,
             differentOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
@@ -546,7 +551,8 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             operationContext(),
             dbName,
             dbOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -572,7 +578,8 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             operationContext(),
             dbName,
             dbOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -608,7 +615,8 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsOnCollecti
             operationContext(),
             collNss,
             collOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -662,14 +670,16 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
             operationContext(),
             collNss,
             collOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
             operationContext(),
             collNss,
             collOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     // Check that the in-memory status has been appropriately updated.
     assertCriticalSectionCatchUpEnteredInMemory(collNss);
@@ -740,14 +750,16 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             operationContext(),
             collNss,
             collOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     ShardingRecoveryService::get(operationContext())
         ->acquireRecoverableCriticalSectionBlockWrites(
             operationContext(),
             collNss,
             differentOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 }
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
@@ -762,7 +774,8 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             operationContext(),
             collNss,
             collOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -788,7 +801,8 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimaryDeathTest,
             operationContext(),
             collNss,
             collOpReason,
-            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+            ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+            true /* clearShardCatalogCache */);
 
     //////////////////////////////////////////////
     // Block read/write operations (commit phase)
@@ -1224,8 +1238,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, CallbackInvokedWhenCollLockContende
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearDbMetadata */,
-            true /* clearCollMetadata */,
+            true /* clearShardCatalogCache */,
             boost::none /* lockAcquisitionTimeout */,
             [&](OperationContext*) {
                 std::lock_guard<std::mutex> lk(mu);
@@ -1266,8 +1279,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, CallbackNotInvokedWhenCollLockNotCo
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearDbMetadata */,
-            true /* clearCollMetadata */,
+            true /* clearShardCatalogCache */,
             boost::none /* lockAcquisitionTimeout */,
             [&](OperationContext*) { callbackInvoked = true; });
 
@@ -1311,8 +1323,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
             collNss,
             collOpReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearDbMetadata */,
-            true /* clearCollMetadata */,
+            true /* clearShardCatalogCache */,
             boost::none /* lockAcquisitionTimeout */,
             [&](OperationContext* opCtx) {
                 auto* cbLocker = shard_role_details::getLocker(opCtx);
@@ -1367,8 +1378,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
                                collNss,
                                collOpReason,
                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                               true /* clearDbMetadata */,
-                               true /* clearCollMetadata */,
+                               true /* clearShardCatalogCache */,
                                Milliseconds(500) /* lockAcquisitionTimeout */,
                                [&](OperationContext* opCtx) {
                                    auto* cbLocker = shard_role_details::getLocker(opCtx);
@@ -1417,8 +1427,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary,
                 collNss,
                 collOpReason,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                true /* clearDbMetadata */,
-                true /* clearCollMetadata */,
+                true /* clearShardCatalogCache */,
                 boost::none /* lockAcquisitionTimeout */,
                 [&](OperationContext* opCtx) {
                     // Attempt to kill sessions for conflicting lockers.

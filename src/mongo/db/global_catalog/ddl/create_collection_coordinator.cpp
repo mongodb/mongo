@@ -1095,15 +1095,22 @@ void logStartCreateCollection(OperationContext* opCtx,
 }
 
 void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
+                                        AuthoritativeMetadataAccessLevelEnum metadataAccessLevel,
                                         const BSONObj& critSecReason,
                                         const NamespaceString& originalNss) {
-
     auto mainNss = originalNss.isTimeseriesBucketsCollection()
         ? originalNss.getTimeseriesViewNamespace()
         : originalNss;
 
+    const bool isAuthoritative =
+        metadataAccessLevel >= AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
     ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-        opCtx, mainNss, critSecReason, defaultMajorityWriteConcernDoNotUse());
+        opCtx,
+        mainNss,
+        critSecReason,
+        defaultMajorityWriteConcernDoNotUse(),
+        !isAuthoritative /* clearShardCatalogCache */);
 
     // Preventively acquire the critical section protecting the buckets namespace that the
     // creation of a timeseries collection would require.
@@ -1111,7 +1118,8 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
-        defaultMajorityWriteConcernDoNotUse());
+        defaultMajorityWriteConcernDoNotUse(),
+        !isAuthoritative /* clearShardCatalogCache */);
 }
 
 void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
@@ -1490,28 +1498,18 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     const std::vector<ShardId>& shardIds) {
-    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
-    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-    unblockCRUDOperationsRequest.setReason(_critSecReason);
-    unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
-
-    // When shards are authoritative, there is no need to clear the filtering metadata upon
-    // releasing the critical section; the commit phase is responsible for updating the shard
-    // catalog (both durable and in-memory) with current information on both primary and secondary
-    // nodes.
-    bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
-        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
-    if (isDDLAuthoritative) {
-        unblockCRUDOperationsRequest.setClearCollMetadata(false);
-    }
-
-    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, unblockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        nss(),
+        shardIds,
+        CriticalSectionBlockTypeEnum::kUnblock,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token,
+        throwIfReasonDiffers);
 }
 
 bool CreateCollectionCoordinator::_mustAlwaysMakeProgress() {
@@ -1760,7 +1758,8 @@ void CreateCollectionCoordinator::_checkPreconditions(OperationContext* opCtx) {
 
 void CreateCollectionCoordinator::_enterWriteCriticalSectionOnCoordinator(OperationContext* opCtx) {
     logStartCreateCollection(opCtx, _request, originalNss());
-    enterCriticalSectionsOnCoordinator(opCtx, _critSecReason, originalNss());
+    enterCriticalSectionsOnCoordinator(
+        opCtx, _doc.getAuthoritativeMetadataAccessLevel(), _critSecReason, originalNss());
 }
 
 void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* opCtx) {
@@ -2000,16 +1999,17 @@ void CreateCollectionCoordinator::_enterCriticalSectionOnShards(
     const NamespaceString& nss,
     const std::vector<ShardId>& shardIds,
     mongo::CriticalSectionBlockTypeEnum blockType) {
-    ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);
-    blockCRUDOperationsRequest.setBlockType(blockType);
-    blockCRUDOperationsRequest.setReason(_critSecReason);
-
-    generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
-    generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
-                                                   getNewSession(opCtx));
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-        **executor, token, blockCRUDOperationsRequest);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    const auto session = getNewSession(opCtx);
+    sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+        opCtx,
+        nss,
+        shardIds,
+        blockType,
+        _critSecReason,
+        _doc.getAuthoritativeMetadataAccessLevel(),
+        session,
+        executor,
+        token);
 }
 
 void CreateCollectionCoordinator::_enterCriticalSection(

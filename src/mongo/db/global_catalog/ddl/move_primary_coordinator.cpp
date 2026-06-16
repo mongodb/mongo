@@ -828,7 +828,7 @@ void MovePrimaryCoordinator::cloneAuthoritativeDatabaseMetadata(OperationContext
         NamespaceString(_dbName),
         _csReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearDbMetadata */);
+        false /* clearShardCatalogCache */);
     recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         NamespaceString(_dbName),
@@ -949,17 +949,17 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (_doc.getAuthoritativeMetadataAccessLevel() > AuthoritativeMetadataAccessLevelEnum::kNone) {
-        ShardsvrParticipantBlock request(
-            NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName));
-        request.setBlockType(CriticalSectionBlockTypeEnum::kReadsAndWrites);
-        request.setReason(_csReason);
-        request.setClearDbInfo(false);
-
-        generic_argument_util::setMajorityWriteConcern(request);
-        generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
-        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-            **executor, token, request);
-        sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {_doc.getToShardId()});
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+            opCtx,
+            NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName),
+            {_doc.getToShardId()},
+            CriticalSectionBlockTypeEnum::kReadsAndWrites,
+            _csReason,
+            _doc.getAuthoritativeMetadataAccessLevel(),
+            session,
+            executor,
+            token);
     } else {
         const auto enterCriticalSectionCommand = [&] {
             ShardsvrMovePrimaryEnterCriticalSection request(_dbName);
@@ -999,19 +999,18 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (_doc.getAuthoritativeMetadataAccessLevel() > AuthoritativeMetadataAccessLevelEnum::kNone) {
-        ShardsvrParticipantBlock request(
-            NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName));
-        request.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-        request.setReason(_csReason);
-        request.setThrowIfReasonDiffers(false);
-        request.setClearDbInfo(false);
-
-        generic_argument_util::setMajorityWriteConcern(request);
-        generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
-
-        auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-            **executor, token, request);
-        sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, {_doc.getToShardId()});
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
+            opCtx,
+            NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName),
+            {_doc.getToShardId()},
+            CriticalSectionBlockTypeEnum::kUnblock,
+            _csReason,
+            _doc.getAuthoritativeMetadataAccessLevel(),
+            session,
+            executor,
+            token,
+            false /* throwIfReasonDiffers */);
     } else {
         const auto exitCriticalSectionCommand = [&] {
             ShardsvrMovePrimaryExitCriticalSection request(_dbName);

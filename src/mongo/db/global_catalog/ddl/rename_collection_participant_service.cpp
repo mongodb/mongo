@@ -348,7 +348,8 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     opCtx,
                     fromNss,
                     reason,
-                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                    _doc.getClearCollMetadata());
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx,
                     fromNss,
@@ -358,7 +359,8 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     opCtx,
                     toNss,
                     reason,
-                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                    _doc.getClearCollMetadata());
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx,
                     toNss,

@@ -118,7 +118,7 @@ public:
      * for db/collection lock acquisition. If unable to acquire the locks within the specified time
      * limit, then a LockTimeout exception is thrown.
      *
-     * NOTE: If the `clearDbMetadata|clearCollMetadata` flag is set, at the time of releasing the
+     * NOTE: If the `clearShardCatalogCache` flag is set, at the time of releasing the
      * critical section it will also clear the filtering metadata. This flag is only used by
      * secondary nodes.
      */
@@ -127,8 +127,7 @@ public:
         const NamespaceString& nss,
         const BSONObj& reason,
         const WriteConcernOptions& writeConcern,
-        bool clearDbMetadata = true,
-        bool clearCollMetadata = true,
+        bool clearShardCatalogCache,
         boost::optional<Milliseconds> lockAcquisitionTimeout = boost::none,
         const CriticalSectionLockContendAction& criticalSectionLockContendAction = nullptr);
 

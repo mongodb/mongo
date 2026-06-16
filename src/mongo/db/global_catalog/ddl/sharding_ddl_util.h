@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
+#include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
@@ -266,6 +267,36 @@ MONGO_MOD_NEEDS_REPLACEMENT void performNoopMajorityWriteLocally(OperationContex
  * barriers (e.g. waiting for majority write concern) without modifying real user data.
  */
 MONGO_MOD_NEEDS_REPLACEMENT write_ops::UpdateCommandRequest buildNoopWriteRequestCommand();
+
+/**
+ * Sends the _shardsvrParticipantBlock command to the specified shards.
+ *
+ * blockType (CriticalSectionBlockTypeEnum) controls how the recipient transitions the critical
+ * section for the namespace:
+ *   - kWrites: enter the critical section blocking only writes.
+ *   - kReadsAndWrites: enter the critical section blocking both reads and writes.
+ *   - kUnblock: exit the critical section.
+ *
+ * authoritativeMetadataAccessLevel (AuthoritativeMetadataAccessLevelEnum) reflects the level of
+ * access to authoritative metadata granted by the FCV state, and determines whether the recipient
+ * should clear the collection or database metadata from its shard catalog cache (CSS / DSS) when
+ * releasing the critical section:
+ *   - kNone: non-authoritative mode. The recipient must clear its cached metadata so it is forced
+ *     to refresh the next time the metadata is needed.
+ *   - kWritesAllowed / kWritesAndReadsAllowed: authoritative mode. The shard catalog already holds
+ *     reliable metadata, so clearing the cache is unnecessary and is skipped.
+ */
+MONGO_MOD_PRIVATE void sendShardsvrParticipantBlockCommandToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    CriticalSectionBlockTypeEnum blockType,
+    boost::optional<BSONObj> reason,
+    AuthoritativeMetadataAccessLevelEnum authoritativeMetadataAccessLevel,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token,
+    boost::optional<bool> throwIfReasonDiffers = boost::none);
 
 /**
  * Sends the _shardsvrDropCollectionParticipant command to the specified shards.

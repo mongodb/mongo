@@ -76,6 +76,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
@@ -652,6 +653,38 @@ write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
     updateOp.setUpdates({updateEntry});
 
     return updateOp;
+}
+
+void sendShardsvrParticipantBlockCommandToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const CriticalSectionBlockTypeEnum blockType,
+    boost::optional<BSONObj> reason,
+    AuthoritativeMetadataAccessLevelEnum authoritativeMetadataAccessLevel,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token,
+    boost::optional<bool> throwIfReasonDiffers) {
+    ShardsvrParticipantBlock request(nss);
+    request.setBlockType(blockType);
+    if (reason) {
+        request.setReason(*reason);
+    }
+
+    if (throwIfReasonDiffers) {
+        request.setThrowIfReasonDiffers(*throwIfReasonDiffers);
+    }
+
+    request.setClearShardCatalogCache(authoritativeMetadataAccessLevel ==
+                                      AuthoritativeMetadataAccessLevelEnum::kNone);
+
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, osi);
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+        **executor, token, std::move(request));
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,

@@ -460,16 +460,15 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [deletedNss = collCSDoc.getNss(),
              reason = collCSDoc.getReason().getOwned(),
-             clearDbMetadata = collCSDoc.getClearDbInfo(),
-             clearCollMetadata = collCSDoc.getClearCollMetadata()](OperationContext* opCtx,
-                                                                   boost::optional<Timestamp>) {
+             clearShardCatalogCache = collCSDoc.getClearShardCatalogCache()](
+                OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (deletedNss.isDbOnly()) {
                     auto scopedDsr =
                         DatabaseShardingRuntime::acquireExclusive(opCtx, deletedNss.dbName());
 
                     // Secondaries that are in oplog application must clear the database metadata
                     // before releasing the in-memory critical section.
-                    if (!opCtx->isEnforcingConstraints() && clearDbMetadata) {
+                    if (!opCtx->isEnforcingConstraints() && clearShardCatalogCache) {
                         scopedDsr->clearDbInfo_DEPRECATED(opCtx);
                     }
 
@@ -479,12 +478,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
                     // Secondaries that are in oplog application must clear the collection
                     // filtering metadata before releasing the in-memory critical section.
-                    if (!opCtx->isEnforcingConstraints() && clearCollMetadata) {
+                    if (!opCtx->isEnforcingConstraints() && clearShardCatalogCache) {
                         scopedCsr->clearCollectionMetadata(opCtx);
-                        // TODO (SERVER-128176): Remove this `setNonAuthoritative` once all DDL
-                        // operations are made shard-authoritative and all DDL operations do not
-                        // clear collection metadata at release.
-                        scopedCsr->setNonAuthoritative();
                     }
 
                     scopedCsr->exitCriticalSection(opCtx, reason);

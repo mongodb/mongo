@@ -115,11 +115,7 @@ public:
                         std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
                             actionPtr;
 
-                        const bool shouldClearMetadata = ns().isDbOnly()
-                            ? request().getClearDbInfo()
-                            : request().getClearCollMetadata();
-
-                        if (shouldClearMetadata) {
+                        if (request().getClearShardCatalogCache()) {
                             actionPtr = std::make_unique<
                                 ShardingRecoveryService::FilteringMetadataClearer>();
                         } else {
@@ -141,8 +137,7 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            request().getClearDbInfo(),
-                            request().getClearCollMetadata());
+                            request().getClearShardCatalogCache());
                         break;
                     default:
                         service->acquireRecoverableCriticalSectionBlockWrites(
@@ -150,8 +145,7 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            request().getClearDbInfo(),
-                            request().getClearCollMetadata());
+                            request().getClearShardCatalogCache());
                         service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             ns(),

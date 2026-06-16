@@ -115,7 +115,8 @@ public:
                         newOpCtx.get(),
                         NamespaceString(dbName),
                         csReason,
-                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                        true /* clearShardCatalogCache */);
                 ShardingRecoveryService::get(newOpCtx.get())
                     ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                         newOpCtx.get(),

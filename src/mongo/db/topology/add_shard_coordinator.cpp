@@ -253,7 +253,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     blockCRUDOperationsRequest.setBlockType(
                         mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
                     blockCRUDOperationsRequest.setReason(_critSecReason);
-                    blockCRUDOperationsRequest.setClearDbInfo(false);
+                    blockCRUDOperationsRequest.setClearShardCatalogCache(false);
                     const auto session = getNewSession(opCtx);
                     generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
                     generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
@@ -396,7 +396,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     unblockCRUDOperationsRequest.setBlockType(
                         mongo::CriticalSectionBlockTypeEnum::kUnblock);
                     unblockCRUDOperationsRequest.setReason(_critSecReason);
-                    unblockCRUDOperationsRequest.setClearDbInfo(false);
+                    unblockCRUDOperationsRequest.setClearShardCatalogCache(false);
                     const auto session = getNewSession(opCtx);
                     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
                     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,

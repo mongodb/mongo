@@ -86,8 +86,7 @@ private:
     void _enterCriticalSectionOnDataShard(
         OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& token,
-        CriticalSectionBlockTypeEnum blockType);
+        const CancellationToken& token);
 
     void _exitCriticalSectionOnDataShard(
         OperationContext* opCtx,
