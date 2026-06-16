@@ -119,6 +119,9 @@ Value ExpressionFunction::evaluate(const Document& root, Variables* variables) c
     auto argValue = _passedArgs->evaluate(root, variables);
     uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::Array);
 
+    // Invalidate any unowned BSON wrappers retained by JS globals from prior invocations.
+    scope->advanceGeneration();
+
     // This logic exists to desugar $where into $expr + $function. In this case set the global obj
     // to this, to handle cases where the $where function references the current document through
     // obj.
