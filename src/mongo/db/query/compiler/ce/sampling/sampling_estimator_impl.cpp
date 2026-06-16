@@ -518,7 +518,7 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 
 void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
     _sampleSize = sampleSize;
-    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kRandom, sampleSize);
+    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kRandom);
     if (tryLoadStatus.isOK()) {
         return;
     }
@@ -545,7 +545,7 @@ void SamplingEstimatorImpl::generateRandomSample() {
 
 void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
     _sampleSize = sampleSize;
-    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kChunk, sampleSize);
+    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kChunk);
     if (tryLoadStatus.isOK()) {
         return;
     }
@@ -1092,8 +1092,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
-Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum method,
-                                                      size_t sampleSize) {
+Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum method) {
     if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
             VersionContext::getDecoration(_opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -1113,7 +1112,7 @@ Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum metho
 
     PersistentSampleLoader loader;
     auto parsed =
-        loader.tryLoad(_opCtx, _nss.dbName(), collection->uuid(), method, sampleSize, numChunks);
+        loader.tryLoad(_opCtx, _nss.dbName(), collection->uuid(), method, _sampleSize, numChunks);
     if (!parsed.isOK()) {
         return parsed.getStatus();
     }

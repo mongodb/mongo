@@ -414,7 +414,7 @@ private:
      * a malformed doc. The caller is responsible for logging non-NoSuchKey failures and falling
      * back to SBE sampling.
      */
-    Status tryLoadPersistentSample(SamplingCEMethodEnum method, size_t sampleSize);
+    Status tryLoadPersistentSample(SamplingCEMethodEnum method);
 
     OperationContext* _opCtx;
     // The collection the sampling plan runs against and is the one accessed by the query being
