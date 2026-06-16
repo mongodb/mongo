@@ -52,7 +52,7 @@ namespace mongo {
 
 bool isKernelVersionSafeForTCMallocPerCPUCache(StringData release) {
     int major = 0, minor = 0;
-    char* end = nullptr;
+    const char* end = nullptr;
     if (!NumberParser::strToAny(10)(release, &major, &end).isOK() || *end != '.' ||
         !NumberParser::strToAny(10)(end + 1, &minor).isOK()) {
         // If the version cannot be parsed, assume the kernel is compatible

@@ -102,28 +102,26 @@ public:
      * Parsing overloads for different supported numerical types.
      *
      * On success, the parsed value is stored into *result and returns Status::OK().
-     * If endPtr is not nullptr, the end of the number portion of the string will be stored at
-     * *endPtr (like strtol).
+     * If end is not nullptr, the end of the number portion of the string will be stored at
+     * *end (like strtol).
      * This will return with Status::FailedToParse if the string does not represent a number value.
      * See skipWhitespace and allowTrailingText for ways to expand the parser's capabilities.
      * Returns with Status::Overflow if the parsed number cannot be represented by the desired type.
      * If the status is not OK, then there are no guarantees about what value will be stored in
      * result.
      */
-    Status operator()(StringData strData, long* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, long long* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, unsigned long* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData,
-                      unsigned long long* result,
-                      char** endPtr = nullptr) const;
-    Status operator()(StringData strData, short* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, unsigned short* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, int* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, unsigned int* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, int8_t* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, uint8_t* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, double* result, char** endPtr = nullptr) const;
-    Status operator()(StringData strData, Decimal128* result, char** endPtr = nullptr) const;
+    Status operator()(StringData s, long* out, const char** end = {}) const;
+    Status operator()(StringData s, long long* out, const char** end = {}) const;
+    Status operator()(StringData s, unsigned long* out, const char** end = {}) const;
+    Status operator()(StringData s, unsigned long long* out, const char** end = {}) const;
+    Status operator()(StringData s, short* out, const char** end = {}) const;
+    Status operator()(StringData s, unsigned short* out, const char** end = {}) const;
+    Status operator()(StringData s, int* out, const char** end = {}) const;
+    Status operator()(StringData s, unsigned int* out, const char** end = {}) const;
+    Status operator()(StringData s, int8_t* out, const char** end = {}) const;
+    Status operator()(StringData s, uint8_t* out, const char** end = {}) const;
+    Status operator()(StringData s, double* out, const char** end = {}) const;
+    Status operator()(StringData s, Decimal128* out, const char** end = {}) const;
 
     int _base = 0;
     Decimal128::RoundingMode _roundingMode = Decimal128::RoundingMode::kRoundTowardZero;

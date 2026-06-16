@@ -559,7 +559,7 @@ Status JParseUtil::numberLong(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(LPAREN)) {
         return _jparse.parseError("Expecting '('");
     }
-    char* endptr;
+    const char* endptr;
     int64_t val;
 
     // Check if the number begins in quotations.
@@ -631,7 +631,7 @@ Status JParseUtil::dbRef(StringData fieldName, BSONObjBuilder& builder) {
 }
 
 Status JParseUtil::number(StringData fieldName, BSONObjBuilder& builder) {
-    char* endptrd;
+    const char* endptrd;
     double retd;
 
     Status parsedStatus = NumberParser::strToAny()(_jparse._input, &retd, &endptrd);

@@ -339,7 +339,7 @@ PARSE_TEST(TestEndOfNum) {
         }
         for (StringData& suffix : suffixes) {
             std::string spec = fmt::format("{}{}", numStr, suffix);
-            char* numEnd = nullptr;
+            const char* numEnd = nullptr;
             NumberType actual;
             parsed = NumberParser().allowTrailingText()(spec, &actual, &numEnd);
             if (shouldParse) {
@@ -401,7 +401,7 @@ PARSE_TEST(TestSkipLeadingWsAndEndptr) {
         }
         for (StringData& prefix : whitespaces) {
             std::string spec = fmt::format("{}{}", prefix, numStr);
-            char* numEnd = nullptr;
+            const char* numEnd = nullptr;
             NumberType actual;
             parsed = NumberParser().skipWhitespace()(spec, &actual, &numEnd);
             if (shouldParse) {

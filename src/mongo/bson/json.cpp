@@ -679,7 +679,7 @@ Status JParse::timestampObject(StringData fieldName, BSONObjBuilder& builder) {
     if (readToken("-")) {
         return parseError("Negative seconds in \"$timestamp\"");
     }
-    char* endptr;
+    const char* endptr;
     uint32_t seconds;
     NumberParser parser = NumberParser::strToAny(10);
     Status parsedStatus = parser(_input, &seconds, &endptr);
@@ -1043,7 +1043,7 @@ Status JParse::timestamp(StringData fieldName, BSONObjBuilder& builder) {
     if (readToken("-")) {
         return parseError("Negative seconds in \"$timestamp\"");
     }
-    char* endptr;
+    const char* endptr;
     NumberParser parser = NumberParser::strToAny(10);
     uint32_t seconds;
     Status parsedStatus = parser(_input, &seconds, &endptr);
@@ -1124,7 +1124,7 @@ Status JParse::numberLong(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(LPAREN)) {
         return parseError("Expecting '('");
     }
-    char* endptr;
+    const char* endptr;
     int64_t val;
     Status parsedStatus = NumberParser::strToAny(10)(_input, &val, &endptr);
     if (parsedStatus == ErrorCodes::Overflow) {
@@ -1173,7 +1173,7 @@ Status JParse::numberInt(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(LPAREN)) {
         return parseError("Expecting '('");
     }
-    char* endptr;
+    const char* endptr;
     int32_t val;
     Status parsedStatus = NumberParser::strToAny(10)(_input, &val, &endptr);
     if (parsedStatus == ErrorCodes::Overflow) {
@@ -1286,8 +1286,8 @@ Status JParse::regexOptCheck(StringData opt) {
 }
 
 Status JParse::number(StringData fieldName, BSONObjBuilder& builder) {
-    char* endptrll;
-    char* endptrd;
+    const char* endptrll;
+    const char* endptrd;
     long long retll;
     double retd;
 
@@ -1544,7 +1544,7 @@ bool JParse::isArray() {
 
 StatusWith<Date_t> JParse::parseDate() {
     long long msSinceEpoch;
-    char* endptr;
+    const char* endptr;
     Status parsedStatus = NumberParser::strToAny(10)(_input, &msSinceEpoch, &endptr);
     if (parsedStatus == ErrorCodes::Overflow) {
         /* Need to handle this because jsonString outputs the value of Date_t as unsigned.

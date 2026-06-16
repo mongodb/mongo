@@ -312,9 +312,9 @@ Status _parseNumber(StringData stringValue,
 }
 }  // namespace
 
-#define DEFINE_NUMBER_PARSER_OPERATOR(type)                                                      \
-    Status NumberParser::operator()(StringData stringValue, type* result, char** endPtr) const { \
-        return _parseNumber(stringValue, result, const_cast<const char**>(endPtr), *this);       \
+#define DEFINE_NUMBER_PARSER_OPERATOR(type)                                            \
+    Status NumberParser::operator()(StringData s, type* out, const char** end) const { \
+        return _parseNumber(s, out, end, *this);                                       \
     }
 
 DEFINE_NUMBER_PARSER_OPERATOR(long)
