@@ -388,7 +388,7 @@ boost::optional<repl::PreparedTxnDerivedFields> _dispatchOpsFromPreparedTransact
     const bool persistAffectedNamespaces = rss::ReplicatedStorageService::get(opCtx)
                                                .getPersistenceProvider()
                                                .supportsPreservingPreparedTxnInPreciseCheckpoints();
-    const bool persistSizeMetadata = shouldPersistPreparedTxnSizeMetadata(opCtx);
+    const bool persistSizeMetadata = isReplicatedFastCountEnabled(opCtx);
 
     boost::optional<repl::PreparedTxnDerivedFields> preparedDerivedFields;
     if (persistAffectedNamespaces || persistSizeMetadata) {

@@ -712,7 +712,6 @@ protected:
 
 TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataToSessionTxnRecord) {
     unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -733,7 +732,6 @@ TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataToSessionTx
 
 TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataForSplitLinkedApplyOps) {
     unittest::ServerParameterGuard flagBase("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
     // Force a split after every 2 ops, so 3 total ops yields 2 linked applyOps entries.
     unittest::ServerParameterGuard maxOps("maxNumberOfTransactionOperationsInSingleOplogEntry", 2);
 
@@ -756,7 +754,6 @@ TEST_F(PreparedSizeMetadataTest, PrepareTransactionWritesSizeMetadataForSplitLin
 
 TEST_F(PreparedSizeMetadataTest, CommitTransactionWritesSizeMetadataToOplogEntry) {
     unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -784,7 +781,6 @@ TEST_F(PreparedSizeMetadataTest, CommitTransactionWritesSizeMetadataToOplogEntry
 TEST_F(PreparedSizeMetadataTest,
        RestorePreciseCheckpointPopulatesPreparedSizeMetadataOnParticipant) {
     unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     auto sessionId = makeLogicalSessionIdForTest();
     TxnNumber txnNumber(0);
@@ -813,7 +809,6 @@ TEST_F(PreparedSizeMetadataTest,
 
 TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCountChanges) {
     unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     const LogicalSessionId sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNumber(0);
@@ -848,7 +843,6 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
 
 TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointThrowsWhenCollectionMissingFromCatalog) {
     unittest::ServerParameterGuard flagReplicatedFastCount("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability", true);
 
     const LogicalSessionId sessionId = makeLogicalSessionIdForTest();
     const TxnNumber txnNumber(0);
@@ -873,43 +867,6 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointThrowsWhenCollectionMis
         AssertionException,
         12615200);
 }
-
-struct PreparedSizeMetadataFlagParams {
-    // Whether `featureFlagReplicatedFastCount` is enabled.
-    bool baseFlagEnabled;
-    // Whether `featureFlagReplicatedFastCountDurability` is enabled.
-    bool durabilityFlagEnabled;
-};
-
-class PreparedSizeMetadataFlagTest
-    : public PreparedSizeMetadataTest,
-      public testing::WithParamInterface<PreparedSizeMetadataFlagParams> {};
-
-TEST_P(PreparedSizeMetadataFlagTest,
-       OmitsSizeMetadataFromConfigTransactionsUnlessBothFlagsEnabled) {
-    const auto [baseFlagEnabled, durabilityFlagEnabled] = GetParam();
-
-    unittest::ServerParameterGuard flagBase("featureFlagReplicatedFastCount", baseFlagEnabled);
-    unittest::ServerParameterGuard flagDurability("featureFlagReplicatedFastCountDurability",
-                                                  durabilityFlagEnabled);
-    auto sessionId = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber(0);
-
-    beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx) {
-        addTransactionInsertOps(opCtx, _nss1, {BSON("_id" << 0 << "data" << "x")});
-    });
-    prepareTxn(sessionId, txnNumber);
-
-    EXPECT_FALSE(getTxnRecord(sessionId).getSizeMetadata().has_value());
-
-    abortTxn(sessionId, txnNumber);
-}
-
-INSTANTIATE_TEST_SUITE_P(SizeMetadataFlagCombinations,
-                         PreparedSizeMetadataFlagTest,
-                         testing::Values(PreparedSizeMetadataFlagParams{false, false},
-                                         PreparedSizeMetadataFlagParams{true, false},
-                                         PreparedSizeMetadataFlagParams{false, true}));
 
 }  // namespace
 }  // namespace mongo::replicated_fast_count

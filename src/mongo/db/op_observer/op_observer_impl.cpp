@@ -447,7 +447,7 @@ void assertBatchedDDLNotMixedWithCRUD(OperationContext* opCtx) {
  */
 boost::optional<std::vector<MultiOpSizeMetadata>> getPreparedSizeMetadataForPersistence(
     OperationContext* opCtx) {
-    if (!shouldPersistPreparedTxnSizeMetadata(opCtx)) {
+    if (!isReplicatedFastCountEnabled(opCtx)) {
         return boost::none;
     }
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -2621,7 +2621,7 @@ void OpObserverImpl::onTransactionPrepare(
     // OplogSlotReserver.
     invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
-    if (shouldPersistPreparedTxnSizeMetadata(opCtx)) {
+    if (isReplicatedFastCountEnabled(opCtx)) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
         invariant(txnParticipant, "Preparing transaction without an active transaction");
         txnParticipant.setPreparedSizeMetadata(

@@ -7458,8 +7458,6 @@ TEST_F(PreparedTxnSplitTest, SinglePreparedTxnMultipleOpsOnOneDoc) {
 
 class PreparedTxnSplitSizeMetadataTest : public PreparedTxnSplitTest {
     unittest::ServerParameterGuard _fastCountFlag{"featureFlagReplicatedFastCount", true};
-    unittest::ServerParameterGuard _durabilityFlag{"featureFlagReplicatedFastCountDurability",
-                                                   true};
 };
 
 TEST_F(PreparedTxnSplitSizeMetadataTest, SizeMetadataIsSummedAcrossSplits) {

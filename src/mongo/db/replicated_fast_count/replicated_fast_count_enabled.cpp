@@ -65,13 +65,6 @@ bool isReplicatedFastCountEligible(const NamespaceString& nss) {
     return nss != fastCountStoreNss && nss != fastCountTimestampsNss;
 }
 
-bool shouldPersistPreparedTxnSizeMetadata(OperationContext* opCtx) {
-    return isReplicatedFastCountEnabled(opCtx) &&
-        gFeatureFlagReplicatedFastCountDurability.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-}
-
 bool shouldReadFromSizeStorerForOplog(OperationContext* opCtx) {
     // TODO SERVER-125772: Create and use a more targeted persistence provider method.
     return !rss::ReplicatedStorageService::get(opCtx)
