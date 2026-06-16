@@ -1031,9 +1031,9 @@ TEST_F(DocumentSourceLookUpTest,
     auto viewNss = NamespaceString::createNamespaceString_forTest("test", "myView");
     auto backingNss = NamespaceString::createNamespaceString_forTest("test", "backing");
 
-    // Enable featureFlagExtensionsInsideHybridSearch so parsePipelineFromLPPWithMaybeViewDefinition
-    // skips applyViewToLiteParsed (the LPP is already the view pipeline — calling it again would
-    // double-prepend).
+    // Enable featureFlagExtensionsInsideHybridSearch so the stage-params dispatch path is used
+    // instead of the BSON-only fallback. The view pipeline is already stitched into the StageParams
+    // during lite-parsing, so re-applying the view definition is incorrect.
     auto ifrCtx = std::make_shared<IncrementalFeatureRolloutContext>(std::vector<BSONObj>{
         BSON("name" << "featureFlagExtensionsInsideHybridSearch" << "value" << true)});
     auto expCtx =

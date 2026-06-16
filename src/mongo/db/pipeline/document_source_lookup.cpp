@@ -957,13 +957,8 @@ void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     _fromExpCtx->startExpressionCounters();
     pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kOptionsMinimal;
     pipelineOpts.validator = lookupPipeValidator;
-    // When '_sharedState->resolvedPipeline' carries a foreign view's stages (e.g.
-    // [$lookup: {from: qux}] from a view-of-bar), those stages reference namespaces that the outer
-    // expCtx never saw — they came from the view definition, not the user's pipeline. Lite-parse
-    // the resolved pipeline and add its involved namespaces so the inner stages' ctors (which call
-    // getResolvedNamespace()) don't tassert. The LPP-based ctor's
-    // parsePipelineFromLPPWithMaybeViewDefinition does this explicitly; mirror it here for the
-    // BSON-based path (which fires when the user did not supply 'pipeline:').
+    // Lite parse the resolved view pipeline and add its involved namespaces - the expCtx currently
+    // does not contain entries for them.
     if (_fromNsIsAView) {
         LiteParsedPipeline viewLpp(_resolvedNs, _sharedState->resolvedPipeline);
         _fromExpCtx->addResolvedNamespaces(viewLpp.getInvolvedNamespaces());
