@@ -253,9 +253,17 @@ public:
     PlanExplainerData extractExplainData();
 
     /**
-     * Stops collecting multi-planning metrics.
+     * Notifies the multi-planner that CBR has chosen the winning plan. Excludes the
+     * finishing-up trial's work/time from the multiplanning stats.
      */
-    void stopCollectingMetrics();
+    void markCBRChoseWinner();
+
+    /**
+     * Emits the accumulated multi-planner metrics without running a new trial. Used when a capped
+     * estimation trial is followed by a non-MP ranker (e.g., CBR) so that metrics are emitted
+     * exactly once per planning invocation even when no finishing-up trial runs.
+     */
+    void emitAccumulatedStats();
 
     /**
      * Abandons the trial period without picking a best plan thus rejecting all plans

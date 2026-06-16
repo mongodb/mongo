@@ -335,10 +335,9 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
     auto tickSource = opCtx()->getServiceContext()->getTickSource();
     auto startTicks = tickSource->getTicks();
 
-    if (!_shouldNotCollectMetrics) {
-        classicNumPlansHistogram.increment(childrenSize);
-        classicNumPlansTotal.increment(childrenSize);
-        classicCount.increment();
+    // Record numPlans from the first trial only (not overwritten on subsequent calls).
+    if (!_shouldNotCollectMetrics && _accumulatedNumPlans == 0) {
+        _accumulatedNumPlans = childrenSize;
     }
 
     try {
@@ -351,8 +350,7 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         auto totalWorks = ix * childrenSize;
 
         if (!_shouldNotCollectMetrics) {
-            classicWorksHistogram.increment(totalWorks);
-            classicWorksTotal.increment(totalWorks);
+            _accumulatedWorks += totalWorks;
         }
 
         if (moreToDo && !trialConfig.isCappedTrialPhase && !_shouldNotCollectMetrics) {
@@ -375,8 +373,24 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
     if (!_shouldNotCollectMetrics) {
         auto durationMicros =
             tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
-        classicMicrosHistogram.increment(durationCount<Microseconds>(durationMicros));
-        classicMicrosTotal.increment(durationMicros);
+        _accumulatedMicros += durationMicros;
+    }
+
+    // Emit accumulated metrics once on the last runTrials() call. That is either:
+    //  - sole trial in normal MP flow;
+    //  - a non-capped finishing-up trial in automatic flow
+    //  - a capped trial that exited early, so this is the only place to emit.
+    //  In the CBR-chosen plan case
+    // _accumulatedWorks/_accumulatedMicros hold only the first trial's values.
+    if (!_shouldNotCollectMetrics &&
+        (!trialConfig.isCappedTrialPhase || _specificStats.earlyExit)) {
+        classicNumPlansHistogram.increment(_accumulatedNumPlans);
+        classicNumPlansTotal.increment(_accumulatedNumPlans);
+        classicCount.increment();
+        classicWorksHistogram.increment(_accumulatedWorks);
+        classicWorksTotal.increment(_accumulatedWorks);
+        classicMicrosHistogram.increment(durationCount<Microseconds>(_accumulatedMicros));
+        classicMicrosTotal.increment(_accumulatedMicros);
     }
 
     // Save state after running trials so that we are safe to yield or do other things
@@ -384,6 +398,24 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
     saveState();
 
     return Status::OK();
+}
+
+void MultiPlanStage::emitAccumulatedStats() {
+    if (_shouldNotCollectMetrics) {
+        return;
+    }
+    classicNumPlansHistogram.increment(_accumulatedNumPlans);
+    classicNumPlansTotal.increment(_accumulatedNumPlans);
+    classicCount.increment();
+    classicWorksHistogram.increment(_accumulatedWorks);
+    classicWorksTotal.increment(_accumulatedWorks);
+    classicMicrosHistogram.increment(durationCount<Microseconds>(_accumulatedMicros));
+    classicMicrosTotal.increment(_accumulatedMicros);
+}
+
+void MultiPlanStage::markCBRChoseWinner() {
+    emitAccumulatedStats();
+    _shouldNotCollectMetrics = true;
 }
 
 trial_period::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
@@ -457,8 +489,9 @@ Status MultiPlanStage::pickBestPlan() {
 
     removeRejectedPlans();
 
-    // Increment relevant server status metric.
-    if (!_shouldNotCollectMetrics) {
+    // Increment relevant server status metric. Skip when CBR (not MP) made the selection, or
+    // when this MP is only planning a subquery and is not choosing the overall winning plan.
+    if (!_shouldNotCollectMetrics && !_isBranchPlanner) {
         multiPlannerChoseWinningPlan.increment();
     }
 

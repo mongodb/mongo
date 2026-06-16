@@ -107,8 +107,9 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         // TODO SERVER-117373. Only if explain is needed.
         auto resultValue = std::move(cbrResult.getValue());
 
-        // Stop collecting MP metrics because at this point CBR has already chosen the winning plan.
-        _multiPlanner->stopCollectingMetrics();
+        // Notify the multi-planner that CBR has chosen a plan. The finishing-up trial's work/time
+        // will be excluded from the multiplanning stats.
+        _multiPlanner->markCBRChoseWinner();
 
         // TODO(SERVER-104684): Avoid abandoning the backup plan.
         _multiPlanner->abandonTrialsExceptHashes({resultValue.solutions[0]->hash()});
