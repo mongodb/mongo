@@ -29,9 +29,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+
+#include <string_view>
 
 #include <wiredtiger.h>
 
@@ -44,12 +45,12 @@ bool rollbackReasonWasCachePressure(int sub_level_err);
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
                                               bool cacheIsInsufficientForTransaction,
                                               const char* reason,
-                                              StringData prefix,
+                                              std::string_view prefix,
                                               int retCode);
 void throwAppropriateException(bool txnTooLargeEnabled,
                                WT_SESSION* session,
                                double cacheThreshold,
-                               StringData prefix,
+                               std::string_view prefix,
                                int retCode);
 
 /**
@@ -57,13 +58,13 @@ void throwAppropriateException(bool txnTooLargeEnabled,
  */
 void dumpErrorLog(int retCode);
 
-Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
-Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix);
+Status wtRCToStatus_slow(int retCode, WT_SESSION* session, std::string_view prefix);
+Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, std::string_view prefix);
 
 inline Status wtRCToStatus_error(int retCode, WT_SESSION* session, const char* prefix = nullptr) {
     invariant(retCode != 0);
     dumpErrorLog(retCode);
-    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
+    return wtRCToStatus_slow(retCode, session, prefix ? prefix : std::string_view{});
 }
 
 inline Status wtRCToStatus_error(int retCode,
@@ -71,7 +72,7 @@ inline Status wtRCToStatus_error(int retCode,
                                  const char* prefix = nullptr) {
     invariant(retCode != 0);
     dumpErrorLog(retCode);
-    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
+    return wtRCToStatus_slow(retCode, session, prefix ? prefix : std::string_view{});
 }
 
 /**
@@ -81,14 +82,14 @@ inline Status wtRCToStatus(int retCode, WT_SESSION* session, const char* prefix 
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 
-    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
+    return wtRCToStatus_slow(retCode, session, prefix ? prefix : std::string_view{});
 }
 
 inline Status wtRCToStatus(int retCode, WiredTigerSession& session, const char* prefix = nullptr) {
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 
-    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
+    return wtRCToStatus_slow(retCode, session, prefix ? prefix : std::string_view{});
 }
 
 template <typename ContextExpr>

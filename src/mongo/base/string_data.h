@@ -57,10 +57,6 @@ namespace mongo {
 /** mongo::StringData is an alias for std::string_view. */
 using StringData = std::string_view;
 
-constexpr std::string_view stringDataDefaultIfNull(const char* ptr,
-                                                   std::string_view defaultString = {}) {
-    return ptr ? std::string_view{ptr} : defaultString;
-}
 inline namespace literals {
 constexpr std::string_view operator""_sd(const char* ptr, std::size_t len) noexcept {
     return std::literals::string_view_literals::operator""sv(ptr, len);

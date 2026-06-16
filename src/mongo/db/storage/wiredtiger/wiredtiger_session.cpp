@@ -34,6 +34,10 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/logv2/log.h"
 
+#include <string_view>
+
+#include <fmt/format.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
@@ -97,7 +101,7 @@ WiredTigerSession::~WiredTigerSession() {
 }
 
 void WiredTigerSession::_openCursor(WT_SESSION* session,
-                                    StringData uri,
+                                    std::string_view uri,
                                     const char* config,
                                     WT_CURSOR** cursorOut) {
     // TODO SERVER-128957: Dangerous assumption of null-terminated StringData.
@@ -120,15 +124,16 @@ void WiredTigerSession::_openCursor(WT_SESSION* session,
         uassertStatusOK(status);
     } else if (ret == ENOENT) {
         uasserted(ErrorCodes::CursorNotFound,
-                  str::stream() << "Failed to open a WiredTiger cursor. Reason: " << status
-                                << ", uri: " << uri
-                                << ", config: " << stringDataDefaultIfNull(config));
+                  fmt::format("Failed to open a WiredTiger cursor. Reason: {}, uri: {}, config: {}",
+                              status.toString(),
+                              uri,
+                              config ? std::string_view{config} : std::string_view{}));
     }
 
     LOGV2_FATAL_NOTRACE(50882,
                         "Failed to open WiredTiger cursor. This may be due to data corruption",
                         "uri"_attr = uri,
-                        "config"_attr = stringDataDefaultIfNull(config),
+                        "config"_attr = config ? std::string_view{config} : std::string_view{},
                         "error"_attr = status,
                         "message"_attr = kWTRepairMsg);
 }
@@ -149,7 +154,7 @@ WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& co
     return nullptr;
 }
 
-WT_CURSOR* WiredTigerSession::getNewCursor(StringData uri, const char* config) {
+WT_CURSOR* WiredTigerSession::getNewCursor(std::string_view uri, const char* config) {
     WT_CURSOR* cursor = nullptr;
     _openCursor(_session, uri, config, &cursor);
     _cursorsOut++;
