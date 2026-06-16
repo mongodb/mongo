@@ -32,7 +32,6 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/test_extension_factory.h"
-#include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -141,6 +140,72 @@ DEFAULT_PARSE_NODE(ExtensionSearch)
 using ExtensionSearchStageDescriptor =
     sdk::TestStageDescriptor<"$_extensionSearch", ExtensionSearchParseNode>;
 
+/**
+ * Exec stage for $_extensionSearchMeta: a standalone source stage that returns one metadata
+ * document to represent the search metadata result.
+ */
+class ExtensionSearchMetaExecStage : public sdk::ExecAggStageSource {
+public:
+    ExtensionSearchMetaExecStage(std::string_view name, const mongo::BSONObj& /*arguments*/)
+        : sdk::ExecAggStageSource(name) {}
+
+    mongo::extension::ExtensionGetNextResult getNext(
+        const sdk::QueryExecutionContextHandle& /*execCtx*/,
+        ::MongoExtensionExecAggStage* /*execStage*/) override {
+        if (_emitted) {
+            return mongo::extension::ExtensionGetNextResult::eof();
+        }
+        _emitted = true;
+        return mongo::extension::ExtensionGetNextResult::advanced(
+            mongo::extension::ExtensionBSONObj::makeAsByteBuf(
+                BSON("count" << BSON("lowerBound" << 0))));
+    }
+
+    void open() override {}
+    void reopen() override {}
+    void close() override {}
+
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity) const override {
+        return mongo::BSONObj();
+    }
+
+private:
+    bool _emitted = false;
+};
+
+DEFAULT_LOGICAL_STAGE(ExtensionSearchMeta)
+
+/**
+ * Reports source-stage properties so that $searchMeta is treated as a kFirst source stage.
+ */
+class ExtensionSearchMetaAstNode : public sdk::TestAstNode<ExtensionSearchMetaLogicalStage> {
+public:
+    ExtensionSearchMetaAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::TestAstNode<ExtensionSearchMetaLogicalStage>(stageName, arguments) {}
+
+    mongo::BSONObj getProperties() const override {
+        mongo::extension::MongoExtensionStaticProperties properties;
+        mongo::BSONObjBuilder builder;
+        properties.setRequiresInputDocSource(false);
+        properties.setPosition(mongo::extension::MongoExtensionPositionRequirementEnum::kFirst);
+        properties.setHostType(mongo::extension::MongoExtensionHostTypeRequirementEnum::kAnyShard);
+        properties.serialize(&builder);
+        return builder.obj();
+    }
+
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<ExtensionSearchMetaAstNode>(getName(), _arguments);
+    }
+};
+
+DEFAULT_PARSE_NODE(ExtensionSearchMeta)
+
 class SearchMetaParseNode : public SearchParseNodeBase {
 public:
     SearchMetaParseNode() : SearchParseNodeBase("$searchMeta", {}) {}
@@ -155,16 +220,14 @@ public:
         std::vector<mongo::extension::VariantNodeHandle> expanded;
         expanded.reserve(1);
         expanded.emplace_back(new sdk::ExtensionAggStageAstNodeAdapter(
-            std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>(
-                "$_extensionSearchMeta", _arguments)));
+            std::make_unique<ExtensionSearchMetaAstNode>("$_extensionSearchMeta", _arguments)));
         return expanded;
     }
 };
 
 using SearchMetaStageDescriptor = sdk::TestStageDescriptor<"$searchMeta", SearchMetaParseNode>;
 using ExtensionSearchMetaStageDescriptor =
-    sdk::TestStageDescriptor<"$_extensionSearchMeta",
-                             sdk::shared_test_stages::TransformAggStageParseNode>;
+    sdk::TestStageDescriptor<"$_extensionSearchMeta", ExtensionSearchMetaParseNode>;
 
 class SearchExtension : public sdk::Extension {
 public:

@@ -14,9 +14,9 @@ import {
 checkPlatformCompatibleWithExtensions();
 
 /*
- * Extension $searchMeta accepts an empty spec and acts as a no-op, returning one metadata
- * document. Legacy $searchMeta throws SearchNotEnabled when mongot is not configured. We can
- * use this behavior to test whether extension or legacy $searchMeta is being used.
+ * Extension $searchMeta is a source stage that returns one metadata document. Legacy $searchMeta
+ * throws SearchNotEnabled when mongot is not configured. We can use this behavior to test whether
+ * extension or legacy $searchMeta is being used.
  */
 const pipeline = [{$searchMeta: {}}];
 
@@ -52,15 +52,11 @@ withExtensions({"libsearch_extension.so": {}}, (conn) => {
         ]),
     );
 
-    // Flag enabled; extension is used (no-op, returns all documents).
+    // Flag enabled; extension is used (source stage, returns one metadata document).
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
     assertArrayEq({
         actual: coll.aggregate(pipeline).toArray(),
-        expected: [
-            {_id: 0, text: "apple"},
-            {_id: 1, text: "banana"},
-            {_id: 2, text: "cherry"},
-        ],
+        expected: [{count: {lowerBound: 0}}],
     });
 
     // Flag disabled; legacy is used (errors because mongot is not configured).
@@ -71,11 +67,7 @@ withExtensions({"libsearch_extension.so": {}}, (conn) => {
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagSearchExtension: true}));
     assertArrayEq({
         actual: coll.aggregate(pipeline).toArray(),
-        expected: [
-            {_id: 0, text: "apple"},
-            {_id: 1, text: "banana"},
-            {_id: 2, text: "cherry"},
-        ],
+        expected: [{count: {lowerBound: 0}}],
     });
 
     // Toggles back to legacy correctly.
