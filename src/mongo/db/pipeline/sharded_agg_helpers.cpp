@@ -702,7 +702,7 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
     ShardId shardId,
-    bool requestQueryStatsFromRemotes) {
+    IncludeMetrics remoteMetricsToInclude) {
     tassert(11282918, "Don't expect explain requests here", !request.getExplain());
 
     auto readPreference = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(
@@ -741,10 +741,8 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
             auto mergePipeline = pipeline_factory::makePipeline(
                 std::vector<BSONObj>{}, expCtx, pipeline_factory::kOptionsMinimal);
 
-            partitionAndAddMergeCursorsSource(mergePipeline.get(),
-                                              std::move(ownedCursors),
-                                              boost::none,
-                                              requestQueryStatsFromRemotes);
+            partitionAndAddMergeCursorsSource(
+                mergePipeline.get(), std::move(ownedCursors), boost::none, remoteMetricsToInclude);
             return mergePipeline;
         });
 }
@@ -797,7 +795,7 @@ BSONObj createPassthroughCommandForShard(
     Pipeline* pipeline,
     boost::optional<BSONObj> readConcern,
     boost::optional<int> overrideBatchSize,
-    bool requestQueryStatsFromRemotes) {
+    IncludeMetrics remoteMetricsToInclude) {
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
@@ -820,7 +818,7 @@ BSONObj createPassthroughCommandForShard(
         }
     }
 
-    if (requestQueryStatsFromRemotes) {
+    if (remoteMetricsToInclude.getQueryStats()) {
         targetedCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
 
@@ -859,7 +857,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                        bool needsMerge,
                                        boost::optional<ExplainOptions::Verbosity> explain,
                                        boost::optional<BSONObj> readConcern,
-                                       bool requestQueryStatsFromRemotes) {
+                                       IncludeMetrics remoteMetricsToInclude) {
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     // If we've parsed a pipeline on mongos, always override the pipeline, in case parsing it
@@ -927,7 +925,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     targetedCmd[AggregateCommandRequest::kExchangeFieldName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
-    if (requestQueryStatsFromRemotes) {
+    if (remoteMetricsToInclude.getQueryStats()) {
         targetedCmd[AggregateCommandRequest::kIncludeQueryStatsMetricsFieldName] = Value(true);
     }
 
@@ -1094,7 +1092,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     const NamespaceString& targetedNss,
     std::unique_ptr<Pipeline> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
-    bool requestQueryStatsFromRemotes,
+    IncludeMetrics remoteMetricsToInclude,
     boost::optional<BSONObj> readConcern,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
     stdx::unordered_map<ShardId, BSONObj> resumeTokenMap) {
@@ -1163,14 +1161,14 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                                          true /* needsMerge */,
                                                          explain,
                                                          std::move(readConcern),
-                                                         requestQueryStatsFromRemotes)
+                                                         remoteMetricsToInclude)
                         : createPassthroughCommandForShard(expCtx,
                                                            serializedCommand,
                                                            explain,
                                                            pipeline.get(),
                                                            std::move(readConcern),
                                                            boost::none,
-                                                           requestQueryStatsFromRemotes));
+                                                           remoteMetricsToInclude));
 
     // Shard targeting for change streams v2 is performed in ChangeStreamHandleTopologyChangeV2
     // stage. Here we early exit with empty DispatchShardPipelineResults.
@@ -1284,7 +1282,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     std::unique_ptr<Pipeline> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
     const NamespaceString& targetedNss,
-    bool requestQueryStatsFromRemotes,
+    IncludeMetrics remoteMetricsToInclude,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
@@ -1321,7 +1319,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                          targetedNss,
                                          std::move(pipeline),
                                          std::move(explain),
-                                         requestQueryStatsFromRemotes,
+                                         remoteMetricsToInclude,
                                          std::move(readConcern),
                                          std::move(designatedHostsMap),
                                          std::move(resumeTokenMap));
@@ -1333,12 +1331,16 @@ DispatchShardPipelineResults dispatchShardPipeline(
 AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> expCtx,
                                         std::vector<OwnedRemoteCursor> ownedCursors,
                                         boost::optional<BSONObj> shardCursorsSortSpec,
-                                        bool requestQueryStatsFromRemotes) {
+                                        IncludeMetrics remoteMetricsToInclude) {
     AsyncResultsMergerParams armParams;
     armParams.setSort(std::move(shardCursorsSortSpec));
     armParams.setTailableMode(expCtx->getTailableMode());
     armParams.setNss(expCtx->getNamespaceString());
-    armParams.setRequestQueryStatsFromRemotes(requestQueryStatsFromRemotes);
+    armParams.setRequestQueryStatsFromRemotes(remoteMetricsToInclude.getQueryStats());
+    if (hasAnyMetricsRequested(remoteMetricsToInclude)) {
+        // Set 'remoteMetricsToInclude' conditionally only when at least one of the flags is set.
+        armParams.setRequestRemoteMetrics(remoteMetricsToInclude);
+    }
 
     if (auto lsid = expCtx->getOperationContext()->getLogicalSessionId()) {
         OperationSessionInfoFromClient sessionInfo(*lsid,
@@ -1416,7 +1418,7 @@ partitionCursors(std::vector<OwnedRemoteCursor> ownedCursors) {
  */
 void injectMetaCursor(Pipeline* mergePipeline,
                       std::vector<OwnedRemoteCursor> metaCursors,
-                      bool requestQueryStatsFromRemotes) {
+                      IncludeMetrics remoteMetricsToInclude) {
     // Provide the "meta" cursors to the $setVariableFromSubPipeline stage.
     for (const auto& source : mergePipeline->getSources()) {
         if (auto* setVarStage =
@@ -1425,10 +1427,8 @@ void injectMetaCursor(Pipeline* mergePipeline,
             // If $setVar is present, we must have a non-empty set of "meta" cursors.
             tassert(625307, "Missing meta cursor set.", !metaCursors.empty());
 
-            auto armParams = sharded_agg_helpers::buildArmParams(mergePipeline->getContext(),
-                                                                 std::move(metaCursors),
-                                                                 {},
-                                                                 requestQueryStatsFromRemotes);
+            auto armParams = sharded_agg_helpers::buildArmParams(
+                mergePipeline->getContext(), std::move(metaCursors), {}, remoteMetricsToInclude);
 
             setVarStage->addSubPipelineInitialSource(DocumentSourceMergeCursors::create(
                 mergePipeline->getContext(), std::move(armParams)));
@@ -1444,12 +1444,12 @@ void injectMetaCursor(Pipeline* mergePipeline,
 void addMergeCursorsSource(Pipeline* mergePipeline,
                            std::vector<OwnedRemoteCursor> cursorsToMerge,
                            boost::optional<BSONObj> shardCursorsSortSpec,
-                           bool requestQueryStatsFromRemotes) {
+                           IncludeMetrics remoteMetricsToInclude) {
 
     auto armParams = sharded_agg_helpers::buildArmParams(mergePipeline->getContext(),
                                                          std::move(cursorsToMerge),
                                                          std::move(shardCursorsSortSpec),
-                                                         requestQueryStatsFromRemotes);
+                                                         remoteMetricsToInclude);
 
     mergePipeline->addInitialSource(
         DocumentSourceMergeCursors::create(mergePipeline->getContext(), std::move(armParams)));
@@ -1460,15 +1460,13 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
 void partitionAndAddMergeCursorsSource(Pipeline* mergePipeline,
                                        std::vector<OwnedRemoteCursor> cursors,
                                        boost::optional<BSONObj> shardCursorsSortSpec,
-                                       bool requestQueryStatsFromRemotes) {
+                                       IncludeMetrics remoteMetricsToInclude) {
     auto [resultsCursors, metaCursors] = partitionCursors(std::move(cursors));
     // Whether or not cursors are typed/untyped, the first is always the results cursor.
-    addMergeCursorsSource(mergePipeline,
-                          std::move(resultsCursors),
-                          shardCursorsSortSpec,
-                          requestQueryStatsFromRemotes);
+    addMergeCursorsSource(
+        mergePipeline, std::move(resultsCursors), shardCursorsSortSpec, remoteMetricsToInclude);
     if (metaCursors) {
-        injectMetaCursor(mergePipeline, std::move(*metaCursors), requestQueryStatsFromRemotes);
+        injectMetaCursor(mergePipeline, std::move(*metaCursors), remoteMetricsToInclude);
     }
 }
 
@@ -1570,7 +1568,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
             buildArmParams(dispatchResults.splitPipeline->mergePipeline->getContext(),
                            std::vector<OwnedRemoteCursor>(),
                            std::move(dispatchResults.splitPipeline->shardCursorsSortSpec),
-                           false /* requestQueryStatsFromRemotes */)
+                           IncludeMetrics{} /* remoteMetricsToInclude */)
                 .toBSON()
                 .removeField(AsyncResultsMergerParams::kRemotesFieldName);
 
@@ -1652,7 +1650,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
                                       std::move(pipelineToTarget),
                                       expCtx->getExplain(),
                                       expCtx->getNamespaceString(),
-                                      false /* requestQueryStatsFromRemotes */);
+                                      IncludeMetrics{} /* remoteMetricsToInclude */);
 
             BSONObjBuilder explainBuilder;
             auto appendStatus =
@@ -1700,7 +1698,7 @@ std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
     PipelineDataSource pipelineDataSource,
     boost::optional<BSONObj> shardCursorsSortSpec,
     boost::optional<BSONObj> readConcern,
-    bool requestQueryStatsFromRemotes) {
+    IncludeMetrics remoteMetricsToInclude) {
     // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregateCommandRequest may not
     // match what was set on the originating command, so copy it from the ExpressionContext.
     aggRequest.setAllowDiskUse(expCtx->getAllowDiskUse());
@@ -1718,7 +1716,7 @@ std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
                                                               expCtx->getNamespaceString(),
                                                               std::move(pipeline),
                                                               boost::none /* explain */,
-                                                              requestQueryStatsFromRemotes,
+                                                              remoteMetricsToInclude,
                                                               readConcern,
                                                               {} /* designatedHostsMap */,
                                                               {} /* resumeTokenMap */);
@@ -1746,7 +1744,7 @@ std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
     partitionAndAddMergeCursorsSource(mergePipeline.get(),
                                       std::move(shardDispatchResults.remoteCursors),
                                       shardCursorsSortSpec,
-                                      requestQueryStatsFromRemotes);
+                                      remoteMetricsToInclude);
     return mergePipeline;
 }
 
@@ -1801,8 +1799,9 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
         }
     }
 
-    bool requestQueryStatsFromRemotes =
-        query_stats::shouldRequestRemoteMetrics(CurOp::get(expCtx->getOperationContext())->debug());
+    IncludeMetrics remoteMetricsToInclude;
+    remoteMetricsToInclude.setQueryStats(query_stats::shouldRequestRemoteMetrics(
+        CurOp::get(expCtx->getOperationContext())->debug()));
 
     return dispatchTargetedPipelineAndAddMergeCursors(expCtx,
                                                       routingCtx,
@@ -1812,7 +1811,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
                                                       pipelineDataSource,
                                                       std::move(shardCursorsSortSpec),
                                                       readConcern,
-                                                      requestQueryStatsFromRemotes);
+                                                      remoteMetricsToInclude);
 }
 
 

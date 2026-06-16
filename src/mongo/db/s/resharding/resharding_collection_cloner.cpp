@@ -279,7 +279,7 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 std::move(pipeline),
                 boost::none /* explain */,
                 _sourceNss,
-                false /* requestQueryStatsFromRemotes */,
+                IncludeMetrics{} /* remoteMetricsToInclude */,
                 ShardTargetingPolicy::kAllowed,
                 readConcern.toBSONInner(),
                 std::move(designatedHostsMap),

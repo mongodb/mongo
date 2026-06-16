@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/split_pipeline.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -150,7 +151,7 @@ dispatchShardPipeline(RoutingContext& routingCtx,
                       std::unique_ptr<Pipeline> pipeline,
                       boost::optional<ExplainOptions::Verbosity> explain,
                       const NamespaceString& targetedNss,
-                      bool requestQueryStatsFromRemotes = false,
+                      IncludeMetrics remoteMetricsToInclude = IncludeMetrics{},
                       ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
                       boost::optional<BSONObj> readConcern = boost::none,
                       AsyncRequestsSender::ShardHostMap designatedHostsMap = {},
@@ -164,7 +165,7 @@ BSONObj createPassthroughCommandForShard(
     Pipeline* pipeline,
     boost::optional<BSONObj> readConcern,
     boost::optional<int> overrideBatchSize,
-    bool requestQueryStatsFromRemotes);
+    IncludeMetrics remoteMetricsToInclude);
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Document serializedCommand,
@@ -173,7 +174,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                        bool needsMerge,
                                        boost::optional<ExplainOptions::Verbosity> explain,
                                        boost::optional<BSONObj> readConcern = boost::none,
-                                       bool requestQueryStatsFromRemotes = false);
+                                       IncludeMetrics remoteMetricsToInclude = IncludeMetrics{});
 
 /**
  * Convenience method for callers that want to do 'partitionCursors', 'injectMetaCursors', and
@@ -182,7 +183,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
 void partitionAndAddMergeCursorsSource(Pipeline* pipeline,
                                        std::vector<OwnedRemoteCursor> cursors,
                                        boost::optional<BSONObj> shardCursorsSortSpec,
-                                       bool requestQueryStatsFromRemotes);
+                                       IncludeMetrics remoteMetricsToInclude);
 
 /**
  * Targets the shards with an aggregation command built from `pipeline` and explain set to true.
@@ -299,7 +300,7 @@ MONGO_MOD_PUBLIC std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     AggregateCommandRequest request,
     ShardId shardId,
-    bool requestQueryStatsFromRemotes);
+    IncludeMetrics remoteMetricsToInclude);
 
 /**
  * Opens a $changeStream cursor on the 'config.shards' collection to watch for new shards if:

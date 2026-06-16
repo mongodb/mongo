@@ -126,8 +126,8 @@ struct MONGO_MOD_PUBLIC ClusterClientCursorParams {
     // unreachable host.
     bool isAllowPartialResults = false;
 
-    // Whether to request query stats when making requests to remote hosts.
-    bool requestQueryStatsFromRemotes = false;
+    // Specifies which metrics to include when making requests to remote hosts.
+    IncludeMetrics remoteMetricsToInclude;
 };
 
 }  // namespace mongo

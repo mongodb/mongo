@@ -48,6 +48,10 @@
 
 namespace mongo {
 
+bool hasAnyMetricsRequested(const IncludeMetrics& metrics) {
+    return metrics.getQueryStats();
+}
+
 namespace {
 
 const char kCursorsField[] = "cursors";

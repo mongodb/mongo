@@ -15,6 +15,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/query:tailable_mode_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/util/net:hostandport_gen",
     ],

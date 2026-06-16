@@ -3621,6 +3621,24 @@ TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
     }
 }
 
+TEST_F(AsyncResultsMergerTest, RequestRemoteMetricsWillIncludeQueryStatsMetricsInGetMore) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+
+    auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
+    IncludeMetrics metrics;
+    metrics.setQueryStats(true);
+    params.setRequestRemoteMetrics(metrics);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    auto cmd = getNthPendingRequest(0u).cmdObj;
+    ASSERT_TRUE(cmd["includeQueryStatsMetrics"].Bool());
+}
+
 TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
     auto scheduleResponse = [&](CursorId id, std::vector<BSONObj> batch, CursorMetrics metrics) {
         std::vector<CursorResponse> responses;

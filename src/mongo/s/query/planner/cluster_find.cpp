@@ -160,7 +160,7 @@ const char kFindCmdName[] = "find";
 BSONObj makeFindCommandForShards(OperationContext* opCtx,
                                  const std::set<ShardId>& shardIds,
                                  const CanonicalQuery& query,
-                                 bool requestQueryStatsFromRemotes,
+                                 IncludeMetrics remoteMetricsToInclude,
                                  const UUID& opKey) {
     auto findCommand = [&]() -> FindCommandRequest {
         if (shardIds.size() > 1) {
@@ -227,7 +227,7 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
         const bool origIncludeQueryStats =
             origFindReq.getIncludeQueryStatsMetrics().value_or(false) ||
             (includeMetricsOption && includeMetricsOption->getQueryStats());
-        if (origIncludeQueryStats || requestQueryStatsFromRemotes) {
+        if (origIncludeQueryStats || remoteMetricsToInclude.getQueryStats()) {
             findCommand.setIncludeQueryStatsMetrics(true);
         }
     }
@@ -275,8 +275,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Get the set of shards on which we will run the query.
     auto shardIds = getTargetedShardsForCanonicalQuery(query, cri);
 
-    bool requestQueryStatsFromRemotes =
-        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+    IncludeMetrics remoteMetricsToInclude;
+    remoteMetricsToInclude.setQueryStats(
+        query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug()));
 
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
@@ -298,7 +299,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.isAllowPartialResults = findCommand.getAllowPartialResults();
     params.originatingPrivileges = {
         Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)};
-    params.requestQueryStatsFromRemotes = requestQueryStatsFromRemotes;
+    params.remoteMetricsToInclude = remoteMetricsToInclude;
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
@@ -362,7 +363,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // OperationKey as well so establishCursors won't copy each request.
         std::vector<OperationKey> opKeys{UUID::gen()};
         const auto findCommandToForward = makeFindCommandForShards(
-            opCtx, shardIds, query, requestQueryStatsFromRemotes, opKeys.front());
+            opCtx, shardIds, query, remoteMetricsToInclude, opKeys.front());
         auto requests = buildVersionedRequests(
             opCtx, query.nss(), cri, shardIds, findCommandToForward, /*eligibleForSampling=*/true);
 

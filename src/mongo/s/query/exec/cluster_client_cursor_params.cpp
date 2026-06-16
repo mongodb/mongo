@@ -55,7 +55,11 @@ AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
     armParams.setNss(nsString);
     armParams.setAllowPartialResults(isAllowPartialResults);
     armParams.setOperationSessionInfo(osi);
-    armParams.setRequestQueryStatsFromRemotes(requestQueryStatsFromRemotes);
+    armParams.setRequestQueryStatsFromRemotes(remoteMetricsToInclude.getQueryStats());
+    if (hasAnyMetricsRequested(remoteMetricsToInclude)) {
+        // Set 'remoteMetricsToInclude' conditionally only when at least one of the flags is set.
+        armParams.setRequestRemoteMetrics(remoteMetricsToInclude);
+    }
 
     return armParams;
 }

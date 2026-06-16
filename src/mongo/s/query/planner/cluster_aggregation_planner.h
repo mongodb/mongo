@@ -130,7 +130,7 @@ Status runPipelineOnMongoS(const ClusterAggregate::Namespaces& namespaces,
                            std::unique_ptr<Pipeline> pipeline,
                            BSONObjBuilder* result,
                            const PrivilegeVector& privileges,
-                           bool requestQueryStatsFromRemotes);
+                           IncludeMetrics remoteMetricsToInclude);
 
 /**
  * Dispatches the pipeline in 'targeter' to the shards that are involved, and merges the results if
@@ -148,7 +148,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 BSONObjBuilder* result,
                                 sharded_agg_helpers::PipelineDataSource pipelineDataSource,
                                 bool eligibleForSampling,
-                                bool requestQueryStatsFromRemotes);
+                                IncludeMetrics remoteMetricsToInclude);
 
 /**
  * Runs a pipeline on a specific shard. Used for running a pipeline on a specifc shard (i.e. by per
@@ -163,7 +163,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                       const PrivilegeVector& privileges,
                                       ShardId shardId,
                                       BSONObjBuilder* out,
-                                      bool requestQueryStatsFromRemotes);
+                                      IncludeMetrics remoteMetricsToInclude);
 
 }  // namespace cluster_aggregation_planner
 }  // namespace mongo

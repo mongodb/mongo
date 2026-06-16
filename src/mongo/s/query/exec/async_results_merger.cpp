@@ -929,7 +929,11 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
             static_cast<std::int64_t>(durationCount<Milliseconds>(*effectiveAwaitDataTimeout)));
     }
 
-    if (_params.getRequestQueryStatsFromRemotes()) {
+    auto& remoteMetricsToInclude = _params.getRequestRemoteMetrics();
+    // Check requestQueryStatsFromRemotes as a fallback for older cluster nodes that set only the
+    // legacy bool field when sending AsyncResultsMergerParams over the wire.
+    if ((remoteMetricsToInclude && remoteMetricsToInclude->getQueryStats()) ||
+        _params.getRequestQueryStatsFromRemotes()) {
         getMoreRequest.setIncludeQueryStatsMetrics(true);
     }
     BSONObjBuilder bob;

@@ -56,6 +56,11 @@
 namespace MONGO_MOD_PUBLIC mongo {
 
 /**
+ * Returns true if any metric collection flag in 'metrics' is enabled.
+ */
+bool hasAnyMetricsRequested(const IncludeMetrics& metrics);
+
+/**
  * Builds the cursor field for a reply to a cursor-generating command in-place.
  */
 class CursorResponseBuilder {

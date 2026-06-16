@@ -184,7 +184,11 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     if (routerSort) {
         params.sortToApplyOnRouter = *routerSort;
     }
-    params.requestQueryStatsFromRemotes = incomingCursorResponse.getCursorMetrics().has_value();
+    if (incomingCursorResponse.getCursorMetrics().has_value()) {
+        IncludeMetrics im;
+        im.setQueryStats(true);
+        params.remoteMetricsToInclude = std::move(im);
+    }
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(executor), std::move(params));
     collectQueryStatsMongos(opCtx, ccc);
@@ -292,7 +296,11 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     if (routerSort) {
         params.sortToApplyOnRouter = *routerSort;
     }
-    params.requestQueryStatsFromRemotes = response.getCursorMetrics().has_value();
+    if (response.getCursorMetrics().has_value()) {
+        IncludeMetrics im;
+        im.setQueryStats(true);
+        params.remoteMetricsToInclude = std::move(im);
+    }
 
     // Build the execution plan: RouterStageTransform wraps RouterStageMerge so the
     // documentTransform is applied to every document in every batch, including getMore batches,

@@ -949,8 +949,9 @@ Status runAggregateImpl(OperationContext* opCtx,
 
     // Need to explicitly assign expCtx because lambdas can't capture structured bindings.
     auto status = [&](auto& expCtx) {
-        bool requestQueryStatsFromRemotes = query_stats::shouldRequestRemoteMetrics(
-            CurOp::get(expCtx->getOperationContext())->debug());
+        IncludeMetrics remoteMetricsToInclude;
+        remoteMetricsToInclude.setQueryStats(query_stats::shouldRequestRemoteMetrics(
+            CurOp::get(expCtx->getOperationContext())->debug()));
         boost::optional<query_shape::QueryShapeHash> queryShapeHash =
             CurOp::get(opCtx)->debug().getQueryShapeHash();
         try {
@@ -979,7 +980,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                         std::move(targeter.pipeline),
                         &result,
                         privileges,
-                        requestQueryStatsFromRemotes);
+                        remoteMetricsToInclude);
                 }
 
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
@@ -996,7 +997,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                         &result,
                         pipelineDataSource,
                         eligibleForSampling,
-                        requestQueryStatsFromRemotes);
+                        remoteMetricsToInclude);
                 }
                 case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                     kSpecificShardOnly: {
@@ -1019,7 +1020,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                         privileges,
                         shardId,
                         &result,
-                        requestQueryStatsFromRemotes);
+                        remoteMetricsToInclude);
                 }
             }
             MONGO_UNREACHABLE;

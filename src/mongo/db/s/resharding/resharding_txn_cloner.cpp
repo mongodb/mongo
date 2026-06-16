@@ -158,7 +158,7 @@ std::unique_ptr<Pipeline> ReshardingTxnCloner::_targetAggregationRequest(Operati
         pipeline.getContext(),
         std::move(request),
         _sourceId.getShardId(),
-        false /* requestQueryStatsFromRemotes */);
+        IncludeMetrics{} /* remoteMetricsToInclude */);
 }
 
 std::unique_ptr<Pipeline> ReshardingTxnCloner::_restartPipeline(

@@ -40,6 +40,7 @@ imports:
     - "mongo/db/query/tailable_mode.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
 
 types:
     CursorResponse:
@@ -121,3 +122,11 @@ structs:
                 query_shape: parameter
                 description: >-
                     If set, query stats will be requested in any requests made to remote hosts.
+            requestRemoteMetrics:
+                type: IncludeMetrics
+                optional: true
+                query_shape: parameter
+                description: >-
+                    If set, specifies which metrics will be requested in any requests made to remote
+                    hosts. This field supersedes requestQueryStatsFromRemotes; both are kept for
+                    wire-protocol backward compatibility with older cluster nodes.
