@@ -463,8 +463,7 @@ TEST(AsioTransportLayer, UnauthenticatedConnectionRejectsOversizedMessage) {
     Notification<StatusWith<Message>> received;
     tf.sep().setOnStartSession([&](transport::test::SessionThread& st) {
         st.schedule([&](auto& session) {
-            // Put the session in restricted mode (pre-auth).
-            session.setRestrictedMode(true);
+            session.setPreauthIngress(true);
             received.set(session.sourceMessage());
         });
     });
@@ -522,8 +521,7 @@ TEST(AsioTransportLayer, AuthenticatedConnectionAllowsLargerMessages) {
 
     Notification<StatusWith<Message>> done;
     st.schedule([&](auto& session) {
-        // NOT in restricted mode - simulates an authenticated connection.
-        session.setRestrictedMode(false);
+        session.setPreauthIngress(false);
         done.set(session.sourceMessage());
     });
 
@@ -565,7 +563,7 @@ TEST(AsioTransportLayer, UnauthenticatedConnectionAcceptsValidSizedMessage) {
     Notification<StatusWith<Message>> received;
     tf.sep().setOnStartSession([&](transport::test::SessionThread& st) {
         st.schedule([&](auto& session) {
-            session.setRestrictedMode(true);
+            session.setPreauthIngress(true);
             received.set(session.sourceMessage());
         });
     });

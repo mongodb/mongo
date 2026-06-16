@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/transport/asio/asio_utils.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
@@ -54,8 +55,6 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayer1sProxyTimeout);
-MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
-MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
 
 namespace {
 
@@ -170,7 +169,7 @@ CommonAsioSession::CommonAsioSession(
     bool isIngressSession,
     Endpoint endpoint,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) try
-    : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
+    : AsioSession(isIngressSession), _socket(std::move(socket)), _tl(tl) {
     auto sev = logv2::LogSeverity::Debug(3);
     try {
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
@@ -239,15 +238,6 @@ CommonAsioSession::CommonAsioSession(
     throw;
 } catch (const asio::system_error&) {
     throw;
-}
-
-bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
-    return MONGO_unlikely(clientIsConnectedToLoadBalancerPort.shouldFail()) ||
-        _isConnectedToLoadBalancerPort;
-}
-
-bool CommonAsioSession::isLoadBalancerPeer() const {
-    return MONGO_unlikely(clientIsLoadBalancedPeer.shouldFail()) || _isLoadBalancerPeer;
 }
 
 void CommonAsioSession::setisLoadBalancerPeer(OperationContext* opCtx,
@@ -331,7 +321,7 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
     _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
         .then([this, message /*keep the buffer alive*/]() {
-            if (_isIngressSession) {
+            if (isIngress()) {
                 networkCounter.hitPhysicalOut(message.size());
             }
         })
@@ -501,7 +491,7 @@ auto CommonAsioSession::getSocket() -> GenericSocket& {
 }
 
 ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
-    invariant(_isIngressSession);
+    invariant(isIngress());
     invariant(reactor);
     const Backoff kExponentialBackoff(Milliseconds(gProxyProtocolMaximumWaitBackoffMillis.load()),
                                       Milliseconds::max());
@@ -512,6 +502,7 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     return AsyncTry([this, buffer] {
                const auto bytesRead = peekASIOStream(
                    _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
+               MessageHooks::onProxyHeaderReceived(*this, buffer->data(), bytesRead, false);
                return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead));
            })
         .until([deadline, proxyHeaderTimeout, reactor](
@@ -574,10 +565,12 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
             if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), kHeaderSize))) {
                 return sendHTTPResponse(baton);
             }
+            if (isIngress())
+                MessageHooks::onHeaderReceived(*this, headerBuffer.get(), kHeaderSize);
 
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
 
-            const size_t maxMessageSize = _restrictedMode
+            const size_t maxMessageSize = isPreauthIngress()
                 ? static_cast<size_t>(gPreAuthMaximumMessageSizeBytes.loadRelaxed())
                 : MaxMessageSizeBytes;
             if (msgLen < kHeaderSize || msgLen > maxMessageSize) {
@@ -591,7 +584,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                             "msgLen"_attr = msgLen,
                             "min"_attr = kHeaderSize,
                             "max"_attr = maxMessageSize);
-                if (_restrictedMode) {
+                if (isPreauthIngress()) {
                     totalMessageSizeErrorsPreAuth.increment();
                 } else {
                     totalMessageSizeErrorsPostAuth.increment();
@@ -602,7 +595,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
 
             if (msgLen == kHeaderSize) {
                 // This probably isn't a real case since all (current) messages have bodies.
-                if (_isIngressSession) {
+                if (isIngress()) {
                     networkCounter.hitPhysicalIn(msgLen);
                 }
                 return Future<Message>::makeReady(Message(std::move(headerBuffer)));
@@ -614,7 +607,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
             MsgData::View msgView(buffer.get());
             return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
                 .then([this, buffer = std::move(buffer), msgLen]() mutable {
-                    if (_isIngressSession) {
+                    if (isIngress()) {
                         networkCounter.hitPhysicalIn(msgLen);
                     }
                     return Message(std::move(buffer));
