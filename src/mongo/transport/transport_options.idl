@@ -150,7 +150,9 @@ server_parameters:
     proxyProtocolTimeoutSecs:
         description: >-
             The maximum wait time (in seconds) before expiring accepted sockets from the proxy port,
-            unless the proxy protocol header is presented to the server before that.
+            unless the proxy protocol header is presented to the server before that. A value of 0
+            means expire immediately if the complete header is not already buffered in the socket
+            at the time of the first read attempt.
         set_at: [startup, runtime]
         cpp_varname: gProxyProtocolTimeoutSecs
         cpp_vartype: Atomic<int32_t>

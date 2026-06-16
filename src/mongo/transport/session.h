@@ -159,6 +159,17 @@ public:
     virtual Future<void> asyncSinkMessage(Message message, const BatonHandle& handle = nullptr) = 0;
 
     /**
+     * Performs networking IO on the client session thread before session establishment rate
+     * limiting is enforced and before the exchange of MongoRPC messages begins.
+     *
+     * An override of this function may block on IO. The default implementation does nothing.
+     *
+     * The motivating example of prelude() is in `HandoffSession`, where the PROXY protocol header
+     * is read and parsed on the client session thread.
+     */
+    virtual void prelude() {}
+
+    /**
      * Cancel any outstanding async operations. There is no way to cancel synchronous calls.
      * Futures will finish with an ErrorCodes::CallbackCancelled error if they haven't already
      * completed.

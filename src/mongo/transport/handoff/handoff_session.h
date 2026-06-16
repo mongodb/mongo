@@ -32,6 +32,7 @@
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -118,6 +119,11 @@ public:
     bool isConnected() override;
     void setTimeout(boost::optional<Milliseconds> timeout) override;
 
+    /**
+     * Parses the PROXY v2 header from the UDS connection, and applies any TLVs to the session.
+     */
+    void prelude() override;
+
     void setIsLoadBalancerPeer(bool) override;
 
     Status validateProxyUnixSocketPeerPermissions() override {
@@ -179,6 +185,12 @@ private:
      * sets receivedFd if one was received via SCM_RIGHTS.
      */
     StatusWith<size_t> _recvWithFd(char* buf, size_t len, int* receivedFd);
+
+    /**
+     * Reads and parses the PROXY v2 header sent by the pre-auth process before OP_HANDOFF.
+     * Returns the parsed header. Uasserts on any I/O or parse error.
+     */
+    transport::ParserResults _parseProxyProtocolHeader();
 
     /**
      * Handles an OP_HANDOFF message. Parses the serialized s2n state from the message, deserializes

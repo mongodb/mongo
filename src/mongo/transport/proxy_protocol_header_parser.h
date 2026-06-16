@@ -48,6 +48,11 @@
 
 namespace mongo::transport {
 
+// PROXY protocol signature strings. kProxyV2Signature contains an embedded null byte; always use
+// .size() rather than strlen() when working with it.
+constexpr StringData kProxyV1Signature = "PROXY"_sd;
+constexpr StringData kProxyV2Signature = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"_sd;
+
 /**
  * The maximum number of bytes ever needed by a proxy protocol header; represents
  * the minimum TCP MTU.

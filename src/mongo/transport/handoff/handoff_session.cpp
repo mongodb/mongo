@@ -30,18 +30,23 @@
 #include "mongo/transport/handoff/handoff_session.h"
 
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
+#include "mongo/transport/proxy_protocol_header_parser.h"
+#include "mongo/transport/proxy_protocol_tlv_extraction.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 
 #include <cerrno>
+#include <limits>
 
 #include <poll.h>
 #include <unistd.h>
@@ -55,6 +60,14 @@ namespace mongo::transport::handoff_transport {
 namespace {
 
 constexpr size_t kHeaderSize = sizeof(MSGHEADER::Value);
+
+// The size of the PROXY v2 fixed header: 12-byte signature + 1-byte version/command + 1-byte
+// address family + 2-byte length.
+constexpr size_t kProxyV2FixedHeaderSize = 16;
+
+// Number of bytes to peek: enough to identify PROXY v1 ("PROXY", 5 bytes) or the start of
+// the PROXY v2 signature ("\r\n\r\n", first 4 bytes of kProxyV2Signature).
+constexpr size_t kProxyPeekSize = transport::kProxyV1Signature.size();
 
 /**
  * Given an s2n return code, returns OK on S2N_SUCCESS or an InternalError with the s2n error
@@ -79,7 +92,9 @@ HandoffSession::HandoffSession(
       _remote(std::move(remote)),
       _local(std::move(local)),
       _s2nConnection(nullptr),
-      _s2nConfig(s2nConfig) {}
+      _s2nConfig(s2nConfig) {
+    _isConnectedToProxyUnixSocket = true;
+}
 
 HandoffSession::~HandoffSession() {
     end();
@@ -473,12 +488,122 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
         _local = HostAndPort(localSa.getAddr(), localSa.getPort());
     }
 
-    // TODO (SERVER-127802): Once PROXY protocol header parsing is added to HandoffSession, store
+    // TODO (SERVER-128853): Once PROXY protocol header parsing is added to HandoffSession, store
     // the proxied source address, override getSourceRemoteEndpoint() to return it, and update
     // _restrictionEnvironment based on the clientSourceAuthenticationRestrictionMode, mirroring
     // CommonAsioSession.
     _restrictionEnvironment = RestrictionEnvironment(sa, localSa);
     return Status::OK();
+}
+
+transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
+    int fd = _fd.load();
+
+    // Apply the proxy header read timeout for the duration of this call, then restore the
+    // session timeout on return.
+    const int64_t proxyTimeoutSecs = gProxyProtocolTimeoutSecs.load();
+
+    {
+        struct timeval tv;
+        tv.tv_sec = proxyTimeoutSecs;
+        // A timeout of 0 means expire immediately if the header is not already available.
+        // SO_RCVTIMEO of {0,0} disables the recv deadline on Linux, so use the smallest
+        // non-zero timeval (1 microsecond) instead to ensure blocking reads time out immediately
+        // rather than hanging indefinitely.
+        tv.tv_usec = (proxyTimeoutSecs == 0) ? 1 : 0;
+        uassert(ErrorCodes::SocketException,
+                fmt::format("Failed to set SO_RCVTIMEO on proxy UDS socket: {}",
+                            errorMessage(lastSocketError())),
+                ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == 0);
+    }
+    ON_BLOCK_EXIT([this, fd] {
+        if (auto status = _applyTimeout(fd); !status.isOK()) {
+            LOGV2_WARNING(12823503,
+                          "Failed to restore session timeout after proxy header read",
+                          "error"_attr = status);
+        }
+    });
+
+    int timeoutMs = static_cast<int>(
+        std::min<int64_t>(proxyTimeoutSecs * 1000LL, std::numeric_limits<int>::max()));
+    uassertStatusOK(_pollForRead(fd, timeoutMs));
+
+    // Peek at the first bytes to distinguish PROXY v1 (unsupported) from v2, and reject
+    // anything else. If v2, consume the full header below.
+    char prefix[kProxyPeekSize];
+    ssize_t peeked;
+    do {
+        peeked = ::recv(fd, prefix, kProxyPeekSize, MSG_PEEK | MSG_WAITALL);
+    } while (peeked < 0 && errno == EINTR);
+    if (peeked < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            uasserted(ErrorCodes::NetworkTimeout, "Timed out waiting for PROXY protocol header");
+        }
+        uasserted(ErrorCodes::SocketException,
+                  fmt::format("recv peek failed: {}", errorMessage(lastSocketError())));
+    }
+    if (peeked == 0) {
+        uasserted(ErrorCodes::SocketException,
+                  "Proxy UDS peer closed connection before sending PROXY header");
+    }
+    if (peeked < static_cast<ssize_t>(kProxyPeekSize)) {
+        // Fewer bytes than requested arrived. With MSG_WAITALL, that can only happen when
+        // SO_RCVTIMEO fires after partial data has arrived — MSG_WAITALL keeps waiting for the
+        // full count past any partial arrival, so it exhausts the timeout budget and returns
+        // whatever was buffered rather than -1/EAGAIN. There is nothing left to wait for, so
+        // treat this as a timeout.
+        uasserted(
+            ErrorCodes::NetworkTimeout,
+            fmt::format("Timed out waiting for PROXY protocol header ({} of {} bytes received)",
+                        peeked,
+                        kProxyPeekSize));
+    }
+
+    uassert(ErrorCodes::ProtocolError,
+            "Proxy UDS connection sent a PROXY v1 header. Only PROXY v2 is supported",
+            memcmp(prefix,
+                   transport::kProxyV1Signature.data(),
+                   transport::kProxyV1Signature.size()) != 0);
+    uassert(ErrorCodes::ProtocolError,
+            "Proxy UDS connection did not begin with a PROXY v2 header",
+            memcmp(prefix, transport::kProxyV2Signature.data(), kProxyPeekSize - 1) == 0);
+
+    // Read the header in two passes: first the fixed-size header to learn the variable length,
+    // then the address + TLV block. This avoids over-reading up to proxyUnixSocketMaximumHeaderSize
+    // in a single shot.
+
+    // Consume the fixed header (signature + version/command + address family + length).
+    std::vector<char> proxyBuf(kProxyV2FixedHeaderSize);
+    uassertStatusOK(_syncRead(proxyBuf.data(), kProxyV2FixedHeaderSize));
+
+    // The last 2 bytes of the fixed header are the big-endian length of the address + TLV block.
+    uint16_t addrLen =
+        ConstDataRange(proxyBuf.data() + kProxyV2FixedHeaderSize - 2, sizeof(uint16_t))
+            .read<BigEndian<uint16_t>>();
+    size_t maxHeaderSize = static_cast<size_t>(proxyUnixSocketMaximumHeaderSize.loadRelaxed());
+    uassert(ErrorCodes::ProtocolError,
+            fmt::format("PROXY v2 header on proxy UDS exceeds "
+                        "proxyUnixSocketMaximumHeaderSize ({} > {})",
+                        kProxyV2FixedHeaderSize + addrLen,
+                        maxHeaderSize),
+            kProxyV2FixedHeaderSize + static_cast<size_t>(addrLen) <= maxHeaderSize);
+
+    if (addrLen > 0) {
+        proxyBuf.resize(kProxyV2FixedHeaderSize + addrLen);
+        uassertStatusOK(_syncRead(proxyBuf.data() + kProxyV2FixedHeaderSize, addrLen));
+    }
+
+    StringData proxyData(proxyBuf.data(), proxyBuf.size());
+    auto results = transport::parseProxyProtocolHeader(proxyData, /*isProxyUnixSock=*/true);
+    uassert(ErrorCodes::ProtocolError,
+            "Failed to parse PROXY v2 header on proxy UDS",
+            results.has_value());
+    return std::move(*results);
+}
+
+void HandoffSession::prelude() {
+    auto proxyHeader = _parseProxyProtocolHeader();
+    applyProxyProtocolTlvs(proxyHeader, shared_from_this());
 }
 
 StatusWith<Message> HandoffSession::sourceMessage() {

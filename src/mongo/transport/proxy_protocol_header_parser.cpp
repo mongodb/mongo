@@ -259,10 +259,9 @@ void parseTLVVectors(StringData buffer,
     }
 }
 
-constexpr StringData kV1Start = "PROXY"_sd;
 
 bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoints) {
-    buffer = buffer.substr(kV1Start.size());
+    buffer = buffer.substr(kProxyV1Signature.size());
     if (buffer.empty())
         return false;
 
@@ -272,7 +271,8 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     const auto crlfPos = buffer.find(crlf);
 
     static constexpr size_t kMaximumV1HeaderSize = 107;
-    static constexpr size_t kMaximumV1InetLineSize = kMaximumV1HeaderSize - kV1Start.size();
+    static constexpr size_t kMaximumV1InetLineSize =
+        kMaximumV1HeaderSize - kProxyV1Signature.size();
     if (crlfPos == std::string::npos) {
         // If we couldn't find a newline sequence, then fail if there cannot be enough room
         // for one to appear in the future.
@@ -354,12 +354,10 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     }
 }
 
-// Since this string contains a null, it's critical we use a `_sd` literal here.
-constexpr StringData kV2Start = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"_sd;
 
 bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isProxyUnixSock) {
     auto& endpoints = results.endpoints;
-    buffer = buffer.substr(kV2Start.size());
+    buffer = buffer.substr(kProxyV2Signature.size());
     if (buffer.empty())
         return false;
 
@@ -532,19 +530,19 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool 
 
     ParserResults results;
     bool complete = false;
-    if (buffer.starts_with(kV1Start)) {
+    if (buffer.starts_with(kProxyV1Signature)) {
         uassert(ErrorCodes::FailedToParse,
                 "Proxy protocol V1 is not supported on the proxy unix socket",
                 !isProxyUnixSock);
         complete = parseV1Buffer(buffer, results.endpoints);
-    } else if (buffer.starts_with(kV2Start)) {
+    } else if (buffer.starts_with(kProxyV2Signature)) {
         complete = parseV2Buffer(buffer, results, isProxyUnixSock);
     } else {
         uassert(ErrorCodes::FailedToParse,
                 fmt::format("Initial Proxy Protocol header bytes invalid: {}; "
                             "Make sure your proxy is configured to emit a Proxy Protocol header",
                             buffer),
-                kV1Start.starts_with(buffer) || kV2Start.starts_with(buffer));
+                kProxyV1Signature.starts_with(buffer) || kProxyV2Signature.starts_with(buffer));
     }
 
     if (complete) {
@@ -556,7 +554,7 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool 
 }
 
 bool maybeProxyProtocolHeader(StringData buffer) {
-    return buffer.starts_with(kV1Start) || buffer.starts_with(kV2Start);
+    return buffer.starts_with(kProxyV1Signature) || buffer.starts_with(kProxyV2Signature);
 }
 
 }  // namespace mongo::transport

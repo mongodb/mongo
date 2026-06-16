@@ -32,14 +32,18 @@
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/auth_options_gen.h"
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/shared_buffer.h"
 
 #include <algorithm>
@@ -58,6 +62,8 @@
 #include <s2n.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 namespace mongo::transport::handoff_transport {
@@ -230,10 +236,10 @@ TEST_F(HandoffSessionPropertiesTest, NotConnectedToPriorityPort) {
     ASSERT_FALSE(session->isConnectedToPriorityPort());
 }
 
-/** A handoff session is never connected via a proxy unix socket. */
-TEST_F(HandoffSessionPropertiesTest, NotConnectedToProxyUnixSocket) {
+/** A handoff session is always connected via a proxy unix socket. */
+TEST_F(HandoffSessionPropertiesTest, IsConnectedToProxyUnixSocket) {
     auto session = makeSession();
-    ASSERT_FALSE(session->isConnectedToProxyUnixSocket());
+    ASSERT_TRUE(session->isConnectedToProxyUnixSocket());
 }
 
 /** A handoff session is never exempted by a CIDR list. */
@@ -1184,8 +1190,8 @@ TEST_F(HandoffSessionHandoffTransitionTest, FailedHandoffWithCorruptState) {
  * respected by post-handoff sourceMessage() calls.
  */
 TEST_F(HandoffSessionHandoffTransitionTest, TimeoutSetBeforeHandoffIsRespectedAfterHandoff) {
-    static constexpr Milliseconds kTestTimeout{50};
-    session->setTimeout(kTestTimeout);
+    static constexpr Milliseconds timeout{50};
+    session->setTimeout(timeout);
 
     Message handoffMsg = buildSessionHandoffMessage(serializedState);
     sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
@@ -1521,6 +1527,527 @@ TEST_F(HandoffSessionPostHandoffEndSessionTest, EndUnblocksBlockedWaitForData) {
     ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
         << "end() failed to unblock waitForData()";
     ASSERT_EQ(fut.get().code(), ErrorCodes::SocketException);
+}
+
+//
+// Proxy header: PROXY v2 header parsing, TLV application, and post-handoff persistence.
+//
+
+class HandoffSessionProxyHeaderTest : public HandoffSessionTLSFixture {
+protected:
+    void driveHandoff() {
+        Message handoffMsg = buildSessionHandoffMessage(serializedState);
+        sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
+        ::close(proxyTlsFd);
+        proxyTlsFd = -1;
+
+        StatusWith<Message> result = Status(ErrorCodes::InternalError, "not set");
+        std::thread t([&] { result = session->sourceMessage(); });
+
+        waitForSessionHandoff();
+        clientSend(makeMessage(dbMsg, BSON("ping" << 1)));
+        t.join();
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+    }
+
+protected:
+    static constexpr uint16_t kTestClientPort = 12345;
+    static constexpr char kTestClientAddr[] = "127.0.0.1";
+    static constexpr char kTestSniName[] = "test.example.com";
+
+    static void appendU16BE(std::vector<uint8_t>& buf, uint16_t v) {
+        buf.push_back(static_cast<uint8_t>(v >> 8));
+        buf.push_back(static_cast<uint8_t>(v & 0xFF));
+    }
+
+    static void appendTLV(std::vector<uint8_t>& buf,
+                          uint8_t type,
+                          const uint8_t* val,
+                          uint16_t len) {
+        buf.push_back(type);
+        appendU16BE(buf, len);
+        buf.insert(buf.end(), val, val + len);
+    }
+
+    static struct sockaddr_storage makeTestIpv4Addr() {
+        struct sockaddr_storage addr{};
+        auto* sin = reinterpret_cast<struct sockaddr_in*>(&addr);
+        sin->sin_family = AF_INET;
+        sin->sin_addr.s_addr = htonl(0x7F000001);  // kTestClientAddr
+        sin->sin_port = htons(kTestClientPort);
+        return addr;
+    }
+
+    /**
+     * Builds a PROXY v2 binary header. sniName, subjectDN, and rolesBytes/rolesLen are optional
+     * — pass nullptr/0 to omit each. Always includes at least a NOOP TLV since the parser requires
+     * a non-empty TLV block on the proxy unix socket (enforced by the parser).
+     */
+    static std::vector<uint8_t> buildProxyHeader(const char* sniName,
+                                                 const char* subjectDN,
+                                                 const uint8_t* rolesBytes,
+                                                 size_t rolesLen) {
+        static constexpr uint8_t kSignature[12] = {
+            0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
+
+        auto src = makeTestIpv4Addr();
+        const auto* s = reinterpret_cast<const struct sockaddr_in*>(&src);
+        const uint8_t* ip = reinterpret_cast<const uint8_t*>(&s->sin_addr.s_addr);
+
+        std::vector<uint8_t> addrBlock;
+        addrBlock.insert(addrBlock.end(), ip, ip + 4);
+        addrBlock.insert(addrBlock.end(), 4, 0);  // dst addr (zeros)
+        appendU16BE(addrBlock, ntohs(s->sin_port));
+        appendU16BE(addrBlock, 0);  // dst port (zero)
+
+        std::vector<uint8_t> tlvs;
+        if (sniName && *sniName) {
+            appendTLV(tlvs,
+                      0x02,
+                      reinterpret_cast<const uint8_t*>(sniName),
+                      static_cast<uint16_t>(strlen(sniName)));
+        }
+        if ((subjectDN && *subjectDN) || (rolesBytes && rolesLen > 0)) {
+            std::vector<uint8_t> subTlvs;
+            if (subjectDN && *subjectDN) {
+                appendTLV(subTlvs,
+                          0xE0,
+                          reinterpret_cast<const uint8_t*>(subjectDN),
+                          static_cast<uint16_t>(strlen(subjectDN)));
+            }
+            if (rolesBytes && rolesLen > 0) {
+                appendTLV(subTlvs, 0xE1, rolesBytes, static_cast<uint16_t>(rolesLen));
+            }
+            // SSL TLV value: client_flags(1) + verify(4 big-endian, 0=success) + sub-TLVs.
+            std::vector<uint8_t> sslVal = {0x07, 0x00, 0x00, 0x00, 0x00};
+            sslVal.insert(sslVal.end(), subTlvs.begin(), subTlvs.end());
+            appendTLV(tlvs, 0x20, sslVal.data(), static_cast<uint16_t>(sslVal.size()));
+        }
+
+        // The parser requires a non-empty TLV block on the proxy unix socket.
+        if (tlvs.empty()) {
+            static constexpr uint8_t kNoop[] = {0x04, 0x00, 0x01, 0x00};
+            tlvs.insert(tlvs.end(), kNoop, kNoop + sizeof(kNoop));
+        }
+
+        uint16_t addrLen = static_cast<uint16_t>(addrBlock.size() + tlvs.size());
+        std::vector<uint8_t> header;
+        header.insert(header.end(), kSignature, kSignature + 12);
+        header.push_back(0x21);  // ver=2, cmd=PROXY
+        header.push_back(0x11);  // TCP over IPv4
+        appendU16BE(header, addrLen);
+        header.insert(header.end(), addrBlock.begin(), addrBlock.end());
+        header.insert(header.end(), tlvs.begin(), tlvs.end());
+        return header;
+    }
+};
+
+/**
+ * A stream that does not begin with the PROXY v2 signature prefix is rejected with ProtocolError.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, RejectsNonProxyStream) {
+    std::vector<char> notProxyHeader(16, 'A');
+    writeAll(proxyUdsFd, notProxyHeader.data(), notProxyHeader.size());
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::ProtocolError);
+}
+
+/** A PROXY v1 header is rejected with a clear error indicating only v2 is supported. */
+TEST_F(HandoffSessionProxyHeaderTest, RejectsProxyV1Header) {
+    // PROXY v1 header starts with "PROXY TCP4 " followed by addresses.
+    std::string v1Header = "PROXY TCP4 127.0.0.1 127.0.0.1 12345 27017\r\n";
+    writeAll(proxyUdsFd, v1Header.data(), v1Header.size());
+
+    ASSERT_THROWS_CODE_AND_WHAT(
+        session->prelude(),
+        DBException,
+        ErrorCodes::ProtocolError,
+        "Proxy UDS connection sent a PROXY v1 header. Only PROXY v2 is supported");
+}
+
+/**
+ * A declared addr_len that exceeds proxyUnixSocketMaximumHeaderSize is rejected with
+ * ProtocolError before any address bytes are read.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, RejectsOversizedProxyHeader) {
+    // Build a 16-byte fixed header with the correct v2 signature prefix (bytes 0-3) and addr_len
+    // (bytes 14-15) set to 0xFFFF = 65535, far above the 4096-byte proxyUnixSocketMaximumHeaderSize
+    // default. All other bytes are zeroed.
+    std::vector<char> header(16, '\x00');
+    header[0] = '\x0D';
+    header[1] = '\x0A';
+    header[2] = '\x0D';
+    header[3] = '\x0A';
+    header[14] = '\xFF';
+    header[15] = '\xFF';
+    writeAll(proxyUdsFd, header.data(), header.size());
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::ProtocolError);
+}
+
+/**
+ * A correct 4-byte signature prefix followed by an invalid full header signature is rejected with
+ * FailedToParse.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, RejectsUnparseableProxyHeader) {
+    // Bytes 4-13, which should contain the rest of the 12-byte signature, are zeroed, so
+    // parseProxyProtocolHeader rejects the full header. addr_len (bytes 14-15) is 0.
+    std::vector<char> header(16, '\x00');
+    header[0] = '\x0D';
+    header[1] = '\x0A';
+    header[2] = '\x0D';
+    header[3] = '\x0A';
+    writeAll(proxyUdsFd, header.data(), header.size());
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::FailedToParse);
+}
+
+/** No SNI or client-cert TLVs. SSLPeerInfo is null both before and after handoff. */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderNoSNIOrCert) {
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    ASSERT_NO_THROW(session->prelude());
+    ASSERT_FALSE(SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session)));
+
+    driveHandoff();
+    ASSERT_FALSE(SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session)));
+}
+
+/**
+ * SNI TLV (AUTHORITY) present, no client cert. SSLPeerInfo has sniName and empty subject, both
+ * before and after handoff.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNINoCert) {
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    auto validatePeerInfo = [&] {
+        auto peerInfo = SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session));
+        ASSERT_TRUE(peerInfo);
+        ASSERT_TRUE(peerInfo->sniName().has_value());
+        ASSERT_EQ(peerInfo->sniName().value(), kTestSniName);
+        ASSERT_TRUE(peerInfo->subjectName().empty());
+        ASSERT_TRUE(peerInfo->roles().empty());
+    };
+
+    ASSERT_NO_THROW(session->prelude());
+    validatePeerInfo();
+
+    driveHandoff();
+    validatePeerInfo();
+}
+
+/**
+ * SNI TLV and SSL TLV block (DN + roles sub-TLVs). SSLPeerInfo has sniName, subjectName, and
+ * roles, both before and after handoff.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderWithSNIAndCert) {
+    // DER-encoded role data for a single role: role="role_name", db="Third field".
+    static constexpr uint8_t roleDer[] = {
+        0x31, 0x1a, 0x30, 0x18, 0x0c, 0x09, 0x72, 0x6f, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d,
+        0x65, 0x0c, 0x0b, 0x54, 0x68, 0x69, 0x72, 0x64, 0x20, 0x66, 0x69, 0x65, 0x6c, 0x64};
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/"CN=customClient,O=customOrg",
+                                   /*rolesBytes=*/roleDer,
+                                   /*rolesLen=*/sizeof(roleDer));
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    auto validatePeerInfo = [&] {
+        auto peerInfo = SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session));
+        ASSERT_TRUE(peerInfo);
+        ASSERT_EQ(peerInfo->sniName().value(), kTestSniName);
+        auto swCN = peerInfo->subjectName().getOID("2.5.4.3");
+        ASSERT_OK(swCN.getStatus());
+        ASSERT_EQ(swCN.getValue(), "customClient");
+        auto swO = peerInfo->subjectName().getOID("2.5.4.10");
+        ASSERT_OK(swO.getStatus());
+        ASSERT_EQ(swO.getValue(), "customOrg");
+        ASSERT_EQ(peerInfo->roles().size(), 1u);
+        ASSERT_EQ(peerInfo->roles().begin()->getRole(), "role_name");
+        ASSERT_EQ(peerInfo->roles().begin()->getDB(), "Third field");
+    };
+
+    ASSERT_NO_THROW(session->prelude());
+    validatePeerInfo();
+
+    driveHandoff();
+    validatePeerInfo();
+}
+
+/**
+ * A PROXY v2 header delivered in two separate sends is reassembled correctly.
+ * SSLPeerInfo is set as expected after the handoff.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderArrivesFragmented) {
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
+    ASSERT_FALSE(header.empty());
+
+    // Send the first quarter, pause, then send the rest.
+    size_t firstChunk = header.size() / 4;
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), firstChunk);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    writeAll(proxyUdsFd,
+             reinterpret_cast<const char*>(header.data() + firstChunk),
+             header.size() - firstChunk);
+
+    auto validatePeerInfo = [&] {
+        auto peerInfo = SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session));
+        ASSERT_TRUE(peerInfo);
+        ASSERT_EQ(peerInfo->sniName().value(), kTestSniName);
+    };
+
+    ASSERT_NO_THROW(session->prelude());
+    validatePeerInfo();
+
+    driveHandoff();
+    validatePeerInfo();
+}
+
+/**
+ * A PROXY v2 header written immediately before a message: the header is consumed exactly,
+ * with no header bytes leaking into the message stream.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyHeaderBoundaryIsRespected) {
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
+    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
+
+    // Write both in one shot so they arrive together in the socket buffer.
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+    writeAll(proxyUdsFd, msg.buf(), msg.size());
+
+    ASSERT_NO_THROW(session->prelude());
+    auto peerInfo = SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session));
+    ASSERT_TRUE(peerInfo);
+    ASSERT_EQ(peerInfo->sniName().value(), kTestSniName);
+
+    auto result = session->sourceMessage();
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(result.getValue().size(), msg.size());
+    ASSERT_EQ(memcmp(result.getValue().buf(), msg.buf(), msg.size()), 0);
+}
+
+/** A peer that closes before sending anything causes prelude() to throw SocketException. */
+TEST_F(HandoffSessionProxyHeaderTest, FailsOnPeerClose) {
+    ::close(proxyUdsFd);
+    proxyUdsFd = -1;
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::SocketException);
+}
+
+/**
+ * end() called while blocked waiting for the proxy header unblocks the read promptly.
+ * Mirrors EndUnblocksBlockedWaitForData but for the proxy-header read path.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, EndUnblocksProxyHeaderRead) {
+    auto fut = std::async(std::launch::async, [&] {
+        ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::SocketException);
+    });
+
+    // Give prelude() time to enter the blocking recv() before end() closes the fd.
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    session->end();
+    ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
+        << "end() failed to unblock proxy header read";
+    fut.get();
+}
+
+/**
+ * Peer sends a partial signature prefix (3 of 5 bytes) and then stalls. prelude() must report
+ * NetworkTimeout, not SocketException. Contrast with ProxyProtocolTimeoutDuringAddressBlockRead,
+ * where the peer sends enough to identify the protocol version but stalls on the address block.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutDuringPeek) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 1};
+
+    // Send only 3 bytes (fewer than kProxyPeekSize=5) then stall.
+    static constexpr char header[] = {'\x0D', '\x0A', '\x0D'};
+    writeAll(proxyUdsFd, header, sizeof(header));
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
+}
+
+/**
+ * Peer sends a complete fixed header declaring a 12-byte address block but never sends the
+ * address bytes. prelude() must report NetworkTimeout. Contrast with
+ * ProxyProtocolTimeoutDuringPeek, where the stall happens before the protocol version can even
+ * be identified.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ProxyProtocolTimeoutDuringAddressBlockRead) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 1};
+
+    // Build only the 16-byte fixed header: correct v2 signature, addr_len = 12 (IPv4 addr block),
+    // but never send the addr block so the read blocks until the proxy timeout fires.
+    static constexpr uint8_t proxyV2Signature[12] = {
+        0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
+    std::vector<uint8_t> header;
+    header.insert(header.end(), proxyV2Signature, proxyV2Signature + 12);
+    header.push_back(0x21);  // ver=2, cmd=PROXY
+    header.push_back(0x11);  // TCP over IPv4
+    header.push_back(0x00);
+    header.push_back(0x0C);  // addr_len = 12
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
+}
+
+/**
+ * With proxyProtocolTimeoutSecs=0, a complete header already in the kernel buffer is parsed
+ * successfully.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutSucceedsIfHeaderAlreadyBuffered) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
+
+    auto header = buildProxyHeader(nullptr, nullptr, nullptr, 0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    ASSERT_NO_THROW(session->prelude());
+    ASSERT_TRUE(session->isConnected());
+}
+
+/**
+ * With proxyProtocolTimeoutSecs=0, prelude() must return NetworkTimeout immediately when the
+ * addr block is withheld instead of hang waiting for the full header.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfHeaderNotAlreadyBuffered) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
+
+    // Send only the 16-byte fixed header with addr_len=12, but never send the addr block.
+    static constexpr uint8_t proxyV2Signature[12] = {
+        0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
+    std::vector<uint8_t> header;
+    header.insert(header.end(), proxyV2Signature, proxyV2Signature + 12);
+    header.push_back(0x21);  // ver=2, cmd=PROXY
+    header.push_back(0x11);  // TCP over IPv4
+    header.push_back(0x00);
+    header.push_back(0x0C);  // addr_len = 12
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    auto fut = std::async(std::launch::async, [&] {
+        ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
+    });
+
+    ASSERT_EQ(fut.wait_for(std::chrono::seconds(5)), std::future_status::ready)
+        << "prelude() hung; SO_RCVTIMEO={0,0} may have disabled the recv timeout";
+    fut.get();
+}
+
+/**
+ * With proxyProtocolTimeoutSecs=0, prelude() returns NetworkTimeout immediately when only a
+ * partial signature prefix is buffered and the sender stalls before completing the header.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfSignaturePrefixIsPartial) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
+
+    static constexpr char header[] = {'\x0D', '\x0A', '\x0D'};
+    writeAll(proxyUdsFd, header, sizeof(header));
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
+}
+
+/**
+ * With proxyProtocolTimeoutSecs=0, prelude() returns NetworkTimeout immediately when no data
+ * is present. poll() with a 0ms timeout does not block, so the read expires on the first check.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, ZeroProxyProtocolTimeoutFailsIfSocketIsEmpty) {
+    unittest::ServerParameterGuard timeoutParam{"proxyProtocolTimeoutSecs", 0};
+
+    ASSERT_THROWS_CODE(session->prelude(), DBException, ErrorCodes::NetworkTimeout);
+}
+
+/**
+ * A session timeout set before prelude() must still be honoured after prelude() returns.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, SessionTimeoutRestoredAfterPrelude) {
+    // Make the proxy protocol timeout larger than the session timeout so the proxy header read
+    // cannot time out before the session does, but small enough that wait_for() below detects
+    // the bug promptly if the session timeout was not restored.
+    constexpr int kProxyTimeoutSecs = 2;
+    unittest::ServerParameterGuard proxyTimeout{"proxyProtocolTimeoutSecs", kProxyTimeoutSecs};
+    Milliseconds sessionTimeout{100};
+    session->setTimeout(sessionTimeout);
+
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+    ASSERT_NO_THROW(session->prelude());
+
+    // Send only the message header so sourceMessage() blocks waiting for the body. If the session
+    // timeout was not restored after prelude(), sourceMessage() will block for up to
+    // proxyProtocolTimeoutSecs rather than returning promptly.
+    Message msg = makeMessage(dbMsg, BSON("ping" << 1));
+    writeAll(proxyUdsFd, msg.buf(), sizeof(MSGHEADER::Value));
+
+    auto fut = std::async(std::launch::async, [&] { return session->sourceMessage(); });
+    ASSERT_EQ(fut.wait_for(std::chrono::seconds(kProxyTimeoutSecs + 1)), std::future_status::ready)
+        << "sourceMessage() did not return. Session timeout was not restored after prelude()";
+    ASSERT_EQ(fut.get().getStatus().code(), ErrorCodes::NetworkTimeout);
+}
+
+/**
+ * Exercises the complete session lifecycle in one continuous sequence: prelude() parses the PROXY
+ * header, sourceMessage() returns a cleartext message, the handoff transitions the session to TLS,
+ * and sourceMessage() returns a post-handoff TLS message. Verifies message content and session
+ * state at each step.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
+    // Pre-buffer the PROXY header and a cleartext ping so prelude() and the first
+    // sourceMessage() complete synchronously on the main thread.
+    auto header = buildProxyHeader(/*sniName=*/kTestSniName,
+                                   /*subjectDN=*/nullptr,
+                                   /*rolesBytes=*/nullptr,
+                                   /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+
+    BSONObj body1 = BSON("ping" << 1);
+    BSONObj body2 = BSON("ping" << 2);
+
+    Message msg1 = makeMessage(dbMsg, body1);
+    writeAll(proxyUdsFd, msg1.buf(), msg1.size());
+
+    auto validatePeerInfo = [&] {
+        auto peerInfo = SSLPeerInfo::forSession(std::shared_ptr<transport::Session>(session));
+        ASSERT_TRUE(peerInfo);
+        ASSERT_EQ(peerInfo->sniName().value(), kTestSniName);
+    };
+
+    ASSERT_NO_THROW(session->prelude());
+    ASSERT_EQ(session->getState(), HandoffSessionState::Cleartext);
+    validatePeerInfo();
+
+    auto result1 = session->sourceMessage();
+    ASSERT_OK(result1.getStatus());
+    ASSERT_BSONOBJ_EQ(BSONObj(result1.getValue().singleData().data()), body1);
+
+    // Drive the handoff inline so the result for the message right after handoff is accessible
+    // for content verification.
+    Message handoffMsg = buildSessionHandoffMessage(serializedState);
+    sendMessageWithFds(proxyUdsFd, handoffMsg, {proxyTlsFd});
+    ::close(proxyTlsFd);
+    proxyTlsFd = -1;
+
+    StatusWith<Message> result2 = Status(ErrorCodes::InternalError, "not set");
+    std::thread t([&] { result2 = session->sourceMessage(); });
+
+    waitForSessionHandoff();
+    clientSend(makeMessage(dbMsg, body2));
+    t.join();
+
+    ASSERT_OK(result2.getStatus());
+    ASSERT_BSONOBJ_EQ(BSONObj(result2.getValue().singleData().data()), body2);
+    ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+    validatePeerInfo();
 }
 
 }  // namespace
