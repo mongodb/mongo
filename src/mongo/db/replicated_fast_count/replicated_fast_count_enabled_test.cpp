@@ -49,6 +49,29 @@ public:
                                    ReplicatedFastCountTestPersistenceProvider>())) {}
 };
 
+// A persistence provider that reports both shouldUseReplicatedFastCount() and
+// mustUseContainerWrites() as true.
+// TODO(SERVER-126250): The shared test helper currently only flips shouldUseReplicatedFastCount()
+// so we override it here.
+class ListCollectionsFastCountProvider
+    : public replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider {
+public:
+    bool shouldUseReplicatedFastCount() const override {
+        return true;
+    }
+
+    bool mustUseContainerWrites() const override {
+        return true;
+    }
+};
+
+class IsReplicatedFastCountListCollectionsWithProviderTest : public CatalogTestFixture {
+public:
+    IsReplicatedFastCountListCollectionsWithProviderTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<ListCollectionsFastCountProvider>())) {}
+};
+
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", false);
     EXPECT_FALSE(isReplicatedFastCountEnabled(operationContext()));
@@ -129,8 +152,6 @@ TEST(ReplicatedFastCountEligibleNsTest, OplogEligible) {
     EXPECT_TRUE(isReplicatedFastCountEligible(NamespaceString::kRsOplogNamespace));
 }
 
-// TODO(SERVER-128304): Add persistence provider testing for
-// isReplicatedFastCountListCollectionsEnabled.
 TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenBothFlagsOff) {
     unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
     unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
@@ -161,6 +182,38 @@ TEST_F(IsReplicatedFastCountEnabledTest, ListCollectionsDisabledWhenTestCommands
     setTestCommandsEnabled(false);
     const auto restoreTestCommands = ScopeGuard([] { setTestCommandsEnabled(true); });
     EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+// The following tests verify that listCollections fast count emission is gated solely on the
+// feature flags and is NOT enabled by persistence provider traits.
+TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+       ListCollectionsDisabledWithProviderWhenBothFlagsOff) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+       ListCollectionsDisabledWithProviderWhenOnlyReplicatedFastCountOn) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", false);
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+       ListCollectionsDisabledWithProviderWhenOnlyContainerWritesOn) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", false);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    EXPECT_FALSE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
+}
+
+// Sanity check: with the provider present and both flags on, emission is still enabled (the
+// provider neither enables nor disables the feature on its own).
+TEST_F(IsReplicatedFastCountListCollectionsWithProviderTest,
+       ListCollectionsEnabledWithProviderWhenBothFlagsOn) {
+    unittest::ServerParameterGuard ffReplicatedFastCount("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard ffContainerWrites("featureFlagContainerWrites", true);
+    EXPECT_TRUE(isReplicatedFastCountListCollectionsEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, ShouldReadFromSizeStorerWhenProviderOff) {
