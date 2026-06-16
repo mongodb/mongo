@@ -2090,16 +2090,43 @@ TEST_F(QueryPlannerWildcardTest, CWIInNullDoesNotUseNonGenericEntry) {
         "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
 }
 
-// $ne:null matches absent-field documents; the sparse non-generic entry would miss them.
+// $ne:null excludes absent-field documents (it is the negation of $eq:null which matches null OR
+// absent, so $ne:null requires the field to exist AND be non-null). The sparse non-generic entry
+// is therefore safe: it also excludes absent fields, so both a non-generic and a generic candidate
+// are generated.
 TEST_F(QueryPlannerWildcardTest, CWINeNullUsesGenericEntryWithResiduals) {
     addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
     runQuery(fromjson("{a: 3, 'b.x': {$ne: null}, c: 5, d: 'foo'}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a:1,'$_path':1,'b.x':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['b.x','b.x',true,true],['b.x.','b.x/',true,false]], "
+        "'b.x': [['MinKey','MaxKey',true,true]], "
+        "c: [[5,5,true,true]]}}}}}");
+    // TODO(SERVER-128773): Also bound `c` & check the resulting bounds here.
     assertSolutionExists(
         "{fetch: {node: {ixscan: {name: 'indexName', "
         "bounds: {a: [[3,3,true,true]], "
         "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, NonGenericNeNullCovered) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuerySortProj(fromjson("{a: 3, 'b.x': 1, c: {$ne: null}}"),
+                     /* sort */ BSONObj(),
+                     /* proj */ BSON("a" << 1 << "c" << 1 << "_id" << 0));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{proj: {spec: {a: true, c: true, _id: false}, node: {ixscan: {pattern: "
+        "{a:1,'$_path':1,'b.x':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['b.x','b.x',true,true]], "
+        "'b.x': [[1,1,true,true]], "
+        "c: [['MinKey',null,true,false],[null,'MaxKey',false,true]]}}}}}");
+    // TODO(SERVER-128773): Assert on the generic plan as well.
 }
 
 TEST_F(QueryPlannerWildcardTest, CWITightBoundsNoExtraField) {

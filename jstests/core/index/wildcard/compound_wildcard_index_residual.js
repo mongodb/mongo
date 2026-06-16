@@ -22,7 +22,16 @@
  *   does_not_support_stepdowns,
  * ]
  */
-import {assertQueryResults, getAllPlans, getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {
+    assertQueryResults,
+    assertResultsSameAsCollscan,
+    assertResultsSameAllPlans,
+    getAllPlans,
+    getPlanStage,
+    getPlanStages,
+    isIndexOnly,
+} from "jstests/libs/query/analyze_plan.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {before, describe, it} from "jstests/libs/mochalite.js";
 
 // Asserts that each plan contains exactly one IXSCAN matching the descriptor.
@@ -77,6 +86,8 @@ describe("predicates matching missing/null", function () {
                 {a: 1, b: null, c: 1},
                 {a: 1, c: 1},
                 {a: 2, c: 1},
+                {a: 1, b: {x: 1}},
+                {a: 1, b: {x: 1}, c: null},
             ]),
         );
     });
@@ -149,11 +160,75 @@ describe("predicates matching missing/null", function () {
         assertAllPlansIxScan(plans, kGenericScan_a1);
     });
     it("$ne:null excludes null and absent", function () {
+        // $ne:null on the wildcard field is compatible with the non-generic sparse entry: absent
+        // fields are not indexed, so any index entry implies the field exists.
+        const kNonGenericScan_bx = {
+            indexName: kIndexName,
+            keyPattern: {a: 1, "$_path": 1, "b.x": 1, c: 1},
+            indexBounds: {
+                a: ["[1.0, 1.0]"],
+                "$_path": ['["b.x", "b.x"]', '["b.x.", "b.x/")'],
+                "b.x": ["[MinKey, MaxKey]"],
+                c: ["[1.0, 1.0]"],
+            },
+        };
         const plans = assertResultsAndGetIxscans(coll, {a: 1, "b.x": {$ne: null}, c: 1}, [
             {a: 1, b: {x: 1}, c: 1},
             {a: 1, b: {x: -5}, c: 1},
         ]);
-        assertAllPlansIxScan(plans, kGenericScan_a1);
+        assert.eq(plans.length, 2, "expected a non-generic and a generic candidate plan", {plans});
+        const nonGenericPlan = plans.find((scans) =>
+            scans.some((s) => s.keyPattern.hasOwnProperty("b.x")),
+        );
+        const genericPlan = plans.find(
+            (scans) => !scans.some((s) => s.keyPattern.hasOwnProperty("b.x")),
+        );
+        assert(nonGenericPlan, "expected a non-generic candidate plan", {plans});
+        assert(genericPlan, "expected a generic candidate plan", {plans});
+        assertAllPlansIxScan([nonGenericPlan], kNonGenericScan_bx);
+        assertAllPlansIxScan([genericPlan], kGenericScan_a1);
+    });
+    it("$ne:null on non-wildcard suffix is covered when wildcard field is indexed (SERVER-95374)", function () {
+        // With a wildcard predicate on b.x AND $ne:null on the non-wildcard suffix c, the
+        // planner should use the non-generic entry and produce a covered plan.
+        const kNonGenericScan_bx1_cNeNull = {
+            indexName: kIndexName,
+            keyPattern: {a: 1, "$_path": 1, "b.x": 1, c: 1},
+            indexBounds: {
+                a: ["[1.0, 1.0]"],
+                "$_path": ['["b.x", "b.x"]'],
+                "b.x": ["[1.0, 1.0]"],
+                c: ["[MinKey, null)", "(null, MaxKey]"],
+            },
+        };
+        const query = {a: 1, "b.x": 1, c: {$ne: null}};
+        const projection = {a: 1, "b.x": 1, c: 1, _id: 0};
+        const expected = [{a: 1, b: {x: 1}, c: 1}];
+
+        assertArrayEq({
+            actual: coll.find(query, projection).toArray(),
+            expected,
+            fieldsToSkip: ["_id"],
+        });
+        assertResultsSameAsCollscan(coll, query);
+        assertResultsSameAllPlans(coll, query);
+        const explain = assert.commandWorked(coll.find(query, projection).explain());
+        const plans = getAllPlans(explain);
+        assert.eq(plans.length, 2, "expected a non-generic and a generic candidate plan", {plans});
+        const nonGenericPlan = plans.find((plan) =>
+            getPlanStage(plan, "IXSCAN").keyPattern.hasOwnProperty("b.x"),
+        );
+        const genericPlan = plans.find(
+            (plan) => !getPlanStage(plan, "IXSCAN").keyPattern.hasOwnProperty("b.x"),
+        );
+        assert(nonGenericPlan, "expected a non-generic candidate plan", {plans});
+        assert(genericPlan, "expected a generic candidate plan", {plans});
+        assertAllPlansIxScan(
+            [getPlanStages(nonGenericPlan, "IXSCAN")],
+            kNonGenericScan_bx1_cNeNull,
+        );
+        assertAllPlansIxScan([getPlanStages(genericPlan, "IXSCAN")], kGenericScan_a1);
+        assert(isIndexOnly(db, nonGenericPlan), "Expected covered ixscan");
     });
 });
 

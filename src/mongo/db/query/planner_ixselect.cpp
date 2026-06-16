@@ -731,21 +731,14 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
         // Equality to null inside an $elemMatch implies a match on literal 'null'.
         return isInElemMatch || !queryExprIn->hasNull();
     } else if (queryExpr->matchType() == MatchExpression::NOT) {
-        const auto* child = queryExpr->getChild(0);
-        const MatchExpression::MatchType childtype = child->matchType();
-        const bool isNotEqualsNull =
-            (childtype == MatchExpression::EQ &&
-             static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
-                 BSONType::null);
-
         // Prevent negated predicates from using sparse indices. Doing so would cause us to
         // miss documents which do not contain the indexed fields. The only case where we may
-        // use a sparse index for a negation is when the query is {$ne: null}. This is due to
-        // the behavior of {$eq: null} matching documents where the field does not exist OR the
-        // field is equal to literal null. The negation of {$eq: null} therefore matches
+        // use a sparse index for a negation is when the query is {$ne: null} (or equivalent). This
+        // is due to the behavior of {$eq: null} matching documents where the field does not exist
+        // OR the field is equal to literal null. The negation of {$eq: null} therefore matches
         // documents where the field does exist AND the field is not equal to literal
         // null. Since the field must exist, it is safe to use a sparse index.
-        if (!isNotEqualsNull) {
+        if (!isQueryNegatingEqualToNull(queryExpr)) {
             return false;
         }
     }
@@ -1102,14 +1095,17 @@ void stripInvalidCompoundWildcardIndexAssignmentImpl(MatchExpression* node,
  * eligible for collecting:
  *
  * - Sargable predicates: These predicates can utilize an index on their own fields. This includes
- *   leaf comparision nodes (e.g., $lt, $in) and $elemMatch (value), while excluding $not nodes.
+ *   leaf comparison nodes (e.g., $lt, $in) and $elemMatch (value). {$ne: null} ($not wrapping
+ *   $eq null) is also treated as sargable: because the negation of "null or missing" implies the
+ *   field exists, a CWI index entry is guaranteed to be present, mirroring the same exception in
+ *   nodeIsSupportedBySparseIndex, whereas other $not nodes are excluded.
  * - Conjunctive nodes: This includes $and and $elemMatch (object).
  *
  * If 'node' is a sargable predicate or a conjunctive node, it stores 'node' in the returned vector
  * if 'idx' is assigned. Then, it continues traversing the children of the 'node' and concatenates
  * their AND-related predicates.
  *
- * If 'node' is neither a leaf node nor conjunctive, it stops the predicate propogation. Instead, it
+ * If 'node' is neither sargable nor conjunctive, it stops the predicate propagation. Instead, it
  * calls stripInvalidCompoundWildcardIndexAssignmentImpl and returns an empty vector of predicates.
  *
  * The returned pair consists of:
@@ -1119,7 +1115,8 @@ void stripInvalidCompoundWildcardIndexAssignmentImpl(MatchExpression* node,
  */
 std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPredicates(
     MatchExpression* node, StringData wildcardField, size_t idx) {
-    if (!Indexability::nodeCanUseIndexOnOwnField(node) && !isConjunctiveNode(node)) {
+    if (!Indexability::nodeCanUseIndexOnOwnField(node) && !isConjunctiveNode(node) &&
+        !isQueryNegatingEqualToNull(node)) {
         stripInvalidCompoundWildcardIndexAssignmentImpl(node, wildcardField, idx);
         return {false, {}};
     }
@@ -1135,7 +1132,6 @@ std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPre
         }
     }
 
-    // Traverse non-leaf nodes.
     indexedPreds.reserve(indexedPreds.size() + node->numChildren());
     for (size_t i = 0; i < node->numChildren(); ++i) {
         auto [childAssigned, childPreds] =
