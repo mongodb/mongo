@@ -34,6 +34,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/handoff/session_handoff_message_gen.h"
@@ -488,12 +489,20 @@ Status HandoffSession::_updateEndpointsForClientFd(int clientFd) {
         _local = HostAndPort(localSa.getAddr(), localSa.getPort());
     }
 
-    // TODO (SERVER-128853): Once PROXY protocol header parsing is added to HandoffSession, store
-    // the proxied source address, override getSourceRemoteEndpoint() to return it, and update
-    // _restrictionEnvironment based on the clientSourceAuthenticationRestrictionMode, mirroring
-    // CommonAsioSession.
-    _restrictionEnvironment = RestrictionEnvironment(sa, localSa);
+    if (_proxiedSrcAddr && clientSourceAuthenticationRestrictionMode == "origin"_sd) {
+        _restrictionEnvironment = RestrictionEnvironment(_proxiedSrcAddr.value(), localSa);
+    } else {
+        _restrictionEnvironment = RestrictionEnvironment(sa, localSa);
+    }
+
     return Status::OK();
+}
+
+const HostAndPort& HandoffSession::getSourceRemoteEndpoint() const {
+    if (_proxiedSrcEndpoint) {
+        return _proxiedSrcEndpoint.value();
+    }
+    return _remote;
 }
 
 transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
@@ -603,6 +612,10 @@ transport::ParserResults HandoffSession::_parseProxyProtocolHeader() {
 
 void HandoffSession::prelude() {
     auto proxyHeader = _parseProxyProtocolHeader();
+    if (proxyHeader.endpoints) {
+        _proxiedSrcAddr = proxyHeader.endpoints->sourceAddress;
+        _proxiedSrcEndpoint = HostAndPort(_proxiedSrcAddr->getAddr(), _proxiedSrcAddr->getPort());
+    }
     applyProxyProtocolTlvs(proxyHeader, shared_from_this());
 }
 

@@ -35,6 +35,7 @@
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
 
 #include <s2n.h>
 
@@ -96,6 +97,10 @@ public:
         return _tl;
     }
 
+    /**
+     * Returns the peer address of the current file descriptor. Before handoff, this is the
+     * pre-auth proxy's UDS address. After handoff, it is the client's TLS socket address.
+     */
     const HostAndPort& remote() const override {
         return _remote;
     }
@@ -103,6 +108,13 @@ public:
     const HostAndPort& local() const override {
         return _local;
     }
+
+    /**
+     * Returns the true origin of the connection. After prelude(), this is the proxied client IP
+     * extracted from the PROXY v2 header. Before prelude(), or if the PROXY header carried no
+     * address block, falls back to remote().
+     */
+    const HostAndPort& getSourceRemoteEndpoint() const override;
 
     StatusWith<Message> sourceMessage() override;
     Status sinkMessage(Message message) override;
@@ -120,7 +132,8 @@ public:
     void setTimeout(boost::optional<Milliseconds> timeout) override;
 
     /**
-     * Parses the PROXY v2 header from the UDS connection, and applies any TLVs to the session.
+     * Parses the PROXY v2 header from the UDS connection, extracts the proxied source address if
+     * present, and applies any TLVs to the session.
      */
     void prelude() override;
 
@@ -194,15 +207,17 @@ private:
 
     /**
      * Handles an OP_HANDOFF message. Parses the serialized s2n state from the message, deserializes
-     * it into an s2n_connection, updates the session endpoints, transitions to TLS mode, then
-     * closes the UDS fd. On failure, closes both the received downstream client fd and the UDS
-     * fd. The session is left disconnected.
+     * it into an s2n_connection, updates the remote and local addresses and restriction
+     * environment, transitions to TLS mode, then closes the UDS fd. On failure, closes both the
+     * received downstream client fd and the UDS fd. The session is left disconnected.
      */
     Status _handleSessionHandoff(const Message& msg, int clientFd);
 
     /**
-     * Updates _remote, _local, and _restrictionEnvironment from the given downstream client fd.
-     * Returns an error if the client address cannot be determined.
+     * Updates the remote and local addresses from the given client fd, and sets the restriction
+     * environment using the proxied source address if available and the restriction mode is
+     * "origin", otherwise using the client fd's peer address. Returns an error if the client
+     * address cannot be determined.
      */
     Status _updateEndpointsForClientFd(int clientFd);
 
@@ -215,6 +230,13 @@ private:
     struct s2n_connection* _s2nConnection;
     struct s2n_config* _s2nConfig;
     boost::optional<Milliseconds> _timeout;
+    // The downstream client's source address from the PROXY v2 header. Set in prelude(). Stored as
+    // SockAddr for RestrictionEnvironment construction in _updateEndpointsForClientFd().
+    boost::optional<SockAddr> _proxiedSrcAddr;
+    // Same address as _proxiedSrcAddr, kept as a stable HostAndPort so that
+    // getSourceRemoteEndpoint() can return a const reference (required by the base class).
+    // Always set whenever _proxiedSrcAddr is set.
+    boost::optional<HostAndPort> _proxiedSrcEndpoint;
 };
 
 }  // namespace mongo::transport::handoff_transport

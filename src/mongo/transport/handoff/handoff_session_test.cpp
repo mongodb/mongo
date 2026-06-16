@@ -1996,6 +1996,98 @@ TEST_F(HandoffSessionProxyHeaderTest, SessionTimeoutRestoredAfterPrelude) {
 }
 
 /**
+ * Before prelude(), getSourceRemoteEndpoint() returns the UDS proxy address from the constructor.
+ * After prelude(), it returns the proxied client IP from the PROXY header, and handoff does not
+ * change it.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, GetSourceRemoteEndpointReturnsProxiedAddress) {
+    ASSERT_EQ(session->getSourceRemoteEndpoint(), HostAndPort("proxy", 0));
+
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+    ASSERT_NO_THROW(session->prelude());
+
+    ASSERT_EQ(session->getSourceRemoteEndpoint().host(), kTestClientAddr);
+    ASSERT_EQ(session->getSourceRemoteEndpoint().port(), kTestClientPort);
+
+    driveHandoff();
+
+    ASSERT_EQ(session->getSourceRemoteEndpoint().host(), kTestClientAddr);
+    ASSERT_EQ(session->getSourceRemoteEndpoint().port(), kTestClientPort);
+}
+
+/**
+ * When the PROXY v2 header uses the LOCAL command (no address block), getSourceRemoteEndpoint()
+ * falls back to remote() both before and after handoff.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, GetSourceRemoteEndpointFallsBackToRemoteWhenNoAddressBlock) {
+    // Build a LOCAL command header (ver=2, cmd=LOCAL, fam=UNSPEC) with no address block.
+    // Includes a NOOP TLV to satisfy MongoDB's requirement of a non-empty TLV block.
+    static constexpr uint8_t kLocalHeader[] = {
+        // 12-byte signature
+        0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A,
+        0x20,                    // ver=2, cmd=LOCAL
+        0x00,                    // fam=UNSPEC
+        0x00, 0x04,              // addr_len=4 (just the NOOP TLV below)
+        0x04, 0x00, 0x01, 0x00,  // NOOP TLV
+    };
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(kLocalHeader), sizeof(kLocalHeader));
+    ASSERT_NO_THROW(session->prelude());
+
+    ASSERT_EQ(session->getSourceRemoteEndpoint(), session->remote());
+
+    driveHandoff();
+
+    ASSERT_EQ(session->getSourceRemoteEndpoint(), session->remote());
+}
+
+/**
+ * Before prelude(), getAuthEnvironment() has a default-constructed RestrictionEnvironment with no
+ * client source address. prelude() does not update it because _restrictionEnvironment requires
+ * both the client source and the server's local address, and the local address comes from
+ * getsockname on the client TLS fd which is only known after handoff. After handoff with
+ * clientSourceAuthenticationRestrictionMode == "origin", getClientSource() reflects the proxied
+ * client IP from the PROXY header.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, GetAuthEnvironmentInOriginMode) {
+    ASSERT_EQ(session->getAuthEnvironment().getClientSource().getAddr(), "(NONE)");
+
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+    ASSERT_NO_THROW(session->prelude());
+
+    ASSERT_EQ(session->getAuthEnvironment().getClientSource().getAddr(), "(NONE)");
+
+    unittest::ServerParameterGuard originMode{"clientSourceAuthenticationRestrictionMode",
+                                              "origin"};
+    driveHandoff();
+    auto& src = session->getAuthEnvironment().getClientSource();
+    ASSERT_EQ(src.getAddr(), kTestClientAddr);
+    ASSERT_EQ(src.getPort(), kTestClientPort);
+}
+
+/**
+ * With clientSourceAuthenticationRestrictionMode == "peer" (the default), getClientSource()
+ * reflects the TLS socket peer address after handoff, not the proxied IP.
+ */
+TEST_F(HandoffSessionProxyHeaderTest, GetAuthEnvironmentInPeerMode) {
+    ASSERT_EQ(session->getAuthEnvironment().getClientSource().getAddr(), "(NONE)");
+
+    auto header = buildProxyHeader(
+        /*sniName=*/nullptr, /*subjectDN=*/nullptr, /*rolesBytes=*/nullptr, /*rolesLen=*/0);
+    writeAll(proxyUdsFd, reinterpret_cast<const char*>(header.data()), header.size());
+    ASSERT_NO_THROW(session->prelude());
+
+    ASSERT_EQ(session->getAuthEnvironment().getClientSource().getAddr(), "(NONE)");
+
+    unittest::ServerParameterGuard peerMode{"clientSourceAuthenticationRestrictionMode", "peer"};
+    driveHandoff();
+    ASSERT_NE(session->getAuthEnvironment().getClientSource().getAddr(), kTestClientAddr);
+}
+
+/**
  * Exercises the complete session lifecycle in one continuous sequence: prelude() parses the PROXY
  * header, sourceMessage() returns a cleartext message, the handoff transitions the session to TLS,
  * and sourceMessage() returns a post-handoff TLS message. Verifies message content and session
@@ -2024,6 +2116,7 @@ TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
 
     ASSERT_NO_THROW(session->prelude());
     ASSERT_EQ(session->getState(), HandoffSessionState::Cleartext);
+    ASSERT_EQ(session->getSourceRemoteEndpoint().host(), kTestClientAddr);
     validatePeerInfo();
 
     auto result1 = session->sourceMessage();
@@ -2047,6 +2140,7 @@ TEST_F(HandoffSessionProxyHeaderTest, FullSessionLifecycle) {
     ASSERT_OK(result2.getStatus());
     ASSERT_BSONOBJ_EQ(BSONObj(result2.getValue().singleData().data()), body2);
     ASSERT_EQ(session->getState(), HandoffSessionState::TLS);
+    ASSERT_EQ(session->getSourceRemoteEndpoint().host(), kTestClientAddr);
     validatePeerInfo();
 }
 
