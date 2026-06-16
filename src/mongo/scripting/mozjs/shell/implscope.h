@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/error.h"
@@ -543,7 +544,14 @@ public:
 
     void setStatus(Status status) override;
 
-    ModuleLoader* getModuleLoader() const;
+    ModuleLoader& getModuleLoader() const;
+
+    /**
+     * JavaScript module loading is a shell-only feature. It is not supported in the server
+     * execution environment, where it would let server-side JavaScript (e.g. $function) read
+     * arbitrary host files via import().
+     */
+    bool supportsModules() const;
 
     /**
      * getJSContextForTest and getGlobalForTest should only be used from implscope_test.cpp, as we
@@ -592,9 +600,18 @@ private:
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
     Status _checkForPendingException();
 
+    /**
+     * Returns true if a failed script compilation/execution should be retried as an ES module,
+     * based on the pending exception (a SyntaxError, or a top-level-await ReferenceError). Always
+     * false for the interactive shell. Note, returns false if modules are not supported (i.e in the
+     * server).
+     */
+    bool _shouldTryExecAsModule(const std::string& name, bool success) const;
+
     void installDBAccess();
     void installBSONTypes();
     void installFork();
+    void _setupScripts();
 
     void setCompileOptions(JS::CompileOptions* co);
 
@@ -632,10 +649,10 @@ private:
     std::string _parentStack;
     std::size_t _generation;
     bool _requireOwnedObjects;
-    std::string _baseURL;
+    Deferred<std::string (*)(const MozJSImplScope&)> _baseURL;
     bool _hasOutOfMemoryException;
 
-    std::unique_ptr<ModuleLoader> _moduleLoader;
+    const std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
     // _promiseResult must be a persistentRootedValue (instead of a simple RootedValue). Using a
     // simple RootedValue here affects the stack cleanup conditions in the promise's execution

@@ -1,0 +1,49 @@
+load("//bazel/config:render_template.bzl", "render_template")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.js",
+    ]),
+)
+
+# Server-specific, self-contained (non-module) copy of assert.js, so the server JS scope can be
+# initialized without the filesystem-backed module loader (assert.js is the only setup script that
+# is an ES module; the others are classic scripts the server loads directly). The file basename
+# (server_assert) becomes the generated JSFiles C++ symbol name, kept distinct from the shell's
+# JSFiles::assert to avoid a link-time collision.
+SERVER_CPP_JSFILES = [
+    "server_assert.js",
+]
+
+render_template(
+    name = "server_jsfiles_cpp",
+    srcs = SERVER_CPP_JSFILES,
+    cmd = [
+        "$(location server_jsfiles.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in SERVER_CPP_JSFILES
+    ],
+    output = "server_jsfiles.cpp",
+    python_file = "//buildscripts:jstoh.py",
+)
+
+mongo_cc_library(
+    name = "server_jsfiles",
+    srcs = [
+        "server_jsfiles.cpp",
+    ],
+    # This package has no on-disk C++ sources (only the generated server_jsfiles.cpp), so the
+    # auto_header generator never produces a .auto_header subpackage here. Disable auto_header and
+    # instead depend on //src/mongo/shell:mongojs, which transitively provides mongo/scripting/
+    # engine.h (the JSFile declaration the generated file needs). mongojs only depends on
+    # //src/mongo:base, so this does not create a cycle with scripting_common.
+    auto_header = False,
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/shell:mongojs",
+    ],
+)
