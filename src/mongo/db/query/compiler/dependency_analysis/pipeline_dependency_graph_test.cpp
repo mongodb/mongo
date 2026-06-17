@@ -1154,7 +1154,7 @@ TEST_F(PipelineDependencyGraphTest, ComplexPathInclusionProjectionModifiedPath) 
         ASSERT_EQUALS(graph->getPrevModifyingStage(stages.back().get(), "a.b"), stages[1]);
         // The inclusion modified a.b.c (filtered its subfields).
         ASSERT_EQUALS(graph->getPrevModifyingStage(stages.back().get(), "a.b.c"), stages[1]);
-        // TODO(SERVER-119392): This is technically kept by the inclusion (prefix "a.b.c" was
+        // TODO(SERVER-129134): This is technically kept by the inclusion (prefix "a.b.c" was
         // defined by the $set), so the declaring field should be $set.
         ASSERT_EQUALS(graph->getPrevModifyingStage(stages.back().get(), "a.b.c.d"), stages[1]);
         // Excluded by the inclusion.
@@ -1299,7 +1299,7 @@ TEST_F(PipelineDependencyGraphTest, SetFieldThenIncludeDottedPath) {
         auto* last = stages.back().get();
         // 'a' modified by inclusion (by filtering subfields).
         ASSERT_EQUALS(graph->getPrevModifyingStage(last, "a"), stages[1]);
-        // TODO(SERVER-119392): 'a.b' preserved by projection, originates from $set (we currently
+        // TODO(SERVER-129134): 'a.b' preserved by projection, originates from $set (we currently
         // report it as being declared by the inclusion projection).
         ASSERT_EQUALS(graph->getPrevModifyingStage(last, "a.b"), stages[1]);
         // 'a.c' excluded by projection.
@@ -1362,11 +1362,10 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWithoutArraynessInfo) {
 TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWhenMissing) {
     setPipeline("[{$replaceWith: {}}]");
     runTest([&] {
-        // Lookup from the end of the pipeline.
-        auto* ds = stages.back().get();
-        // TODO(SERVER-119392): These should be trivially non-array with constant propagation.
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "a.a"));
+        // TODO(SERVER-129132): With constant propagation for $replaceRoot these should be
+        // non-array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.a"));
     });
 }
 
