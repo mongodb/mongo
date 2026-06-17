@@ -236,7 +236,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
         """
 
         kwargs["connectTimeoutMS"] = timeout_millis
-        if pymongo.version_tuple[0] >= 3:
+        if pymongo.version_tuple >= (3,):
             kwargs["serverSelectionTimeoutMS"] = timeout_millis
             kwargs["connect"] = True
 

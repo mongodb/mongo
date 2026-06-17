@@ -27,7 +27,7 @@ except Exception as ex:
         venv_not_activated = "You need to activate your virtual environment"
         # Python versions >= 3.11 support an add_note() function on exceptions so this
         # message shows up _after_ the stack trace (more likely to be seen by a dev)
-        if sys.version_info.major == 3 and sys.version_info.minor >= 11:
+        if sys.version_info >= (3, 11):
             ex.add_note(venv_not_activated)
         else:
             print(venv_not_activated)

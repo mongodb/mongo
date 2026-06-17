@@ -144,7 +144,7 @@ except ImportError:
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None
 
-if sys.version_info[0] < 3:
+if sys.version_info < (3,):
     raise gdb.GdbError(
         "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2"
     )

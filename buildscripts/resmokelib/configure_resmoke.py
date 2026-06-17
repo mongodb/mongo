@@ -848,10 +848,10 @@ flags in common: {common_set}
                             patch += mongot_patch_version
 
                     # Ensure we don't append the current version.
-                    if (
-                        major == mongot_major_version
-                        and minor == mongot_minor_version
-                        and patch == mongot_patch_version
+                    if (major, minor, patch) == (
+                        mongot_major_version,
+                        mongot_minor_version,
+                        mongot_patch_version,
                     ):
                         continue
                     mongot_excluded_versions.append(f"requires_mongot_{major}_{minor}_{patch}")

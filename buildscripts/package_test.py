@@ -1041,7 +1041,7 @@ if args.command == "release":
             if version_major > 4:
                 urls.append(f"{repo_uri}/{match.group(1)}-database{match.group(3)}")
 
-            if version_major > 4 or (version_major == 4 and version_minor >= 3):
+            if (version_major, version_minor) >= (4, 3):
                 urls.append(f"{repo_uri}/{match.group(1)}-database-tools-extra{match.group(3)}")
 
             urls.append(f"{repo_uri}/{match.group(1)}-tools{match.group(3)}")
@@ -1056,7 +1056,7 @@ if args.command == "release":
             logging.error("Failed to match package name: %s", package)
             sys.exit(1)
 
-        if version_major > 4 or (version_major == 4 and version_minor >= 3):
+        if (version_major, version_minor) >= (4, 3):
             # The external `tools' package is only compatible with server
             # versions 4.3 and above. Before that, we used the `tools`
             # package built in the server repo.

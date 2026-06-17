@@ -16,7 +16,7 @@ from buildscripts.gdb.mongo_utils import (
     lookup_type,
 )
 
-if sys.version_info[0] < 3:
+if sys.version_info < (3,):
     raise gdb.GdbError(
         "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2"
     )
