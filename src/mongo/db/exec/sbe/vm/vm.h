@@ -983,7 +983,6 @@ private:
     value::TagValueMaybeOwned builtinAggRemovableMinMaxNRemove(ArityType arity);
     template <AccumulatorMinMaxN::MinMaxSense S>
     value::TagValueMaybeOwned builtinAggRemovableMinMaxNFinalize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtin(ArityType arity);
     value::TagValueMaybeOwned linearFillInterpolate(value::TagValueView x1,
                                                     value::TagValueView y1,
                                                     value::TagValueView x2,
@@ -1107,10 +1106,6 @@ private:
     value::TagValueMaybeOwned builtinValueBlockGetSortKey(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockGetSortKeyAsc(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockGetSortKeyDesc(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetNonLeafSortKeyAsc(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetNonLeafSortKeyDesc(
-        ArityType arity);
     value::TagValueMaybeOwned builtinCellFoldValues_F(ArityType arity);
     value::TagValueMaybeOwned builtinCellFoldValues_P(ArityType arity);
     value::TagValueMaybeOwned builtinCellBlockGetFlatValuesBlock(ArityType arity);
