@@ -317,6 +317,10 @@ bool NamespaceString::isConfigTransactionsCollection() const {
     return ns() == kSessionTransactionsTableNamespace.ns();
 }
 
+bool NamespaceString::isFLE2EcocCollection() const {
+    return coll().starts_with(fle2Prefix) && coll().ends_with(fle2EcocSuffix);
+}
+
 bool NamespaceString::isFLE2StateCollection() const {
     return coll().starts_with(fle2Prefix) &&
         (coll().ends_with(fle2EscSuffix) || coll().ends_with(fle2EcocSuffix) ||

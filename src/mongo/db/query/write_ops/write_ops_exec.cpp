@@ -316,6 +316,14 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 defaultCollectionOptions.clusteredIndex =
                     clustered_util::makeDefaultClusteredIdIndex();
             }
+
+            // TODO SERVER-128438 remove this workaround once the race condition described in
+            // SERVER-126384 has been addressed at a different level
+            if (ns.isFLE2EcocCollection()) {
+                defaultCollectionOptions.clusteredIndex =
+                    clustered_util::makeDefaultClusteredIdIndex();
+            }
+
             auto db = autoDb.ensureDbExists(opCtx);
             uassertStatusOK(db->userCreateNS(opCtx, ns, defaultCollectionOptions));
             wuow.commit();
