@@ -60,7 +60,7 @@ public:
      */
     inline wiredtiger_connection_guard(
       WT_CONNECTION *connection, const char *close_config = nullptr) noexcept
-        : _connection(connection), _close_config(close_config == nullptr ? "" : close_config){};
+        : _connection(connection), _close_config(close_config == nullptr ? "" : close_config) {};
 
     /*
      * wiredtiger_connection_guard::wiredtiger_connection_guard --
@@ -100,7 +100,7 @@ public:
      * wiredtiger_cursor_guard::wiredtiger_cursor_guard --
      *     Create a new instance of the guard.
      */
-    inline wiredtiger_cursor_guard(WT_CURSOR *cursor) noexcept : _cursor(cursor){};
+    inline wiredtiger_cursor_guard(WT_CURSOR *cursor) noexcept : _cursor(cursor) {};
 
     /*
      * wiredtiger_cursor_guard::wiredtiger_cursor_guard --
@@ -139,7 +139,7 @@ public:
      * wiredtiger_session_guard::wiredtiger_session_guard --
      *     Create a new instance of the guard.
      */
-    inline wiredtiger_session_guard(WT_SESSION *session) noexcept : _session(session){};
+    inline wiredtiger_session_guard(WT_SESSION *session) noexcept : _session(session) {};
 
     /*
      * wiredtiger_session_guard::wiredtiger_session_guard --
@@ -184,7 +184,7 @@ public:
       timestamp_t commit_timestamp = k_timestamp_none,
       timestamp_t durable_timestamp = k_timestamp_none) noexcept
         : _txn(std::move(txn)), _commit_timestamp(commit_timestamp),
-          _durable_timestamp(durable_timestamp){};
+          _durable_timestamp(durable_timestamp) {};
 
     /*
      * kv_transaction_guard::kv_transaction_guard --
@@ -479,7 +479,7 @@ public:
      * at_cleanup::at_cleanup --
      *     Create the cleanup object.
      */
-    inline at_cleanup(std::function<void()> fn) : _fn(std::move(fn)){};
+    inline at_cleanup(std::function<void()> fn) : _fn(std::move(fn)) {};
 
     /* Delete the copy constructor. */
     at_cleanup(const at_cleanup &) = delete;

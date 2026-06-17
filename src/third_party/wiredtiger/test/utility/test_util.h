@@ -451,8 +451,9 @@ typedef struct {
 #ifdef _WIN32
 __declspec(noreturn)
 #endif
-  void testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
-    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+void
+testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
+  WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 /*
  * u64_to_string --

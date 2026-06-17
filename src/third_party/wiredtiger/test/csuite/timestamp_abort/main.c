@@ -162,7 +162,7 @@ static struct {
  * timestamp for that use.
  */
 #define RESERVED_TIMESTAMPS_FOR_ITERATION(td, iter) \
-    ((uint64_t)WT_BILLION * (td)->workload_iteration + ((iter)*nth + (td)->threadnum) * 3 + 1)
+    ((uint64_t)WT_BILLION * (td)->workload_iteration + ((iter) * nth + (td)->threadnum) * 3 + 1)
 
 /* The index of a backup. */
 #define BACKUP_INDEX(td, sequence_number) \

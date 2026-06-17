@@ -160,7 +160,7 @@ __wti_rec_dictionary_lookup(
     /* Search the dictionary, and return any match we find. */
     hash = __wt_hash_city64(val->buf.data, val->buf.size);
     for (dp = __rec_dictionary_skip_search(r->dictionary_head, hash);
-         dp != NULL && dp->hash == hash; dp = dp->next[0]) {
+      dp != NULL && dp->hash == hash; dp = dp->next[0]) {
         WT_RET(
           __wt_cell_pack_value_match((WT_CELL *)((uint8_t *)r->cur_ptr->image.mem + dp->offset),
             &val->cell, val->buf.data, &match));

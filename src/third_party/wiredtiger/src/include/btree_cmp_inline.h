@@ -19,7 +19,7 @@
 #endif
 
 /* 16B alignment */
-#define WT_ALIGNED_16(p) (((uintptr_t)(p)&0x0f) == 0)
+#define WT_ALIGNED_16(p) (((uintptr_t)(p) & 0x0f) == 0)
 #define WT_VECTOR_SIZE 16 /* chunk size */
 
 /*
@@ -52,7 +52,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
         len -= remain;
         if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
             for (; len > 0;
-                 len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
+              len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
                 u = _mm_load_si128((const __m128i *)userp);
                 t = _mm_load_si128((const __m128i *)treep);
                 res_eq = _mm_cmpeq_epi8(u, t);
@@ -61,7 +61,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
             }
         else
             for (; len > 0;
-                 len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
+              len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
                 u = _mm_loadu_si128((const __m128i *)userp);
                 t = _mm_loadu_si128((const __m128i *)treep);
                 res_eq = _mm_cmpeq_epi8(u, t);
@@ -199,7 +199,7 @@ __wt_lex_compare_skip(
         len -= remain;
         if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
             for (; len > 0; len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
-                 *matchp += WT_VECTOR_SIZE) {
+              *matchp += WT_VECTOR_SIZE) {
                 u = _mm_load_si128((const __m128i *)userp);
                 t = _mm_load_si128((const __m128i *)treep);
                 res_eq = _mm_cmpeq_epi8(u, t);
@@ -208,7 +208,7 @@ __wt_lex_compare_skip(
             }
         else
             for (; len > 0; len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
-                 *matchp += WT_VECTOR_SIZE) {
+              *matchp += WT_VECTOR_SIZE) {
                 u = _mm_loadu_si128((const __m128i *)userp);
                 t = _mm_loadu_si128((const __m128i *)treep);
                 res_eq = _mm_cmpeq_epi8(u, t);
@@ -226,7 +226,7 @@ __wt_lex_compare_skip(
         len -= remain;
         if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
             for (; len > 0; len -= WT_VECTOR_SIZE, userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
-                 *matchp += WT_VECTOR_SIZE) {
+              *matchp += WT_VECTOR_SIZE) {
                 u = vld1q_u8(userp);
                 t = vld1q_u8(treep);
                 res_eq = vceqq_u8(u, t);

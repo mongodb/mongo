@@ -783,7 +783,7 @@ __tree_stack(WT_VSTUFF *vs)
     int force_unused;
 
     for (strsz = 0, i = 0, len = WT_MIN(vs->depth, WT_ELEMENTS(vs->depth_internal) - 1); i < len;
-         ++i)
+      ++i)
         force_unused = /* using plain WT_UNUSED(snprintf) is screwed on GCC */
           __wt_snprintf_len_incr(&data[strsz], 10, &strsz, "%" PRIu64 ".", vs->tree_stack[i]);
     WT_UNUSED(force_unused);
@@ -1606,7 +1606,7 @@ __verify_compare_page_id_lists(WT_SESSION_IMPL *session, uint64_t *btree_ids, si
     WT_DECL_RET;
 
     for (uint32_t index_in_pali = 0, index_in_btree = 0;
-         index_in_pali <= num_pali && index_in_btree <= num_btree;) {
+      index_in_pali <= num_pali && index_in_btree <= num_btree;) {
         if (index_in_pali == num_pali && index_in_btree == num_btree)
             break;
         uint64_t id_in_pali =

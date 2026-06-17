@@ -12,3 +12,6 @@ c12c796f486b852da1737a25f66bcd59e9975d69
 
 # WT-14619 Merge layered tables
 5d8fe009553e4ae547dc809be535822b1cd1b5a0
+
+# WT-17744 Use clang-format 19.1.7 (same as Mongo toolchain v5)
+9257a9fc35359808a583a5863df565b44d43b825

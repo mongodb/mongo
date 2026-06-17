@@ -233,16 +233,16 @@ struct __wtperf {          /* Per-database structure */
 #define ns_to_us(v) ((v) / THOUSAND)
 
 #define us_to_ms(v) ((v) / THOUSAND)
-#define us_to_ns(v) ((v)*THOUSAND)
+#define us_to_ns(v) ((v) * THOUSAND)
 #define us_to_sec(v) ((v) / MILLION)
 
-#define ms_to_ns(v) ((v)*MILLION)
-#define ms_to_us(v) ((v)*THOUSAND)
+#define ms_to_ns(v) ((v) * MILLION)
+#define ms_to_us(v) ((v) * THOUSAND)
 #define ms_to_sec(v) ((v) / THOUSAND)
 
-#define sec_to_ns(v) ((v)*BILLION)
-#define sec_to_us(v) ((v)*MILLION)
-#define sec_to_ms(v) ((v)*THOUSAND)
+#define sec_to_ns(v) ((v) * BILLION)
+#define sec_to_us(v) ((v) * MILLION)
+#define sec_to_ms(v) ((v) * THOUSAND)
 
 typedef struct {
     /*

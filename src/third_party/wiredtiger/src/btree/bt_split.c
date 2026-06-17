@@ -1629,7 +1629,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
             if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
               supd->onpage_tombstone != NULL && supd->onpage_upd == NULL) {
                 for (WT_UPDATE *scan = upd; scan != NULL && scan != supd->onpage_tombstone;
-                     scan = scan->next) {
+                  scan = scan->next) {
                     if (scan->prepared_id != WT_PREPARED_ID_NONE) {
                         retain_tombstone = true;
                         break;
@@ -1657,7 +1657,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
                  * truncate all the updates starting from the onpage value.
                  */
                 for (prev_onpage = upd; prev_onpage->next != NULL && prev_onpage->next != tmp;
-                     prev_onpage = prev_onpage->next)
+                  prev_onpage = prev_onpage->next)
                     ;
                 WT_ASSERT(session, prev_onpage->next == tmp);
 #ifdef HAVE_DIAGNOSTIC

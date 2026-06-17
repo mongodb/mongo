@@ -74,8 +74,8 @@ __cm_extend(WT_CM_STATE *cms, const uint8_t *m1, const uint8_t *m2, WT_CM_MATCH 
      * faster than our byte-at-a-time loop below.
      */
     for (p1 = m1, p2 = m2;
-         (n = WT_MIN(cms->e1 - p1, cms->e2 - p2) / 2) > 8 && memcmp(p1, p2, (size_t)n) == 0;
-         p1 += n, p2 += n)
+      (n = WT_MIN(cms->e1 - p1, cms->e2 - p2) / 2) > 8 && memcmp(p1, p2, (size_t)n) == 0;
+      p1 += n, p2 += n)
         ;
 
     /* Step past the end and before the beginning of the matching block. */
@@ -155,7 +155,7 @@ __wt_calc_modify(WT_SESSION_IMPL *wt_session, const WT_ITEM *oldv, const WT_ITEM
     hstart = hend = 0;
     i = gap = 0;
     for (p1 = cms.used1, p2 = cms.used2, start = true;
-         p1 + WT_CM_BLOCKSIZE <= cms.e1 && p2 + WT_CM_BLOCKSIZE <= cms.e2; p2++, i++) {
+      p1 + WT_CM_BLOCKSIZE <= cms.e1 && p2 + WT_CM_BLOCKSIZE <= cms.e2; p2++, i++) {
         if (start || i == gap) {
             p1 += gap;
             gap = start ? WT_CM_STARTGAP : gap * 2;

@@ -207,7 +207,7 @@ enum WT_DISAGG_CKPT_PICKUP_CURSORS {
     WT_DISAGG_CURSOR_FILE,
     WT_DISAGG_CURSOR_LAYERED,
     WT_DISAGG_CURSOR_TABLE,
-    WT_DISAGG_CURSOR_COUNT
+    WT_DISAGG_CURSOR_COUNT /* Must be last. */
 };
 
 /* Prefixes for each cursor type. */
@@ -338,6 +338,7 @@ __disagg_insert_meta(WT_SESSION_IMPL *session, WT_CURSOR *sh_cursor, WT_CURSOR *
       session, md_cursor->insert(md_cursor), "Failed to insert metadata for key \"%s\"", key);
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Inserted new key to the local metadata \"%s\": \"%s\"", key, value);
+    WT_STAT_CONN_INCR(session, disagg_pick_up_file_meta_inserted);
 
 err:
     return (ret);
@@ -352,7 +353,7 @@ static int
 __disagg_update_file_meta(
   WT_SESSION_IMPL *session, WT_CURSOR *sh_file_cursor, WT_CURSOR *md_file_cursor)
 {
-    WT_CONFIG_ITEM cval;
+    WT_CONFIG_ITEM cval, cval_cur;
     WT_DECL_ITEM(metadata_cfg);
     WT_DECL_ITEM(old_uri_buf);
     WT_DECL_RET;
@@ -381,6 +382,15 @@ __disagg_update_file_meta(
     /* Copy the value since we don't own the memory after calling get_value(). */
     WT_ERR(__wt_strdup(session, current_value, &current_value_copy));
 
+    /*
+     * Extract the checkpoint information from the current value and compare it to the new
+     * checkpoint. If they are the same, there is no need to proceed further.
+     */
+    WT_ERR(__wt_config_getones(session, current_value, "checkpoint", &cval_cur));
+    if (__wt_string_slice_cmp(cval_cur.str, cval_cur.len, cval.str, cval.len) == 0)
+        goto err;
+
+    /* Overwrite the checkpoint field in the local metadata with the one from shared storage. */
     cfg[0] = current_value_copy;
     cfg[1] = metadata_cfg->data;
     cfg[2] = NULL;
@@ -389,6 +399,7 @@ __disagg_update_file_meta(
     md_file_cursor->set_value(md_file_cursor, cfg_ret);
     WT_ERR_MSG_CHK(session, md_file_cursor->update(md_file_cursor),
       "Failed to update metadata for key \"%s\"", sh_file_key);
+    WT_STAT_CONN_INCR(session, disagg_pick_up_file_meta_updated);
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Updated the local metadata for key \"%s\" to include new checkpoint: \"%.*s\"", sh_file_key,
@@ -398,8 +409,10 @@ __disagg_update_file_meta(
      * Mark any matching data handles associated with the previous checkpoint to be out of date. Any
      * new opens will get the new metadata.
      *
-     * FIXME-WT-14730: check that the other parts of the metadata are identical. FIXME-WT-16494: how
-     * to decide two checkpoints are different if they are written by different nodes.
+     * FIXME-WT-14730: Check that the other parts of the metadata are identical.
+     *
+     * FIXME-WT-16494: How to decide two checkpoints are different if they are written by different
+     * nodes?
      */
     WT_ERR(__disagg_discard_old_checkpoint_check(
       session, current_value_copy, cfg_ret, &checkpoint_name, &discard));

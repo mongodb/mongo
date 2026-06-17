@@ -252,7 +252,8 @@ static sigjmp_buf dump_crash_jmp;
  * dump_crash_handler --
  *     Handle crash during page dump.
  */
-static void __attribute__((noreturn)) dump_crash_handler(int sig)
+static void __attribute__((noreturn))
+dump_crash_handler(int sig)
 {
     siglongjmp(dump_crash_jmp, sig);
 }

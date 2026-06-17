@@ -53,7 +53,7 @@ static int __verify_dsk_row_leaf(WT_VERIFY_INFO *);
  */
 #define WT_CELL_FOREACH_VRFY(session, dsk, cell, unpack, i)                                 \
     for ((cell) = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), (i) = (dsk)->u.entries; (i) > 0; \
-         (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
+      (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
 /*
  * __wt_verify_dsk_image --

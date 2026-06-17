@@ -508,8 +508,8 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
      * participant shutdown if we spend a long time balancing.
      */
     for (i = 0; i < 2 * WT_CACHE_POOL_BUMP_THRESHOLD && F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-         FLD_ISSET_ATOMIC_16(S2C(session)->cache->pool_flags_atomic, WT_CACHE_POOL_RUN);
-         i++) {
+      FLD_ISSET_ATOMIC_16(S2C(session)->cache->pool_flags_atomic, WT_CACHE_POOL_RUN);
+      i++) {
         __cache_pool_adjust(session, highest, bump_threshold, forward, &adjusted);
         /*
          * Stop if the amount of cache being used is stable, and we aren't over capacity.
@@ -649,8 +649,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
 
     for (entry = forward ? TAILQ_FIRST(&cp->cache_pool_qh) :
                            TAILQ_LAST(&cp->cache_pool_qh, __wt_cache_pool_qh);
-         entry != NULL;
-         entry = forward ? TAILQ_NEXT(entry, cpq) : TAILQ_PREV(entry, __wt_cache_pool_qh, cpq)) {
+      entry != NULL;
+      entry = forward ? TAILQ_NEXT(entry, cpq) : TAILQ_PREV(entry, __wt_cache_pool_qh, cpq)) {
         cache = entry->cache;
         evict = entry->evict;
         reserved = cache->cp_reserved;

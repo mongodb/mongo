@@ -61,7 +61,7 @@ public:
         int ret = lambda();
         _time_recordings.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(
           (std::chrono::steady_clock::now() - start_time))
-                                     .count());
+            .count());
         return ret;
     }
 

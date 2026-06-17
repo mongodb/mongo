@@ -455,19 +455,19 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
     return (0);
 }
 
-#define MATCH_KEYWORD(session, in, result, keyword, matchval)                               \
-    do {                                                                                    \
-        size_t _kwlen = strlen(keyword);                                                    \
-        if (strncmp(in, keyword, _kwlen) == 0 && !__wt_isalnum((u_char)(in)[_kwlen])) {     \
-            (in) += _kwlen;                                                                 \
-            (result) = matchval;                                                            \
-        } else {                                                                            \
-            const char *_bad = (in);                                                        \
-            while (__wt_isalnum((u_char) * (in)))                                           \
-                (in)++;                                                                     \
-            WT_RET_MSG(                                                                     \
-              session, EINVAL, "unknown keyword \"%.*s\" in JSON", (int)((in)-_bad), _bad); \
-        }                                                                                   \
+#define MATCH_KEYWORD(session, in, result, keyword, matchval)                                 \
+    do {                                                                                      \
+        size_t _kwlen = strlen(keyword);                                                      \
+        if (strncmp(in, keyword, _kwlen) == 0 && !__wt_isalnum((u_char)(in)[_kwlen])) {       \
+            (in) += _kwlen;                                                                   \
+            (result) = matchval;                                                              \
+        } else {                                                                              \
+            const char *_bad = (in);                                                          \
+            while (__wt_isalnum((u_char) * (in)))                                             \
+                (in)++;                                                                       \
+            WT_RET_MSG(                                                                       \
+              session, EINVAL, "unknown keyword \"%.*s\" in JSON", (int)((in) - _bad), _bad); \
+        }                                                                                     \
     } while (0)
 
 /*

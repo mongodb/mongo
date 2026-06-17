@@ -27,7 +27,7 @@
 #define WTI_LOGC_KEY_FORMAT WT_UNCHECKED_STRING(III)
 #define WTI_LOGC_VALUE_FORMAT WT_UNCHECKED_STRING(qIIIuu)
 
-#define WTI_LOG_REC_SIZE(size) ((size)-offsetof(WT_LOG_RECORD, record))
+#define WTI_LOG_REC_SIZE(size) ((size) - offsetof(WT_LOG_RECORD, record))
 
 /*
  * We allocate the buffer size, but trigger a slot switch when we cross the maximum size of half the
@@ -91,8 +91,8 @@
 /*
  * These macros manipulate the slot state and its component parts.
  */
-#define WTI_LOG_SLOT_FLAGS(state) ((state)&WTI_LOG_SLOT_MASK_ON)
-#define WTI_LOG_SLOT_JOINED(state) (((state)&WTI_LOG_SLOT_MASK_OFF) >> 32)
+#define WTI_LOG_SLOT_FLAGS(state) ((state) & WTI_LOG_SLOT_MASK_ON)
+#define WTI_LOG_SLOT_JOINED(state) (((state) & WTI_LOG_SLOT_MASK_OFF) >> 32)
 #define WTI_LOG_SLOT_JOINED_BUFFERED(state) \
     (WTI_LOG_SLOT_JOINED(state) & (WTI_LOG_SLOT_UNBUFFERED - 1))
 #define WTI_LOG_SLOT_JOIN_REL(j, r, s) (((j) << 32) + (r) + (s))

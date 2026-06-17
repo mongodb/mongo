@@ -140,8 +140,8 @@ __evict_get_ref(WT_SESSION_IMPL *session, bool is_server, WT_BTREE **btreep, WT_
 
     /* Get the next page queued for eviction. */
     for (evict_entry = queue->evict_current;
-         evict_entry >= queue->evict_queue && evict_entry < queue->evict_queue + candidates;
-         ++evict_entry) {
+      evict_entry >= queue->evict_queue && evict_entry < queue->evict_queue + candidates;
+      ++evict_entry) {
         if (evict_entry->ref == NULL)
             continue;
         WT_ASSERT(session, evict_entry->btree != NULL);
@@ -323,7 +323,7 @@ __wti_evict_app_assist_worker(
      * have to deal with internal eviction return codes.
      */
     for (uint64_t initial_progress = __wt_atomic_load_uint64_v_relaxed(&evict->eviction_progress);;
-         ret = 0) {
+      ret = 0) {
         /*
          * If eviction is stuck, check if this thread is likely causing problems and should be
          * rolled back. Ignore if in recovery, those transactions can't be rolled back.

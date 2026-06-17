@@ -2268,7 +2268,7 @@ __txn_modify_block(
             if (txn->snapshot_data.snapshot_count > 0) {
                 WT_ERR(__wt_buf_catfmt(session, buf, ", snapshots=["));
                 for (snap_count = 0; snap_count < txn->snapshot_data.snapshot_count - 1;
-                     ++snap_count)
+                  ++snap_count)
                     WT_ERR(__wt_buf_catfmt(
                       session, buf, "%" PRIu64 ",", txn->snapshot_data.snapshot[snap_count]));
                 WT_ERR(__wt_buf_catfmt(

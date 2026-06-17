@@ -782,7 +782,7 @@ __rec_hs_collect_upd_chain(WT_SESSION_IMPL *session, WT_SAVE_UPD *list, WT_UPDAT
 
     for (upd = list->onpage_upd->next,
         prev_upd = WT_TIME_WINDOW_HAS_START_PREPARE(&list->tw) ? NULL : list->onpage_upd;
-         upd != NULL; upd = upd->next) {
+      upd != NULL; upd = upd->next) {
         WT_SKIP_ABORTED_AND_SET_CHECK_PREPARED(txnid, txnid_prepared, check_prepared, upd);
 
         if (txnid == WT_TXN_ABORTED)
@@ -1210,7 +1210,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
          * store.
          */
         for (upd = list->onpage_upd->next; upd != NULL && upd->txnid == WT_TXN_ABORTED;
-             upd = upd->next)
+          upd = upd->next)
             ;
 
         /* No update to insert to history store. */

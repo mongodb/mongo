@@ -1979,7 +1979,7 @@ __wt_page_cell_data_ref_kv(
         uint32_t __i;                                                                           \
         uint8_t *__cell;                                                                        \
         for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-             __i -= 2) {                                                                        \
+          __i -= 2) {                                                                           \
             WT_CELL_DELTA_LEAF_UNPACK(session, dsk, unpack, __cell);
 
 #define WT_CELL_FOREACH_ADDR(session, dsk, unpack)                                              \
@@ -1987,7 +1987,7 @@ __wt_page_cell_data_ref_kv(
         uint32_t __i;                                                                           \
         uint8_t *__cell;                                                                        \
         for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-             --__i) {                                                                           \
+          --__i) {                                                                              \
             __wt_cell_unpack_addr(session, dsk, (WT_CELL *)__cell, &(unpack));                  \
             __cell += (unpack).__len;
 
@@ -1996,7 +1996,7 @@ __wt_page_cell_data_ref_kv(
         uint32_t __i;                                                                           \
         uint8_t *__cell;                                                                        \
         for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-             __cell += (unpack).__len, --__i) {                                                 \
+          __cell += (unpack).__len, --__i) {                                                    \
             __wt_cell_unpack_kv(session, dsk, (WT_CELL *)__cell, &(unpack));
 
 #define WT_CELL_FOREACH_END \

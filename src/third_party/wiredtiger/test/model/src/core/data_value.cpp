@@ -287,10 +287,10 @@ set_wt_cursor_key_or_value(WT_CURSOR *cursor, void set_fn(WT_CURSOR *cursor, ...
     if (std::holds_alternative<std::monostate>(value) || value.valueless_by_exception())
         throw model_exception("Cannot use the NONE value in a WiredTiger cursor");
 
-        /*
-         * SET_DATA_VALUE --
-         *     Read the given key or value into a data_value.
-         */
+    /*
+     * SET_DATA_VALUE --
+     *     Read the given key or value into a data_value.
+     */
 #define SET_DATA_VALUE(wt_type, c_type, variant_type)              \
     case wt_type[0]: {                                             \
         if (!std::holds_alternative<variant_type>(value))          \

@@ -28,10 +28,7 @@ typedef struct {
 } WT_PACK_VALUE;
 
 /* Default to size = 1 if there is no size prefix. */
-#define WT_PACK_VALUE_INIT \
-    {                      \
-        {0}, 1, 0, 0       \
-    }
+#define WT_PACK_VALUE_INIT {{0}, 1, 0, 0}
 #define WT_DECL_PACK_VALUE(pv) WT_PACK_VALUE pv = WT_PACK_VALUE_INIT
 
 typedef struct {
@@ -41,10 +38,7 @@ typedef struct {
     WT_PACK_VALUE lastv;
 } WT_PACK;
 
-#define WT_PACK_INIT                                  \
-    {                                                 \
-        NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT \
-    }
+#define WT_PACK_INIT {NULL, NULL, NULL, NULL, 0, WT_PACK_VALUE_INIT}
 #define WT_DECL_PACK(pack) WT_PACK pack = WT_PACK_INIT
 
 typedef struct {

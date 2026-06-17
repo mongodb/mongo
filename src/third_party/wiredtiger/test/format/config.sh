@@ -6,6 +6,11 @@
 fc="format_config_def.c"
 fh="format_config.h"
 
+if ! command -v clang-format > /dev/null 2>&1; then
+    echo "error: clang-format not found; please install it and ensure it is on PATH"
+    exit 1
+fi
+
 cat<<END_OF_HEADER_FILE_PREFIX>$fh
 /* DO NOT EDIT: automatically built by format/config.sh. */
 

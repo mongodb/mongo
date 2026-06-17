@@ -140,7 +140,7 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
 
         /* Automatically close the cursor at the end of the iteration. */
         for (wiredtiger_cursor_guard cursor_guard(wt_cursor);
-             (ret = wt_cursor->next(wt_cursor)) == 0;) {
+          (ret = wt_cursor->next(wt_cursor)) == 0;) {
             /* Verify each key-value pair. */
             key = get_wt_cursor_key(wt_cursor);
             value = get_wt_cursor_value(wt_cursor);

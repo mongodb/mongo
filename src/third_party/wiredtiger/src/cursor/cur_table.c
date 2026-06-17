@@ -16,7 +16,7 @@ static int __curtable_update(WT_CURSOR *cursor);
         WT_CURSOR **__cp;                                                               \
         u_int __i;                                                                      \
         for (__i = 0, __cp = (ctable)->cg_cursors; __i < WT_COLGROUPS((ctable)->table); \
-             __i++, __cp++) {                                                           \
+          __i++, __cp++) {                                                              \
             WT_TRET((*__cp)->f(*__cp));                                                 \
             WT_ERR_NOTFOUND_OK(ret, true);                                              \
         }                                                                               \

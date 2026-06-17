@@ -120,7 +120,7 @@ TEST_CASE_METHOD(checkpoint_meta_version_fixture,
         };
 
         for (size_t i = 0; i < sizeof(incompatible_configs) / sizeof(incompatible_configs[0]);
-             ++i) {
+          ++i) {
             ret = __ut_disagg_validate_checkpoint_meta_version(
               session, incompatible_configs[i], &version, &compatible_version);
             REQUIRE(ret == ENOTSUP);

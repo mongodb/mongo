@@ -68,7 +68,7 @@ extern "C" {
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) < (b) ? (b) : (a))
 #define TIMESPEC_DOUBLE(ts) (static_cast<double>((ts).tv_sec) + ts.tv_nsec * 0.000000001)
-#define PCT(n, total) ((total) == 0 ? 0 : ((n)*100) / (total))
+#define PCT(n, total) ((total) == 0 ? 0 : ((n) * 100) / (total))
 #define OPS_PER_SEC(ops, ts) static_cast<int>((ts) == 0 ? 0.0 : (ops) / TIMESPEC_DOUBLE(ts))
 
 // Get the value of a STL container, even if it is not present
@@ -906,7 +906,7 @@ OptionsList::help() const
 {
     std::stringstream sstm;
     for (std::map<std::string, TypeDescPair>::const_iterator i = _option_map.begin();
-         i != _option_map.end(); i++) {
+      i != _option_map.end(); i++) {
         sstm << i->first << " (" << i->second.first << ")" << std::endl;
         pretty_print(i->second.second.c_str(), "\t", sstm);
     }
@@ -1135,7 +1135,7 @@ Monitor::run()
 
         Stats new_totals(true);
         for (std::vector<ThreadRunner>::iterator tr = _wrunner._trunners.begin();
-             tr != _wrunner._trunners.end(); tr++)
+          tr != _wrunner._trunners.end(); tr++)
             new_totals.add(tr->_stats, true);
         Stats interval(new_totals);
         interval.subtract(prev_totals);
@@ -1355,7 +1355,7 @@ ThreadRunner::open_all()
     _cursors = new WT_CURSOR_PTR[_icontext->_tint_last + 1];
     memset(_cursors, 0, sizeof(WT_CURSOR *) * (_icontext->_tint_last + 1));
     for (std::map<uint32_t, uint32_t>::iterator i = _table_usage.begin(); i != _table_usage.end();
-         i++) {
+      i++) {
         uint32_t tindex = i->first;
         const std::string uri(_icontext->_table_names[tindex]);
         WT_RET(_session->open_cursor(_session, uri.c_str(), nullptr, nullptr, &_cursors[tindex]));
@@ -1407,7 +1407,7 @@ ThreadRunner::cross_check(std::vector<ThreadRunner> &runners)
     // Determine which tables have cross usage
     for (std::vector<ThreadRunner>::iterator r = runners.begin(); r != runners.end(); r++) {
         for (std::map<uint32_t, uint32_t>::iterator i = r->_table_usage.begin();
-             i != r->_table_usage.end(); i++) {
+          i != r->_table_usage.end(); i++) {
             uint32_t tindex = i->first;
             uint32_t thisusage = i->second;
             uint32_t curusage = CONTAINER_VALUE(usage, tindex, 0);
@@ -1446,7 +1446,7 @@ ThreadRunner::run()
         WT_ERR(op_run_setup(&_thread->_op));
     }
 
-err :
+err:
 #ifdef _DEBUG
 {
     std::string messages = this->get_debug();
@@ -1979,7 +1979,7 @@ ThreadRunner::op_run(Operation *op)
             bool has_mirror;
             for (int count = 0; (!_stop || _in_transaction) && count < op->_repeatgroup; count++) {
                 for (std::vector<Operation>::iterator i = op->_group->begin();
-                     i != op->_group->end(); i++) {
+                  i != op->_group->end(); i++) {
                     auto [table_uri, tint] = op_get_table(&*i);
                     has_mirror = op_has_mirror(tint);
                     /*
@@ -2194,7 +2194,7 @@ void
 ThreadListWrapper::extend(const ThreadListWrapper &other)
 {
     for (std::vector<Thread>::const_iterator i = other._threads.begin(); i != other._threads.end();
-         i++)
+      i++)
         _threads.push_back(*i);
 }
 

@@ -14,7 +14,7 @@
  * worrying about the memory management. For now also assign types to slots. Local files in slot 0.
  * Shared tier top level in slot 1.
  */
-#define WT_TIERED_INDEX_INVALID (uint32_t) - 1
+#define WT_TIERED_INDEX_INVALID (uint32_t)-1
 #define WT_TIERED_INDEX_LOCAL 0
 #define WT_TIERED_INDEX_SHARED 1
 

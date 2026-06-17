@@ -1244,7 +1244,7 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 #define WT_IK_ENCODE_KEY_LEN(v) ((uintptr_t)(v) << 32)
 #define WT_IK_DECODE_KEY_LEN(v) ((v) >> 32)
 #define WT_IK_ENCODE_KEY_OFFSET(v) ((uintptr_t)(v) << 1)
-#define WT_IK_DECODE_KEY_OFFSET(v) (((v)&0xFFFFFFFF) >> 1)
+#define WT_IK_DECODE_KEY_OFFSET(v) (((v) & 0xFFFFFFFF) >> 1)
     v = (uintptr_t)ref->ref_ikey;
     if (v & WT_IK_FLAG) {
         *(void **)keyp = WT_PAGE_REF_OFFSET(page, WT_IK_DECODE_KEY_OFFSET(v));
@@ -1397,36 +1397,36 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy, WT_IKEY **ikeyp, WT_CELL **cel
 
 #define WT_K_FLAG 0x02
 #define WT_K_MAX_KEY_LEN (0x80000 - 1)
-#define WT_K_DECODE_KEY_LEN(v) (((v)&0xffffe00000000000) >> 45)
+#define WT_K_DECODE_KEY_LEN(v) (((v) & 0xffffe00000000000) >> 45)
 #define WT_K_ENCODE_KEY_LEN(v) ((uintptr_t)(v) << 45)
 #define WT_K_MAX_KEY_OFFSET (0x40 - 1)
-#define WT_K_DECODE_KEY_OFFSET(v) (((v)&0x001f8000000000) >> 39)
+#define WT_K_DECODE_KEY_OFFSET(v) (((v) & 0x001f8000000000) >> 39)
 #define WT_K_ENCODE_KEY_OFFSET(v) ((uintptr_t)(v) << 39)
 /* Key prefix field size can hold maximum value, WT_K_MAX_KEY_PREFIX not needed. */
-#define WT_K_DECODE_KEY_PREFIX(v) (((v)&0x00007f80000000) >> 31)
+#define WT_K_DECODE_KEY_PREFIX(v) (((v) & 0x00007f80000000) >> 31)
 #define WT_K_ENCODE_KEY_PREFIX(v) ((uintptr_t)(v) << 31)
 /* Key cell offset field size can hold maximum value, WT_K_MAX_KEY_CELL_OFFSET not needed. */
-#define WT_K_DECODE_KEY_CELL_OFFSET(v) (((v)&0x0000007ffffffc) >> 2)
+#define WT_K_DECODE_KEY_CELL_OFFSET(v) (((v) & 0x0000007ffffffc) >> 2)
 #define WT_K_ENCODE_KEY_CELL_OFFSET(v) ((uintptr_t)(v) << 2)
 
 #define WT_KV_FLAG 0x03
 #define WT_KV_MAX_VALUE_LEN (0x2000 - 1)
-#define WT_KV_DECODE_VALUE_LEN(v) (((v)&0xfff8000000000000) >> 51)
+#define WT_KV_DECODE_VALUE_LEN(v) (((v) & 0xfff8000000000000) >> 51)
 #define WT_KV_ENCODE_VALUE_LEN(v) ((uintptr_t)(v) << 51)
 #define WT_KV_MAX_VALUE_OFFSET (0x40 - 1)
-#define WT_KV_DECODE_VALUE_OFFSET(v) (((v)&0x07e00000000000) >> 45)
+#define WT_KV_DECODE_VALUE_OFFSET(v) (((v) & 0x07e00000000000) >> 45)
 #define WT_KV_ENCODE_VALUE_OFFSET(v) ((uintptr_t)(v) << 45)
 #define WT_KV_MAX_KEY_LEN (0x1000 - 1)
-#define WT_KV_DECODE_KEY_LEN(v) (((v)&0x001ffe00000000) >> 33)
+#define WT_KV_DECODE_KEY_LEN(v) (((v) & 0x001ffe00000000) >> 33)
 #define WT_KV_ENCODE_KEY_LEN(v) ((uintptr_t)(v) << 33)
 /* Key offset encoding is the same for key and key/value forms, WT_KV_MAX_KEY_OFFSET not needed. */
-#define WT_KV_DECODE_KEY_OFFSET(v) (((v)&0x000001f8000000) >> 27)
+#define WT_KV_DECODE_KEY_OFFSET(v) (((v) & 0x000001f8000000) >> 27)
 #define WT_KV_ENCODE_KEY_OFFSET(v) ((uintptr_t)(v) << 27)
 /* Key prefix encoding is the same for key and key/value forms, WT_KV_MAX_KEY_PREFIX not needed. */
-#define WT_KV_DECODE_KEY_PREFIX(v) (((v)&0x00000007f80000) >> 19)
+#define WT_KV_DECODE_KEY_PREFIX(v) (((v) & 0x00000007f80000) >> 19)
 #define WT_KV_ENCODE_KEY_PREFIX(v) ((uintptr_t)(v) << 19)
 #define WT_KV_MAX_KEY_CELL_OFFSET (0x20000 - 1)
-#define WT_KV_DECODE_KEY_CELL_OFFSET(v) (((v)&0x0000000007fffc) >> 2)
+#define WT_KV_DECODE_KEY_CELL_OFFSET(v) (((v) & 0x0000000007fffc) >> 2)
 #define WT_KV_ENCODE_KEY_CELL_OFFSET(v) ((uintptr_t)(v) << 2)
 
     switch (v & WT_KEY_FLAG_BITS) {
@@ -2136,7 +2136,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 #define WT_MIN_SPLIT_MULTIPLIER 16 /* At level 2, we see 1/16th entries */
 
     for (count = 0, size = 0, ins = ins_head->head[WT_MIN_SPLIT_DEPTH]; ins != NULL;
-         ins = ins->next[WT_MIN_SPLIT_DEPTH]) {
+      ins = ins->next[WT_MIN_SPLIT_DEPTH]) {
         count += WT_MIN_SPLIT_MULTIPLIER;
         size += WT_MIN_SPLIT_MULTIPLIER * (WT_INSERT_KEY_SIZE(ins) + WT_UPDATE_MEMSIZE(ins->upd));
 
@@ -2522,7 +2522,7 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 #endif
 
     for (depth = 1; depth < WT_SKIP_MAXDEPTH && __wt_random(&session->rnd_skiplist) < probability;
-         depth++)
+      depth++)
         ;
     return (depth);
 }
@@ -2853,7 +2853,7 @@ __wt_ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pinde
             goto found;
         for (start = &pindex->index[0], stop = &pindex->index[entries - 1],
             p = t = &pindex->index[slot];
-             p > start || t < stop;) {
+          p > start || t < stop;) {
             if (p > start && *--p == ref) {
                 slot = (uint32_t)(p - start);
                 goto found;

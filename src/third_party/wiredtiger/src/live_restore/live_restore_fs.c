@@ -892,7 +892,7 @@ __live_restore_compute_read_end_bit(WT_SESSION_IMPL *session, WTI_LIVE_RESTORE_F
     uint64_t max_read_bit = WTI_OFFSET_TO_BIT(largest_possible_read) - 1;
     uint64_t current_bit;
     for (current_bit = first_clear_bit;
-         current_bit < max_read_bit && !__bit_test(lr_fh->bitmap, current_bit + 1); current_bit++)
+      current_bit < max_read_bit && !__bit_test(lr_fh->bitmap, current_bit + 1); current_bit++)
         ;
     *end_bitp = current_bit;
     return (0);

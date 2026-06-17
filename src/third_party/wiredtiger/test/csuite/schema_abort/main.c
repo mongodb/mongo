@@ -85,7 +85,7 @@ static wt_timestamp_t stop_timestamp;            /* stop condition for threads. 
  * We reserve timestamps for each thread for the entire run. The timestamp for the i-th key that a
  * thread writes is given by the macro below.
  */
-#define RESERVED_TIMESTAMP_FOR_ITERATION(threadnum, iter) ((iter)*nth + (threadnum) + 1)
+#define RESERVED_TIMESTAMP_FOR_ITERATION(threadnum, iter) ((iter) * nth + (threadnum) + 1)
 
 typedef struct {
     uint64_t ts;

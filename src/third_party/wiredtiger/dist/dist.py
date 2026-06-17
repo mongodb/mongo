@@ -88,10 +88,7 @@ def compare_srcfile(tmp, src):
 #    Format a source file.
 def format_srcfile(src):
     src = os.path.abspath(src)
-    try:
-        subprocess.check_call(['./s_clang_format', src])
-    except subprocess.CalledProcessError as e:
-        print(e)
+    subprocess.check_call(['./s_clang_format', src])
 
 # ModifyFile --
 #    This manages a file that may be modified, possibly multiple times.

@@ -59,8 +59,8 @@ __checksum_with_seed_hw(uint32_t seed, const void *chunk, size_t len)
     /* Checksum in 8B chunks. */
     for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
         __asm__ __volatile__(".byte 0xF2, 0x48, 0x0F, 0x38, 0xF1, 0xF1"
-                             : "=S"(crc)
-                             : "0"(crc), "c"(*p64));
+          : "=S"(crc)
+          : "0"(crc), "c"(*p64));
         p64++;
     }
 

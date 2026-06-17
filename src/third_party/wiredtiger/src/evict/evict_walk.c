@@ -1301,8 +1301,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, u_int max_en
     pages_seen_clean = pages_seen_dirty = pages_seen_updates = 0;
     root_pages_skipped = 0;
     for (evict_entry = start, pages_already_queued = pages_queued = pages_seen = refs_walked = 0;
-         evict_entry < end && (ret == 0 || ret == WT_NOTFOUND);
-         last_parent = ref == NULL ? NULL : ref->home,
+      evict_entry < end && (ret == 0 || ret == WT_NOTFOUND);
+      last_parent = ref == NULL ? NULL : ref->home,
         ret = __wt_tree_walk_count(session, &ref, &refs_walked, walk_flags)) {
 
         if ((give_up = __evict_should_give_up_walk(

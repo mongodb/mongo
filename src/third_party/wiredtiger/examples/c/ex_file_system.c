@@ -110,7 +110,8 @@ typedef struct demo_file_handle {
  */
 __declspec(dllexport)
 #endif
-  int demo_file_system_create(WT_CONNECTION *, WT_CONFIG_ARG *);
+int
+demo_file_system_create(WT_CONNECTION *, WT_CONFIG_ARG *);
 
 /*
  * Forward function declarations for file system API implementation

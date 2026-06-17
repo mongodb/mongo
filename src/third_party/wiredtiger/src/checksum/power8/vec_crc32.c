@@ -67,8 +67,8 @@ crc32_align(unsigned int crc, const unsigned char *p, unsigned long len)
 }
 #endif
 
-static unsigned int __attribute__((aligned(32)))
-__crc32_vpmsum(unsigned int crc, const void *p, unsigned long len);
+static unsigned int __attribute__((aligned(32))) __crc32_vpmsum(
+  unsigned int crc, const void *p, unsigned long len);
 
 /* -Werror=missing-prototypes */
 unsigned int crc32_vpmsum(unsigned int crc, const unsigned char *p, unsigned long len);

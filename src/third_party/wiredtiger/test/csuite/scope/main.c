@@ -96,7 +96,7 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
             RESERVE,
             UPDATE
         } func;
-    } * op,
+    } *op,
       ops[] = {/*
                 * The ops order is specific: insert has to happen first so
                 * other operations are possible, and remove has to be last.

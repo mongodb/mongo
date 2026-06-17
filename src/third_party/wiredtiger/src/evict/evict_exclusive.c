@@ -47,8 +47,8 @@ __wti_evict_lock_handle_list(WT_SESSION_IMPL *session)
      * quickly.
      */
     for (spins = 0; (ret = __wt_try_readlock(session, dh_lock)) == EBUSY &&
-         __wt_atomic_load_uint32_v_relaxed(&evict->pass_intr) == 0;
-         spins++) {
+      __wt_atomic_load_uint32_v_relaxed(&evict->pass_intr) == 0;
+      spins++) {
         if (spins < WT_THOUSAND)
             __wt_yield();
         else

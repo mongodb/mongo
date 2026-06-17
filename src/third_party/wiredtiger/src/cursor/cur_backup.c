@@ -651,7 +651,7 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
     __wt_config_subinit(session, &targetconf, &cval);
     for (target_list = false; (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
-         target_list = true) {
+      target_list = true) {
         /* If it is our first time through, allocate. */
         if (!target_list) {
             *foundp = true;

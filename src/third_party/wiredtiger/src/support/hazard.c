@@ -197,7 +197,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_REF *ref)
      * Clear the caller's hazard pointer. The common pattern is LIFO, so do a reverse search.
      */
     for (hp = session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse) - 1;
-         hp >= session->hazards.arr; --hp)
+      hp >= session->hazards.arr; --hp)
         if (hp->ref == ref) {
             /*
              * Release write the hazard pointer. We want to ensure that all operations performed on
@@ -241,7 +241,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
      * hazard pointer count, but this is a useful diagnostic.
      */
     for (found = false, hp = session->hazards.arr;
-         hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
+      hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
         if (hp->ref != NULL) {
             found = true;
             break;
@@ -266,7 +266,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
      * would be).
      */
     for (hp = session->hazards.arr;
-         hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
+      hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
         if (hp->ref != NULL) {
             hp->ref = NULL;
             --session->hazards.num_active;
@@ -444,7 +444,7 @@ __hazard_dump(WT_SESSION_IMPL *session)
     WT_HAZARD *hp;
 
     for (hp = session->hazards.arr;
-         hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
+      hp < session->hazards.arr + __wt_atomic_load_uint32_relaxed(&session->hazards.inuse); ++hp)
         if (hp->ref != NULL)
             __wt_errx(session, "session %p: hazard pointer %p: %s, line %d", (void *)session,
               (void *)hp->ref, hp->func, hp->line);

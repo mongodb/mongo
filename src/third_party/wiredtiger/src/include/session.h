@@ -209,7 +209,7 @@ struct __wt_session_impl {
     struct __wt_scratch_track {
         const char *func; /* Allocating function, line */
         int line;
-    } * scratch_track;
+    } *scratch_track;
 #endif
 
     /* Record the important timestamps of each stage in an reconciliation. */
@@ -409,7 +409,7 @@ struct __wt_session_impl {
             void *p; /* Memory, length */
             size_t len;
             uint64_t gen; /* Generation */
-        } * list;
+        } *list;
         size_t cnt;   /* Array entries */
         size_t alloc; /* Allocated bytes */
     } stash[WT_GENERATIONS];

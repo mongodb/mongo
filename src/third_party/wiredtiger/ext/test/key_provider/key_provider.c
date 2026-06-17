@@ -90,7 +90,7 @@ static const WT_CRYPT_KEYS DEFAULT_KEY = {
 /*
  * On non-Windows platforms, convert clock ticks to microseconds.
  */
-#define CLOCK_USECS(ts) ((ts)*USEC_PER_SEC) / CLOCKS_PER_SEC
+#define CLOCK_USECS(ts) ((ts) * USEC_PER_SEC) / CLOCKS_PER_SEC
 #endif /* CLOCK_USECS */
 
 /*

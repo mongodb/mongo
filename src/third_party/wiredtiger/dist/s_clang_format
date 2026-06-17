@@ -6,28 +6,10 @@ setup_trap
 cd_top
 check_fast_mode_flag
 
-venv="$TOP_DIR/.venv"
-
-download_clang_format() {
-    version=$1
-    python3 -m venv "$venv"
-    "$venv/bin/pip" install --quiet --disable-pip-version-check "clang-format==$version"
-}
-
-# Override existing Clang-Format versions in the PATH.
-export PATH="$venv/bin":$PATH
-
-# Check if Clang-Format is already available with the desired version.
-desired_version="12.0.1"
 if ! command -v clang-format &> /dev/null; then
-    download_clang_format $desired_version || exit 1
-elif ! clang-format --version | grep -q $desired_version; then
-    download_clang_format $desired_version || exit 1
+    echo "error: clang-format not found; please install it and ensure it is on PATH"
+    exit 1
 fi
-
-# Users may need to manually approve binaries.
-# If we're not allowed to run Clang-Format, let's exit (should be obvious from the dialog).
-clang-format --version &> /dev/null || exit 1
 
 # Parallel execution: if it's the main invocation of the script, collect the file names
 # to process and run them in subprocesses.
@@ -42,7 +24,6 @@ if is_main_run; then
 fi
 
 # A list of files provided: process them one by one.
-
 # Don't format inplace with -i flag.
 # We want to be able to detect modifications.
 for f in "$@"; do

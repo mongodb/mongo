@@ -783,7 +783,7 @@ __wt_txn_reconfigure(WT_SESSION_IMPL *session, WT_CONF *conf)
 
     if (ret == 0 && cval.len != 0) {
         session->isolation = txn->isolation = WT_CONFIG_LIT_MATCH("snapshot", cval) ?
-                                                          WT_ISO_SNAPSHOT :
+          WT_ISO_SNAPSHOT :
           WT_CONFIG_LIT_MATCH("read-uncommitted", cval) ? WT_ISO_READ_UNCOMMITTED :
                                                           WT_ISO_READ_COMMITTED;
     }
@@ -1206,9 +1206,9 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
           session, btree, txn_time_point->commit_timestamp, upd->prev_durable_ts));
 
     for (first_committed_upd = upd; first_committed_upd != NULL &&
-         (first_committed_upd->txnid == WT_TXN_ABORTED ||
-           first_committed_upd->prepare_state == WT_PREPARE_INPROGRESS);
-         first_committed_upd = first_committed_upd->next)
+      (first_committed_upd->txnid == WT_TXN_ABORTED ||
+        first_committed_upd->prepare_state == WT_PREPARE_INPROGRESS);
+      first_committed_upd = first_committed_upd->next)
         ;
 
     /*

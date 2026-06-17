@@ -127,7 +127,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
             if (stable_upd->type == WT_UPDATE_TOMBSTONE && F_ISSET(stable_upd, WT_UPDATE_HS)) {
                 tombstone = stable_upd;
                 for (stable_upd = stable_upd->next; stable_upd != NULL;
-                     stable_upd = stable_upd->next) {
+                  stable_upd = stable_upd->next) {
                     if (stable_upd->txnid != WT_TXN_ABORTED) {
                         /*
                          * We have seen a tombstone in the history store so the update cannot have a

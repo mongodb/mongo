@@ -75,7 +75,7 @@
 #define WT_CELL_KEY_SHORT 0x01     /* Short key */
 #define WT_CELL_KEY_SHORT_PFX 0x02 /* Short key with prefix byte */
 #define WT_CELL_VALUE_SHORT 0x03   /* Short data */
-#define WT_CELL_SHORT_TYPE(v) ((v)&0x03U)
+#define WT_CELL_SHORT_TYPE(v) ((v) & 0x03U)
 
 #define WT_CELL_SHORT_MAX 63  /* Maximum short key/value */
 #define WT_CELL_SHORT_SHIFT 2 /* Shift for short key/value */
@@ -118,7 +118,7 @@
 #define WT_CELL_VALUE_OVFL_RM (11 << 4)        /* Overflow value (removed) */
 
 #define WT_CELL_TYPE_MASK (0x0fU << 4) /* Maximum 16 cell types */
-#define WT_CELL_TYPE(v) ((v)&WT_CELL_TYPE_MASK)
+#define WT_CELL_TYPE(v) ((v) & WT_CELL_TYPE_MASK)
 
 /*
  * When unable to create a short key or value (and where it wasn't an associated RLE or validity

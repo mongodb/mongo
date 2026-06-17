@@ -1890,7 +1890,7 @@ execute_workload(WTPERF *wtperf)
     }
     /* Start each workload. */
     for (threads = wtperf->workers, i = 0, workp = wtperf->workload; i < wtperf->workload_cnt;
-         ++i, ++workp) {
+      ++i, ++workp) {
         lprintf(wtperf, 0, 1,
           "Starting workload #%u: %" PRId64 " threads, inserts=%" PRId64 ", modifies=%" PRId64
           ", reads=%" PRId64 ", truncate=%" PRId64 ", updates=%" PRId64 ", throttle=%" PRIu64,
@@ -1914,7 +1914,7 @@ execute_workload(WTPERF *wtperf)
 
     wtperf->testsec = 0;
     for (interval = opts->report_interval, run_time = opts->run_time, run_ops = opts->run_ops;
-         !wtperf->error;) {
+      !wtperf->error;) {
         /*
          * Sleep for one second at a time. If we are tracking run time, check to see if we're done,
          * and if we're only tracking run time, go back to sleep.

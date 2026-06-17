@@ -955,7 +955,7 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
     /* Keep bitmap of "active" threads. */
     threadmap = (0x1U << nth) - 1;
     for (ret = cursor->search(cursor); ret != WT_NOTFOUND && threadmap != 0;
-         ret = cursor->next(cursor)) {
+      ret = cursor->next(cursor)) {
         testutil_check(ret);
         testutil_check(cursor->get_key(cursor, &gotkey));
         gotid = (uint64_t)strtol(gotkey, &p, 10);

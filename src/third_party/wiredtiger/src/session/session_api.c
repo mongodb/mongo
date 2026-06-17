@@ -2605,7 +2605,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
 
     /* Find the first inactive session slot. */
     for (session_ret = WT_CONN_SESSIONS_GET(conn), i = 0; i < conn->session_array.size;
-         ++session_ret, ++i)
+      ++session_ret, ++i)
         if (!session_ret->active)
             break;
     if (i == conn->session_array.size) {

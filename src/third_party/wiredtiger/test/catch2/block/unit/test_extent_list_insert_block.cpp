@@ -226,40 +226,39 @@ TEST_CASE("Extent Lists: block_append", "[extent_list]")
     {
         BREAK;
         /* Tests and expected values. */
-        std::vector<off_size_expected> test_list
-        {
-            {off_size(4096, 2048), // First half of First [4,096, 6,143].
-              {
-                off_size(4096, 2048), // First [4,096, 6,143].
-              }},
-              {off_size(4096 + 2048, 2048), // Adjacent: Second half of First [6,144, 8,191].
-                {
-                  off_size(4096, 4096), // First [4,096, 8,191].
-                }},
-              {off_size(3 * 4096, 4096), // Not adjacent: Second [12,288, 16,383].
-                {
-                  off_size(4096, 4096),     // First [4,096, 8,191].
-                  off_size(3 * 4096, 4096), // Second [12,288, 16,383].
-                }},
-              {off_size(5 * 4096, 4096), // Not adjacent: Third [20,480, 24,575].
-                {
-                  off_size(4096, 4096),     // First [4,096, 8,191].
-                  off_size(3 * 4096, 4096), // Second [12,288, 16,383].
-                  off_size(5 * 4096, 4096), // Third [20,480, 24,575].
-                }},
-#if 0   // Tests that are not appends and should crash.
+        std::vector<off_size_expected> test_list{
+          {off_size(4096, 2048), // First half of First [4,096, 6,143].
+            {
+              off_size(4096, 2048), // First [4,096, 6,143].
+            }},
+          {off_size(4096 + 2048, 2048), // Adjacent: Second half of First [6,144, 8,191].
+            {
+              off_size(4096, 4096), // First [4,096, 8,191].
+            }},
+          {off_size(3 * 4096, 4096), // Not adjacent: Second [12,288, 16,383].
+            {
+              off_size(4096, 4096),     // First [4,096, 8,191].
+              off_size(3 * 4096, 4096), // Second [12,288, 16,383].
+            }},
+          {off_size(5 * 4096, 4096), // Not adjacent: Third [20,480, 24,575].
+            {
+              off_size(4096, 4096),     // First [4,096, 8,191].
+              off_size(3 * 4096, 4096), // Second [12,288, 16,383].
+              off_size(5 * 4096, 4096), // Third [20,480, 24,575].
+            }},
+#if 0                                       // Tests that are not appends and should crash.
           {off_size(4 * 4096, 4096), // Below last extent, nonoverlapping
             {
               off_size(4096, 4096),     // First [4,096, 8,191].
               off_size(3 * 4096, 3*4096), // Second' [12,288, 24,575].
             }},
-#elif 0 // Tests that are not appends and should crash.
-              {off_size(5 * 4096 + 1024, 4096), // Overlapping last extent
-                {
-                  off_size(4096, 4096),            // First [4,096, 8,191].
-                  off_size(3 * 4096, 4096),        // Second [12,288, 16,383].
-                  off_size(5 * 4096, 4096 + 1024), // Third' [20,480, 25,559].
-                }},
+#elif 0                                     // Tests that are not appends and should crash.
+          {off_size(5 * 4096 + 1024, 4096), // Overlapping last extent
+            {
+              off_size(4096, 4096),            // First [4,096, 8,191].
+              off_size(3 * 4096, 4096),        // Second [12,288, 16,383].
+              off_size(5 * 4096, 4096 + 1024), // Third' [20,480, 25,559].
+            }},
 #endif
         };
 

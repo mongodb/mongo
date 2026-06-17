@@ -599,14 +599,14 @@ __wt_checksum_with_seed_sw(uint32_t seed, const void *chunk, size_t len)
         p += sizeof(uint32_t);
         crc =
 #ifdef WORDS_BIGENDIAN
-          g_crc_slicing[4][(crc)&0xFF] ^ g_crc_slicing[5][(crc >> 8) & 0xFF] ^
+          g_crc_slicing[4][(crc) & 0xFF] ^ g_crc_slicing[5][(crc >> 8) & 0xFF] ^
           g_crc_slicing[6][(crc >> 16) & 0xFF] ^ g_crc_slicing[7][(crc >> 24)] ^
-          g_crc_slicing[0][(next)&0xFF] ^ g_crc_slicing[1][(next >> 8) & 0xFF] ^
+          g_crc_slicing[0][(next) & 0xFF] ^ g_crc_slicing[1][(next >> 8) & 0xFF] ^
           g_crc_slicing[2][(next >> 16) & 0xFF] ^ g_crc_slicing[3][(next >> 24)];
 #else
-          g_crc_slicing[7][(crc)&0xFF] ^ g_crc_slicing[6][(crc >> 8) & 0xFF] ^
+          g_crc_slicing[7][(crc) & 0xFF] ^ g_crc_slicing[6][(crc >> 8) & 0xFF] ^
           g_crc_slicing[5][(crc >> 16) & 0xFF] ^ g_crc_slicing[4][(crc >> 24)] ^
-          g_crc_slicing[3][(next)&0xFF] ^ g_crc_slicing[2][(next >> 8) & 0xFF] ^
+          g_crc_slicing[3][(next) & 0xFF] ^ g_crc_slicing[2][(next >> 8) & 0xFF] ^
           g_crc_slicing[1][(next >> 16) & 0xFF] ^ g_crc_slicing[0][(next >> 24)];
 #endif
     }

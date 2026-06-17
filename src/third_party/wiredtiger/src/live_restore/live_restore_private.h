@@ -26,7 +26,7 @@
  */
 #define WTI_OFFSET_END(offset, len) (offset + (wt_off_t)len)
 #define WTI_OFFSET_TO_BIT(offset) (uint64_t)((offset) / (wt_off_t)lr_fh->allocsize)
-#define WTI_BIT_TO_OFFSET(bit) (wt_off_t)((bit)*lr_fh->allocsize)
+#define WTI_BIT_TO_OFFSET(bit) (wt_off_t)((bit) * lr_fh->allocsize)
 /*
  * The end of the bitmap is the portion of the file represented by the bitmap. i.e. a file with
  * 2*4096 blocks will have a size of 8192 bytes represented.

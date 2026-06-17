@@ -61,7 +61,7 @@ main(int argc, char *argv[])
         const char *uri;
         const char *desc;
         const char *config;
-    } * cp, configs[] = {{"file:wt", NULL, NULL}, {"table:wt", NULL, NULL}, {NULL, NULL, NULL}};
+    } *cp, configs[] = {{"file:wt", NULL, NULL}, {"table:wt", NULL, NULL}, {NULL, NULL, NULL}};
     u_int nthreads;
     int ch, cnt, runs;
     char *config_open, *working_dir;

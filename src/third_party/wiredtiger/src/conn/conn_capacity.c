@@ -12,7 +12,7 @@
  * Compute the time in nanoseconds that must be reserved to represent a number of bytes in a
  * subsystem with a particular capacity per second.
  */
-#define WT_RESERVATION_NS(bytes, capacity) (((bytes)*WT_BILLION) / (capacity))
+#define WT_RESERVATION_NS(bytes, capacity) (((bytes) * WT_BILLION) / (capacity))
 
 /*
  * The fraction of a second's worth of capacity that will be stolen at a time. The number of bytes

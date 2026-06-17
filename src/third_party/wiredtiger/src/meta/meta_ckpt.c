@@ -811,8 +811,8 @@ __assert_ckptlist_matches(WT_SESSION_IMPL *session, WT_CKPT *saved_list, WT_CKPT
     WT_CKPT *ckpt_new, *ckpt_saved;
 
     for (ckpt_saved = saved_list, ckpt_new = new_list;
-         ckpt_saved != NULL && ckpt_saved->order != 0 && ckpt_new != NULL && ckpt_new->order != 0;
-         ckpt_saved++, ckpt_new++)
+      ckpt_saved != NULL && ckpt_saved->order != 0 && ckpt_new != NULL && ckpt_new->order != 0;
+      ckpt_saved++, ckpt_new++)
         __assert_ckpt_matches(session, ckpt_saved, ckpt_new);
 
     WT_ASSERT(session,

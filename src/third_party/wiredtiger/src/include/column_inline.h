@@ -320,7 +320,7 @@ __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
      * repeat counts of 1.
      */
     for (base = 0, limit = WT_COL_VAR_REPEAT_SET(page) ? page->pg_var_nrepeats : 0; limit != 0;
-         limit >>= 1) {
+      limit >>= 1) {
         indx = base + (limit >> 1);
 
         repeat = page->pg_var_repeats + indx;
