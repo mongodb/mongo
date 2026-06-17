@@ -413,6 +413,8 @@ public:
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
             UpdateOp::validate(request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
 
             invariant(_commandObj.isOwned());
 
@@ -711,6 +713,8 @@ public:
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
             DeleteOp::validate(request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
         }
 
         bool supportsWriteConcern() const final {

@@ -356,8 +356,13 @@ private:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
-        return std::make_unique<Invocation>(
-            this, request, BatchedCommandRequest::parseDelete(request));
+        auto parsedRequest = BatchedCommandRequest::parseDelete(request);
+        // Deletes forward client-supplied runtime constants instead of regenerating them, so only
+        // reject external attempts to set 'userRoles'. Internal redispatch paths are exempt and
+        // may set runtime constants.
+        Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                        parsedRequest.getLegacyRuntimeConstants());
+        return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
     }
 
     std::string help() const override {

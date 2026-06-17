@@ -949,6 +949,8 @@ last-continuous:
     ticket: SERVER-128512
   - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
     ticket: SERVER-111411
+  - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+    ticket: SERVER-128433
   suites: null
 last-lts:
   all:
@@ -1960,4 +1962,6 @@ last-lts:
     ticket: SERVER-128512
   - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
     ticket: SERVER-111411
+  - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+    ticket: SERVER-128433
   suites: null
