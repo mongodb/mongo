@@ -612,9 +612,12 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
  * stream stage, and which apply to the aggregate overall. Returns two objects: the change
  * stream stage specification and the options for the aggregate command, respectively.
  */
-Mongo.prototype._extractChangeStreamOptions = function (options) {
-    options ||= {};
-    assert(options instanceof Object, "'options' argument must be an object");
+Mongo.prototype._extractChangeStreamOptions = function (opts) {
+    opts ||= {};
+    assert(opts instanceof Object, "'options' argument must be an object");
+
+    // Clone the original options so that 'opts' is not modified in place.
+    let options = {...opts};
 
     let changeStreamOptions = {fullDocument: options.fullDocument || "default"};
     delete options.fullDocument;
