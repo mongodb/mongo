@@ -61,15 +61,13 @@ MatchStage::MatchStage(StringData stageName,
           OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !isTextQuery);
+    _trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
+        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
 }
 
 GetNextResult MatchStage::doGetNext() {
-    // Only charge expression evaluation against the memory tracker when both the stage-level and
-    // expression-level memory tracking feature flags are enabled.
-    const bool trackMemory = feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
-        feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled();
     const EvaluationContext evalCtx =
-        trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
+        _trackMemory ? EvaluationContext{.tracker = &_memoryTracker} : EvaluationContext{};
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         if (_matchProcessor->process(nextInput.getDocument(), evalCtx)) {

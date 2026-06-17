@@ -58,6 +58,9 @@ private:
     // Tracks memory used while evaluating the match expression. Reports to the operation-wide
     // tracker so all stages contribute to the operation memory total.
     SimpleMemoryUsageTracker _memoryTracker;
+    // Whether to charge expression evaluation against the memory tracker. Evaluated once at
+    // construction; feature flags must not change during stage execution.
+    bool _trackMemory{false};
 };
 
 }  // namespace agg
