@@ -155,28 +155,56 @@ private:
     REGISTER_EXTENSION_WITH_VERSION(MyExtensionType, (MONGODB_EXTENSION_API_VERSION))
 
 /**
- * Base case macro to define get_mongodb_extension.
+ * Base case macro to define both halves of the two-phase load protocol:
  *
- * setHostServices() is called BEFORE wrapCXXAndConvertExceptionToStatus so that sdk_uassert
- * and sdk_tassert (which rely on HostServices to throw across the C API boundary) are
- * available during version negotiation inside the lambda. setHostServices itself cannot throw.
+ *   - get_mongodb_extension_versions: publishes the registered set of supported API versions.
+ *     This runs BEFORE the host has selected a version, so no HostServices is available and
+ *     exceptions MUST NOT escape across the C boundary. The body is wrapped in a noexcept
+ *     try/catch that swallows any thrown exception, leaving 'len=0' so the host treats it
+ *     as "extension supports no versions" and rejects in negotiation.
+ *
+ *   - get_mongodb_extension: instantiates the extension at the host-selected version.
+ *     HostServices is delivered with this call and is laid out per the chosen version's
+ *     major, so 'setHostServices' is safe before the wrap and sdk_uassert/sdk_tassert
+ *     work normally inside the lambda.
  */
-#define DEFINE_GET_EXTENSION()                                                               \
-    extern "C" {                                                                             \
-    ::MongoExtensionStatus* get_mongodb_extension(                                           \
-        const ::MongoExtensionAPIVersionVector* hostVersions,                                \
-        const ::MongoExtensionHostServices* hostServices,                                    \
-        const ::MongoExtension** extension) {                                                \
-        mongo::extension::sdk::HostServicesAPI::setHostServices(hostServices);               \
-        return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                    \
-            const auto& versionedExtensionContainer =                                        \
-                mongo::extension::sdk::VersionedExtensionContainer::getInstance();           \
-            static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>( \
-                versionedExtensionContainer.getVersionedExtension(                           \
-                    mongo::extension::sdk::to_span(hostVersions)));                          \
-            *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());           \
-        });                                                                                  \
-    }                                                                                        \
+#define DEFINE_GET_EXTENSION()                                                                     \
+    extern "C" {                                                                                   \
+    void get_mongodb_extension_versions(                                                           \
+        ::MongoExtensionAPIVersionVector* extensionVersions) noexcept {                            \
+        extensionVersions->len = 0;                                                                \
+        extensionVersions->versions = nullptr;                                                     \
+        try {                                                                                      \
+            /* The static vector of versions is materialized once, on the first call, from the */  \
+            /* singleton container. This is safe, given that version negotiation happens once  */  \
+            /* during an extension's lifetime, at which point all versions have already been   */  \
+            /* registered. */                                                                      \
+            static const std::vector<::MongoExtensionAPIVersion> kVersions =                       \
+                mongo::extension::sdk::VersionedExtensionContainer::getInstance()                  \
+                    .getVersionsList();                                                            \
+            extensionVersions->len = kVersions.size();                                             \
+            extensionVersions->versions = kVersions.data();                                        \
+        } catch (...) {                                                                            \
+            /* Swallow error. No HostServices available, no error-reporting path. Host will see */ \
+            /* len=0 and reject during negotiation. */                                             \
+            extensionVersions->len = 0;                                                            \
+            extensionVersions->versions = nullptr;                                                 \
+        }                                                                                          \
+    }                                                                                              \
+                                                                                                   \
+    ::MongoExtensionStatus* get_mongodb_extension(                                                 \
+        ::MongoExtensionAPIVersion version,                                                        \
+        const ::MongoExtensionHostServices* hostServices,                                          \
+        const ::MongoExtension** extension) {                                                      \
+        mongo::extension::sdk::HostServicesAPI::setHostServices(hostServices);                     \
+        return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                          \
+            const auto& container =                                                                \
+                mongo::extension::sdk::VersionedExtensionContainer::getInstance();                 \
+            static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>(       \
+                container.getVersionedExtension(version));                                         \
+            *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());                 \
+        });                                                                                        \
+    }                                                                                              \
     }
 
 }  // namespace mongo::extension::sdk

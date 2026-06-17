@@ -106,5 +106,30 @@ TEST_F(VersionedExtensionGreaterComparatorTest, OrderedSetBlocksDoubleInsert) {
     ASSERT_FALSE(versionedSet.insert(makeTestVersionedExtension(1, 2)).second);
 }
 
+TEST(VersionedExtensionContainerTest, BuildVersionsListEmptyByDefault) {
+    VersionedExtensionContainer container;
+    ASSERT_TRUE(container.getVersionsList().empty());
+}
+
+TEST(VersionedExtensionContainerTest, BuildVersionsListReturnsRegisteredVersionsDescending) {
+    VersionedExtensionContainer container;
+    container.registerVersion(::MongoExtensionAPIVersion{1, 10}, []() { return nullptr; });
+    container.registerVersion(::MongoExtensionAPIVersion{2, 0}, []() { return nullptr; });
+    container.registerVersion(::MongoExtensionAPIVersion{0, 9}, []() { return nullptr; });
+    container.registerVersion(::MongoExtensionAPIVersion{1, 9}, []() { return nullptr; });
+
+    const std::vector<::MongoExtensionAPIVersion> expected = {::MongoExtensionAPIVersion{2, 0},
+                                                              ::MongoExtensionAPIVersion{1, 10},
+                                                              ::MongoExtensionAPIVersion{1, 9},
+                                                              ::MongoExtensionAPIVersion{0, 9}};
+
+    const auto versions = container.getVersionsList();
+    ASSERT_EQUALS(versions.size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+        ASSERT_EQUALS(versions[i].major, expected[i].major);
+        ASSERT_EQUALS(versions[i].minor, expected[i].minor);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::extension::sdk

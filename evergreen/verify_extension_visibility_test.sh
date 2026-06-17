@@ -2,7 +2,11 @@
 #
 # Purpose: Enforce strict “safe-to-dlopen” rules for a MongoDB extension .so by inspecting:
 #     1) Exported symbols (nm)
-#        - The extension must export ONLY the C API entry point get_mongodb_extension
+#        - The extension must export ONLY the C API load-protocol entry points:
+#            * get_mongodb_extension          (phase 2: instantiate at host-chosen version)
+#            * get_mongodb_extension_versions (phase 1: publish supported versions)
+#          The phase 1 symbol is optional to accommodate older extensions that predate
+#          the two-step load protocol; phase 2 (get_mongodb_extension) is always required.
 #     2) Dynamic dependencies (ldd)
 #        - Enumerate the extension’s runtime shared-library dependencies
 #        - Compare against the server’s runtime dependencies to detect major-version conflicts (per MongoDB version)
@@ -38,12 +42,14 @@ EXT_SO="${2:-}"
 
 # ------------------------------------------------------------------------------
 # 1) Exported symbol surface check (nm)
-#    Rule: extension exports ONLY get_mongodb_extension.
+#    Rule: extension exports ONLY the two documented load-protocol entry points:
+#      - get_mongodb_extension          (phase 2: instantiate at host-chosen version)
+#      - get_mongodb_extension_versions (phase 1: publish supported versions)
 #
 # We inspect the dynamic symbol table (-D) and consider only symbols that are defined by the extension (--defined-only).
 # Undefined symbols ('U' / 'w') are references and do not count as exports.
 # ------------------------------------------------------------------------------
-info "1) Checking extension exports only get_mongodb_extension"
+info "1) Checking extension exports only the load-protocol entry point(s)"
 
 ext_defined_exports="$(
     nm -D --defined-only "$EXT_SO" |
@@ -52,16 +58,22 @@ ext_defined_exports="$(
         sort -u
 )"
 
-# Strict expected set.
-expected_exports=$'get_mongodb_extension'
+# Accept either of two valid export sets (sorted, matching the `sort -u` output above):
+#   - get_mongodb_extension                                    (older single-phase extensions)
+#   - get_mongodb_extension + get_mongodb_extension_versions   (current two-step load protocol)
+# In both cases get_mongodb_extension (phase 2) is required, and no other symbols may be exported.
+expected_exports_phase2_only=$'get_mongodb_extension'
+expected_exports_both=$'get_mongodb_extension\nget_mongodb_extension_versions'
 
-if [[ "$ext_defined_exports" != "$expected_exports" ]]; then
-    echo "Expected exported defined dynsym set:"
-    echo "$expected_exports"
+if [[ "$ext_defined_exports" != "$expected_exports_phase2_only" &&
+    "$ext_defined_exports" != "$expected_exports_both" ]]; then
+    echo "Expected exported defined dynsym set to be one of:"
+    echo "  [$expected_exports_phase2_only]"
+    echo "  [${expected_exports_both//$'\n'/, }]"
     echo
     echo "Actual exported defined dynsym set:"
     echo "$ext_defined_exports"
-    die "Extension exports unexpected symbols. Enforce -fvisibility=hidden and export only get_mongodb_extension."
+    die "Extension exports unexpected symbols. Enforce -fvisibility=hidden and export only get_mongodb_extension (and optionally get_mongodb_extension_versions)."
 fi
 
 info "Export surface check passed."

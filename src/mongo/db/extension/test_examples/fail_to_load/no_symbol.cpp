@@ -37,5 +37,5 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {}
 };
 
-// No definition of get_mongodb_extension() here, which is intentional to simulate a malformed
-// extension missing the export of the get_mongodb_extension symbol.
+// No definition of either get_mongodb_extension_versions or get_mongodb_extension), which is
+// intentional to simulate a malformed extension missing the entire load protocol.

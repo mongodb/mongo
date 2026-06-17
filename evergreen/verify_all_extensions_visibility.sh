@@ -3,9 +3,11 @@
 # Verify all test extension .so files are compiled and linked correctly.
 #
 # Discovers mongod and all extension .so files, then runs verify_extension_visibility_test.sh on
-# each one. Note that libno_symbol_bad_extension.so intentionally does not pass the verifier because
-# it lacks get_mongodb_extension. We instead run a dedicated negative test to confirm the verifier
-# catches it.
+# each one. Note that the following extensions intentionally do not pass the verifier because they
+# omit one or both of the required load-protocol symbols:
+#   - libno_symbol_bad_extension.so: lacks both phase 1 and phase 2 symbols.
+#   - libno_get_extension_symbol_bad_extension.so: lacks the phase 2 symbol.
+# We run dedicated negative tests on each to confirm the verifier catches them.
 #
 
 set -euo pipefail
@@ -79,9 +81,12 @@ EXT_DIR="$(find_ext_dir)"
 info "mongod:        $MONGOD"
 info "extension dir: $EXT_DIR"
 
-# Collect all extension .so files except libno_symbol_bad_extension.so.
+# Collect all extension .so files except those expected to fail visibility (handled below as
+# dedicated negative tests).
 mapfile -t so_files < <(
-    find "$EXT_DIR" -maxdepth 1 -name '*_extension*.so' ! -name '*no_symbol_bad_extension*' | sort
+    find "$EXT_DIR" -maxdepth 1 -name '*_extension*.so' \
+        ! -name '*no_symbol_bad_extension*' \
+        ! -name '*no_get_extension_symbol_bad_extension*' | sort
 )
 
 if [[ ${#so_files[@]} -eq 0 ]]; then
@@ -121,7 +126,7 @@ for so in "${so_files[@]}"; do
     fi
 done
 
-# Confirm that libno_symbol_bad_extension.so fails verification.
+# Confirm that the bad-by-design extensions fail verification.
 no_symbol_so="$EXT_DIR/libno_symbol_bad_extension.so"
 if [[ -f "$no_symbol_so" ]]; then
     info "Negative test: libno_symbol_bad_extension.so should fail verification"
@@ -130,6 +135,16 @@ if [[ -f "$no_symbol_so" ]]; then
     fi
 else
     info "libno_symbol_bad_extension.so not found in $EXT_DIR."
+fi
+
+no_get_extension_symbol_so="$EXT_DIR/libno_get_extension_symbol_bad_extension.so"
+if [[ -f "$no_get_extension_symbol_so" ]]; then
+    info "Negative test: libno_get_extension_symbol_bad_extension.so should fail verification"
+    if "$VERIFIER" "$MONGOD" "$no_get_extension_symbol_so" &>/dev/null; then
+        failures+=("libno_get_extension_symbol_bad_extension.so (expected failure but passed)")
+    fi
+else
+    info "libno_get_extension_symbol_bad_extension.so not found in $EXT_DIR."
 fi
 
 echo

@@ -42,8 +42,17 @@ static const ::MongoExtension my_extension = {
     .version = MONGODB_EXTENSION_API_VERSION,
 };
 
+namespace {
+static ::MongoExtensionAPIVersion kSupportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
+}  // namespace
+
 extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
+void get_mongodb_extension_versions(::MongoExtensionAPIVersionVector* extensionVersions) noexcept {
+    extensionVersions->len = sizeof(kSupportedVersions) / sizeof(kSupportedVersions[0]);
+    extensionVersions->versions = kSupportedVersions;
+}
+
+::MongoExtensionStatus* get_mongodb_extension(::MongoExtensionAPIVersion version,
                                               const ::MongoExtensionHostServices* hostServices,
                                               const ::MongoExtension** extension) {
     return mongo::extension::wrapCXXAndConvertExceptionToStatus(

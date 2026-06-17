@@ -39,16 +39,7 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {}
 };
 
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtensionHostServices* hostServices,
-                                              const ::MongoExtension** extension) {
-    return mongo::extension::wrapCXXAndConvertExceptionToStatus([&]() {
-        static auto ext = std::make_unique<sdk::ExtensionAdapter>(
-            std::make_unique<MyExtension>(),
-            // Major version is max uint32_t, which is incompatible with the current version
-            ::MongoExtensionAPIVersion{UINT32_MAX, 0});
-        *extension = reinterpret_cast<const ::MongoExtension*>(ext.get());
-    });
-}
-}
+// Major version is max uint32_t, incompatible with any plausible host major. Host-side negotiation
+// rejects in phase 1, so this adapter is never instantiated in the current host order.
+REGISTER_EXTENSION_WITH_VERSION(MyExtension, (::MongoExtensionAPIVersion{UINT32_MAX, 0}))
+DEFINE_GET_EXTENSION()

@@ -10,7 +10,6 @@ mongo_cc_library(
     name = "sdk_cpp",
     srcs = [
         "aggregation_stage.cpp",
-        "extension_helper.cpp",
         "host_services.cpp",
         "logger.cpp",
         "query_execution_context_handle.cpp",

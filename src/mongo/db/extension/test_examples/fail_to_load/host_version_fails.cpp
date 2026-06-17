@@ -28,10 +28,7 @@
  */
 
 
-#include "mongo/db/extension/sdk/api_version_vector_to_span.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
-#include "mongo/db/extension/sdk/extension_helper.h"
-#include "mongo/db/extension/shared/extension_status.h"
 
 namespace sdk = mongo::extension::sdk;
 
@@ -49,30 +46,15 @@ public:
     }
 };
 
-extern "C" {
-::MongoExtensionStatus* get_mongodb_extension(const ::MongoExtensionAPIVersionVector* hostVersions,
-                                              const ::MongoExtensionHostServices* hostServices,
-                                              const ::MongoExtension** extension) {
-    // We expect to fail to initialize extension. extensionA's major version is higher than
-    // host's and extensionB's minor version is higher than host's.
-    return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {
-        const ::MongoExtensionAPIVersion verA{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
-                                              MONGODB_EXTENSION_API_MINOR_VERSION};
-
-        const ::MongoExtensionAPIVersion verB{MONGODB_EXTENSION_API_MAJOR_VERSION,
-                                              MONGODB_EXTENSION_API_MINOR_VERSION + 1};
-
-        if (sdk::isVersionCompatible(sdk::to_span(hostVersions), &verA)) {
-            static auto extA =
-                std::make_unique<sdk::ExtensionAdapter>(std::make_unique<ExtensionA>(), verA);
-            *extension = reinterpret_cast<const ::MongoExtension*>(extA.get());
-        } else if (sdk::isVersionCompatible(sdk::to_span(hostVersions), &verB)) {
-            static auto extB =
-                std::make_unique<sdk::ExtensionAdapter>(std::make_unique<ExtensionB>(), verB);
-            *extension = reinterpret_cast<const ::MongoExtension*>(extB.get());
-        } else {
-            *extension = nullptr;
-        }
-    });
-}
-}
+// ExtensionA's major is higher than any host major; ExtensionB matches a host major but its minor
+// exceeds the host's supported minor for that major. Host-side negotiation rejects both in phase 1
+// and fires 10615505 (matching major, no compatible minor), so neither adapter is ever
+// instantiated in the current host order.
+REGISTER_EXTENSION_WITH_VERSION(ExtensionA,
+                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION + 1,
+                                                            MONGODB_EXTENSION_API_MINOR_VERSION}))
+REGISTER_EXTENSION_WITH_VERSION(ExtensionB,
+                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_MAJOR_VERSION,
+                                                            MONGODB_EXTENSION_API_MINOR_VERSION +
+                                                                1}))
+DEFINE_GET_EXTENSION()

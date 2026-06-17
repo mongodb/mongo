@@ -28,22 +28,19 @@
  */
 
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/sdk/extension_factory.h"
 
-namespace sdk = mongo::extension::sdk;
+// This extension intentionally defines only the get_mongodb_extension_versions and omits the
+// get_mongodb_extension to simulate a malformed extension missing the part of the load protocol.
 
-class MyExtension : public sdk::Extension {
-public:
-    void initialize(const sdk::HostPortalHandle& portal) override {
-        // Intentionally left blank.
-    }
-};
+namespace {
+static ::MongoExtensionAPIVersion kSupportedVersions[] = {MONGODB_EXTENSION_API_VERSION};
+}  // namespace
 
-// This test confirms the error code thrown by the macro when no valid version is found in the
-// versionedExtensions set. This is compared to the "major/minor_version_too_high/low" tests as
-// those don't use the macro and instead confirm the error code thrown by
-// assertVersionCompatibility.
-REGISTER_EXTENSION_WITH_VERSION(MyExtension,
-                                (::MongoExtensionAPIVersion{MONGODB_EXTENSION_API_VERSION.major + 1,
-                                                            0}))
-DEFINE_GET_EXTENSION()
+extern "C" {
+__attribute__((visibility("default"))) void get_mongodb_extension_versions(
+    ::MongoExtensionAPIVersionVector* extensionVersions) noexcept {
+    extensionVersions->len = sizeof(kSupportedVersions) / sizeof(kSupportedVersions[0]);
+    extensionVersions->versions = kSupportedVersions;
+}
+// No definition of get_mongodb_extension — intentional.
+}

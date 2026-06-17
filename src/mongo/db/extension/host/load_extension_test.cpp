@@ -141,12 +141,20 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
         AssertionException,
         11528800);
 
-    // no_symbol_bad_extension is missing the get_mongodb_extension symbol definition.
+    // no_symbol_bad_extension does not define get_mongodb_extension_versions.
     ASSERT_THROWS_CODE(
         ExtensionLoader::load("no_symbol_bad_extension",
                               test_util::makeEmptyExtensionConfig("libno_symbol_bad_extension.so")),
         AssertionException,
         10615501);
+
+    // no_get_extension_symbol_bad_extension defines get_mongodb_extension_versions but does not
+    // define get_mongodb_extension.
+    ASSERT_THROWS_CODE(ExtensionLoader::load("no_get_extension_symbol_bad_extension",
+                                             test_util::makeEmptyExtensionConfig(
+                                                 "libno_get_extension_symbol_bad_extension.so")),
+                       AssertionException,
+                       12688600);
 
     // null_mongo_extension_bad_extension returns null from get_mongodb_extension.
     ASSERT_THROWS_CODE(ExtensionLoader::load("null_mongo_extension_bad_extension",
@@ -198,14 +206,6 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
                                                  "libduplicate_version_bad_extension.so")),
                        AssertionException,
                        10930201);
-
-    // no_compatible_version_bad_extension registers a version incompatible with the host,
-    // which triggers sdk_uasserted during get_mongodb_extension's version negotiation.
-    ASSERT_THROWS_CODE(ExtensionLoader::load("no_compatible_version_bad_extension",
-                                             test_util::makeEmptyExtensionConfig(
-                                                 "libno_compatible_version_bad_extension.so")),
-                       AssertionException,
-                       10930202);
 }
 
 // null_initialize_function_bad_extension has a null initialization function.
@@ -351,11 +351,13 @@ TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterSucceeds) {
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionHostVersionParameterFails) {
+    // Extension publishes two versions: one with an incompatible major, one whose minor exceeds
+    // the host's max for the matching major.
     ASSERT_THROWS_CODE(ExtensionLoader::load("host_version_fails_bad_extension",
                                              test_util::makeEmptyExtensionConfig(
                                                  "libhost_version_fails_bad_extension.so")),
                        AssertionException,
-                       10615503);
+                       10615505);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionInitializeVersionFails) {
@@ -565,6 +567,136 @@ DEATH_TEST_REGEX_F(ExtensionErrorsTestDeathTest, ExtensionTasserts, "98765.*anot
                                         << "tassert"))};
     [[maybe_unused]] auto parsedPipeline =
         pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
+}
+
+// -----------------------------------------------------------------------------
+// selectCompatibleVersion tests.
+//
+// These exercise the host-side negotiation function in isolation, without going through the full
+// extension-loading machinery.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+::MongoExtensionAPIVersionVector makeVec(const std::vector<::MongoExtensionAPIVersion>& storage) {
+    return {.len = storage.size(), .versions = storage.data()};
+}
+
+}  // namespace
+
+TEST(SelectCompatibleVersionTest, NullExtensionVersionsListFiresAssertion) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    auto hostVec = makeVec(host);
+    ::MongoExtensionAPIVersionVector extVec{.len = 0, .versions = nullptr};
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 12688601);
+}
+
+TEST(SelectCompatibleVersionTest, EmptyExtensionVersionsListFiresAssertion) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    auto hostVec = makeVec(host);
+    // A non-null buffer with len == 0 must still be rejected by the length guard, distinct from the
+    // null-pointer guard above.
+    const std::vector<::MongoExtensionAPIVersion> storage = {{1, 0}};
+    ::MongoExtensionAPIVersionVector extVec{.len = 0, .versions = storage.data()};
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 12688602);
+}
+
+TEST(SelectCompatibleVersionTest, ExactMatchReturned) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 5}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(hostVec, extVec);
+    ASSERT_EQ(chosen.major, 1u);
+    ASSERT_EQ(chosen.minor, 5u);
+}
+
+TEST(SelectCompatibleVersionTest, HostMinorAheadReturnsExtensionVersion) {
+    // Host supports up to {1, 5}; extension only knows {1, 3}. Forward-compat path: extension's
+    // version is what gets returned (the lower bound).
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 3}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(hostVec, extVec);
+    ASSERT_EQ(chosen.major, 1u);
+    ASSERT_EQ(chosen.minor, 3u);
+}
+
+TEST(SelectCompatibleVersionTest, ExtensionMajorTooHighFiresNoMatchingMajor) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{2, 0}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 10615504);
+}
+
+TEST(SelectCompatibleVersionTest, ExtensionMajorTooLowFiresNoMatchingMajor) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{2, 0}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 0}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 10615504);
+}
+
+TEST(SelectCompatibleVersionTest, ExtensionMinorAheadFiresIncompatibleMinor) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 3}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 5}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 10615505);
+}
+
+TEST(SelectCompatibleVersionTest, MultipleVersionsPicksTheCompatibleOne) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    // First entry incompatible (wrong major), second compatible.
+    const std::vector<::MongoExtensionAPIVersion> ext = {{2, 0}, {1, 3}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(hostVec, extVec);
+    ASSERT_EQ(chosen.major, 1u);
+    ASSERT_EQ(chosen.minor, 3u);
+}
+
+TEST(SelectCompatibleVersionTest, PicksHighestCompatibleEvenWhenInputIsAscending) {
+    // Verify the sort actually does work: feed in ascending order, expect highest returned.
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 0}, {1, 2}, {1, 4}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(hostVec, extVec);
+    ASSERT_EQ(chosen.major, 1u);
+    ASSERT_EQ(chosen.minor, 4u);
+}
+
+TEST(SelectCompatibleVersionTest, AllMatchingMajorsButMinorsTooHighFiresIncompatibleMinor) {
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 3}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 5}, {1, 7}, {1, 4}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 10615505);
+}
+
+TEST(SelectCompatibleVersionTest, MixedNoMatchAndMinorTooHighFiresIncompatibleMinor) {
+    // Even with a non-matching major in the mix, the matching-major-but-minor-too-high case wins
+    // the diagnostic because at least one major did match.
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 3}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{2, 0}, {1, 5}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    ASSERT_THROWS_CODE(selectCompatibleVersion(hostVec, extVec), AssertionException, 10615505);
+}
+
+TEST(SelectCompatibleVersionTest, MultipleHostMajorsPicksHighestCompatible) {
+    // Forward-looking: when the host advertises two majors simultaneously, the extension's
+    // highest-major-compatible version should win.
+    const std::vector<::MongoExtensionAPIVersion> host = {{1, 5}, {2, 3}};
+    const std::vector<::MongoExtensionAPIVersion> ext = {{1, 2}, {2, 1}};
+    auto hostVec = makeVec(host);
+    auto extVec = makeVec(ext);
+    auto chosen = selectCompatibleVersion(hostVec, extVec);
+    ASSERT_EQ(chosen.major, 2u);
+    ASSERT_EQ(chosen.minor, 1u);
 }
 
 }  // namespace mongo::extension::host

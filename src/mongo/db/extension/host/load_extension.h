@@ -64,6 +64,22 @@ static const ::MongoExtensionAPIVersionVector MONGO_EXTENSION_API_VERSIONS_SUPPO
 
 
 /**
+ * Return the compatible extension API version given the vector of supported host API versions.
+ * Returns the chosen version on success and uasserts on incompatibility.
+ *
+ * Selection policy: among the extension's published versions, pick the highest (major, minor)
+ * that is compatible with at least one host version. A version V is compatible with host version
+ * H iff V.major == H.major && H.minor >= V.minor. The chosen version's minor is the extension's
+ * minor (the lower bound between the two sides) which the host must respect when dispatching
+ * vtable slots later.
+ *
+ * Exposed for unit testing; production callers go through ExtensionLoader::load.
+ */
+::MongoExtensionAPIVersion selectCompatibleVersion(
+    const ::MongoExtensionAPIVersionVector& hostVersions,
+    const ::MongoExtensionAPIVersionVector& extensionVersions);
+
+/**
  * Load all extensions in the provided array. Returns true if loading is successful, otherwise
  * false.
  */

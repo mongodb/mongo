@@ -75,13 +75,13 @@ typedef struct {
 /**
  * A generic struct for a vector of Extensions API versions.
  *
- * Used for version compatibility checking, where it contains all supported extensions API versions
- * by the host. For example, if 'versions' contains {v1.3.2, v2.4.3}, then the host will support any
- * extension written for versions in the ranges [v1.0.0, v1.3.2] and [v2.0.0, v2.4.3].
+ * Used for version compatibility checking. The data pointed to by 'versions' is read-only from
+ * the receiver's perspective; the producer (host or extension, depending on direction) is
+ * responsible for keeping the array alive for the lifetime of the struct's use.
  */
 typedef struct {
     uint64_t len;
-    MongoExtensionAPIVersion* versions;
+    const MongoExtensionAPIVersion* versions;
 } MongoExtensionAPIVersionVector;
 
 /**
@@ -1582,19 +1582,49 @@ typedef struct MongoExtensionVTable {
 } MongoExtensionVTable;
 
 /**
- * The symbol that must be defined in all extension shared libraries to register the extension with
- * the MongoDB server when the extension is loaded. Returns a MongoExtensionStatus indicating
- * whether or not the parameter MongoExtension was successfully initialized. Also takes a struct
- * representing the API version requirements to comply with the host, and a pointer to HostServices
- * so that the extension can use host assertion functions during loading. The HostServices pointer
- * is valid for the lifetime of the extension and may be saved by the extension for later use.
+ * Extension loading is a two-step process driven by the host across two symbols that the
+ * extension shared library must export:
  *
- * NOTE: You must define this symbol in your extension shared library and avoid name mangling (for
- * example, with 'extern "C"') so that the MongoDB server can find it at loadtime.
+ *   1. get_mongodb_extension_versions: the host asks the extension to specify all the versions
+ *      of the Extensions API the extension implements.
+ *
+ *   2. get_mongodb_extension: the host deliberates on whether any of those published versions
+ *      are compatible with its own supported set. If a compatible version is found, the host
+ *      explicitly requests that version by invoking this function with the chosen version. During
+ * this step, the host provides the HostServices corresponding to the requested API version.
+ *
+ * NOTE: You must define both symbols in your extension shared library and avoid name mangling
+ * (for example, with 'extern "C"') so that the MongoDB server can find them at loadtime.
+ */
+
+/**
+ * Phase 1 : the host asks the extension for the versions of the API it implements. The host
+ * provides a MongoExtensionAPIVersionVector struct which the extension is responsible for filling
+ * with its supported API versions. Any errors during the execution of this function should result
+ * in the extensionVersions array being left empty.
+ *
+ * This call MUST NOT allow exceptions to escape across the C API boundary. No HostServices have
+ * been delivered to the extension at this point, so host-routed assertion mechanisms are not
+ * available and must not be used. Extension implementations must be noexcept in practice: if a
+ * thrown exception escapes this function, behavior is undefined and the host has no way to recover.
+ */
+#define GET_MONGODB_EXTENSION_VERSIONS_SYMBOL "get_mongodb_extension_versions"
+typedef void (*get_mongodb_extension_versions_t)(MongoExtensionAPIVersionVector* extensionVersions);
+
+/**
+ * Phase 2: The host requests the specific version. The version must be one of the versions which
+ * the extension advertised as supported in a previous call to get_mongodb_extension_versions.
+ * Calling this function with a version which was not previously advertised by the extension is
+ * considered undefined behaviour. The provided MongoExtensionHostServices is guaranteed to be
+ * compatible with the requested version. The HostServices pointer remains valid for the lifetime of
+ * the extension and may be saved by the extension for later use.
+ *
+ * Returns a MongoExtensionStatus indicating whether the parameter MongoExtension was successfully
+ * initialized.
  */
 #define GET_MONGODB_EXTENSION_SYMBOL "get_mongodb_extension"
 typedef MongoExtensionStatus* (*get_mongo_extension_t)(
-    const MongoExtensionAPIVersionVector* hostVersions,
+    MongoExtensionAPIVersion version,
     const MongoExtensionHostServices* hostServices,
     const MongoExtension** extension);
 
