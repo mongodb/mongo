@@ -58,6 +58,7 @@ namespace {
 struct ClusterAggregateCommandD {
     using Request = AggregateCommandRequest;
     static constexpr StringData kCommandName = "clusterAggregate"_sd;
+    static constexpr bool kAlwaysUsingMongos = false;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;

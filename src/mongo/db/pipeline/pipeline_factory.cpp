@@ -49,10 +49,16 @@ namespace {
 
 LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           const std::vector<BSONObj>& rawPipeline) {
-    return LiteParsedPipeline(expCtx->getNamespaceString(),
-                              rawPipeline,
-                              false,
-                              LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
+    return LiteParsedPipeline(
+        expCtx->getNamespaceString(),
+        rawPipeline,
+        false,
+        // TODO SERVER-129127 These options should be passed via a ParseContext struct rather than
+        // through LiteParserOptions.
+        LiteParserOptions{.allowGenericForeignDbLookup = expCtx->getAllowGenericForeignDbLookup(),
+                          .ifrContext = expCtx->getIfrContext(),
+                          .usingMongos = expCtx->getInRouter() || expCtx->getFromRouter(),
+                          .isParsingViewDefinition = expCtx->getIsParsingViewDefinition()});
 }
 
 void addViewInvolvedNamespaces(const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,

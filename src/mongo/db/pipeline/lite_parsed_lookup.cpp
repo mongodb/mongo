@@ -67,7 +67,10 @@ LiteParsedLookUp::LiteParsedLookUp(const BSONElement& spec,
                                    bool isHybridSearch,
                                    boost::optional<int64_t> internalFieldMatchPipelineIdx,
                                    bool internalFromIsAView,
-                                   bool noUserPipeline)
+                                   bool noUserPipeline,
+                                   bool allowGenericForeignDbLookup,
+                                   bool usingMongos,
+                                   bool isParsingViewDefinition)
     : LiteParsedDocumentSourceNestedPipelines(spec, std::move(foreignNss), std::move(pipeline)),
       _rawPipeline(std::move(rawPipeline)),
       _as(std::move(as)),
@@ -77,6 +80,9 @@ LiteParsedLookUp::LiteParsedLookUp(const BSONElement& spec,
       _unwindSpec(std::move(unwindSpec)),
       _hasForeignDB(hasForeignDB),
       _isHybridSearch(isHybridSearch),
+      _allowGenericForeignDbLookup(allowGenericForeignDbLookup),
+      _usingMongos(usingMongos),
+      _isParsingViewDefinition(isParsingViewDefinition),
       _internalFieldMatchPipelineIdx(internalFieldMatchPipelineIdx),
       _internalFromIsAView(internalFromIsAView),
       _noUserPipeline(noUserPipeline) {}
@@ -96,8 +102,11 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
     bool hasForeignDB = false;
     if (lookupSpec.getFrom().has_value()) {
         auto fromElem = lookupSpec.getFrom().value().getElement();
-        fromNss = parseLookupFromAndResolveNamespace(
-            fromElem, nss.dbName(), options.allowGenericForeignDbLookup);
+        fromNss = parseLookupFromAndResolveNamespace(fromElem,
+                                                     nss.dbName(),
+                                                     options.allowGenericForeignDbLookup,
+                                                     options.usingMongos,
+                                                     options.isParsingViewDefinition);
         if (fromElem.type() == BSONType::object) {
             auto specAsNs = NamespaceSpec::parse(fromElem.embeddedObject(),
                                                  IDLParserContext{fromElem.fieldNameStringData()});
@@ -173,7 +182,10 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
                                               isHybridSearch,
                                               internalFieldMatchPipelineIdx,
                                               internalFromIsAView,
-                                              noUserPipeline);
+                                              noUserPipeline,
+                                              options.allowGenericForeignDbLookup,
+                                              options.usingMongos,
+                                              options.isParsingViewDefinition);
 }
 
 PrivilegeVector LiteParsedLookUp::requiredPrivileges(bool isMongos,
@@ -246,6 +258,16 @@ std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
 }
 
 void LiteParsedLookUp::validate() const {
+    if (_hasForeignDB) {
+        // Enforce the cross-db $lookup restriction using the routing/view-definition context
+        // stored from parse time. This mirrors the check on the legacy createFromBson path via
+        // expCtx and ensures validation fires before the stage is constructed from stage params.
+        parseLookupFromAndResolveNamespace(getOriginalBson().Obj().getField("from"),
+                                           _foreignNss->dbName(),
+                                           _allowGenericForeignDbLookup,
+                                           _usingMongos,
+                                           _isParsingViewDefinition);
+    }
     if (_pipelines.empty()) {
         return;
     }

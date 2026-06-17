@@ -146,7 +146,10 @@ public:
                      bool isHybridSearch,
                      boost::optional<int64_t> internalFieldMatchPipelineIdx = boost::none,
                      bool internalFromIsAView = false,
-                     bool noUserPipeline = false);
+                     bool noUserPipeline = false,
+                     bool allowGenericForeignDbLookup = false,
+                     bool usingMongos = false,
+                     bool isParsingViewDefinition = false);
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const final;
@@ -184,6 +187,13 @@ private:
     boost::optional<BSONObj> _unwindSpec;
     bool _hasForeignDB;
     bool _isHybridSearch;
+
+    // TODO SERVER-129127 The fields in this code block can be removed when they live on a
+    // ParseContext and are passed at parse/validation time to the LiteParsedLookup.
+    bool _allowGenericForeignDbLookup;
+    bool _usingMongos;
+    bool _isParsingViewDefinition;
+
     // Parsed from $_internalFieldMatchPipelineIdx at construction so getStageParams() can forward
     // it.
     boost::optional<int64_t> _internalFieldMatchPipelineIdx;

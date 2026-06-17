@@ -463,19 +463,6 @@ void DocumentSourceLookUp::relocateFieldMatchPlaceholder(
 
 DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
     LookUpStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (params.hasForeignDB) {
-        // TODO SERVER-125518 Remove this validation when we can bind to an involved namespace in
-        // LiteParsedLookup. It should be moved to the validate() override.
-        // Re-run the resolver now that expCtx is available. It encodes the
-        // allow-list for cross-db $lookup (config.collections, config.chunks, oplog,
-        // cache.chunks.*) and the mongos/view gating, matching the legacy createFromBson path.
-        parseLookupFromAndResolveNamespace(params.getOriginalBson().Obj().getField("from"),
-                                           expCtx->getNamespaceString().dbName(),
-                                           expCtx->getAllowGenericForeignDbLookup(),
-                                           expCtx->getInRouter() || expCtx->getFromRouter(),
-                                           expCtx->getIsParsingViewDefinition());
-    }
-
     // TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
     // search stage.
     if (params.isHybridSearch || hybrid_scoring_util::isHybridSearchPipeline(params.pipeline)) {

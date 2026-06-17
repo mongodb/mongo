@@ -149,5 +149,52 @@ TEST_F(LiteParsedLookUpTest, RequiredPrivilegesIncludesForeignFind) {
     ASSERT_EQ(privs.size(), 1u);
 }
 
+TEST_F(LiteParsedLookUpTest, ValidatePassesForSameDatabaseLookup) {
+    auto lp = parse(R"({$lookup: {from: "foreign", as: "a", pipeline: [{$match: {x: 1}}]}})");
+    ASSERT_DOES_NOT_THROW(lp->validate());
+}
+
+TEST_F(LiteParsedLookUpTest, ParseRejectsCrossDbWhenUsingMongos) {
+    LiteParserOptions opts;
+    opts.usingMongos = true;
+    ASSERT_THROWS_CODE(
+        parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+TEST_F(LiteParsedLookUpTest, ParseRejectsCrossDbWhenParsingViewDefinition) {
+    LiteParserOptions opts;
+    opts.isParsingViewDefinition = true;
+    ASSERT_THROWS_CODE(
+        parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbToConfigCacheChunksWhenUsingMongos) {
+    LiteParserOptions opts;
+    opts.usingMongos = true;
+    // config.cache.chunks.* is explicitly allowed even on mongos.
+    auto lp = parse(
+        R"({$lookup: {from: {db: "config", coll: "cache.chunks.test.foo"}, as: "a", pipeline: []}})",
+        opts);
+    ASSERT_DOES_NOT_THROW(lp->validate());
+}
+
+TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbWhenAllowGenericForeignDbLookupSet) {
+    LiteParserOptions opts;
+    opts.usingMongos = true;
+    opts.allowGenericForeignDbLookup = true;
+    auto lp = parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})", opts);
+    ASSERT_DOES_NOT_THROW(lp->validate());
+}
+
+TEST_F(LiteParsedLookUpTest, ParseAllowsCrossDbWhenNotUsingMongos) {
+    // Default options: usingMongos=false, so cross-db lookup is not restricted.
+    auto lp = parse(R"({$lookup: {from: {db: "other", coll: "c"}, as: "a", pipeline: []}})");
+    ASSERT_DOES_NOT_THROW(lp->validate());
+}
+
 }  // namespace
 }  // namespace mongo
