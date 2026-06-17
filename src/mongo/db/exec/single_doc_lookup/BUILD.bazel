@@ -32,6 +32,30 @@ mongo_cc_unit_test(
     ],
 )
 
+# Header-only collection-acquisition seam for single-document lookups: the OnDemand / PreAcquired
+# acquirers plus the assertLocalLookupReadAtOrAfter snapshot guard.
+mongo_cc_library(
+    name = "collection_acquirer",
+    hdrs = [
+        "collection_acquirer.h",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "collection_acquirer_test",
+    srcs = [
+        "collection_acquirer_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":collection_acquirer",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
 # Universal routed fallback strategy: wraps MongoProcessInterface::lookupSingleDocument.
 mongo_cc_library(
     name = "aggregation_single_document_lookup_executor",
