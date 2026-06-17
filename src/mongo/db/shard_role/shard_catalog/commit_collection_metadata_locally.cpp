@@ -34,6 +34,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/repl/oplog.h"
@@ -242,11 +243,11 @@ void deleteAllCollectionMetadataLocally(OperationContext* opCtx,
     deleteCollectionChunksMetadataLocally(opCtx, uuid);
 }
 
-void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               const UUID& uuid,
-                                               bool forDroppedCollection,
-                                               bool authoritative = true) {
+void invalidateCollectionMetadata(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const UUID& uuid,
+                                  bool forDroppedCollection,
+                                  bool authoritative = true) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
@@ -259,6 +260,7 @@ void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
     oplogEntry.setOpTime(OplogSlot());
     oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
+    // Replicate the invalidation through the oplog to secondaries via a 'c' entry.
     writeConflictRetry(
         opCtx, "invalidateCollectionMetadata", NamespaceString::kRsOplogNamespace, [&] {
             AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
@@ -272,6 +274,10 @@ void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
                     !opTime.isNull());
             wuow.commit();
         });
+
+    // Apply the invalidation on the current (primary) node after the timestamp has been assigned.
+    opCtx->getServiceContext()->getOpObserver()->onInvalidateCollectionMetadata(
+        opCtx, repl::OplogEntry(oplogEntry.toBSON()));
 }
 
 void setAllowChunkOperationsOnSecondaries(OperationContext* opCtx,
@@ -349,13 +355,6 @@ void updateShardCatalogCache(OperationContext* opCtx,
         opCtx, nss, coll.getUuid(), coll.getAllowChunkOperations());
 }
 
-void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
-                                                const NamespaceString& nss) {
-    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    scopedCsr->setAuthoritative();
-    scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
-}
-
 }  // namespace
 
 void commitDropCollectionLocally(OperationContext* opCtx,
@@ -370,11 +369,8 @@ void commitDropCollectionLocally(OperationContext* opCtx,
     // Write to `config.shard.catalog.(collections|chunks)` to delete collection metadata.
     deleteAllCollectionMetadataLocally(opCtx, nss, uuid);
 
-    // Write an oplog 'c' entry to invalidate secondaries CSR.
-    invalidateCollectionMetadataOnSecondaries(opCtx, nss, uuid, true /* forDroppedCollection */);
-
-    // Clear this node collection metadata from CSR.
-    clearShardCatalogCacheForDroppedCollection(opCtx, nss);
+    // Write an oplog 'c' entry to invalidate the CSR and clear it on this node and secondaries.
+    invalidateCollectionMetadata(opCtx, nss, uuid, true /* forDroppedCollection */);
 }
 
 void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid) {
@@ -400,19 +396,15 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         // At this point we've fully modified the durable state to reflect the final state. We have
         // to clear out the in-memory state if the collection got replaced.
         if (clearFromNss && fromUUID) {
-            // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
-            invalidateCollectionMetadataOnSecondaries(
+            // Emit the oplog 'c' entry and clear the in-memory state.
+            invalidateCollectionMetadata(
                 opCtx, fromNss, *fromUUID, true /* forDroppedCollection */);
-
-            clearShardCatalogCacheForDroppedCollection(opCtx, fromNss);
         }
 
         if (clearToNss && targetUUID) {
-            // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
-            invalidateCollectionMetadataOnSecondaries(
+            // Emit the oplog 'c' entry and clear the in-memory state.
+            invalidateCollectionMetadata(
                 opCtx, toNss, *targetUUID, true /* forDroppedCollection */);
-
-            clearShardCatalogCacheForDroppedCollection(opCtx, toNss);
         }
     };
 
@@ -509,23 +501,25 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
     // rather than replace.
     deleteCollectionChunksMetadataLocally(opCtx, coll.getUuid());
 
-    if (isDbPrimaryShard || !ownedChunks.empty()) {
+    const bool hasCollectionEntry = isDbPrimaryShard || !ownedChunks.empty();
+    if (hasCollectionEntry) {
         // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
         writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
-
-        // Update this node CSR with collection metadata and chunks.
-        updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
     } else {
         // If the shard owns no chunks AND is not the dbPrimary then it really doesn't know anything
-        // about the collection. Make sure to delete any existing collection entry as well and clear
-        // the CSR.
+        // about the collection. Make sure to delete any existing collection entry.
         deleteCollectionEntryLocally(opCtx, nss);
-        clearShardCatalogCacheForDroppedCollection(opCtx, nss);
     }
 
-    // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
-    invalidateCollectionMetadataOnSecondaries(
-        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
+    // Emit the oplog 'c' entry and clear the in-memory state.
+    invalidateCollectionMetadata(
+        opCtx, nss, coll.getUuid(), !hasCollectionEntry /* forDroppedCollection */);
+
+    if (hasCollectionEntry) {
+        // Update this node CSR with collection metadata and chunks as an optimization, so the next
+        // query doesn't have to recover it from disk.
+        updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
+    }
 }
 
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
@@ -545,12 +539,14 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     //     latter case, we need to invalidate it so that the CSS is recreated with state "tracked"
     //     (a DB primary can't have "kUnowned" entries in the CSS by definition).
 
-    const auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    const auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
-    if (scopedCsr->isUnowned()) {
-        invalidateCollectionMetadataOnSecondaries(
-            opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-        scopedCsr->clearCollectionMetadata(opCtx);
+    const bool isUnowned = [&] {
+        // This lock is dropped before invalidating because the op observer has to reacquire it to
+        // clear the CSR. This is fine: at worst, it forces a redundant re-recovery.
+        const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+        return scopedCsr->isUnowned();
+    }();
+    if (isUnowned) {
+        invalidateCollectionMetadata(opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
     }
 }
 
@@ -700,9 +696,8 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
     // data present on the shard.
     bool shardOwnsChunks = shard_catalog_commit::doesShardOwnChunks(opCtx, nss);
     if (!shardOwnsChunks) {
-        shard_catalog_commit::invalidateCollectionMetadataOnSecondaries(
+        shard_catalog_commit::invalidateCollectionMetadata(
             opCtx, nss, oldUuid, true /* forDroppedCollection */);
-        shard_catalog_commit::clearShardCatalogCacheForDroppedCollection(opCtx, nss);
     }
 }
 

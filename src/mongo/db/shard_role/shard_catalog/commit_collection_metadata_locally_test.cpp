@@ -33,6 +33,8 @@
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
+#include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
@@ -512,6 +514,29 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionClearsCSR) {
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     auto metadata = scopedCsr->getCurrentMetadataIfKnown();
     ASSERT_FALSE(metadata) << "CSR should have no metadata after drop";
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CommitNotifiesInFlightRecoverer) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
+
+    // Simulate a recovery round that has already read from disk and is waiting to drain.
+    auto recoverer = std::make_shared<CollectionCacheRecoverer>(
+        kTestNss, CancellationToken::uncancelable(), CollectionMetadata::UNTRACKED());
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
+        scopedCsr->setCollectionRecoverer(recoverer);
+    }
+    auto roundId = recoverer->start(operationContext(), nullptr);
+
+    // Drop the collection. This should notify the recoverer about the drop.
+    shard_catalog_commit::commitDropCollectionLocally(
+        operationContext(), kTestNss, collType.getUuid());
+
+    // The recoverer should force a new recovery instead of returning the metadata before the drop.
+    ASSERT_FALSE(recoverer->drainAndApply(operationContext(), roundId));
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionIsNoOpOnEmptyCatalog) {
