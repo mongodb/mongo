@@ -1,0 +1,10 @@
+version: 1.0.0
+filters:
+  # Generic single-document lookup mechanism, usable by any executor (Express, SBE, aggregation)
+  # and any caller (change streams, $search idLookup, ...). Owned by query-execution at large.
+  - "*":
+    approvers:
+      - 10gen/query-execution
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/query-execution-staff-leads

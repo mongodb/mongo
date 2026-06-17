@@ -1,0 +1,33 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+# Header-only strategy interface for single-document lookups, plus the PrimaryWithFallback
+# combinator.
+mongo_cc_library(
+    name = "single_document_lookup_executor",
+    hdrs = [
+        "single_document_lookup_executor.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "single_document_lookup_executor_test",
+    srcs = [
+        "single_document_lookup_executor_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":single_document_lookup_executor",
+    ],
+)
