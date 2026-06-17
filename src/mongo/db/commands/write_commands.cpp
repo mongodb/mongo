@@ -57,6 +57,7 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -409,6 +410,8 @@ public:
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
             UpdateOp::validate(request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
 
             invariant(_commandObj.isOwned());
 
@@ -676,6 +679,8 @@ public:
                    const OpMsgRequest& opMsgRequest)
             : InvocationBaseGen(opCtx, command, opMsgRequest), _commandObj(opMsgRequest.body) {
             DeleteOp::validate(request());
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
         }
 
         bool supportsWriteConcern() const final {

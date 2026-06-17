@@ -37,6 +37,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -239,6 +240,21 @@ void Variables::setLegacyRuntimeConstants(const LegacyRuntimeConstants& constant
 
 void Variables::setDefaultRuntimeConstants(OperationContext* opCtx) {
     setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+}
+
+void Variables::validateRuntimeConstantsArePermitted(
+    OperationContext* opCtx, const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    if (!runtimeConstants || !runtimeConstants->getUserRoles()) {
+        return;
+    }
+
+    auto* client = opCtx->getClient();
+    const bool isInternalClient =
+        client->session() && (client->session()->getTags() & transport::Session::kInternalClient);
+    const bool isTrustedSource =
+        !client->session() || isInternalClient || client->isInDirectClient();
+    uassert(
+        12843300, "Manually setting 'runtimeConstants.userRoles' is not allowed.", isTrustedSource);
 }
 
 void Variables::appendSystemVariables(BSONObjBuilder& bob) const {

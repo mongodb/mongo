@@ -50,6 +50,7 @@
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_retryability.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -229,7 +230,13 @@ public:
 
     class Invocation final : public InvocationBaseGen {
     public:
-        using InvocationBaseGen::InvocationBaseGen;
+        Invocation(OperationContext* opCtx,
+                   const Command* command,
+                   const OpMsgRequest& opMsgRequest)
+            : InvocationBaseGen(opCtx, command, opMsgRequest) {
+            Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                            request().getLegacyRuntimeConstants());
+        }
 
         bool supportsWriteConcern() const final {
             return true;

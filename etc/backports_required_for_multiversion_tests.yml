@@ -679,6 +679,8 @@ last-continuous:
     ticket: SERVER-120668
   - test_file: jstests/change_streams/events_containing_version_literals.js
     ticket: SERVER-111406
+  - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+    ticket: SERVER-128433
   suites: null
 last-lts:
   all:
@@ -1410,4 +1412,6 @@ last-lts:
     ticket: SERVER-120668
   - test_file: jstests/change_streams/events_containing_version_literals.js
     ticket: SERVER-111406
+  - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
+    ticket: SERVER-128433
   suites: null

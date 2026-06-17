@@ -31,6 +31,8 @@
 
 #include <memory>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -168,6 +170,17 @@ public:
      * Set the runtime constants using the current local and cluster times.
      */
     void setDefaultRuntimeConstants(OperationContext* opCtx);
+
+    /**
+     * Ensures external clients cannot directly set security-sensitive runtime constants like
+     * $$USER_ROLES. This check cannot live in a central place like setLegacyRuntimeConstants():
+     * server-generated paths such as $merge may pass propagated constants through that setter using
+     * an opCtx that still looks external. At command ingress we still know the constants came from
+     * the user command body, so non-aggregation commands validate them there while only rejecting
+     * userRoles to preserve stable API behavior.
+     */
+    static void validateRuntimeConstantsArePermitted(
+        OperationContext* opCtx, const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
     /**
      * Seed let parameters with the given BSONObj.

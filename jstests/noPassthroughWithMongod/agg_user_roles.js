@@ -27,14 +27,16 @@ const mergeCmd = (userRoles) => ({
     runtimeConstants: {
         localNow: new Date(),
         clusterTime: Timestamp(1, 1),
-        userRoles,
+        ...(userRoles && {userRoles}),
     },
     readConcern: {},
     writeConcern: {},
 });
 
 // fromMongos is an internal-only field; external clients should get an unknown-field error.
-assert.commandFailedWithCode(db.runCommand(mergeCmd([])), ErrorCodes.BadValue);
+// Call mergeCmd() without userRoles so this exercises the fromMongos check rather than the
+// userRoles guard (SERVER-128433), which would otherwise reject it earlier with code 12843300.
+assert.commandFailedWithCode(db.runCommand(mergeCmd()), ErrorCodes.BadValue);
 
 // Reset and insert source document for subsequent tests.
 db.dropDatabase();

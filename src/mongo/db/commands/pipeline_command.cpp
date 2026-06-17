@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -87,6 +88,12 @@ public:
             opMsgRequest.body,
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false));
+
+        // Unlike on newer branches, mongod on 7.0 does not reject external 'runtimeConstants'
+        // outright, so reject external attempts to set 'userRoles' here. Internal paths that
+        // propagate runtime constants (e.g. $merge, shard requests) are exempt.
+        Variables::validateRuntimeConstantsArePermitted(
+            opCtx, aggregationRequest.getLegacyRuntimeConstants());
 
         auto privileges = uassertStatusOK(
             auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),

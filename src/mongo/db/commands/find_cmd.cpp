@@ -807,6 +807,9 @@ public:
                 std::move(nss),
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
+            Variables::validateRuntimeConstantsArePermitted(
+                opCtx, findCommand->getLegacyRuntimeConstants());
+
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
