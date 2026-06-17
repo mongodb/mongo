@@ -60,6 +60,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 
+#include <algorithm>
 #include <memory>
 
 namespace mongo {
@@ -163,7 +164,12 @@ class CrudBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
     static constexpr auto kCollection = "test"_sd;
     static constexpr auto kDatabase = "test"_sd;
-    static constexpr int kInsertManyBatchSize = 100;
+    static inline const std::string kDocumentData = std::string(256, 'x');
+    static constexpr int kBatchSize = 100;
+    static constexpr int kDeleteOneIterations = 10'000;
+    // Extra documents preloaded for BM_DELETE_ONE that are never deleted, so deletes always run
+    // against a collection of at least this size.
+    static constexpr int kDeleteOneCollectionFloor = 10'000;
 
     void setUpServiceContext(ServiceContext* svcCtx) override {
         auto service = svcCtx->getService();
@@ -196,6 +202,26 @@ protected:
                                                                   << "MongoDB")));
             auto msg = request.serialize();
             doRequest(service->getServiceEntryPoint(), strand->getClientPointer(), msg);
+        });
+    }
+
+    // Bulk loads `count` documents with _ids [baseId, baseId + count) for BM_DELETE_ONE.
+    void _populateDeleteTestData(ServiceContext* svcCtx, int64_t baseId, int64_t count) {
+        auto service = svcCtx->getService();
+        auto strand = ClientStrand::make(service->makeClient("db-initializer", nullptr));
+        strand->run([&] {
+            for (int64_t batchStart = 0; batchStart < count; batchStart += kBatchSize) {
+                const auto batchEnd = std::min<int64_t>(batchStart + kBatchSize, count);
+                BSONArrayBuilder documents;
+                for (auto i = batchStart; i < batchEnd; ++i) {
+                    documents.append(BSON("_id" << baseId + i << "data" << kDocumentData));
+                }
+                OpMsgRequest request;
+                request.body = BSON("insert" << kCollection << "$db" << kDatabase << "ordered"
+                                             << false << "documents" << documents.arr());
+                auto msg = request.serialize();
+                doRequest(service->getServiceEntryPoint(), strand->getClientPointer(), msg);
+            }
         });
     }
 };
@@ -267,12 +293,11 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_ONE)
 (benchmark::State& state) {
     // Prepopulate the collection so we are not benchmarking collection creation time.
     _populateTestData(getGlobalServiceContext());
-    static const std::string data(256, 'x');
     // clang-format off
     BSONObj cmd = BSON(
             "insert" << kCollection
             << "$db" << kDatabase
-            << "documents" << BSON_ARRAY(BSON("data" << data)));
+            << "documents" << BSON_ARRAY(BSON("data" << kDocumentData)));
     // clang-format on
     runBenchmark(state, [=] { return cmd; });
 }
@@ -281,10 +306,9 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_MANY)
 (benchmark::State& state) {
     // Prepopulate the collection so we are not benchmarking collection creation time.
     _populateTestData(getGlobalServiceContext());
-    static const std::string data(256, 'x');
     BSONArrayBuilder documents;
-    for (int i = 0; i < kInsertManyBatchSize; ++i) {
-        documents.append(BSON("data" << data));
+    for (int i = 0; i < kBatchSize; ++i) {
+        documents.append(BSON("data" << kDocumentData));
     }
     // clang-format off
     BSONObj cmd = BSON(
@@ -293,6 +317,33 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_MANY)
             << "documents" << documents.arr());
     // clang-format on
     runBenchmark(state, [=] { return cmd; });
+}
+
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_DELETE_ONE)
+(benchmark::State& state) {
+    // Load one document per iteration (kDeleteOneIterations). The extra kDeleteOneCollectionFloor
+    // documents are never deleted, so every iteration deletes from a collection of at least that
+    // size. Ids are partitioned by thread so concurrent benchmark threads never target the same
+    // document.
+    const auto baseId = (int64_t{state.thread_index} + 1) << 32;
+    _populateDeleteTestData(
+        getGlobalServiceContext(), baseId + 1, kDeleteOneIterations + kDeleteOneCollectionFloor);
+    runBenchmark(state, [idValue = baseId]() mutable {
+        // clang-format off
+        return BSON(
+            "delete" << kCollection
+            << "$db" << kDatabase
+            << "deletes" << BSON_ARRAY(
+                BSON(
+                    "q" << BSON(
+                        "_id" << ++idValue
+                    )
+                    << "limit" << 1
+                )
+            )
+        );
+        // clang-format on
+    });
 }
 
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->Threads(1)->Threads(kCommandBMMaxThreads);
@@ -306,6 +357,10 @@ BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT_ONE)
     ->Threads(1)
     ->Threads(kCommandBMMaxThreads);
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT_MANY)
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_DELETE_ONE)
+    ->Iterations(CrudBenchmarkFixture::kDeleteOneIterations)
     ->Threads(1)
     ->Threads(kCommandBMMaxThreads);
 

@@ -6,3 +6,6 @@ filters:
   - "test_add_remove_shards.py":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "test_generate_and_check_perf_results.py":
+    approvers:
+      - 10gen/devprod-performance-infrastructure

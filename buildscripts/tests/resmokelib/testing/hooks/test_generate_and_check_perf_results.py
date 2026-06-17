@@ -287,6 +287,29 @@ class TestBenchmarkThreadsReport(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(name_obj.statistic_type, "mean")
         self.assertEqual(name_obj.base_name, "BM_baseline_match_simple/0")
 
+    def test_iterations_from_name(self):
+        name_obj = self.bm_threads_report.parse_bm_name(
+            {"name": "BM_Name/iterations:10000/threads:10"}
+        )
+        self.assertEqual(name_obj.thread_count, "10")
+        self.assertEqual(name_obj.statistic_type, None)
+        self.assertEqual(name_obj.base_name, "BM_Name")
+
+        name_obj = self.bm_threads_report.parse_bm_name(
+            {
+                "name": "BM_Name/arg name:100/iterations:10000/threads:10_mean",
+                "aggregate_name": "mean",
+            }
+        )
+        self.assertEqual(name_obj.thread_count, "10")
+        self.assertEqual(name_obj.statistic_type, "mean")
+        self.assertEqual(name_obj.base_name, "BM_Name/arg name:100")
+
+        name_obj = self.bm_threads_report.parse_bm_name({"name": "BM_Name/iterations:10000"})
+        self.assertEqual(name_obj.thread_count, "1")
+        self.assertEqual(name_obj.statistic_type, None)
+        self.assertEqual(name_obj.base_name, "BM_Name")
+
     def test_generate_multithread_cedar_metrics(self):
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_REPORT), _BM_MULTITHREAD_REPORT
