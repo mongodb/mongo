@@ -119,6 +119,10 @@ ExecutorFuture<void> MoveRangeCoordinator::_acquireLocksAsync(
         _scopedDonateChunk =
             uassertStatusOK(ActiveMigrationsRegistry::get(opCtx.get())
                                 .registerDonateChunk(opCtx.get(), nss(), _request, bypass));
+        if (_recoveredFromDisk) {
+            ShardingStatistics::get(opCtx.get())
+                .unfinishedMigrationFromPreviousPrimary.fetchAndAdd(1);
+        }
     });
 }
 
@@ -324,12 +328,9 @@ ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
                 return optMeta && optMeta->isSharded() && optMeta->keyBelongsToMe(min);
             }();
 
-            // These are meaningful only when recovering after a failover: the stat tracks
-            // unfinished migrations from the previous term, and the range deleter needs to know
-            // its recovery job for this migration is complete.
+            // Notify the range deleter that recovery is complete. Only meaningful when
+            // recovering after a failover.
             if (_recoveredFromDisk) {
-                ShardingStatistics::get(opCtx.get())
-                    .unfinishedMigrationFromPreviousPrimary.fetchAndAdd(1);
                 const auto term = repl::ReplicationCoordinator::get(opCtx.get())->getTerm();
                 RangeDeleterService::get(opCtx.get())->notifyRecoveryJobComplete(term);
             }
