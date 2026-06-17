@@ -12,6 +12,7 @@
 //   requires_scripting,
 //   # Time-series collections are views which don't support map-reduce
 //   exclude_from_timeseries_crud_passthrough,
+//   uses_map_reduce_internal_merge_pipeline
 // ]
 
 db.recursion.drop();

@@ -219,9 +219,6 @@ filters:
   - "*change_streams*":
     approvers:
       - 10gen/query-execution-change-streams
-  - "*rate_limited.yml":
-    approvers:
-      - 10gen/server-workload-resilience
   - "*rseq_kernel_check*":
     approvers:
       - 10gen/server-workload-resilience

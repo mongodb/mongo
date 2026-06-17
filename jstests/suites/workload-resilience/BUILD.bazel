@@ -17,7 +17,7 @@ load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
 
 resmoke_suite_test(
     name = "sharded_collections_jscore_passthrough_rate_limited",
-    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_rate_limited.yml",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_rate_limited.yml",
     data = [
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
@@ -41,7 +41,7 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "sharding_jscore_passthrough_with_balancer_rate_limited",
-    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_balancer_rate_limited.yml",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_balancer_rate_limited.yml",
     data = [
         "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",

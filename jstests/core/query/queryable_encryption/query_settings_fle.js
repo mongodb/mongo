@@ -9,6 +9,7 @@
  *   no_selinux,
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
  *   transitioning_replicaset_incompatible,
+ *   needs_query_settings_user_role
  * ]
  */
 import {EncryptedClient, kSafeContentField} from "jstests/fle2/libs/encrypted_client_util.js";

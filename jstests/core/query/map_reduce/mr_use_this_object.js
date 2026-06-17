@@ -10,6 +10,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   # Uses mapReduce command.
 //   requires_scripting,
+//   uses_map_reduce_internal_merge_pipeline
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

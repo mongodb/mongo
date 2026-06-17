@@ -60,7 +60,9 @@ function assertFailsWithInvalidNamespacesForField(
     }
 
     const dbCmd = isAdminCommand ? db.adminCommand : db.runCommand;
-    const expErrors = [ErrorCodes.InvalidNamespace, ErrorCodes.NamespaceNotFound];
+    // When auth is enabled, findAndModify will fail the namespace check with a custom
+    // error code 17137.
+    const expErrors = [ErrorCodes.InvalidNamespace, ErrorCodes.NamespaceNotFound, 17137];
     for (let cmd of cmds) {
         jsTestLog(`running ${tojson(cmd)}`);
         assert.commandFailedWithCode(dbCmd.apply(db, [cmd]), expErrors);

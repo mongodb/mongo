@@ -8,6 +8,7 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   uses_map_reduce_internal_merge_pipeline
 // ]
 const coll = db.mr_scope;
 coll.drop();

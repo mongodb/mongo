@@ -10,6 +10,7 @@
 //   requires_getmore,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
+//   uses_map_reduce_internal_merge_pipeline,
 //   # Map reduce requires a stable collection UUID, but MoveCollection drops the collection and recreates it with a new UUID.
 //   assumes_stable_collection_uuid,
 // ]

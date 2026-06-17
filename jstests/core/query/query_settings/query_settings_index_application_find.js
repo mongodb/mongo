@@ -13,6 +13,7 @@
 //   examines_sbe_cache,
 //   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //   transitioning_replicaset_incompatible,
+//   assumes_query_settings_role
 // ]
 //
 

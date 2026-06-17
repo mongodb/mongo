@@ -404,7 +404,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # needed because mongos only refresh their cache of cluster parameters periodically.
         # Running getClusterParameter on a router causes it to refresh its cache.
         for mongos in self.mongos:
-            mongos.mongo_client().admin.command(
+            mongos_client = interface.build_client(mongos, self.auth_options)
+            mongos_client.admin.command(
                 {"getClusterParameter": self.set_cluster_parameter["parameter"]}
             )
 

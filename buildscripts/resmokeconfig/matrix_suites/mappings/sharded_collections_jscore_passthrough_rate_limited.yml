@@ -1,0 +1,15 @@
+# This suite tests the core collection functionality with a simulated rate limiter enabled to reject
+# random requests. The purpose of this passthrough is to add coverage on the retryability support in
+# various process internal clients. With a high amount of maximum retries, no errors should bubble
+# up to the driver.
+base_suite: sharded_collections_jscore_passthrough_base
+overrides:
+  - "sharded_rate_limiter_with_auth.auth_shell_options"
+  - "sharded_rate_limiter_with_auth.auth_hooks_sharded"
+  - "sharded_rate_limiter_with_auth.fixture_with_auth"
+eval:
+  - "sharded_rate_limiter_with_auth.auth_eval"
+excludes:
+  - "sharded_rate_limiter_with_auth.auth_exclude_files"
+  - "sharded_rate_limiter_with_auth.auth_exclude_files_core_sharding"
+  - "sharded_rate_limiter_with_auth.auth_exclude_tags"
