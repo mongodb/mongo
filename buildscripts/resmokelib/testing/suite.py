@@ -165,25 +165,12 @@ class Suite(object):
         if loggers.ROOT_EXECUTOR_LOGGER is None:
             loggers.ROOT_EXECUTOR_LOGGER = logging.getLogger("executor")
 
-        # Check if test selection is enabled for this variant
-        tss_enabled = _config.TSS_ENABLED
         is_patch_build = _config.EVERGREEN_PATCH_BUILD
 
-        # Test selection is enabled if:
-        # - The feature is globally enabled (default: True)
-        # - The variant has tss_enabled expansion set to true
-        # - Running a patch build
-        use_test_selection = (
-            _config.ENABLE_EVERGREEN_API_TEST_SELECTION and tss_enabled and is_patch_build
-        )
+        use_test_selection = _config.ENABLE_EVERGREEN_API_TEST_SELECTION and is_patch_build
 
-        # Log when test selection is skipped
         if tests and _config.EVERGREEN_TASK_ID and _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
-            if not tss_enabled:
-                loggers.ROOT_EXECUTOR_LOGGER.info(
-                    "Skipping test selection services: variant does not have tss_enabled expansion set to true"
-                )
-            elif not is_patch_build:
+            if not is_patch_build:
                 loggers.ROOT_EXECUTOR_LOGGER.info(
                     "Skipping test selection services: not a patch build (only enabled for patch builds)"
                 )
@@ -191,7 +178,7 @@ class Suite(object):
         # Apply Evergreen API test selection if:
         # 1. We have tests to filter
         # 2. We're running in Evergreen
-        # 3. Test selection is enabled (variant matches AND patch build AND feature enabled)
+        # 3. Test selection is enabled (patch build AND feature enabled)
         if tests and _config.EVERGREEN_TASK_ID and use_test_selection:
             try:
                 evg_api = evergreen_conn.get_evergreen_api()

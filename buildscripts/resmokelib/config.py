@@ -431,11 +431,6 @@ ENABLE_EVERGREEN_API_TEST_SELECTION = False
 # If set, requests Evergreen to use the specified test selection strategies.
 EVERGREEN_TEST_SELECTION_STRATEGY = None
 
-# Boolean indicating if test selection service is enabled for this variant.
-# Read from the variant's 'tss_enabled' expansion in Evergreen YAML.
-# If None, test selection is disabled (default for local runs or variants without the expansion).
-TSS_ENABLED = None
-
 # Path to the YAML file containing the current `mongo_version`
 # Use RESMOKE_ROOT so it works when running from external directories
 MONGO_VERSION_FILE = os.path.join(RESMOKE_ROOT, ".resmoke_mongo_version.yml")

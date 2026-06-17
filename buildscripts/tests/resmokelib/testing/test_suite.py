@@ -82,7 +82,6 @@ class TestGetTestsForKind(unittest.TestCase):
         self.default_evergreen_requester = under_test._config.EVERGREEN_REQUESTER
         self.default_evergreen_patch_build = under_test._config.EVERGREEN_PATCH_BUILD
         self.default_evergreen_task_name = under_test._config.EVERGREEN_TASK_NAME
-        self.default_tss_enabled = under_test._config.TSS_ENABLED
         self.default_selector = under_test._selector
         self.default_evergreen_conn = under_test.evergreen_conn
 
@@ -104,7 +103,6 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = (
             self.default_evergreen_test_selection_strategy
         )
-        under_test._config.TSS_ENABLED = self.default_tss_enabled
         under_test._selector = self.default_selector
         under_test.evergreen_conn = self.default_evergreen_conn
 
@@ -130,7 +128,6 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TASK_NAME = "task_name"
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = "strategy"
         under_test._config.EVERGREEN_PATCH_BUILD = True
-        under_test._config.TSS_ENABLED = True
 
         # Mock Evergreen API
         mock_evg_api = MagicMock()
@@ -188,7 +185,6 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TASK_NAME = "task_name"
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = ["NotFailing"]
         under_test._config.EVERGREEN_PATCH_BUILD = True
-        under_test._config.TSS_ENABLED = True
 
         # TSS returns test_ri.js in addition to test_normal.js.  test_ri.js was not in the
         # tag-filtered list — it belongs to the resource_intensive suite, not this one.
