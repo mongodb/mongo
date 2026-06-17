@@ -56,6 +56,69 @@ mongo_cc_unit_test(
     ],
 )
 
+# LocalLookupEligibility interface + the two trivial implementations (AlwaysLocal /
+# AlwaysUnknown) and the createScopedShardRole helper.
+mongo_cc_library(
+    name = "local_lookup_eligibility",
+    srcs = [
+        "local_lookup_eligibility.cpp",
+    ],
+    hdrs = [
+        "local_lookup_eligibility.h",
+    ],
+    deps = [
+        # run() returns SingleDocumentLookupExecutor::LookupResult.
+        ":single_document_lookup_executor",
+        # shard_role_api transitively provides ScopedSetShardRole, ShardVersion / DatabaseVersion.
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+# Production factory producing LocalLookupEligibility instances based on ShardingState.
+mongo_cc_library(
+    name = "local_lookup_eligibility_factory",
+    srcs = [
+        "local_lookup_eligibility_factory_impl.cpp",
+    ],
+    hdrs = [
+        "local_lookup_eligibility_factory_impl.h",
+        "local_lookup_eligibility_factory_interface.h",
+    ],
+    deps = [
+        ":local_lookup_eligibility",
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+# Test-only library carrying the eligibility mocks. Linked only into test binaries.
+mongo_cc_library(
+    name = "local_lookup_eligibility_test_util",
+    hdrs = [
+        "local_lookup_eligibility_factory_mock.h",
+        "mock_local_lookup_eligibility.h",
+    ],
+    deps = [
+        ":local_lookup_eligibility",
+        ":local_lookup_eligibility_factory",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "local_lookup_eligibility_test",
+    srcs = [
+        "local_lookup_eligibility_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":local_lookup_eligibility",
+        ":local_lookup_eligibility_factory",
+        ":local_lookup_eligibility_test_util",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
 # Universal routed fallback strategy: wraps MongoProcessInterface::lookupSingleDocument.
 mongo_cc_library(
     name = "aggregation_single_document_lookup_executor",
