@@ -124,6 +124,10 @@ commit_queue_aliases:
     task: ".*"
     variant_tags: []
     task_tags: []
+  - variant: "^(commit-queue-atlas)$"
+    task: ".*"
+    variant_tags: []
+    task_tags: []
   # Monguard
   - variant: "^(amazon-linux2023-arm|Lint)$"
     task: "^(.*)$"
@@ -143,6 +147,10 @@ github_pr_aliases:
     variant_tags: []
     task_tags: ["benchmarks_sep"]
   - variant: "^(commit-queue-monorepo)$"
+    task: ".*"
+    variant_tags: []
+    task_tags: []
+  - variant: "^(commit-queue-atlas)$"
     task: ".*"
     variant_tags: []
     task_tags: []
