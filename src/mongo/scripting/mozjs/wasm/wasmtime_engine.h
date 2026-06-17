@@ -31,13 +31,9 @@
 
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
-#include "mongo/util/time_support.h"
-
-#include <chrono>
-#include <mutex>
-#include <vector>
 
 namespace mongo {
+
 namespace mozjs {
 
 class WasmtimeImplScope;
@@ -88,70 +84,13 @@ public:
     void registerOperation(OperationContext* ctx, WasmtimeImplScope* scope);
     void unregisterOperation(OperationContext* opCtx);
 
-    // Returns a pre-warmed WasmEngineContext from the pool if available, or creates a fresh one.
-    // Each scope (and each post-kill rebuild) gets its own context so that the engine-wide
-    // interrupt-epoch counter cannot leak across scopes.
+    // Builds a fresh Wasmtime Engine + deserialized Component from the embedded precompiled
+    // component bytes. Each scope (and each post-kill rebuild inside a scope) gets its own
+    // context so that engine-wide state (notably the interrupt-epoch counter bumped by kill())
+    // cannot leak across scopes or survive a reset().
     std::shared_ptr<wasm::WasmEngineContext> createWasmEngineContext() const;
-
-    // Thread-local idle bridge (one per thread). Populated when a healthy scope is destroyed;
-    // consumed by the next createScopeForCurrentThread() on the same thread.
-    struct IdleBridge {
-        std::unique_ptr<wasm::MozJSWasmBridge> bridge;
-        std::shared_ptr<wasm::WasmEngineContext> ctx;
-        // Function-handle cache from the previous scope. resetRealm() invalidates all
-        // compiled function handles on revival, so this cache is cleared on reuse.
-        FunctionCacheMap cachedFunctions;
-        // steady_clock so NTP backward jumps cannot make the bridge appear fresh forever.
-        std::chrono::steady_clock::time_point parkedAt;
-        // Number of times this bridge has been parked (reused). SpiderMonkey's JIT code
-        // and internal caches accumulate with each reuse. Discarding after kMaxBridgeReuseCount
-        // reuses bounds the linear-memory growth over long passthrough runs.
-        uint32_t reuseCount{0};
-        // Linear-memory size (bytes) at the last "linear memory growth" log line for this
-        // bridge. Lets parkBridgeForCurrentThread() log only when memory grew materially
-        // instead of on every park.
-        uint64_t lastLoggedLinearMemoryBytes{0};
-
-        IdleBridge() = default;
-        IdleBridge(IdleBridge&&) = default;
-        IdleBridge& operator=(IdleBridge&&) = default;
-
-        // On thread exit, all WASM linear memory is freed by wasmtime's Store
-        // destructor when `bridge`'s unique_ptr fires — the in-WASM SpiderMonkey
-        // destructor does not need to run explicitly. Calling bridge->shutdown()
-        // here is unsafe: it would execute JIT code while other threads may be
-        // concurrently destroying their own stores and flushing the shared JIT
-        // icache, which causes use-after-free in the JIT executor on aarch64.
-        ~IdleBridge() = default;
-    };
-
-    static constexpr std::chrono::seconds kMaxBridgeIdleTime{10};
-    // Safety net: discard the idle bridge after this many reuses so that slow accumulation in
-    // WASM linear memory (which never shrinks, even after GC) cannot build up indefinitely in a
-    // long-lived bridge. Steady-state growth per reuse is small now that WIT argument buffers
-    // are freed by the in-WASM bindings (see ArgListGuard in engine/api.cpp); this bound exists
-    // to cap the blast radius of any future leak, not to work around a known one.
-    static constexpr uint32_t kMaxBridgeReuseCount{100};
-
-    void parkBridgeForCurrentThread(std::unique_ptr<wasm::MozJSWasmBridge> bridge,
-                                    std::shared_ptr<wasm::WasmEngineContext> ctx,
-                                    FunctionCacheMap cachedFunctions);
-
-    // Test-only: rewind the current thread's idle bridge park time so expiry tests don't sleep.
-    static void backdateIdleBridgeForTest(Milliseconds age);
-
-    // Test-only: returns true if the current thread's idle bridge slot holds a parked bridge.
-    // Used by regression tests to confirm that an emit-configured bridge is shut down (not
-    // parked) on scope teardown — see WasmtimeImplScope::~WasmtimeImplScope.
-    static bool hasIdleBridgeForTest();
-
-private:
-    // A small pool of pre-warmed contexts reduces the cost of cold-start scope creation and
-    // post-kill recovery by amortising Engine+Component+Linker initialisation over time.
-    mutable std::mutex _contextPoolMutex;
-    mutable std::vector<std::shared_ptr<wasm::WasmEngineContext>> _contextPool;
-    static constexpr size_t kContextPoolSize = 4;
 };
 
 }  // namespace mozjs
+
 }  // namespace mongo

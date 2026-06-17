@@ -9,14 +9,6 @@
 //   # Uses mapReduce command.
 //   requires_scripting,
 //   requires_getmore,
-//   # TODO SERVER-128404: WASM engine is slower under TSAN instrumentation, causing timing-sensitive failures.
-//   tsan_incompatible,
-//   # WASM reserves ~1210 MB of linear memory per scope; ASAN/UBSAN shadow memory triples
-//   # host RAM usage, causing OOM-kills on multi-node burn-in.
-//   incompatible_aubsan,
-//   # $function and $where queries embed a JavaScript body whose query shape hash is not stable
-//   # across nodes with different query framework configurations or binary versions.
-//   known_query_shape_computation_problem,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
@@ -62,31 +54,26 @@ assert.eq(
 );
 
 // Test that the 'this' object doesn't have any properties in $function.
-// The WASM MozJS engine isolates 'this' so it is empty; the legacy MozJS engine exposes global
-// properties on 'this'. Only assert the stricter WASM behaviour when the WASM engine is active.
-const isWasmEngine = db.adminCommand({getParameter: 1, wasmtimeStoreMemoryLimitMB: 1}).ok === 1;
-if (isWasmEngine) {
-    assert.eq(
-        [],
-        coll
-            .aggregate([
-                {
-                    $replaceWith: {
-                        field: {
-                            $function: {
-                                lang: "js",
-                                args: ["$$ROOT"],
-                                body: "function(obj) { return Object.getOwnPropertyNames(this); }",
-                            },
+assert.eq(
+    [],
+    coll
+        .aggregate([
+            {
+                $replaceWith: {
+                    field: {
+                        $function: {
+                            lang: "js",
+                            args: ["$$ROOT"],
+                            body: "function(obj) { return Object.getOwnPropertyNames(this); }",
                         },
                     },
                 },
-                {$unwind: "$field"},
-                {$sort: {field: 1}},
-            ])
-            .toArray(),
-    );
-}
+            },
+            {$unwind: "$field"},
+            {$sort: {field: 1}},
+        ])
+        .toArray(),
+);
 
 // Test that mapReduce's 'map' function cannot see any other properties.
 assert(

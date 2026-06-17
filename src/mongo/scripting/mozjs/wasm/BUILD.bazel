@@ -2,6 +2,7 @@ load("//bazel/wasm_rules:wasm_cc_binary.bzl", "wasm_cc_binary")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/wasm_rules:embed_binary.bzl", "embed_binary_obj", "embed_binary_rc")
 load("//bazel/wasm_rules:wasm_aot_compile.bzl", "aot_compile_wasm")
+load("//bazel/wasm_rules:wasm_cc_binary.bzl", "wasm_cc_binary")
 load("//bazel/wasm_rules:wit_bindgen_c.bzl", "wit_bindgen_c")
 
 package(default_visibility = ["//visibility:public"])
@@ -59,9 +60,9 @@ mongo_cc_library(
     srcs = glob(
         ["*.cpp"],
         exclude = [
+            "*_test.cpp",
             "status.cpp",  # Included in wasi_sources filegroup
             "wasmtime_engine.cpp",
-            "wasmtime_engine_killop_proxy_test.cpp",  # Host-side test, not compiled for WASM
         ],
     ) + [
         ":api.c",
@@ -129,13 +130,11 @@ mongo_cc_library(
     name = "bridge",
     srcs = [
         "//src/mongo/scripting:config_engine_gen",
-        "//src/mongo/scripting:config_engine_wasm_gen",
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge.cpp",
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.cpp",
     ],
     hdrs = [
         "//src/mongo/scripting:config_engine_gen",
-        "//src/mongo/scripting:config_engine_wasm_gen",
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge.h",
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.h",
     ],
@@ -146,9 +145,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_parameter",
-        # _throwAfterTrap calls Client::getCurrent() and checkForInterrupt() to map
-        # WASM interrupt traps to the real mongo error code (MaxTimeMSExpired etc.).
-        "//src/mongo/db:service_context",
         "@crates//:wasmtime_c",
     ] + select({
         "@platforms//os:windows": ["//bazel/rules_rust:win_allocator_shim"],
@@ -176,7 +172,6 @@ mongo_cc_unit_test(
     deps = [
         ":bridge",
         "//src/mongo:base",
-        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/scripting:scripting_common",
         "@crates//:wasmtime_c",
     ] + select({
@@ -243,7 +238,30 @@ mongo_cc_unit_test(
     deps = [
         ":wasmtime_engine",
         "//src/mongo:base",
+        "//src/mongo/db:service_context",
         "//src/mongo/db/query:query_knobs",
+        "//src/mongo/scripting:scripting_common",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wasmtime_engine_killop_proxy_test",
+    srcs = [
+        "wasmtime_engine_killop_proxy_test.cpp",
+    ],
+    auto_header = False,
+    tags = [
+        "mongo_unittest_eighth_group",
+        "mozjs_wasm_tests",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":wasmtime_engine",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/scripting:scripting_common",
     ],
 )
@@ -272,28 +290,4 @@ mongo_cc_library(
         "@platforms//os:windows": [":embed_mozjs_wasm_rc"],
         "//conditions:default": [":embed_mozjs_wasm_obj"],
     }),
-)
-
-mongo_cc_unit_test(
-    name = "wasmtime_engine_killop_proxy_test",
-    size = "large",
-    timeout = "long",
-    srcs = [
-        "wasmtime_engine_killop_proxy_test.cpp",
-    ],
-    auto_header = False,
-    tags = [
-        "mongo_unittest_eighth_group",
-        "mozjs_wasm_tests",
-    ],
-    target_compatible_with = select({
-        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":wasmtime_engine",
-        "//src/mongo:base",
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/scripting:scripting_common",
-    ],
 )

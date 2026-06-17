@@ -239,12 +239,47 @@ void trace(JSTracer* trc, JSObject* obj) {
 template <typename T>
 class MONGO_MOD_PUB WrapType : public T {
 public:
-    WrapType(JSContext* context) : _context(context), _proto(), _constructor() {
+    WrapType(JSContext* context)
+        : _context(context),
+          _proto(),
+          _constructor(),
+          _jsclass({T::className,
+                    T::classFlags,
+                    &_jsclassOps,
+                    JS_NULL_CLASS_SPEC,
+                    JS_NULL_CLASS_EXT,
+                    &_jsoOps}),
+          _jsclassOps({T::addProperty != BaseInfo::addProperty ? smUtils::addProperty<T> : nullptr,
+                       T::delProperty != BaseInfo::delProperty ? smUtils::delProperty<T> : nullptr,
+                       nullptr,  // enumerate
+                       T::enumerate != BaseInfo::enumerate ? smUtils::enumerate<T>
+                                                           : nullptr,  // newEnumerate
+                       T::resolve != BaseInfo::resolve ? smUtils::resolve<T> : nullptr,
+                       T::mayResolve != BaseInfo::mayResolve ? T::mayResolve : nullptr,
+                       T::finalize != BaseInfo::finalize ? T::finalize : nullptr,
+                       T::call != BaseInfo::call ? smUtils::call<T> : nullptr,
+                       T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
+                       T::trace != BaseInfo::trace ? smUtils::trace<T> : nullptr}),
+          _jsoOps({
+              nullptr,  // lookupProperty
+              nullptr,  // defineProperty
+              nullptr,  // hasProperty
+              T::getProperty != BaseInfo::getProperty ? smUtils::getProperty<T>
+                                                      : nullptr,  // getProperty
+              T::setProperty != BaseInfo::setProperty ? smUtils::setProperty<T>
+                                                      : nullptr,  // setProperty
+              nullptr,                                            // getOwnPropertyDescriptor
+              nullptr,                                            // deleteProperty
+              nullptr,                                            // getElements
+              nullptr                                             // funToString
+          }) {
 
         // The global object is different.  We need it for basic setup
         // before the other types are installed.  Might as well just do it
         // in the constructor.
         if (T::classFlags & JSCLASS_GLOBAL_FLAGS) {
+            _jsclassOps.trace = JS_GlobalObjectTraceHook;
+
             JS::RootedObject proto(_context);
 
             JS::RealmOptions options;
@@ -570,42 +605,9 @@ private:
     JSContext* _context;
     JS::PersistentRootedObject _proto;
     JS::PersistentRootedObject _constructor;
-
-    // _jsclassOps, _jsoOps, and _jsclass are static per template instantiation: all fields
-    // are initialised once from T's static members (never mutated after init).  Static lifetime
-    // prevents use-after-free when WrapType instances are destroyed while GC-managed JS objects
-    // still hold JSClass* or JSClass.ops* pointers into them (e.g. during realm reset where a new
-    // MozJSPrototypeInstaller is created before the old realm's objects are GC-collected).
-    // _jsclassOps and _jsoOps are declared before _jsclass to ensure they are initialized
-    // first (C++ inline-static members initialise in declaration order within a TU).
-    inline static JSClassOps _jsclassOps = {
-        T::addProperty != BaseInfo::addProperty ? smUtils::addProperty<T> : nullptr,
-        T::delProperty != BaseInfo::delProperty ? smUtils::delProperty<T> : nullptr,
-        nullptr,                                                                // enumerate
-        T::enumerate != BaseInfo::enumerate ? smUtils::enumerate<T> : nullptr,  // newEnumerate
-        T::resolve != BaseInfo::resolve ? smUtils::resolve<T> : nullptr,
-        T::mayResolve != BaseInfo::mayResolve ? T::mayResolve : nullptr,
-        T::finalize != BaseInfo::finalize ? T::finalize : nullptr,
-        T::call != BaseInfo::call ? smUtils::call<T> : nullptr,
-        T::construct != BaseInfo::construct ? smUtils::construct<T> : nullptr,
-        // Global objects require JS_GlobalObjectTraceHook (set here to avoid a data race
-        // from writing to the shared static in the constructor under concurrent init).
-        (T::classFlags& JSCLASS_GLOBAL_FLAGS)
-            ? JS_GlobalObjectTraceHook
-            : (T::trace != BaseInfo::trace ? smUtils::trace<T> : nullptr)};
-    inline static js::ObjectOps _jsoOps = {
-        nullptr,  // lookupProperty
-        nullptr,  // defineProperty
-        nullptr,  // hasProperty
-        T::getProperty != BaseInfo::getProperty ? smUtils::getProperty<T> : nullptr,
-        T::setProperty != BaseInfo::setProperty ? smUtils::setProperty<T> : nullptr,
-        nullptr,  // getOwnPropertyDescriptor
-        nullptr,  // deleteProperty
-        nullptr,  // getElements
-        nullptr   // funToString
-    };
-    inline static JSClass _jsclass = {
-        T::className, T::classFlags, &_jsclassOps, JS_NULL_CLASS_SPEC, JS_NULL_CLASS_EXT, &_jsoOps};
+    JSClass _jsclass;
+    JSClassOps _jsclassOps;
+    js::ObjectOps _jsoOps;
 };
 
 }  // namespace mozjs

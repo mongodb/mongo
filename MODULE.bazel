@@ -407,7 +407,6 @@ crate.annotation(
     patch_args = ["-p1"],
     patches = [
         "//bazel/wasmtime:val_bytes_fast_path.patch",
-        "//bazel/wasmtime:val_bytes_lift_fast_path.patch",
         "//bazel/wasmtime:val_bytes_wave_fast_path.patch",
     ],
 )
