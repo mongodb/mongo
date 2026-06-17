@@ -8,7 +8,7 @@ import tempfile
 from collections import defaultdict
 from subprocess import check_output
 
-from buildscripts.resmokelib.config import MultiversionOptions
+from buildscripts.resmokelib import config
 from buildscripts.resmokelib.core.programs import get_path_env_var
 from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.utils import is_windows
@@ -94,7 +94,8 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
     Create a tag file associating multiversion tests to tags for exclusion.
 
     Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the
-    last-lts and/or last-continuous branch to determine which tests should be denylisted.
+    last-lts, last-continuous and/or last-patch branch to determine which tests should be
+    denylisted.
     """
 
     output = os.path.abspath(output)
@@ -109,10 +110,9 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
     # mongo shell executable.
     from buildscripts.resmokelib import multiversionconstants
 
-    old_mongod = {
-        MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOD_BINARY,
-        MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY,
-    }[old_bin_version]
+    old_mongod = multiversionconstants.get_binary_name_for_version(
+        old_bin_version, config.DEFAULT_MONGOD_EXECUTABLE
+    )
 
     old_version_commit_hash = get_backports_required_hash(old_mongod)
 
@@ -125,11 +125,8 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
 
     def get_suite_exclusions(version_key):
         _suites_latest = backports_required_latest[version_key]["suites"] or {}
-        # Check if the changed syntax for etc/backports_required_for_multiversion_tests.yml has been
-        # backported.
-        # This variable and all branches where it's not set can be deleted after backporting the change.
-        change_backported = version_key in backports_required_old.keys()
-        if change_backported:
+        if version_key in backports_required_old.keys():
+            # The old binary's file already has this version's section (nested syntax).
             _always_exclude = diff(
                 backports_required_latest[version_key]["all"],
                 backports_required_old[version_key]["all"],
@@ -137,11 +134,21 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
             _suites_old: defaultdict = defaultdict(
                 list, backports_required_old[version_key]["suites"] or {}
             )
-        else:
+        elif "all" in backports_required_old.keys():
+            # The old binary predates the nested syntax and still uses the flat top-level
+            # `all`/`suites` layout.
+            # This branch can be deleted once the nested syntax has been backported everywhere.
             _always_exclude = diff(
                 backports_required_latest[version_key]["all"], backports_required_old["all"]
             )
             _suites_old: defaultdict = defaultdict(list, backports_required_old["suites"] or {})
+        else:
+            # The old binary's file has neither this version's section nor the flat layout. This
+            # happens when the section itself (e.g. `last-patch`) has not yet been backported to the
+            # old binary's branch: treat the old exclusions as empty so every current entry for this
+            # version is denylisted until it is backported.
+            _always_exclude = diff(backports_required_latest[version_key]["all"], [])
+            _suites_old: defaultdict = defaultdict(list)
 
         return _suites_latest, _suites_old, _always_exclude
 

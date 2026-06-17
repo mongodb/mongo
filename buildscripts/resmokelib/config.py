@@ -350,12 +350,13 @@ class MultiversionOptions(object):
 
     LAST_LTS = "last_lts"
     LAST_CONTINUOUS = "last_continuous"
+    LAST_PATCH = "last_patch"
 
     @classmethod
     def all_options(cls):
         """Return available version options for multiversion."""
 
-        return [cls.LAST_LTS, cls.LAST_CONTINUOUS]
+        return [cls.LAST_LTS, cls.LAST_CONTINUOUS, cls.LAST_PATCH]
 
 
 ##

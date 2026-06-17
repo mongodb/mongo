@@ -196,6 +196,23 @@ OLD_VERSIONS = (
 )
 
 
+def get_binary_name_for_version(version: str, base_name: str) -> str:
+    """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.
+
+    :param version: One of the _config.MultiversionOptions constants (LAST_LTS, LAST_CONTINUOUS,
+        LAST_PATCH).
+    :param base_name: The binary base name, e.g. 'mongod' or 'mongos'.
+    """
+    binary_builders = {
+        _config.MultiversionOptions.LAST_LTS: version_constants.build_last_lts_binary,
+        _config.MultiversionOptions.LAST_CONTINUOUS: version_constants.build_last_continuous_binary,
+        _config.MultiversionOptions.LAST_PATCH: multiversion_service.get_last_patch_binary_name,
+    }
+    if version not in binary_builders:
+        raise ValueError(f"Unknown multiversion option: {version}")
+    return binary_builders[version](base_name)
+
+
 def log_constants(exec_log):
     """Log FCV constants."""
     exec_log.info("Last LTS FCV: {}".format(LAST_LTS_FCV))

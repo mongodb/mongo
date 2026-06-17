@@ -292,3 +292,13 @@ class MultiversionService:
             )
             return None
         return last_patch_tag[1:]
+
+    def get_last_patch_binary_name(self, base_name: str) -> str:
+        """
+        Return the name of the binary file corresponding to last-patch release of the given tool.
+
+          :param base_name: Base name of binary (mongod, mongos, etc...).
+          :return: Name of last patch version of the given tool.
+        """
+        last_patch_fcv = self.get_last_patch_fcv()
+        return f"{base_name}-{last_patch_fcv}"

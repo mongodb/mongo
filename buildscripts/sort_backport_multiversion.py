@@ -43,7 +43,7 @@ def _extract_header(str_data: str) -> str:
 
 def _sort_all_entries(yml_data: dict) -> None:
     """Sort the entries in-place by test_file and ticket."""
-    for section in ("last-continuous", "last-lts"):
+    for section in ("last-continuous", "last-lts", "last-patch"):
         entries = (yml_data.get(section) or {}).get("all")
         if entries is None:
             continue

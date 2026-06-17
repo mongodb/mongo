@@ -339,6 +339,78 @@ class TestGenerateExcludeYaml(unittest.TestCase):
         self.patch_and_run(latest_yaml, old_yaml, MultiversionOptions.LAST_LTS)
         self.assert_contents(expected)
 
+    def test_last_patch(self):
+        # last_patch is diffed against the last-patch section of the old binary's file, exactly like
+        # last-lts/last-continuous: only the entry missing from the old file is excluded.
+        latest_yaml = {
+            "last-continuous": None,
+            "last-lts": None,
+            "last-patch": {
+                "all": [{"ticket": "fake_ticket0", "test_file": "jstests/fake_file0.js"}],
+                "suites": {
+                    "suite1": [
+                        {"ticket": "fake_ticket1", "test_file": "jstests/fake_file1.js"},
+                        {"ticket": "fake_ticket2", "test_file": "jstests/fake_file2.js"},
+                    ]
+                },
+            },
+        }
+
+        old_yaml = {
+            "last-continuous": None,
+            "last-lts": None,
+            "last-patch": {
+                "all": [{"ticket": "fake_ticket0", "test_file": "jstests/fake_file0.js"}],
+                "suites": {
+                    "suite1": [{"ticket": "fake_ticket2", "test_file": "jstests/fake_file2.js"}]
+                },
+            },
+        }
+
+        expected = {
+            "selector": {
+                "js_test": {"jstests/fake_file1.js": ["suite1_backport_required_multiversion"]}
+            }
+        }
+
+        self.patch_and_run(latest_yaml, old_yaml, MultiversionOptions.LAST_PATCH)
+        self.assert_contents(expected)
+
+    def test_last_patch_section_missing_from_old(self):
+        # Until this change is backported, the old binary's file has no `last-patch` section at all.
+        # Every current last-patch entry should then be excluded (treat old exclusions as empty).
+        latest_yaml = {
+            "last-continuous": None,
+            "last-lts": None,
+            "last-patch": {
+                "all": [{"ticket": "fake_ticket0", "test_file": "jstests/fake_file0.js"}],
+                "suites": {
+                    "suite1": [
+                        {"ticket": "fake_ticket1", "test_file": "jstests/fake_file1.js"},
+                        {"ticket": "fake_ticket2", "test_file": "jstests/fake_file2.js"},
+                    ]
+                },
+            },
+        }
+
+        old_yaml = {
+            "last-continuous": None,
+            "last-lts": None,
+        }
+
+        expected = {
+            "selector": {
+                "js_test": {
+                    "jstests/fake_file0.js": ["backport_required_multiversion"],
+                    "jstests/fake_file1.js": ["suite1_backport_required_multiversion"],
+                    "jstests/fake_file2.js": ["suite1_backport_required_multiversion"],
+                }
+            }
+        }
+
+        self.patch_and_run(latest_yaml, old_yaml, MultiversionOptions.LAST_PATCH)
+        self.assert_contents(expected)
+
 
 if __name__ == "__main__":
     unittest.main()

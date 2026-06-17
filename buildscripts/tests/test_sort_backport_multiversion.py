@@ -90,11 +90,15 @@ class TestSortAllEntries(unittest.TestCase):
                 _sort_all_entries(data)
                 self.assertEqual(data["last-continuous"]["all"], expected_result)
 
-    def test_sorts_both_sections_independently(self):
+    def test_sorts_all_sections_independently(self):
         input_lc = [{"test_file": "z.js", "ticket": "T-1"}, {"test_file": "a.js", "ticket": "T-2"}]
         input_llts = [
             {"test_file": "y.js", "ticket": "T-3"},
             {"test_file": "b.js", "ticket": "T-4"},
+        ]
+        input_lpatch = [
+            {"test_file": "x.js", "ticket": "T-5"},
+            {"test_file": "c.js", "ticket": "T-6"},
         ]
         expected_result = {
             "last-continuous": {
@@ -109,8 +113,18 @@ class TestSortAllEntries(unittest.TestCase):
                     {"test_file": "y.js", "ticket": "T-3"},
                 ]
             },
+            "last-patch": {
+                "all": [
+                    {"test_file": "c.js", "ticket": "T-6"},
+                    {"test_file": "x.js", "ticket": "T-5"},
+                ]
+            },
         }
-        data = {"last-continuous": {"all": input_lc}, "last-lts": {"all": input_llts}}
+        data = {
+            "last-continuous": {"all": input_lc},
+            "last-lts": {"all": input_llts},
+            "last-patch": {"all": input_lpatch},
+        }
         _sort_all_entries(data)
         self.assertEqual(data, expected_result)
 

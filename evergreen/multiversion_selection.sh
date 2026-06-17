@@ -29,6 +29,14 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
     last_continuous_arg=""
 fi
 
+# Optionally include the last-patch version (e.g. on the disagg variant). The release feed source
+# used to resolve it is controlled independently via the DB_CONTRIB_TOOL_RELEASE_FEED_SOURCE env
+# variable (db-contrib-tool's --releaseFeedSource option), injected by the evergreen function.
+last_patch_arg=""
+if [[ -n "${multiversion_include_last_patch}" ]]; then
+    last_patch_arg="last-patch"
+fi
+
 base_command="db-contrib-tool setup-repro-env"
 evergreen_args="-sb \
   --platform $platform \
@@ -38,7 +46,9 @@ local_args="--edition $edition \
   --debug \
   --fallbackToMaster \
   ${last_lts_arg} \
-  ${last_continuous_arg} 7.0 8.0.16"
+  ${last_continuous_arg} \
+  ${last_patch_arg} \
+  7.0 8.0.16"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"

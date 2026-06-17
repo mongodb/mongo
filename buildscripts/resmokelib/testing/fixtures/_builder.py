@@ -310,12 +310,11 @@ class ReplSetBuilder(FixtureBuilder):
         binary_versions = [BinVersionEnum.NEW for _ in range(kwargs["num_nodes"])]
 
         if mixed_bin_versions is not None:
-            from buildscripts.resmokelib import multiversionconstants
+            from buildscripts.resmokelib.multiversionconstants import get_binary_name_for_version
 
-            old_mongod_version = {
-                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOD_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY,
-            }[old_bin_version]
+            old_mongod_version = get_binary_name_for_version(
+                old_bin_version, config.DEFAULT_MONGOD_EXECUTABLE
+            )
 
             executables[BinVersionEnum.OLD] = old_mongod_version
             binary_versions = [x for x in mixed_bin_versions]
@@ -330,13 +329,19 @@ class ReplSetBuilder(FixtureBuilder):
         :param old_bin_version: old bin version
         :return: FCV
         """
-        from buildscripts.resmokelib import multiversionconstants
+        from buildscripts.resmokelib.multiversionconstants import (
+            LAST_CONTINUOUS_FCV,
+            LAST_LTS_FCV,
+            LATEST_FCV,
+            multiversion_service,
+        )
 
-        fcv = multiversionconstants.LATEST_FCV
+        fcv = LATEST_FCV
         if is_multiversion:
             fcv = {
-                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_FCV,
-                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_FCV,
+                config.MultiversionOptions.LAST_LTS: LAST_LTS_FCV,
+                config.MultiversionOptions.LAST_CONTINUOUS: LAST_CONTINUOUS_FCV,
+                config.MultiversionOptions.LAST_PATCH: multiversion_service.get_last_patch_fcv(),
             }[old_bin_version]
 
         return fcv
@@ -612,12 +617,11 @@ class ShardedClusterBuilder(FixtureBuilder):
         _class = cls.LATEST_MONGOS_CLASS
 
         if mixed_bin_versions is not None:
-            from buildscripts.resmokelib import multiversionconstants
+            from buildscripts.resmokelib.multiversionconstants import get_binary_name_for_version
 
-            old_mongos_version = {
-                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOS_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOS_BINARY,
-            }[old_bin_version]
+            old_mongos_version = get_binary_name_for_version(
+                old_bin_version, config.DEFAULT_MONGOS_EXECUTABLE
+            )
 
             executables[BinVersionEnum.OLD] = old_mongos_version
         return _class, executables

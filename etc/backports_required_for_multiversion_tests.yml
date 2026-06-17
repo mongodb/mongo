@@ -1,12 +1,12 @@
 # This file is intended to track tests that should be denylisted from multiversion testing due to
-# changes that have not yet been backported to the last-lts or last-continuous development
-# branches.
+# changes that have not yet been backported to the last-lts, last-continuous or last-patch
+# development branches.
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to denylist
 # under the appropriate multiversion branch. Any test in a (ticket, test_file) pair that appears in this file but
-# not in the last-lts or last-continuous branch version of this file indicates that a commit has
-# not yet been backported to the last-lts or last-continuous branch and will be excluded from the
+# not in the last-lts, last-continuous or last-patch branch version of this file indicates that a commit has
+# not yet been backported to the last-lts, last-continuous or last-patch branch and will be excluded from the
 # multiversion suite corresponding to the root level suite key.
 #
 # Example: To prevent 'my_test_file.js' from running with the last-continuous binary
@@ -19,6 +19,17 @@
 # last-continuous branch until this file has been updated with the same
 # (ticket, test_file) pair on the last-continuous branch.
 #
+last-patch:
+  all:
+    - test_file: jstests/core/index/wildcard/compound_wildcard_index_residual.js
+      ticket: SERVER-83322
+    - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+      ticket: SERVER-83322
+    - test_file: jstests/core/query/distinct/distinct_replanning.js
+      ticket: SERVER-125858
+    - test_file: jstests/core/query/group_sbe_accumulator_limit.js
+      ticket: SERVER-118700
+  suites: null
 last-continuous:
   all:
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js

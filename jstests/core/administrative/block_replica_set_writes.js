@@ -8,7 +8,7 @@
 //   assumes_read_preference_unchanged,
 //   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
-//   does_not_support_config_fuzzer
+//   does_not_support_config_fuzzer,
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -217,6 +217,7 @@ MongoRunner.binVersionSubs = [
     new MongoRunner.VersionSub("latest", shellVersion()),
     new MongoRunner.VersionSub("last-continuous", fcvConstants.lastContinuous),
     new MongoRunner.VersionSub("last-lts", fcvConstants.lastLTS),
+    new MongoRunner.VersionSub("last-patch", shellVersion()),
 ];
 
 MongoRunner.getBinVersionFor = function (version) {
@@ -242,10 +243,15 @@ MongoRunner.getBinVersionFor = function (version) {
 
 /**
  * Returns true if two version strings could represent the same version. This is true
- * if, after passing the versions through getBinVersionFor, the versions have the
- * same value for each version component up through the length of the shorter version.
+ * if, after passing the versions through getBinVersionFor, the versions share the same
+ * value for every component (major, minor, and patch) up through the length of the
+ * shorter version.
  *
- * That is, 3.2.4 compares equal to 3.2, but 3.2.4 does not compare equal to 3.2.3.
+ * That is, 3.2 compares equal to 3.2.4 (the patch component of the longer version is
+ * not examined), but 3.2.3 does not compare equal to 3.2.4.
+ *
+ * Two versions whose pre-release or build metadata differ (e.g. 9.0.0-rc1 vs 9.0.0-rc2,
+ * or two git hashes) are reported as not the same.
  */
 MongoRunner.areBinVersionsTheSame = function (versionA, versionB) {
     // Check for invalid version strings first.
@@ -254,7 +260,8 @@ MongoRunner.areBinVersionsTheSame = function (versionA, versionB) {
     try {
         return 0 === MongoRunner.compareBinVersions(versionA, versionB);
     } catch (err) {
-        // compareBinVersions() throws an error if two versions differ only by the git hash.
+        // compareBinVersions() throws an error if two versions differ only by a
+        // non-numeric component such as a pre-release tag or git hash.
         return false;
     }
 };
@@ -265,9 +272,13 @@ MongoRunner.areBinVersionsTheSame = function (versionA, versionB) {
  *      0, if they are equal
  *     -1, if the first is older
  *
- * Note that this function only compares up to the length of the shorter version.
- * Because of this, minor versions will compare equal to the major versions they stem
- * from, but major-major and minor-minor version pairs will undergo strict comparison.
+ * Only the components present in both versions are compared, i.e. up to the length of
+ * the shorter version. The versions are compared component-by-component (major, then
+ * minor, then patch), so a shorter version compares equal to any longer version sharing
+ * its prefix -- e.g. 3.2 equals 3.2.4, but 3.2.3 does not equal 3.2.4.
+ *
+ * Comparing two versions whose pre-release or build metadata differ (e.g. 9.0.0-rc1 vs
+ * 9.0.0-rc2, or two git hashes) throws rather than returning an ordering.
  */
 MongoRunner.compareBinVersions = function (versionA, versionB) {
     let stringA = versionA;
