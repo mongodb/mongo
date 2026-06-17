@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
@@ -93,64 +94,39 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        void setAllowChunkOperations(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     bool allowChunkOperations,
-                                     const boost::optional<UUID>& uuid,
-                                     bool isPrimaryShard) {
+        boost::optional<SharedSemiFuture<void>> setAllowChunkOperations(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            bool allowChunkOperations,
+            const boost::optional<UUID>& uuid,
+            bool isPrimaryShard) {
 
-            boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
+            // Holding this acquisition guarantees serialization with the critical section (both the
+            // blocking writes CS and the blocking reads CS), so it is guaranteed that no chunk
+            // operation commits while this acquisition is held.
+            // We release the collection acquisition when returning from this function, and drain
+            // operations outside. If some chunk operation (or migration) was in the commit phase,
+            // we have to release the acquisition so that it can acquire the critical section to
+            // attempt to commit, otherwise we would deadlock.
+            const CollectionAcquisition acq =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+                                  MODE_IX);
 
-            {
-                // Holding this acquisition guarantees serialization with the critical section
-                // (both the blocking writes CS and the blocking reads CS), so it is guaranteed
-                // that no chunk operation commits while this acquisition is held.
-                const CollectionAcquisition acq = acquireCollection(
-                    opCtx,
-                    CollectionAcquisitionRequest::fromOpCtx(
-                        opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
-                    MODE_IX);
+            shard_catalog_commit::commitSetAllowChunkOperationsLocally(
+                opCtx, nss, allowChunkOperations, uuid, isPrimaryShard);
 
-                shard_catalog_commit::commitSetAllowChunkOperationsLocally(
-                    opCtx, nss, allowChunkOperations, uuid, isPrimaryShard);
-
-                if (allowChunkOperations) {
-                    // If we are setting chunk operations back on, there's nothing to drain.
-                    return;
-                }
-
-                const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-                if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
-                    waitForMigrationAbort.emplace(msm->abort());
-                }
-            }
-            // We release the collection acquisition at this point. If some chunk operation (or
-            // migration) was in the commit phase, we have to release the acquisition so that it can
-            // acquire the critical section to attempt to commit. The commit should always fail,
-            // because by the time this command is invoked, the CSRS has already stored
-            // "allowMigrations: false", so it should reject any commit attempt (except for
-            // migration destinations).
-
-            if (waitForMigrationAbort) {
-                waitForMigrationAbort->get(opCtx);
+            if (allowChunkOperations) {
+                return boost::none;
             }
 
-            // Wait for all chunk operation coordinators.
-            auto* const service = ShardingCoordinatorService::getService(opCtx);
-            service->waitForOngoingCoordinatorsToFinish(
-                opCtx, [&](const ShardingCoordinator& coord) -> bool {
-                    static constexpr std::array kChunkOperationTypes{
-                        CoordinatorTypeEnum::kMoveRange,
-                        CoordinatorTypeEnum::kSplitChunk,
-                        CoordinatorTypeEnum::kMergeChunks,
-                        CoordinatorTypeEnum::kMergeAllChunks,
-                    };
-                    const auto type = coord.operationType();
-                    const auto& coordNss = coord.originalNss();
-                    return std::ranges::any_of(kChunkOperationTypes,
-                                               [type](auto t) { return t == type; }) &&
-                        (coordNss == nss || coordNss.makeTimeseriesBucketsNamespace() == nss);
-                });
+            const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+            if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
+                return msm->abort();
+            }
+
+            return boost::none;
         }
 
         void typedRun(OperationContext* opCtx) {
@@ -165,8 +141,6 @@ public:
                     "Expected to be called within a retryable write",
                     TransactionParticipant::get(opCtx));
 
-            const auto nss = ns();
-
             uassert(12120913,
                     "_shardsvrSetAllowChunkOperations should only run with AuthoritativeShardsDDL "
                     "enabled",
@@ -175,8 +149,10 @@ public:
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) !=
                         AuthoritativeMetadataAccessLevelEnum::kNone);
 
+            const auto nss = ns();
             const auto allowChunkOperations = request().getAllowChunkOperations();
             const auto collectionUUID = request().getCollectionUUID();
+            boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
 
             {
                 auto newClient = getGlobalServiceContext()->getService()->makeClient(
@@ -201,29 +177,76 @@ public:
                 // DBDirectClient retries WriteConflictException only when yielding is allowed.
                 // This command holds a CollectionAcquisition across the commit path, so yielding
                 // is disabled and WriteConflictException would otherwise propagate.
-                writeConflictRetry(newOpCtx, "ShardsvrSetAllowChunkOperations", nss, [&] {
-                    setAllowChunkOperations(newOpCtx,
-                                            nss,
-                                            allowChunkOperations,
-                                            collectionUUID,
-                                            ShardingState::get(newOpCtx)->shardId() ==
-                                                request().getPrimaryShardId());
-                });
+                waitForMigrationAbort =
+                    writeConflictRetry(newOpCtx, "ShardsvrSetAllowChunkOperations", nss, [&] {
+                        return setAllowChunkOperations(newOpCtx,
+                                                       nss,
+                                                       allowChunkOperations,
+                                                       collectionUUID,
+                                                       ShardingState::get(newOpCtx)->shardId() ==
+                                                           request().getPrimaryShardId());
+                    });
             }
+
+            {
+                // Since no write happened on this txnNumber, we need to make a dummy write so that
+                // secondaries can be aware of this txn.
+                DBDirectClient client(opCtx);
+                client.update(NamespaceString::kServerConfigurationNamespace,
+                              BSON("_id" << Request::kCommandName),
+                              BSON("$inc" << BSON("count" << 1)),
+                              true /* upsert */,
+                              false /* multi */);
+            }
+
+            if (allowChunkOperations) {
+                // If we are setting chunk operations back on, there's nothing to drain.
+                invariant(!waitForMigrationAbort.has_value());
+                return;
+            }
+
+            // Yield the session before waiting for ongoing operations, to avoid deadlocks. By this
+            // point, all mutating operations have already been done, so there isn't any risk from
+            // retried commands on this session running concurrently to this wait.
+            auto* const mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            mongoDSessionCatalog->checkInUnscopedSession(
+                opCtx, OperationContextSession::CheckInReason::kYield);
+
+            if (waitForMigrationAbort) {
+                waitForMigrationAbort->get(opCtx);
+            }
+
+            // Wait for all chunk operation coordinators.
+            auto* const service = ShardingCoordinatorService::getService(opCtx);
+            service->waitForOngoingCoordinatorsToFinish(
+                opCtx, [&](const ShardingCoordinator& coord) -> bool {
+                    static constexpr std::array kChunkOperationTypes{
+                        CoordinatorTypeEnum::kMoveRange,
+                        CoordinatorTypeEnum::kSplitChunk,
+                        CoordinatorTypeEnum::kMergeChunks,
+                        CoordinatorTypeEnum::kMergeAllChunks,
+                    };
+                    const auto type = coord.operationType();
+                    const auto& coordNss = coord.originalNss();
+                    return std::ranges::any_of(kChunkOperationTypes,
+                                               [type](auto t) { return t == type; }) &&
+                        (coordNss == nss || coordNss.makeTimeseriesBucketsNamespace() == nss);
+                });
+
+            // Checkout the session to check for potential newer commands on this session that may
+            // have executed while we were waiting. If that's the case, this command should fail.
+            opCtx->checkForInterrupt();
+            mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
+            TransactionParticipant::get(opCtx).beginOrContinue(
+                opCtx,
+                {*opCtx->getTxnNumber()},
+                boost::none /* autocommit */,
+                TransactionParticipant::TransactionActions::kNone);
 
             LOGV2_INFO(12120902,
                        "setAllowChunkOperations finished",
                        "ns"_attr = nss,
                        "allowChunkOperations"_attr = allowChunkOperations);
-
-            // Since no write happened on this txnNumber, we need to make a dummy write so that
-            // secondaries can be aware of this txn.
-            DBDirectClient client(opCtx);
-            client.update(NamespaceString::kServerConfigurationNamespace,
-                          BSON("_id" << Request::kCommandName),
-                          BSON("$inc" << BSON("count" << 1)),
-                          true /* upsert */,
-                          false /* multi */);
         }
 
     private:
