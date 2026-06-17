@@ -475,9 +475,15 @@ public:
 
     /**
      * Inserts the specified keys into the index. Does not attempt to determine whether the
-     * insertion of these keys should cause the index to become multikey. The 'numInserted' output
-     * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
-     * call, or to zero in the case of either a non-OK return Status or an empty 'keys' argument.
+     * insertion of these keys should cause the index to become multikey.
+     *
+     * The 'numInserted' output parameter, if non-nullptr, will be reset to the number of keys
+     * inserted by this function call, and also counts keys that already existed and were no-ops.
+     * The paremeter is set to zero in the case of either a non-OK return Status or an empty 'keys'
+     * argument.
+     *
+     * The 'numSkipped' output parameter, if non-nullptr, is reset to the number of keys that were
+     * already present in the index and therefore skipped as no-ops.
      */
     Status insertKeys(
         OperationContext* opCtx,
@@ -488,6 +494,7 @@ public:
         const InsertDeleteOptions& options,
         KeyHandlerFn&& onDuplicateKey,
         int64_t* numInserted,
+        int64_t* numSkipped = nullptr,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff,
         ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kDoNotReplicate);
 

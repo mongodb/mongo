@@ -518,6 +518,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                         set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(
                             multikeyMetadataKeys, descriptor()->ordering());
                     pathsObj = set_multikey_metadata_oplog_helpers::fieldPathsToBSON(fieldPaths);
+                    int64_t numSkipped = 0;
                     uassertStatusOK(accessMethod()->asSortedData()->insertKeys(
                         opCtx,
                         *shard_role_details::getRecoveryUnit(opCtx),
@@ -526,7 +527,14 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                         multikeyMetadataKeys,
                         {},
                         {},
-                        nullptr));
+                        nullptr,
+                        &numSkipped));
+                    if (numSkipped == static_cast<int64_t>(multikeyMetadataKeys.size())) {
+                        // Every metadata key was already present, so these paths are already
+                        // multikey and replicated. There is nothing to write or replicate, so roll
+                        // back this empty side transaction rather than committing a no-op.
+                        return;
+                    }
                 } else {
                     // Regular index: existing multikey paths format.
                     pathsObj = multikeyPathsToBSON(descriptor()->keyPattern(), multikeyPaths);

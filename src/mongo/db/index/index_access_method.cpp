@@ -330,6 +330,7 @@ Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
                              options,
                              std::move(onDuplicateKey),
                              numInserted,
+                             /* numSkipped */ nullptr,
                              includeDuplicateRecordId,
                              containerWriteBehavior);
     if (!status.isOK()) {
@@ -355,11 +356,15 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                                const InsertDeleteOptions& options,
                                                KeyHandlerFn&& onDuplicateKey,
                                                int64_t* numInserted,
+                                               int64_t* numSkipped,
                                                IncludeDuplicateRecordId includeDuplicateRecordId,
                                                ContainerWriteBehavior containerWriteBehavior) {
-    // Initialize the 'numInserted' out-parameter to zero in case the caller did not already do so.
+    // Initialize the out-parameters to zero in case the caller did not already do so.
     if (numInserted) {
         *numInserted = 0;
+    }
+    if (numSkipped) {
+        *numSkipped = 0;
     }
     bool unique = entry->descriptor()->unique();
     bool prepareUnique = entry->descriptor()->prepareUnique();
@@ -382,6 +387,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
         dupsAllowed = !unique;
     }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
+    int64_t numExistingKeys = 0;
     for (const auto& keyString : keys) {
         std::variant<Status, SortedDataInterface::DuplicateKey> result = Status::OK();
         if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
@@ -444,14 +450,20 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
             }
         }
 
-        // It's okay if the entire key (including record id) matches a key already inserted.
-        if (auto& status = std::get<Status>(result);
-            !status.isOK() && status != ErrorCodes::KeyExists) {
+        // KeyExists means the exact key (including its RecordId) was already present, so the insert
+        // was a benign no-op that does not count toward newly inserted keys.
+        if (auto& status = std::get<Status>(result); status == ErrorCodes::KeyExists) {
+            ++numExistingKeys;
+            continue;
+        } else if (!status.isOK()) {
             return status;
         }
     }
     if (numInserted) {
         *numInserted = keys.size();
+    }
+    if (numSkipped) {
+        *numSkipped = numExistingKeys;
     }
     return Status::OK();
 }
