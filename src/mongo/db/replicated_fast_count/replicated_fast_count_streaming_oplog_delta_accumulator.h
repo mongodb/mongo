@@ -72,6 +72,10 @@ public:
                                     const boost::optional<UUID>& uuidFilter,
                                     SizeCountDeltas& globalResult);
 
+    bool isTrackingChain() const {
+        return _isTrackingActiveChain();
+    }
+
 private:
     bool _hasActiveChainConflict(const repl::OplogEntry& entry) const;
     bool _isTrackingActiveChain() const;
@@ -89,6 +93,13 @@ public:
     int consume(const repl::OplogEntry& oplogEntry,
                 const boost::optional<UUID>& uuidFilter,
                 SizeCountDeltas& globalResult);
+
+    // True if a partial-transaction applyOps chain is currently being buffered. The fast-scan
+    // lanes only run when no chain is active; otherwise every entry must keep flowing through
+    // the txn buffer so its abandon/discard invariants stay intact.
+    bool isTrackingChain() const {
+        return _txnBuffer.isTrackingChain();
+    }
 
 private:
     TxnDeltaBuffer _txnBuffer;

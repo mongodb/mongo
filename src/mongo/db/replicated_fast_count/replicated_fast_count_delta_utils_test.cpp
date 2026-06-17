@@ -1544,6 +1544,52 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateOplogWithNoSizeMetadata) {
     EXPECT_TRUE(result.deltas.empty());
 }
 
+// When the fast lanes (Layer 2 / Layer 2.5) see a CRUD entry with `m.sz` but no `ui`, they fall
+// through to Layer 3, where the massert id 12116001 in `extractSizeCountDeltaForOpImpl` surfaces
+// the invariant violation. Both tests below exercise the fast-lane paths via the cursor.
+
+TEST_F(AggregateSizeCountFromOplogTest, AggregateCrudWithSizeMetadataMissingUiThrows) {
+    // A direct CRUD entry that carries `m.sz` but lacks `ui` falls through Layer 2 to Layer 3.
+    const Timestamp ts1{1, 1};
+    SingleOpSizeMetadata sm;
+    sm.setSz(10);
+    std::list<repl::OplogEntry> entries{
+        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(ts1, 1),
+            .opType = repl::OpTypeEnum::kInsert,
+            .nss = collA.nss,
+            // .uuid intentionally omitted
+            .oField = BSONObj(),
+            .sizeMetadata = repl::OplogEntrySizeMetadata{sm},
+            .wallClockTime = Date_t::now(),
+        }}},
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+    ASSERT_THROWS_CODE(
+        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12116001);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, AggregateApplyOpsInnerOpMissingUiThrows) {
+    // An applyOps whose inner CRUD op carries `m.sz` but lacks `ui` falls through Layer 2.5 to
+    // Layer 3 by way of the inner-op fast CRUD path.
+    const Timestamp ts1{1, 1};
+    BSONObj innerOpNoUi =
+        BSON("op" << "i"
+                  << "ns" << collA.nss.ns_forTest() << "o" << BSONObj() << "m" << BSON("sz" << 10));
+    std::list<repl::OplogEntry> entries{
+        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(ts1, 1),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = NamespaceString::kAdminCommandNamespace,
+            .oField = BSON("applyOps" << BSON_ARRAY(innerOpNoUi)),
+            .wallClockTime = Date_t::now(),
+        }}},
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+    ASSERT_THROWS_CODE(
+        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12116001);
+}
+
 class AggregateSizeCountFromOplogTxnVisibilityTest : public AggregateSizeCountFromOplogTest {
 protected:
     static constexpr int64_t kTestTerm = 1;
@@ -2146,6 +2192,37 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionWithPreExistingWritesFai
 
     ASSERT_THROWS_CODE(
         aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12601900);
+}
+
+// Verifies that the local `isFastCountEligibleNonStore` helper agrees with the canonical
+// `isReplicatedFastCountEligible` for every namespace outside the fast-count-store. The fast-scan
+// cursor path uses the local helper to skip two redundant `NamespaceString` constructions per
+// CRUD entry. This test guards against future drift if either function's predicates change.
+TEST(FastCountEligibilityParityTest, NonStoreNamespacesAgreeWithCanonical) {
+    struct TestCase {
+        StringData db;
+        StringData coll;
+    };
+    const std::vector<TestCase> cases{
+        // Eligible user collections.
+        {"mydb"_sd, "users"_sd},
+        {"app"_sd, "events"_sd},
+        // Ineligible: local DB.
+        {"local"_sd, "oplog.rs"_sd},
+        {"local"_sd, "replset.minvalid"_sd},
+        {"local"_sd, "anything"_sd},
+        // Ineligible: server configuration collection (admin.system.version).
+        {"admin"_sd, "system.version"_sd},
+        // Ineligible: system.profile in any user DB.
+        {"mydb"_sd, "system.profile"_sd},
+        {"app"_sd, "system.profile"_sd},
+    };
+
+    for (const auto& c : cases) {
+        const auto nss = NamespaceString::createNamespaceString_forTest(c.db, c.coll);
+        EXPECT_EQ(isReplicatedFastCountEligible(nss), isFastCountEligibleNonStore(nss))
+            << "Disagreement for " << nss.toStringForErrorMsg();
+    }
 }
 }  // namespace
 }  // namespace mongo::replicated_fast_count

@@ -32,6 +32,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <list>
@@ -80,6 +82,136 @@ protected:
             acc.consumeRecord(*rec);
         }
         return acc.finish();
+    }
+
+    // Feeds an arbitrary BSON record straight to consumeRecord, bypassing the cursor + OplogEntry
+    // round-trip. Used by the fast-lane tests that need to construct deliberately malformed or
+    // hand-shaped raw entries (e.g. non-string `op`, missing `sz`, custom `tid` field).
+    OplogScanResult runAccumulatorRaw(StreamingOplogDeltaAccumulator::Options opts,
+                                      const std::vector<BSONObj>& rawRecords) {
+        StreamingOplogDeltaAccumulator acc(std::move(opts));
+        int64_t rid = 1;
+        for (const auto& raw : rawRecords) {
+            Record rec{RecordId(rid++), RecordData(raw.objdata(), raw.objsize())};
+            acc.consumeRecord(rec);
+        }
+        return acc.finish();
+    }
+
+    // Builds a noop (`n`) oplog BSON without `m` or `ui` — Layer 1 returns kCountedNoDelta and
+    // advances lastTimestamp without recording any delta.
+    BSONObj makeNoopBson(Timestamp ts) {
+        return repl::DurableOplogEntry{
+            repl::DurableOplogEntryParams{
+                .opTime = opTimeAt(ts),
+                .opType = repl::OpTypeEnum::kNoop,
+                .nss = NamespaceString::createNamespaceString_forTest("test", "$cmd"),
+                .oField = BSON("msg" << "noop"),
+                .wallClockTime = Date_t::now(),
+            }}
+            .toBSON()
+            .getOwned();
+    }
+
+    // Builds a `c` (command) oplog BSON whose first o-field is a known no-delta command
+    // (createIndexes). Layer 1 returns kCountedNoDelta.
+    BSONObj makeUnrelatedCommandBson(Timestamp ts) {
+        return repl::DurableOplogEntry{
+            repl::DurableOplogEntryParams{
+                .opTime = opTimeAt(ts),
+                .opType = repl::OpTypeEnum::kCommand,
+                .nss = collA.nss.getCommandNS(),
+                .uuid = collA.uuid,
+                .oField = BSON("createIndexes" << collA.nss.coll() << "v" << 2 << "key"
+                                               << BSON("a" << 1) << "name" << "a_1"),
+                .wallClockTime = Date_t::now(),
+            }}
+            .toBSON()
+            .getOwned();
+    }
+
+    // Builds a container op (ci/cu/cd) oplog BSON. `containerIdent` is written to the top-level
+    // `container` field that Layer 1 reads to decide whether to skip the entry.
+    BSONObj makeContainerOpBson(Timestamp ts, StringData opStr, StringData containerIdent) {
+        BSONObjBuilder b;
+        b.append("op", opStr);
+        b.append("ns", collA.nss.ns_forTest());
+        collA.uuid.appendToBuilder(&b, "ui");
+        b.append("ts", ts);
+        b.append("t", kTestTerm);
+        b.append("v", repl::DurableOplogEntry::kOplogVersion);
+        b.append("wall", Date_t::now());
+        b.append("o", BSONObj());
+        b.append("container", containerIdent);
+        return b.obj();
+    }
+
+    // Builds a raw CRUD oplog BSON with explicit control over which fields are present and what
+    // shape `m` and `sz` take. Used to exercise the Layer 2 fall-through branches.
+    BSONObj makeRawCrudBson(Timestamp ts,
+                            StringData opStr,
+                            const NamespaceString& nss,
+                            boost::optional<UUID> uuid,
+                            boost::optional<BSONObj> mField) {
+        BSONObjBuilder b;
+        b.append("op", opStr);
+        b.append("ns", nss.ns_forTest());
+        if (uuid) {
+            uuid->appendToBuilder(&b, "ui");
+        }
+        b.append("ts", ts);
+        b.append("t", kTestTerm);
+        b.append("v", repl::DurableOplogEntry::kOplogVersion);
+        b.append("wall", Date_t::now());
+        b.append("o", BSON("_id" << 1));
+        b.append("o2", BSON("_id" << 1));
+        if (mField) {
+            b.append("m", *mField);
+        }
+        return b.obj();
+    }
+
+    // Builds a non-partial applyOps oplog BSON with the supplied inner ops. Set `prepare=true`
+    // to mark it as a prepare entry (Layer 2.5 short-circuits to kProcessed{0}).
+    BSONObj makeApplyOpsBson(Timestamp ts, BSONArray innerOps, bool prepare = false) {
+        BSONObjBuilder oBuilder;
+        oBuilder.append("applyOps", innerOps);
+        if (prepare) {
+            oBuilder.append("prepare", true);
+        }
+        return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+                                           .opTime = opTimeAt(ts),
+                                           .opType = repl::OpTypeEnum::kCommand,
+                                           .nss = NamespaceString::kAdminCommandNamespace,
+                                           .oField = oBuilder.obj(),
+                                           .wallClockTime = Date_t::now(),
+                                       }}
+            .toBSON()
+            .getOwned();
+    }
+
+    // Builds a commitTransaction oplog BSON. If `mArray` is provided, it is written as the
+    // top-level `m` field (array variant of OplogEntrySizeMetadata).
+    BSONObj makeCommitTxnBson(Timestamp ts, boost::optional<BSONArray> mArray) {
+        BSONObjBuilder b;
+        b.append("op", "c");
+        b.append("ns", NamespaceString::kAdminCommandNamespace.ns_forTest());
+        b.append("ts", ts);
+        b.append("t", kTestTerm);
+        b.append("v", repl::DurableOplogEntry::kOplogVersion);
+        b.append("wall", Date_t::now());
+        b.append("o", BSON("commitTransaction" << 1));
+        if (mArray) {
+            b.append("m", *mArray);
+        }
+        return b.obj();
+    }
+
+    // Builds a raw insert inner-op BSON for use inside an applyOps array.
+    BSONObj makeInnerInsertBson(const test_helpers::NsAndUUID& coll, int32_t sizeDelta) {
+        return BSON("op" << "i"
+                         << "ns" << coll.nss.ns_forTest() << "ui" << coll.uuid << "o"
+                         << BSON("_id" << 1) << "m" << BSON("sz" << sizeDelta));
     }
 
     test_helpers::NsAndUUID collA = {.nss = NamespaceString::createNamespaceString_forTest(
@@ -269,6 +401,241 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, PartialTxn_AtEndOfStream_Discarded) {
     EXPECT_FALSE(result.deltas.contains(collA.uuid));
     // lastTimestamp advances to the last scanned entry even though its delta is not yet visible.
     EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+// ---------- Fast-lane focused tests ----------
+//
+// The tests below exercise the Layer 1 / Layer 2 / Layer 2.5 fast lanes in
+// `consumeRecord`. Each test targets a specific branch in `classifyForFastLane`,
+// `tryRecordFastCrud`, `tryFastApplyOps`, or `tryFastCommitTxn` that the higher-level scan tests
+// cover only incidentally.
+
+// ----- Layer 1: classifyForFastLane / kCountedNoDelta -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_Noop_AdvancesTimestampNoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({}, {makeNoopBson(ts)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_UnrelatedCommand_AdvancesTimestampNoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({}, {makeUnrelatedCommandBson(ts)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ContainerOpOnUserIdent_AdvancesTimestamp) {
+    // ci/cu/cd targeting a non-fast-count ident are still counted-no-delta (ts advances).
+    const Timestamp ts{1, 1};
+    const auto result =
+        runAccumulatorRaw({}, {makeContainerOpBson(ts, "ci"_sd, "collection-user-ident"_sd)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ContainerOpOnFastCountIdent_NoTimestampAdvance) {
+    // ci/cu/cd targeting a replicated-fast-count ident are internal writes; Layer 1 returns
+    // kFastCountStoreSkip so lastTimestamp must NOT advance (avoids feedback loop on the
+    // checkpoint store itself). The container field stores the ident string, not the namespace.
+    const Timestamp ts{1, 1};
+    const auto result =
+        runAccumulatorRaw({}, {makeContainerOpBson(ts, "ci"_sd, ident::kFastCountMetadataStore)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_FALSE(result.lastTimestamp);
+}
+
+// ----- Layer 1: classifyForFastLane / kFastCountStoreSkip via ns -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_DirectCrudOnFastCountStore_NoTimestampAdvance) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulator(
+        {},
+        {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, /*sz=*/10)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_FALSE(result.lastTimestamp);
+}
+
+// ----- Layer 2: tryRecordFastCrud shape handling -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudMissingM_NoDeltas) {
+    // CRUD entry without `m` size metadata is treated as no-delta. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {}, {makeRawCrudBson(ts, "i"_sd, collA.nss, collA.uuid, /*mField=*/boost::none)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudIneligibleNamespace_NoDeltas) {
+    // local.* is ineligible for replicated fast count. Layer 2's `isFastCountEligibleNonStore`
+    // check skips the delta but still counts the entry as processed (ts advances).
+    const auto localNss =
+        NamespaceString::createNamespaceString_forTest("local", "rs.oplog.rs.archive");
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw(
+        {}, {makeRawCrudBson(ts, "i"_sd, localNss, UUID::gen(), BSON("sz" << 10))});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_UuidFilterMismatch_NoDelta) {
+    // CRUD entry on a UUID outside the filter is dropped silently. ts still advances.
+    const Timestamp ts{1, 1};
+    const auto result =
+        runAccumulator({.uuidFilter = collA.uuid},
+                       {test_helpers::makeOplogEntry(ts, collB, repl::OpTypeEnum::kInsert, 50)});
+    EXPECT_FALSE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+// ----- Layer 2.5: tryFastApplyOps applyOps shapes -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_PreparedApplyOps_AdvancesTimestampNoDeltas) {
+    // A prepare entry holds its deltas until the matching commitTransaction. Layer 2.5 returns
+    // kProcessed{0}: ts advances, but no per-uuid deltas are recorded.
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts, BSON_ARRAY(makeInnerInsertBson(collA, 100)), /*prepare=*/true);
+    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NonPartialApplyOps_CrudInnerOps_AccumulatesDeltas) {
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson = makeApplyOpsBson(
+        ts, BSON_ARRAY(makeInnerInsertBson(collA, 100) << makeInnerInsertBson(collB, 200)));
+    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
+    ASSERT_TRUE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 200);
+    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 1);
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsAllInternalInnerOps_NoTimestampAdvance) {
+    // applyOps where every inner op targets the fast-count store maps to kAllInternal: the
+    // entry is skipped entirely (no ts advance), mirroring `operationsOnFastCountStores`.
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson =
+        makeApplyOpsBson(ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 50)));
+    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_FALSE(result.lastTimestamp);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_ApplyOpsMixedUserAndInternal_OnlyUserDeltasRecorded) {
+    // Mixed inner ops: internal-store inner ops are silently dropped, user-collection inner ops
+    // contribute deltas. ts advances because at least one user op was observed.
+    const Timestamp ts{1, 1};
+    const auto applyOpsBson = makeApplyOpsBson(
+        ts, BSON_ARRAY(makeInnerInsertBson(fastCountColl, 1) << makeInnerInsertBson(collA, 100)));
+    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 100);
+    EXPECT_FALSE(result.deltas.contains(fastCountColl.uuid));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_ApplyOpsInnerNonCrud_FallsThroughToLayer3) {
+    // An inner op whose `op` is not in {i,u,d} forces Layer 2.5 to fall through. Layer 3 then
+    // parses the entry and processes inner ops via the typed dispatch. For this synthetic
+    // applyOps containing a noop inner op, the typed dispatch still produces no deltas because
+    // the noop has no size metadata. ts advances.
+    const Timestamp ts{1, 1};
+    BSONObj innerNoop =
+        BSON("op" << "n"
+                  << "ns" << collA.nss.ns_forTest() << "o" << BSON("msg" << "noop"));
+    const auto applyOpsBson = makeApplyOpsBson(ts, BSON_ARRAY(innerNoop));
+    const auto result = runAccumulatorRaw({}, {applyOpsBson});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+// ----- Layer 2.5: tryFastCommitTxn shapes -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_CommitTxnWithoutSizeMetadata_AdvancesTimestampNoDeltas) {
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulatorRaw({}, {makeCommitTxnBson(ts, /*mArray=*/boost::none)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_CommitTxnWithSizeMetadataArray_AccumulatesPerUuidDeltas) {
+    // commitTransaction's `m` field is an array of {uuid, sz, ct} (per-collection rollup of the
+    // prepared transaction's writes). Layer 2.5 reads it directly and records each entry.
+    const Timestamp ts{1, 1};
+    BSONArrayBuilder mArr;
+    mArr.append(BSON("uuid" << collA.uuid << "sz" << int64_t{300} << "ct" << int64_t{3}));
+    mArr.append(BSON("uuid" << collB.uuid << "sz" << int64_t{500} << "ct" << int64_t{5}));
+    const auto result = runAccumulatorRaw({}, {makeCommitTxnBson(ts, mArr.arr())});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 300);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 3);
+    ASSERT_TRUE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.size, 500);
+    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount.count, 5);
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CommitTxnUuidFilter_FiltersPerEntry) {
+    const Timestamp ts{1, 1};
+    BSONArrayBuilder mArr;
+    mArr.append(BSON("uuid" << collA.uuid << "sz" << int64_t{300} << "ct" << int64_t{3}));
+    mArr.append(BSON("uuid" << collB.uuid << "sz" << int64_t{500} << "ct" << int64_t{5}));
+    const auto result =
+        runAccumulatorRaw({.uuidFilter = collA.uuid}, {makeCommitTxnBson(ts, mArr.arr())});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_FALSE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+// ----- Death tests for unsupported data shapes -----
+
+class StreamingOplogDeltaAccumulatorDeathTest : public StreamingOplogDeltaAccumulatorTest {};
+
+DEATH_TEST_F(StreamingOplogDeltaAccumulatorDeathTest, FastLane_TidFieldCrashes, "12565801") {
+    // SERVER-125723: an oplog entry with a `tid` field must crash the fast-scan path. Layer 1's
+    // `extractScanFields` reads the `tid` byte triple in its size-3 dispatch and aborts the
+    // process with assert id 12565801. Multi-tenancy is no longer supported on this hot path.
+    const Timestamp ts{1, 1};
+    BSONObjBuilder b;
+    b.append("op", "i");
+    b.append("ns", collA.nss.ns_forTest());
+    collA.uuid.appendToBuilder(&b, "ui");
+    b.append("tid", "tenant1");
+    b.append("ts", ts);
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSON("_id" << 1));
+    b.append("m", BSON("sz" << 10));
+    runAccumulatorRaw({}, {b.obj()});
+}
+
+// ----- Checkpoint metrics interaction -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_CheckpointSkippedMetric_FiresOnFastCountStoreSkip) {
+    // Records that hit kFastCountStoreSkip (direct CRUD on the store, or container ops on the
+    // fast-count ident) must report a "skipped" metric in checkpoint mode and must not advance
+    // lastTimestamp. This is the contract Layer 1 has with the checkpoint accountant.
+    const Timestamp ts{1, 1};
+    const auto result = runAccumulator(
+        {.isCheckpoint = true},
+        {test_helpers::makeOplogEntry(ts, fastCountColl, repl::OpTypeEnum::kInsert, 10)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_FALSE(result.lastTimestamp);
 }
 
 }  // namespace
