@@ -185,7 +185,7 @@ bool isProcessInternalClient(const Client& client) {
  * Non-user connections are listed active if they have an opCtx and not waiting on a condvar.
  */
 bool Client::hasAnyActiveCurrentOp() const {
-    if (!_opCtx)
+    if (!_opCtx || _opCtxIsPendingDestruction)
         return false;
     if (isFromUserConnection() || !_opCtx->isWaitingForConditionOrInterrupt())
         return true;
@@ -270,10 +270,11 @@ int Client::getLocalPort() const {
 }
 
 void Client::_setOperationContext(OperationContext* opCtx) {
-    _opCtx = opCtx;
     if (_session) {
         _session->setInOperation(opCtx != nullptr);
     }
+    _opCtx = opCtx;
+    _opCtxIsPendingDestruction = false;
 }
 
 bool Client::isInternalClient() {

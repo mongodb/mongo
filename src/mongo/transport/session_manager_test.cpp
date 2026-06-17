@@ -96,13 +96,13 @@ TEST_F(SessionManagerTest, TestActiveClientOperationsForClientsWithSessions) {
     ASSERT_EQ(getActiveOperations(), 0);
 }
 
-TEST_F(SessionManagerTest, TestActiveClientOperationsOnDelist) {
+TEST_F(SessionManagerTest, TestActiveClientOperationsOnPendingDestruction) {
     auto client = makeClient(transportLayer->createSession());
     ASSERT_EQ(getActiveOperations(), 0);
     {
         auto opCtx = client->makeOperationContext();
         ASSERT_EQ(getActiveOperations(), 1);
-        getServiceContext()->killAndDelistOperation(opCtx.get());
+        getServiceContext()->markOperationAsPendingDestruction(opCtx.get());
         ASSERT_EQ(getActiveOperations(), 0);
     }
     ASSERT_EQ(getActiveOperations(), 0);

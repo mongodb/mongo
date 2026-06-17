@@ -289,7 +289,8 @@ public:
 
     /**
      * Removes the operation UUID associated with this operation.
-     * DO NOT call this function outside `~OperationContext()` and `killAndDelistOperation()`.
+     * DO NOT call this function outside `~OperationContext()` and
+     * `markOperationAsPendingDestruction()`.
      */
     void releaseOperationKey();
 

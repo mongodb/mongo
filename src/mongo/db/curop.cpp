@@ -300,7 +300,9 @@ void CurOp::reportCurrentOpForClient(WithLock,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
 
-    OperationContext* clientOpCtx = client->getOperationContext();
+    OperationContext* clientOpCtx = nullptr;
+    if (!client->operationContextIsPendingDestruction())
+        clientOpCtx = client->getOperationContext();
 
     infoBuilder->append("type", "op");
 
@@ -384,10 +386,14 @@ void CurOp::reportCurrentOpForClient(WithLock,
 
 bool CurOp::currentOpBelongsToTenant(WithLock, Client* client, TenantId tenantId) {
     invariant(client);
-
+    if (client->operationContextIsPendingDestruction()) {
+        return false;
+    }
     OperationContext* clientOpCtx = client->getOperationContext();
-
-    if (!clientOpCtx || (CurOp::get(clientOpCtx))->getNSS().tenantId() != tenantId) {
+    if (!clientOpCtx) {
+        return false;
+    }
+    if (CurOp::get(clientOpCtx)->getNSS().tenantId() != tenantId) {
         return false;
     }
 

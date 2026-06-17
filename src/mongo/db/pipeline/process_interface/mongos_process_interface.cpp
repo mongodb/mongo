@@ -320,7 +320,7 @@ BSONObj MongosProcessInterface::_reportCurrentOpForClient(
 
     OperationContext* clientOpCtx = client->getOperationContext();
 
-    if (clientOpCtx) {
+    if (clientOpCtx && !client->operationContextIsPendingDestruction()) {
         if (auto txnRouter = TransactionRouter::get(clientOpCtx)) {
             txnRouter.reportState(clientOpCtx, &builder, true /* sessionIsActive */);
         }

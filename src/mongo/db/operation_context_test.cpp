@@ -1123,7 +1123,7 @@ TEST_F(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
     ASSERT_FALSE(optCtx->isWaitingForConditionOrInterrupt());
 }
 
-TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
+TEST_F(OperationContextTest, CurrentOpExcludesPendingDestructionOperations) {
     auto client = getService()->makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
     const auto expCtx = ExpressionContextBuilder{}
@@ -1131,11 +1131,11 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
                             .ns(NamespaceString::createNamespaceString_forTest("foo.bar"_sd))
                             .build();
     for (auto truncateOps : {true, false}) {
-        BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
+        BSONObjBuilder bobNoOpCtx, bobPendingDestructionOpCtx;
         // We use a separate client thread to generate CurrentOp reports in presence and absence
         // of an `opCtx`. This is because `CurOp::reportCurrentOpForClient()` accepts an `opCtx`
         // as input and requires it to be present throughout its execution.
-        stdx::thread thread([&]() mutable {
+        stdx::thread([&]() {
             std::lock_guard<Client> lk(*opCtx->getClient());
 
             auto threadClient = getService()->makeClient("ThreadClient");
@@ -1145,26 +1145,28 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
                 lk, expCtx, threadClient.get(), truncateOps, &bobNoOpCtx);
 
             auto threadOpCtx = threadClient->makeOperationContext();
-            getServiceContext()->killAndDelistOperation(threadOpCtx.get());
+            getServiceContext()->markOperationAsPendingDestruction(threadOpCtx.get());
 
-            // Generate report in presence of a killed opCtx
+            // Generate report in presence of a pending destruction opCtx
             CurOp::reportCurrentOpForClient(
-                lk, expCtx, threadClient.get(), truncateOps, &bobKilledOpCtx);
-        });
+                lk, expCtx, threadClient.get(), truncateOps, &bobPendingDestructionOpCtx);
+        }).join();
 
-        thread.join();
         auto objNoOpCtx = bobNoOpCtx.obj();
-        auto objKilledOpCtx = bobKilledOpCtx.obj();
+        auto objPendingDestructionOpCtx = bobPendingDestructionOpCtx.obj();
 
         LOGV2_DEBUG(4780201, 1, "With no opCtx", "object"_attr = objNoOpCtx);
-        LOGV2_DEBUG(4780202, 1, "With killed opCtx", "object"_attr = objKilledOpCtx);
+        LOGV2_DEBUG(4780202,
+                    1,
+                    "With pending destruction opCtx",
+                    "object"_attr = objPendingDestructionOpCtx);
 
-        ASSERT_EQ(objNoOpCtx.nFields(), objKilledOpCtx.nFields());
+        ASSERT_EQ(objNoOpCtx.nFields(), objPendingDestructionOpCtx.nFields());
 
         auto compareBSONObjs = [](BSONObj& a, BSONObj& b) -> bool {
             return (a == b).type == BSONObj::DeferredComparison::Type::kEQ;
         };
-        ASSERT(compareBSONObjs(objNoOpCtx, objKilledOpCtx));
+        ASSERT(compareBSONObjs(objNoOpCtx, objPendingDestructionOpCtx));
     }
 }
 

@@ -1137,7 +1137,7 @@ BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
 
     OperationContext* clientOpCtx = client->getOperationContext();
 
-    if (clientOpCtx) {
+    if (clientOpCtx && !client->operationContextIsPendingDestruction()) {
         if (CurOp::get(clientOpCtx)->getShouldOmitDiagnosticInformation()) {
             return builder.obj();
         }
