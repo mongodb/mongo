@@ -327,8 +327,9 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
     const DocumentSourceChangeStreamSpec& spec,
     const ChangeStream& changeStream) try {
 
-    if (!expCtx->getInRouter()) {
-        // If we are not on a router, we always set reader version v1.
+    // If we are not on a router or are re-parsing the query for $queryStats, set reader version v1.
+    if (!expCtx->getInRouter() ||
+        !expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
@@ -343,25 +344,19 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
-    // Check If the user explicitly requested a specific change stream reader version.
+    // If the user explicitly requested v1, honor it.
     const auto& version = spec.getVersion();
-
-    // If no change stream reader version was explicitly selected, or if it was set explicitly to
-    // v1, change stream reader version v1 will be used.
-    if (!version.has_value() || *version == ChangeStreamReaderVersionEnum::kV1) {
+    if (version.has_value() && *version == ChangeStreamReaderVersionEnum::kV1) {
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
-    // The user has explicitly selected the v2 change stream reader version.
-
+    // Otherwise (no version specified, or explicit v2), proceed with v2 prerequisite checks.
     ChangeStreamReaderBuilder* readerBuilder =
         ChangeStreamReaderBuilder::get(opCtx->getServiceContext());
-
     tassert(10743904, "expecting ChangeStreamReaderBuilder to be available", readerBuilder);
 
     DataToShardsAllocationQueryService* dataToShardsAllocationQueryService =
         DataToShardsAllocationQueryService::get(opCtx);
-
     tassert(10743906,
             "expecting DataToShardsAllocationQueryService to be available",
             dataToShardsAllocationQueryService);

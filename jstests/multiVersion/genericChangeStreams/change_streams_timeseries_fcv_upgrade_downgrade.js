@@ -5,6 +5,7 @@
 //   requires_replication,
 //   requires_timeseries,
 //   featureFlagChangeStreamPreciseShardTargeting,
+//   requires_fcv_90,
 // ]
 
 import "jstests/multiVersion/libs/verify_versions.js";
@@ -51,17 +52,9 @@ function withChangeStreamTest(db, fn) {
     }
 }
 
-function openChangeStreamCursor(
-    cst,
-    collName,
-    {watchMode, comment, rawData, version = "v2", ...spec},
-) {
+function openChangeStreamCursor(cst, collName, {watchMode, comment, rawData, ...spec}) {
     if (watchMode === ChangeStreamWatchMode.kCluster) {
         spec.allChangesForCluster = true;
-    }
-
-    if (version) {
-        spec.version = version;
     }
 
     const collection = watchMode === ChangeStreamWatchMode.kCollection ? collName : 1;

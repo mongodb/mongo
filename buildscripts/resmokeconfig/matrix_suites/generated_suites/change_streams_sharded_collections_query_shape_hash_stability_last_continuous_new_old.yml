@@ -48,6 +48,8 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
+    - jstests/change_streams/create_event_from_chunk_migration.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
     - jstests/change_streams/does_not_implicitly_create_database.js
     - jstests/change_streams/oplog_rewrite/*.js
     - jstests/change_streams/split_large_event.js

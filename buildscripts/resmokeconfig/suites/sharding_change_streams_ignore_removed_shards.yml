@@ -4,8 +4,6 @@ selector:
   roots:
     - jstests/sharding/query/change_streams/*.js
   exclude_files:
-    # Test is testing behavior specific to change streams v1.
-    - jstests/sharding/query/change_streams/change_streams_establishment_finds_new_shards.js
     # Test removes primary shard after some documents were inserted, thus (expectedly) produces
     # different result with missing documents in ignoreRemovedShards mode.
     - jstests/sharding/query/change_streams/change_streams_with_config_transitions.js
@@ -21,6 +19,10 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+  exclude_with_any_tags:
+    # This suite runs change streams as v2; v1-pinned tests use scaffolding (e.g.
+    # 'shardedAggregateHangBeforeEstablishingShardCursors') that v2 doesn't trigger.
+    - assumes_change_streams_v1
 
 executor:
   archive:
@@ -29,7 +31,6 @@ executor:
   config:
     shell_options:
       nodb: ""
-      # Ensure we always start change streams with v2 version in ignoreRemovedShards mode.
+      # Ensure we always start change streams in ignoreRemovedShards mode (a v2-only feature).
       eval: >-
         await import('jstests/libs/override_methods/implicit_change_stream_v2_ignore_removed_shards.js');
-        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');

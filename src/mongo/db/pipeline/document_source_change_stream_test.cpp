@@ -114,22 +114,6 @@ using DSChangeStream = DocumentSourceChangeStream;
 // Deterministic values used for testing
 const UUID testConstUuid = UUID::parse("6948DF80-14BD-4E04-8842-7668D9C001F5").getValue();
 
-// RAII scopeguard for creating a 'ChangeStreamReaderBuilder' mock instance.
-struct ScopedChangeStreamReaderBuilderMock {
-    ScopedChangeStreamReaderBuilderMock(const ScopedChangeStreamReaderBuilderMock&) = delete;
-    ScopedChangeStreamReaderBuilderMock& operator=(const ScopedChangeStreamReaderBuilderMock&) =
-        delete;
-
-    explicit ScopedChangeStreamReaderBuilderMock(
-        std::unique_ptr<ChangeStreamReaderBuilder> readerBuilder) {
-        ChangeStreamReaderBuilder::set(getGlobalServiceContext(), std::move(readerBuilder));
-    }
-
-    ~ScopedChangeStreamReaderBuilderMock() {
-        ChangeStreamReaderBuilder::set(getGlobalServiceContext(), nullptr);
-    }
-};
-
 // Extract a stage from the pipeline by type. Returns nullptr if the pipeline does not contain a
 // stage of that type.
 template <typename Stage>
@@ -463,9 +447,9 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
     unittest::ServerParameterGuard preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
-    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
     ScopedChangeStreamReaderBuilderMock readerBuilder(
         std::make_unique<ChangeStreamReaderBuilderMock>());
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(AllocationToShardsStatus::kOk);
 
     // Versions "v1", "v2" are supported.
     std::array<boost::optional<StringData>, 3> versions = {boost::none, "v1"_sd, "v2"_sd};
@@ -502,14 +486,16 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
                     ASSERT_EQ(idl::deserialize<ChangeStreamReaderVersionEnum>(*version),
                               getExpCtx()->getChangeStreamSpec()->getVersion());
                 } else {
-                    ASSERT_EQ("v1",
+                    // No version specified: with the precise shard targeting feature flag enabled
+                    // and on a router, this defaults to v2.
+                    ASSERT_EQ("v2",
                               serialization[0]
                                   .getDocument()
                                   .getField(DocumentSourceChangeStreamTransform::kStageName)
                                   .getDocument()
                                   .getField("version"_sd)
                                   .getStringData());
-                    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1,
+                    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV2,
                               getExpCtx()->getChangeStreamSpec()->getVersion());
                 }
                 found = true;

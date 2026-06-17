@@ -7,16 +7,11 @@
  * ]
  */
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = jsTestName();
 const collName = jsTestName();
 
 const validVersions = ["v1", "v2", undefined];
-const isPreciseShardTargetingEnabled = FeatureFlagUtil.isEnabled(
-    db,
-    "ChangeStreamPreciseShardTargeting",
-);
 
 function testChangeStreamWithVersionAttributeSet(version = undefined) {
     // Specifying the "version" field does nothing when opening a change stream on a replica set or
@@ -26,22 +21,11 @@ function testChangeStreamWithVersionAttributeSet(version = undefined) {
         changeStreamParams.version = version;
     }
 
-    let tests = [
+    const tests = [
         {collection: collName}, // Collection change stream
+        {collection: 1}, // Whole-DB change stream
+        {}, // Whole-cluster change stream
     ];
-
-    // The change stream reader version of 'v2' can be requested even if the feature flag for precise shard
-    // targeting is disabled. In this case the change stream reader version will silently fall back to 'v1'.
-    // If the feature flag is enabled, we currently only support collection-level change streams for v2 readers.
-    // Database-level and all database-change streams are currently not implemented for v2 readers, so we
-    // only add them to the test when it is safe to do so (non-v2 change stream reader and/or feature flag is
-    // disabled).
-    if (version !== "v2" && !isPreciseShardTargetingEnabled) {
-        tests = tests.concat([
-            {collection: 1}, // Whole-DB change stream
-            {}, // Whole-cluster change stream
-        ]);
-    }
 
     tests.forEach((nss) => {
         db.getSiblingDB(dbName).dropDatabase();

@@ -15,9 +15,7 @@ executor:
       - jstests/change_stream_fsm/test_change_stream_sharding_fsm_*.js
   config:
     shell_options:
-      eval:
-        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
-        await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
+      eval: await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
       global_vars:
         TestData:
           configShard: true

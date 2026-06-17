@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

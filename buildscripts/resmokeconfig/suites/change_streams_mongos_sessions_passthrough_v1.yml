@@ -10,12 +10,6 @@ selector:
     # distributed transaction is not allowed.
     - jstests/change_streams/ddl_create_index_txn.js
 
-    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
-    - jstests/change_streams/create_event_from_chunk_migration.js
-
-    # TODO: SERVER-114511 re-enable this test.
-    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
-
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the
@@ -45,7 +39,7 @@ executor:
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
         await import('jstests/libs/override_methods/enable_sessions.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
+        await import('jstests/libs/override_methods/implicit_change_stream_v1.js');
       # Set longer host discovery time to handle change stream resumable errors.
       setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:

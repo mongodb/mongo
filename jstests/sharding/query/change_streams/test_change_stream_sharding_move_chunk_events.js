@@ -10,6 +10,7 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
  * ]

@@ -1135,6 +1135,7 @@ mongo_cc_library(
         "//src/mongo/executor:mock_async_rpc",
         "//src/mongo/otel",
         "//src/mongo/otel/traces:tracing",
+        "//src/mongo/unittest:server_parameter_guard",
         "//src/mongo/util:version_impl",
     ],
 )

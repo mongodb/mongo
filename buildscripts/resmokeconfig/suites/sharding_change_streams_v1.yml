@@ -1,0 +1,16 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/sharding/query/change_streams/*.js
+  exclude_files:
+executor:
+  archive:
+    tests:
+      - jstests/sharding/*reshard*.js
+  config:
+    shell_options:
+      nodb: ""
+      # Ensure we always start change streams with v1 version.
+      eval: >-
+        await import('jstests/libs/override_methods/implicit_change_stream_v1.js');

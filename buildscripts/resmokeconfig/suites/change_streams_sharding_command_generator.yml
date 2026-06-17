@@ -12,7 +12,6 @@ executor:
     shell_options:
       nodb: ""
       eval: >-
-        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
         await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
       global_vars:
         TestData:

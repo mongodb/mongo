@@ -8,6 +8,7 @@
  *   requires_sharding,
  *   uses_change_streams,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -182,8 +183,6 @@ describe("change stream v2", function () {
         });
     }
 
-    const version = "v2";
-
     describe("FCV downgrade", function () {
         describe("DbPresent state", function () {
             for (const watchMode of [
@@ -200,7 +199,7 @@ describe("change stream v2", function () {
                     cst = new ChangeStreamTest(db);
 
                     // Opening the stream at latestFCV initializes placement in strict mode.
-                    const cursor = openChangeStream(cst, {watchMode, version, comment});
+                    const cursor = openChangeStream(cst, {watchMode, comment});
                     awaitLogMessageCodes(
                         conn,
                         [V2TargeterLogCodes.kCollOrDbShardTargeterInitStrictMode],
@@ -275,7 +274,7 @@ describe("change stream v2", function () {
                     cst = new ChangeStreamTest(db);
 
                     // Opening the stream at latestFCV initializes placement in strict mode.
-                    const cursor = openChangeStream(cst, {watchMode, version, comment});
+                    const cursor = openChangeStream(cst, {watchMode, comment});
                     awaitLogMessageCodes(
                         conn,
                         [V2TargeterLogCodes.kCollOrDbShardTargeterInitStrictMode],
@@ -347,7 +346,7 @@ describe("change stream v2", function () {
             cst = new ChangeStreamTest(adminDB);
 
             // Opening the stream at latestFCV initializes placement in strict mode.
-            const cursor = openChangeStream(cst, {watchMode, version, comment});
+            const cursor = openChangeStream(cst, {watchMode, comment});
             awaitLogMessageCodes(
                 conn,
                 [V2TargeterLogCodes.kClusterShardTargeterInitStrictMode],
@@ -428,7 +427,7 @@ describe("change stream v2", function () {
                 // Open v2 stream and generate an event to capture a resume token.
                 let resumeToken;
                 {
-                    const cursor = openChangeStream(cst, {watchMode, version, comment});
+                    const cursor = openChangeStream(cst, {watchMode, comment});
 
                     executeAndAssertEvents({
                         cst,
@@ -504,7 +503,6 @@ describe("change stream v2", function () {
                         : V2TargeterLogCodes.kCollOrDbShardTargeterStartChangeStreamSegment;
                     const cursor = openChangeStream(cst, {
                         watchMode,
-                        version,
                         ignoreRemovedShards: true,
                         startAtOperationTime,
                         comment,
@@ -604,7 +602,6 @@ describe("change stream v2", function () {
                     cst = new ChangeStreamTest(db);
                     const cursor = openChangeStream(cst, {
                         watchMode,
-                        version,
                         ignoreRemovedShards: true,
                         startAtOperationTime,
                         comment,
@@ -678,7 +675,7 @@ describe("change stream v2", function () {
             const scope = watchModeToString(watchMode);
             const isCluster = watchMode === ChangeStreamWatchMode.kCluster;
 
-            it(`${scope}-scope: existing v1 stream stays v1 after FCV upgrade even when opened with version: v2`, function () {
+            it(`${scope}-scope: existing v1 stream stays v1 after FCV upgrade`, function () {
                 setupShardedCollection();
 
                 // Downgrade FCV first.
@@ -696,13 +693,8 @@ describe("change stream v2", function () {
                 const comment = `upgrade_v1_stays_v1_${scope}`;
                 cst = new ChangeStreamTest(db);
 
-                // Open stream at downgraded FCV. It will be v1 even with version: "v2".
-                const cursor = openChangeStream(cst, {
-                    watchMode,
-                    version,
-                    comment,
-                    startAtOperationTime,
-                });
+                // Open stream at downgraded FCV. It will be v1 (flag is disabled at downgraded FCV).
+                const cursor = openChangeStream(cst, {watchMode, comment, startAtOperationTime});
                 const preUpgradeCursorId = cursor.id;
 
                 // Confirm the stream is alive and idle before checking cursor topology.
@@ -756,7 +748,7 @@ describe("change stream v2", function () {
                 // config server, so getAllocationToShardsStatus returns kFutureClusterTime and the stream opens as v2.
                 // On the first getMore the v2 state machine detects placement is unavailable and throws
                 // RetryChangeStream, reopening the stream as v1.
-                const cursor = openChangeStream(cst, {watchMode, version, comment});
+                const cursor = openChangeStream(cst, {watchMode, comment});
 
                 // Insert + consume to let the natural v2->v1 fallback happen.
                 executeAndAssertEvents({
@@ -814,12 +806,7 @@ describe("change stream v2", function () {
                 // FCV upgrade, it learns that placement history is now being tracked and narrows the set of open cursors.
                 const comment = `resume_before_fcv_upgrade_${scope}`;
                 cst = new ChangeStreamTest(db);
-                const cursor = openChangeStream(cst, {
-                    watchMode,
-                    version,
-                    startAtOperationTime,
-                    comment,
-                });
+                const cursor = openChangeStream(cst, {watchMode, startAtOperationTime, comment});
                 const v2CursorId = cursor.id;
 
                 const initCode = isCluster
@@ -877,7 +864,7 @@ describe("change stream v2", function () {
                 // Open v1 stream and generate an event to capture a resume token.
                 let resumeToken;
                 {
-                    const cursor = openChangeStream(cst, {watchMode, version, comment});
+                    const cursor = openChangeStream(cst, {watchMode, comment});
 
                     executeAndAssertEvents({
                         cst,
@@ -906,7 +893,6 @@ describe("change stream v2", function () {
                     const resumedComment = comment + "_resumed";
                     const cursor = openChangeStream(cst, {
                         watchMode,
-                        version,
                         resumeAfter: resumeToken,
                         comment: resumedComment,
                     });

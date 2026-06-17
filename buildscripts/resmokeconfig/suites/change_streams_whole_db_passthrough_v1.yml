@@ -4,10 +4,9 @@ selector:
   roots:
     - jstests/change_streams/**/*.js
   exclude_files:
-    # Only relevant for v1 internals.
-    - jstests/change_streams/create_event_from_chunk_migration.js
-    # TODO SERVER-114511: re-enable this test.
-    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+    # Only relevant for single-collection change streams.
+    - jstests/change_streams/metadata_notifications.js
+
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the
@@ -17,18 +16,14 @@ selector:
     ##
     # "Cowardly refusing to override write concern of command: ..."
     - assumes_write_concern_unchanged
-    # Exclude any that assume sharding is disabled
-    - assumes_against_mongod_not_mongos
-    - assumes_unsharded_collection
-    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
-    # can't be created on `getCollection` call.
-    - assumes_no_implicit_collection_creation_on_get_collection
-    - requires_2_or_more_shards
+    # Not relevant for whole-db change streams.
+    - do_not_run_in_whole_db_passthrough
+
 executor:
   archive:
     hooks:
       - CheckReplDBHash
-      - CheckMetadataConsistencyInBackground
+      - CheckReplOplogs
       - ValidateCollections
   config:
     shell_options:
@@ -39,31 +34,25 @@ executor:
       # change_streams.yml for detailed explanation.
       eval: >-
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
-        await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+        await import('jstests/libs/override_methods/implicit_change_stream_v1.js');
+        await import('jstests/libs/override_methods/implicit_whole_db_changestreams.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
-        await import('jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js');
       # Set longer host discovery time to handle change stream resumable errors.
       setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplOplogs
     - class: CheckReplDBHash
-    - class: CheckMetadataConsistencyInBackground
     - class: RunQueryStats
     - class: ValidateCollections
-    - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
   fixture:
-    class: ShardedClusterFixture
-    mongos_options:
-      bind_ip_all: ""
-      set_parameters:
-        enableTestCommands: 1
+    class: ReplicaSetFixture
     mongod_options:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
-        writePeriodicNoops: 1
-        periodicNoopIntervalSecs: 1
-    num_shards: 1
-    num_mongos: 3
+    num_nodes: 1

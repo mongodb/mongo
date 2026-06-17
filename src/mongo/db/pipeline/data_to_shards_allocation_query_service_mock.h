@@ -41,6 +41,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 class DataToShardsAllocationQueryServiceMock : public DataToShardsAllocationQueryService {
@@ -65,12 +67,26 @@ public:
     }
 
     /**
-     * Check that the provided cluster time is equal to next buffered response's cluster time, and
-     * then hand out the buffered status for it.
+     * Sets a fallback status that will be returned by 'getAllocationToShardsStatus' whenever the
+     * buffered response queue is empty (instead of uasserting). Useful for fixtures that need a
+     * stable, unbounded response, e.g. always 'kNotAvailable' so that the v2 reader prerequisite
+     * check fails and v1 is selected.
+     */
+    void setDefaultStatus(AllocationToShardsStatus status) {
+        _defaultStatus = status;
+    }
+
+    /**
+     * If the buffered response queue is non-empty, hand out the next buffered status (and check
+     * the cluster time when '_allowAnyClusterTime' is false). Otherwise fall back to the default
+     * status if one has been set.
      */
     AllocationToShardsStatus getAllocationToShardsStatus(OperationContext* opCtx,
                                                          const Timestamp& clusterTime) override {
-        uassert(10612400, "queue should not be empty", !empty());
+        if (empty()) {
+            uassert(10612400, "queue should not be empty", _defaultStatus.has_value());
+            return *_defaultStatus;
+        }
         auto response = _responses.front();
         uassert(10612401,
                 str::stream() << "cluster time should be equal to expected cluster time. expected: "
@@ -86,13 +102,16 @@ private:
 
     // If set to true, allows any cluster time for the 'getAllocationToShardsStatus' calls.
     bool _allowAnyClusterTime = false;
+
+    // If set, used as the response when the queue is empty.
+    boost::optional<AllocationToShardsStatus> _defaultStatus;
 };
 
 /**
  * RAII scopeguard for creating a 'DataToShardsAllocationQueryService' mock instance in the global
- * service context. This will create a new 'DataToShardsAllocationQueryServiceMock' instance and
- * register it in the global service context upon creation. Upon destruction, it will unregister the
- * instance from the global service context, so that there will be no more instance registered.
+ * service context. On construction, the previously-installed decoration (if any) is saved aside;
+ * on destruction, that previous decoration is restored. This makes the guard safely nestable
+ * fixtures can register a baseline mock and individual tests can stack their own on top.
  */
 struct ScopedDataToShardsAllocationQueryServiceMock {
     ScopedDataToShardsAllocationQueryServiceMock(
@@ -101,7 +120,8 @@ struct ScopedDataToShardsAllocationQueryServiceMock {
         const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
 
     ScopedDataToShardsAllocationQueryServiceMock(std::nullptr_t) {
-        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
+        _previous =
+            DataToShardsAllocationQueryService::swap_forTest(getGlobalServiceContext(), nullptr);
     }
 
     /**
@@ -116,7 +136,8 @@ struct ScopedDataToShardsAllocationQueryServiceMock {
         auto queryService = std::make_unique<DataToShardsAllocationQueryServiceMock>();
         queryService->bufferResponses(std::move(responses));
 
-        DataToShardsAllocationQueryService::set(getGlobalServiceContext(), std::move(queryService));
+        _previous = DataToShardsAllocationQueryService::swap_forTest(getGlobalServiceContext(),
+                                                                     std::move(queryService));
     }
 
     /**
@@ -131,9 +152,24 @@ struct ScopedDataToShardsAllocationQueryServiceMock {
             ->allowAnyClusterTime();
     }
 
-    ~ScopedDataToShardsAllocationQueryServiceMock() {
-        DataToShardsAllocationQueryService::set(getGlobalServiceContext(), nullptr);
+    /**
+     * Registers a 'DataToShardsAllocationQueryService' mock instance whose 'getAllocationToShards-
+     * Status' returns 'status' for any cluster time, indefinitely.
+     */
+    explicit ScopedDataToShardsAllocationQueryServiceMock(AllocationToShardsStatus status) {
+        auto queryService = std::make_unique<DataToShardsAllocationQueryServiceMock>();
+        queryService->setDefaultStatus(status);
+        _previous = DataToShardsAllocationQueryService::swap_forTest(getGlobalServiceContext(),
+                                                                     std::move(queryService));
     }
+
+    ~ScopedDataToShardsAllocationQueryServiceMock() {
+        DataToShardsAllocationQueryService::swap_forTest(getGlobalServiceContext(),
+                                                         std::move(_previous));
+    }
+
+private:
+    std::unique_ptr<DataToShardsAllocationQueryService> _previous;
 };
 
 }  // namespace mongo

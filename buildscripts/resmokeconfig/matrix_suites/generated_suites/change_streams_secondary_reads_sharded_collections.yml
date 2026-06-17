@@ -59,6 +59,8 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
+    - jstests/change_streams/create_event_from_chunk_migration.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   exclude_with_any_tags:
     - assumes_write_concern_unchanged

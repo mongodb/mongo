@@ -9,6 +9,7 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  *   # The test spins up a multi-shard cluster and runs DDL commands; too slow for
  *   # sanitizer builds that add significant overhead.
  *   incompatible_aubsan,

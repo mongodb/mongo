@@ -4,6 +4,12 @@ selector:
   roots:
     - jstests/change_streams/**/*.js
   exclude_files:
+    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
+    - jstests/change_streams/create_event_from_chunk_migration.js
+
+    # TODO: SERVER-114511 re-enable this test.
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+
     # This test creates a collection (and index) inside a transaction. Even though the collections are
     # unsharded this suite enables sharding in the test database which makes transactions against
     # it distributed. This causes the following tests to fail since creating a collection in a

@@ -155,16 +155,33 @@ assert.commandFailedWithCode(
     ErrorCodes.TypeMismatch,
 );
 
-// collectionUUID is not allowed with change streams.
-assert.commandFailedWithCode(
-    testDB.runCommand({
+// collectionUUID is not allowed with change streams. The v1 reader establishes shard cursors
+// eagerly during the aggregate command, so the rejection surfaces on the initial response.
+// The v2 reader opens shard cursors lazily, so we issue a getMore to force shard-cursor
+// establishment.
+{
+    const startAtOperationTime = new Timestamp(0, 1);
+    let response = testDB.runCommand({
         aggregate: collName,
         collectionUUID: uuid,
-        pipeline: [{$changeStream: {}}],
+        pipeline: [{$changeStream: {startAtOperationTime}}],
         cursor: {},
-    }),
-    4928900,
-);
+    });
+    if (response.ok) {
+        // v2 returned a routing cursor without contacting shards; force shard-cursor establishment
+        // via getMore so the rejection can surface.
+        assert.eq(
+            response._changeStreamVersion,
+            "v2",
+            "Change stream of version v1 should fail immediately",
+        );
+        response = testDB.runCommand({getMore: response.cursor.id, collection: collName});
+    }
+
+    // 'RetryChangeStream' is accepted because v2 can surface placement/migration churn on getMore
+    // (e.g. in FCV upgrade/downgrade suites) before reaching the collectionUUID validation.
+    assert.commandFailedWithCode(response, [4928900, ErrorCodes.RetryChangeStream]);
+}
 
 // collectionUUID is not allowed with collectionless aggregations.
 assert.commandFailedWithCode(

@@ -86,6 +86,14 @@ describe("$changeStream", function () {
         // conforms to the specified arguments; it will return the expected events. Passing an empty array will confirm that we see no events in the stream. We
         // further confirm that the faked events do not cause additional cursors to be opened.
         function assertChangeStreamBehaviour(projection, expectedEvents) {
+            const isMultiversion =
+                TestData.useRandomBinVersionsWithinReplicaSet ||
+                TestData.mixedBinVersions ||
+                TestData.mongosBinVersion;
+            if (isMultiversion && bsonWoCompare(expectedEvents.v1, expectedEvents.v2) !== 0) {
+                return;
+            }
+
             // Generate a random ID for this stream.
             const commentID = `${Math.random()}`;
 

@@ -110,27 +110,25 @@ cursor.hasNext();
 // time to be less than or equal to the total execution duration.
 const watchComment = "example_watch_should_have_remote_op_wait";
 const csCursor = coll.watch([], {comment: watchComment});
-{
-    const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const line = findMatchingLogLine(mongosLog.log, {msg: "Slow query", comment: watchComment});
-    assert(line, "Failed to find a log line matching the comment");
-    const remoteOpWait = getRemoteOpWait(line);
-    const workingMillis = getWorkingMillis(line);
-    assert.lte(remoteOpWait, workingMillis);
-}
 
 // A $changeStream getMore may pause execution while awaiting data if no results are currently
 // available. In this case, it is possible for the total execution time to be less than the
 // remoteOpWait time.
-assert(!csCursor.hasNext());
-{
+assert.soonNoExcept(() => {
+    assert(!csCursor.hasNext());
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const line = findMatchingLogLine(mongosLog.log, {
-        msg: "Slow query",
-        comment: watchComment,
-        command: "getMore",
-    });
-    assert(line, "Failed to find a log line matching the comment");
+    // Under v2 change streams, the first getMores may fire before any remote cursors are opened
+    // and won't record remoteOpWaitMillis. Inspect the latest getMore; assert.soonNoExcept retries
+    // until V2 opens cursors and a subsequent getMore records the field.
+    const lines = [
+        ...iterateMatchingLogLines(mongosLog.log, {
+            msg: "Slow query",
+            comment: watchComment,
+            command: "getMore",
+        }),
+    ];
+    const line = lines[lines.length - 1];
+    assert(line, "Failed to find a getMore log line matching the comment");
     const remoteOpWait = getRemoteOpWait(line);
     const workingMillis = getWorkingMillis(line);
     assert.gte(remoteOpWait, 900);
@@ -140,7 +138,8 @@ assert(!csCursor.hasNext());
     // during testing.
     const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes("-fsanitize");
     assert.lte(workingMillis, isSanitizerEnabled ? 1000 : 30000);
-}
+    return true;
+});
 
 // A query that merges on a shard logs remoteOpWaitMillis on the shard.
 const pipeline2 = [{$sort: {x: 1}}, {$group: {_id: "$y"}}];

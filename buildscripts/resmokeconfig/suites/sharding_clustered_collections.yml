@@ -9,6 +9,9 @@ selector:
     - jstests/sharding/shard2.js
   exclude_with_any_tags:
     - expects_explicit_underscore_id_index
+    # The default suite runs change streams as v2; v1-pinned tests use scaffolding (e.g.
+    # 'shardedAggregateHangBeforeEstablishingShardCursors') that v2 doesn't trigger.
+    - assumes_change_streams_v1
 
 executor:
   config:

@@ -4,6 +4,12 @@ selector:
   roots:
     - jstests/change_streams/**/*.js
   exclude_files:
+    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
+    - jstests/change_streams/create_event_from_chunk_migration.js
+
+    # TODO: SERVER-114511 re-enable this test.
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+
     # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   exclude_with_any_tags:

@@ -1,6 +1,10 @@
 // Tests that change streams is able to find and return results from new shards which are added
-// during cursor establishment.
+// during cursor establishment. Pinned to the v1 reader because it drives establishment via the
+// 'shardedAggregateHangBeforeEstablishingShardCursors' failpoint, which sits on the v1
+// 'sharded_agg_helpers::establishCursors' code path. The v2 reader opens shard cursors through a
+// different mechanism (placement-change control events) that the failpoint cannot intercept.
 // @tags: [
+//   assumes_change_streams_v1,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]

@@ -3,6 +3,7 @@
  * TODO (SERVER-98118): Delete this file once featureFlagChangeStreamPreciseShardTargeting reaches last-lts.
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

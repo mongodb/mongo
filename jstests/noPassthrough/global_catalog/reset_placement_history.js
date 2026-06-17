@@ -2,6 +2,7 @@
  * Test validating the expected behavior of resetPlacementHistory.
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  *  ]
  */
 

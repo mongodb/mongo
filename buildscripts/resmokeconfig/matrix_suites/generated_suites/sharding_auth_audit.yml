@@ -52,6 +52,8 @@ selector:
     - jstests/sharding/set_user_write_block_mode.js
     - jstests/sharding/drop_config_db.js
     - jstests/sharding/block_replica_set_writes.js
+  exclude_with_any_tags:
+    - assumes_change_streams_v1
   roots:
     - jstests/sharding/**/*.js
 test_kind: js_test

@@ -325,6 +325,7 @@ selector:
 
   exclude_with_any_tags:
     - does_not_support_stepdowns
+    - assumes_change_streams_v1
 
 executor:
   config:

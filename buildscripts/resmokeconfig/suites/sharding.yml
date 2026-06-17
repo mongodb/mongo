@@ -7,6 +7,10 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/sharding/range_deleter_script_with_crud.js
   exclude_files:
     - jstests/sharding/**/libs/**/*.js
+  exclude_with_any_tags:
+    # The default suite runs change streams as v2; v1-pinned tests use scaffolding (e.g.
+    # 'shardedAggregateHangBeforeEstablishingShardCursors') that v2 doesn't trigger.
+    - assumes_change_streams_v1
 
 executor:
   archive:

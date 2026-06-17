@@ -34,7 +34,9 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/change_stream_reader_builder_mock.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -65,6 +67,15 @@ class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup();
     explicit ChangeStreamStageTestNoSetup(NamespaceString nsString);
+
+private:
+    // Register v2 reader prerequisites that drive '_determineChangeStreamReaderVersion' to v1
+    // (kNotAvailable mirrors the production fallback when shard placement info is missing). Tests
+    // that exercise v2 override these via their own scoped guards.
+    ScopedChangeStreamReaderBuilderMock _readerBuilder{
+        std::make_unique<ChangeStreamReaderBuilderMock>()};
+    ScopedDataToShardsAllocationQueryServiceMock _queryService{
+        AllocationToShardsStatus::kNotAvailable};
 };
 
 struct ChangeStreamMockMongoInterface final : public ExecutableStubMongoProcessInterface {

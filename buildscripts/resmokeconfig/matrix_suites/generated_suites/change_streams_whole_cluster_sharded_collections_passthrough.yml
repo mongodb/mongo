@@ -43,6 +43,9 @@ executor:
       n: 20
 matrix_suite: true
 selector:
+  exclude_files:
+    - jstests/change_streams/create_event_from_chunk_migration.js
+    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
   exclude_with_any_tags:
     - assumes_write_concern_unchanged
     - do_not_run_in_whole_cluster_passthrough

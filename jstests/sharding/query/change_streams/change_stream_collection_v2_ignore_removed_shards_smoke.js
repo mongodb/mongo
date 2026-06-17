@@ -6,6 +6,7 @@
  *   # Assume balancer is off, and we do not get random moveChunk events during the test.
  *   assumes_balancer_off,
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
  *   # Incompatible with embedded config server, because the config server would be embedded on a

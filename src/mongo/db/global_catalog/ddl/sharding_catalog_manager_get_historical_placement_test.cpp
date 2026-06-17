@@ -42,6 +42,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -297,7 +298,12 @@ public:
     }
 
     void disablePreciseTargetingFeatureFlag() {
+        // Release the previous "enabled" controller before installing the "disabled" one. RAII
+        // destruction of the inner controller would otherwise restore the flag to whatever was
+        // observed at the inner controller's construction time, which is no longer the default.
         _scopedFeatureFlagEnabled.reset();
+        _scopedFeatureFlagEnabled = std::make_unique<unittest::ServerParameterGuard>(
+            "featureFlagChangeStreamPreciseShardTargeting", false);
     }
 
 private:

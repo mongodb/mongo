@@ -80,6 +80,16 @@ public:
      */
     virtual AllocationToShardsStatus getAllocationToShardsStatus(OperationContext* opCtx,
                                                                  const Timestamp& clusterTime) = 0;
+
+private:
+    /**
+     * Swaps current DataToShardsAllocationQueryService with the 'replacement', returning the
+     * original service.
+     */
+    static std::unique_ptr<DataToShardsAllocationQueryService> swap_forTest(
+        ServiceContext* service, std::unique_ptr<DataToShardsAllocationQueryService> replacement);
+
+    friend struct ScopedDataToShardsAllocationQueryServiceMock;
 };
 
 }  // namespace mongo

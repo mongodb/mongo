@@ -4,30 +4,23 @@
  */
 
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-let featureFlagEnabled = null;
-function isFeatureFlagEnabled(conn) {
-    if (featureFlagEnabled === null) {
-        featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(
-            conn,
-            "ChangeStreamPreciseShardTargeting",
-        );
-    }
-    return featureFlagEnabled;
-}
 
 function isChangeStreamCommandV2WithoutIgnoreRemovedShards(cmdObj) {
-    return (
-        cmdObj &&
-        cmdObj.aggregate &&
-        Array.isArray(cmdObj.pipeline) &&
-        cmdObj.pipeline.length > 0 &&
-        typeof cmdObj.pipeline[0].$changeStream == "object" &&
-        cmdObj.pipeline[0].$changeStream.constructor === Object &&
-        cmdObj.pipeline[0].$changeStream.version === "v2" &&
-        !cmdObj.pipeline[0].$changeStream.hasOwnProperty("ignoreRemovedShards")
-    );
+    if (
+        !cmdObj ||
+        !cmdObj.aggregate ||
+        !Array.isArray(cmdObj.pipeline) ||
+        cmdObj.pipeline.length === 0 ||
+        typeof cmdObj.pipeline[0].$changeStream != "object" ||
+        cmdObj.pipeline[0].$changeStream.constructor !== Object
+    ) {
+        return false;
+    }
+
+    // The stream must already be v2, either explicitly or implicitly (no version specified defaults to v2).
+    const changeStreamSpec = cmdObj.pipeline[0].$changeStream;
+    const isV2 = changeStreamSpec.version === "v2" || !changeStreamSpec.hasOwnProperty("version");
+    return isV2 && !changeStreamSpec.hasOwnProperty("ignoreRemovedShards");
 }
 
 function runChangeStreamWithIgnoreRemovedShards(
@@ -38,11 +31,7 @@ function runChangeStreamWithIgnoreRemovedShards(
     func,
     makeFuncArgs,
 ) {
-    // TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
-    if (
-        isChangeStreamCommandV2WithoutIgnoreRemovedShards(commandObj) &&
-        isFeatureFlagEnabled(conn)
-    ) {
+    if (isChangeStreamCommandV2WithoutIgnoreRemovedShards(commandObj)) {
         commandObj.pipeline[0].$changeStream["ignoreRemovedShards"] = true;
     }
     return func.apply(conn, makeFuncArgs(commandObj));

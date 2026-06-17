@@ -8,8 +8,7 @@ eval:
   - "change_streams.secondary_reads_eval"
   - "change_streams.causal_consistency_eval"
   - "change_streams.whole_db_eval"
-  - "change_streams.change_streams_v2_eval"
+  - "change_streams.change_streams_v1_eval"
 excludes:
   - "change_streams.mongos_passthrough_excludes"
   - "change_streams.secondary_reads_excludes"
-  - "change_streams.change_streams_v2_excludes"

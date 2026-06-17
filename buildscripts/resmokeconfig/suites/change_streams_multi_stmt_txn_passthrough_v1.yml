@@ -6,13 +6,6 @@ selector:
   exclude_files:
     # Parallel Shell - we do not signal the override to end a txn when a parallel shell closes.
     - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
-
-    # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
-    - jstests/change_streams/create_event_from_chunk_migration.js
-
-    # TODO: SERVER-114511 re-enable this test.
-    - jstests/change_streams/migrate_last_chunk_from_shard_event.js
-
   exclude_with_any_tags:
     # These tests would fail with "Cowardly refusing to override write concern of command: ..."
     - assumes_write_concern_unchanged
@@ -22,15 +15,12 @@ selector:
     # These tests make assumptions about change stream results that are no longer true once operations
     # get bundled into transactions.
     - change_stream_does_not_expect_txns
-    # Exclude any that assume sharding is disabled
-    - assumes_against_mongod_not_mongos
 
 executor:
   archive:
     hooks:
       - CheckReplDBHash
       - CheckReplOplogs
-      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -44,7 +34,7 @@ executor:
         await import("jstests/libs/override_methods/txn_passthrough_cmd_massage.js");
         await import("jstests/libs/override_methods/network_error_and_txn_override.js");
         await import("jstests/libs/override_methods/implicit_filter_eot_changestreams.js");
-        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
+        await import('jstests/libs/override_methods/implicit_change_stream_v1.js');
       # Set longer host discovery time to handle change stream resumable errors.
       setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:
@@ -53,25 +43,14 @@ executor:
     # validating the entire contents of the collection.
     - class: CheckReplOplogs
     - class: CheckReplDBHash
-    - class: CheckMetadataConsistencyInBackground
     - class: RunQueryStats
     - class: ValidateCollections
-    - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
   fixture:
-    class: ShardedClusterFixture
-    # Use two shards to make sure we will only talk to the primary shard for the database and will
-    # not delay changes to wait for notifications or a clock advancement from other shards.
-    num_shards: 2
-    num_mongos: 3
-    mongos_options:
-      bind_ip_all: ""
-      set_parameters:
-        enableTestCommands: 1
+    class: ReplicaSetFixture
     mongod_options:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
-        periodicNoopIntervalSecs: 1
-        writePeriodicNoops: true
+    num_nodes: 1

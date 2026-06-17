@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
@@ -136,6 +137,31 @@ private:
     GetControlEventTypesFunction _controlEventTypesOnConfigServer;
 
     ChangeStreamShardTargeter* _shardTargeter = nullptr;
+};
+
+/**
+ * RAII scopeguard for installing a 'ChangeStreamReaderBuilder' mock in the global service context.
+ * On construction, the previously-installed decoration (if any) is saved aside; on destruction,
+ * that previous decoration is restored. This makes the guard safely nestable — fixtures can
+ * register a baseline mock and individual tests can stack their own on top.
+ */
+struct ScopedChangeStreamReaderBuilderMock {
+    ScopedChangeStreamReaderBuilderMock(const ScopedChangeStreamReaderBuilderMock&) = delete;
+    ScopedChangeStreamReaderBuilderMock& operator=(const ScopedChangeStreamReaderBuilderMock&) =
+        delete;
+
+    explicit ScopedChangeStreamReaderBuilderMock(
+        std::unique_ptr<ChangeStreamReaderBuilder> readerBuilder) {
+        _previous = ChangeStreamReaderBuilder::swap_forTest(getGlobalServiceContext(),
+                                                            std::move(readerBuilder));
+    }
+
+    ~ScopedChangeStreamReaderBuilderMock() {
+        ChangeStreamReaderBuilder::swap_forTest(getGlobalServiceContext(), std::move(_previous));
+    }
+
+private:
+    std::unique_ptr<ChangeStreamReaderBuilder> _previous;
 };
 
 }  // namespace mongo

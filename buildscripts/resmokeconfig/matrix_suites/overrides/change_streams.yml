@@ -58,18 +58,9 @@
   value:
     eval: "await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');"
 
-- name: change_streams_v2_eval
+- name: change_streams_v1_eval
   value:
-    eval: "await import('jstests/libs/override_methods/implicit_change_stream_v2.js');"
-
-- name: change_streams_v2_excludes
-  value:
-    exclude_files:
-      # This test exercises the internal behavior of $changeStream v1 and is not compatible with v2.
-      - jstests/change_streams/create_event_from_chunk_migration.js
-
-      # TODO: SERVER-114511 re-enable this test.
-      - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+    eval: "await import('jstests/libs/override_methods/implicit_change_stream_v1.js');"
 
 # Contains mongos and mongod options for secondary reads testing.
 - name: secondary_reads

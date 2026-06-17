@@ -92,6 +92,16 @@ public:
     static ChangeStreamReaderBuilder* get(ServiceContext* serviceContext);
     static void set(ServiceContext* serviceContext,
                     std::unique_ptr<ChangeStreamReaderBuilder> builder);
+
+private:
+    /**
+     * Swaps the current 'ChangeStreamReaderBuilder' with the 'replacement', returning the original
+     * builder.
+     */
+    static std::unique_ptr<ChangeStreamReaderBuilder> swap_forTest(
+        ServiceContext* serviceContext, std::unique_ptr<ChangeStreamReaderBuilder> replacement);
+
+    friend struct ScopedChangeStreamReaderBuilderMock;
 };
 
 }  // namespace mongo

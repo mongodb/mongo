@@ -55,4 +55,13 @@ void DataToShardsAllocationQueryService::set(
     holder = std::move(dataToShardsAllocationQueryService);
 }
 
+std::unique_ptr<DataToShardsAllocationQueryService>
+DataToShardsAllocationQueryService::swap_forTest(
+    ServiceContext* service, std::unique_ptr<DataToShardsAllocationQueryService> replacement) {
+    auto& holder = getDataToShardsAllocationQueryServiceFromServiceContext(service);
+    auto oldService = std::move(holder);
+    holder = std::move(replacement);
+    return oldService;
+}
+
 }  // namespace mongo

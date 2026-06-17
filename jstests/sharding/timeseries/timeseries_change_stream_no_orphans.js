@@ -16,21 +16,9 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-// Asserts that there is no change stream event.
-function assertNoChanges(csCursor) {
-    function advanceAndGetToken() {
-        assert(!csCursor.hasNext(), () => csCursor.next());
-        return csCursor.getResumeToken();
-    }
-    const startToken = advanceAndGetToken();
-    assert.soon(() => {
-        const currentToken = advanceAndGetToken();
-        return bsonWoCompare(currentToken, startToken) > 0;
-    });
-}
 
 const dbName = "ts_change_stream_no_orphans";
 const collName = "ts";
@@ -113,7 +101,12 @@ assert.commandWorked(
 //
 // Note: the change stream is on the database because watching the change stream events on the
 // raw buckets is not allowed.
-const mongosDbChangeStream = db.watch([], {showSystemEvents: true, rawData: true});
+const cst = new ChangeStreamTest(db);
+const mongosDbChangeStream = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {showSystemEvents: true}}],
+    collection: 1,
+    aggregateOptions: {rawData: true},
+});
 
 const shard0DB = st.shard0.getDB(dbName);
 const shard0Coll = shard0DB.getCollection(collName);
@@ -129,7 +122,7 @@ const shard0Coll = shard0DB.getCollection(collName);
     assert.commandWorked(shard0Coll.remove({f: 60}));
 
     // No event is generated on the database change stream.
-    assertNoChanges(mongosDbChangeStream);
+    cst.assertNoChange(mongosDbChangeStream);
 
     // The entire orphaned bucket on the first shard has been removed with meta == 3 because the
     // measurement with {f: 60} was the only one in the bucket.
@@ -147,7 +140,7 @@ const shard0Coll = shard0DB.getCollection(collName);
     assert.commandWorked(shard0Coll.remove({f: 30}));
 
     // No event is generated on the database change stream.
-    assertNoChanges(mongosDbChangeStream);
+    cst.assertNoChange(mongosDbChangeStream);
 
     // The orphaned bucket on the first shard have been updated since two measurements ({f: 30})
     // has been removed from the bucket and only the measurement with {_id: 4, f: 40} stays in
@@ -187,10 +180,9 @@ const shard0Coll = shard0DB.getCollection(collName);
     // The document is hosted by the second shard and the replace event is notified because a single
     // measurement is deleted from the containing bucket. The first shard still hosts the orphaned
     // document but no additional event must be notified.
-    assert.soon(() => mongosDbChangeStream.hasNext(), "A replace event of a bucket is expected");
-    const change = mongosDbChangeStream.next();
+    const [change] = cst.getNextChanges(mongosDbChangeStream, 1);
     assert.eq(change.operationType, "replace", change);
-    assertNoChanges(mongosDbChangeStream);
+    cst.assertNoChange(mongosDbChangeStream);
 
     // The orphaned bucket on the first shard have not been updated, unlike the mongos collection.
     assert.eq(null, mongosColl.findOne({_id: 4}), mongosColl.find().toArray());
@@ -218,10 +210,9 @@ const shard0Coll = shard0DB.getCollection(collName);
     // The documents are hosted by the second shard and a bucket delete event is notified because
     // all measurements are deleted from the bucket. The first shard still hosts the orphaned
     // documents but no additional event must be notified.
-    assert.soon(() => mongosDbChangeStream.hasNext(), "A delete event of a bucket is expected");
-    const change = mongosDbChangeStream.next();
+    const [change] = cst.getNextChanges(mongosDbChangeStream, 1);
     assert.eq(change.operationType, "delete", change);
-    assertNoChanges(mongosDbChangeStream);
+    cst.assertNoChange(mongosDbChangeStream);
 
     // The orphaned bucket on first shard have not been removed, unlike the mongos collection.
     assert.eq(null, mongosColl.findOne({_id: 6}), mongosColl.find().toArray());
@@ -238,6 +229,8 @@ const shard0Coll = shard0DB.getCollection(collName);
     assert.eq(6, shard0Bucket.data._id[0], shard0Bucket);
     assert.eq(50, shard0Bucket.data.f[0], shard0Bucket);
 })();
+
+cst.cleanUp();
 
 suspendRangeDeletionShard0.off();
 

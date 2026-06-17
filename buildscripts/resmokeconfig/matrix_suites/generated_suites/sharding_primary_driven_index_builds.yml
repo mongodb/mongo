@@ -28,6 +28,7 @@ executor:
 matrix_suite: true
 selector:
   exclude_with_any_tags:
+    - assumes_change_streams_v1
     - resumable_primary_driven_index_builds_incompatible
     - primary_driven_index_builds_incompatible
     - rolling_index_builds

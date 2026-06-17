@@ -21,7 +21,8 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/sharding/**/libs/**/*.js
-  exclude_with_any_tags: []
+  exclude_with_any_tags:
+    - assumes_change_streams_v1
   roots:
     - jstests/sharding/**/*.js
     - src/mongo/db/modules/enterprise/jstests/sharding/range_deleter_script_with_shard_keys.js

@@ -50,4 +50,12 @@ void ChangeStreamReaderBuilder::set(
     holder = std::move(changeStreamReaderBuilder);
 }
 
+std::unique_ptr<ChangeStreamReaderBuilder> ChangeStreamReaderBuilder::swap_forTest(
+    ServiceContext* serviceContext, std::unique_ptr<ChangeStreamReaderBuilder> replacement) {
+    auto& holder = getChangeStreamReaderBuilderFromServiceContext(serviceContext);
+    auto previous = std::move(holder);
+    holder = std::move(replacement);
+    return previous;
+}
+
 }  // namespace mongo

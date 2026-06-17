@@ -60,7 +60,7 @@ filters:
   - "validate_collections_on_shutdown.js":
     approvers:
       - 10gen/server-validate
-  - "implicit_change_stream_v2.js":
+  - "implicit_change_stream_v1.js":
     approvers:
       - 10gen/query-execution-change-streams
   - "implicit_change_stream_v2_ignore_removed_shards.js":

@@ -1,6 +1,6 @@
 # This suite combines testing for change_streams_whole_db_mongos_passthrough,
 # change_streams_whole_db_secondary_reads_passthrough, and
-# change_streams_whole_db_sharded_collections_passthrough while including the change stream v2 override.
+# change_streams_whole_db_sharded_collections_passthrough while forcing change streams to v1 via override.
 # If part of this suite fails, you can comment out individual parts or run the above tests
 # to dig deeper into what is failing.
 base_suite: change_streams_whole_db_passthrough
@@ -18,9 +18,8 @@ eval:
   - "change_streams.causal_consistency_eval"
   - "change_streams.sharded_collections_passthrough_eval"
   - "change_streams.whole_db_eval"
-  - "change_streams.change_streams_v2_eval"
+  - "change_streams.change_streams_v1_eval"
 excludes:
   - "change_streams.mongos_passthrough_excludes"
   - "change_streams.sharded_collections_passthrough_excludes"
   - "change_streams.secondary_reads_excludes"
-  - "change_streams.change_streams_v2_excludes"

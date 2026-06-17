@@ -216,8 +216,7 @@ DB.prototype._runCommandImpl = function (name, obj, options) {
 
     // Set change stream version into the result object for easier assertions.
     if (obj.pipeline && obj.pipeline.length > 0 && obj.pipeline[0].$changeStream) {
-        // TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
-        const changeStreamVersion = obj.pipeline[0].$changeStream.version ?? "v1";
+        const changeStreamVersion = obj.pipeline[0].$changeStream.version ?? "v2";
         result._changeStreamVersion = changeStreamVersion;
     }
 

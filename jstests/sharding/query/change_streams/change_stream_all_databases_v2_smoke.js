@@ -7,6 +7,7 @@
  *
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
  * ]

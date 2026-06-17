@@ -14,6 +14,7 @@
  *   does_not_support_stepdowns,
  *   featureFlagChangeStreamPreciseShardTargeting,
  *   multiversion_incompatible,
+ *   requires_fcv_90,
  *   requires_sharding,
  *   uses_change_streams,
  * ]

@@ -170,8 +170,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_mongos_sessions_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough_v2.yml",
+    name = "change_streams_mongos_sessions_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -205,8 +205,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_multi_stmt_txn_mongos_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_mongos_passthrough_v2.yml",
+    name = "change_streams_multi_stmt_txn_mongos_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_mongos_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -236,8 +236,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_multi_stmt_txn_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_passthrough_v2.yml",
+    name = "change_streams_multi_stmt_txn_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -266,8 +266,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_multi_stmt_txn_sharded_collections_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_sharded_collections_passthrough_v2.yml",
+    name = "change_streams_multi_stmt_txn_sharded_collections_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_sharded_collections_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -297,8 +297,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_per_shard_cursor_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_per_shard_cursor_passthrough_v2.yml",
+    name = "change_streams_per_shard_cursor_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_per_shard_cursor_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -343,8 +343,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_whole_cluster_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_cluster_passthrough_v2.yml",
+    name = "change_streams_whole_cluster_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_cluster_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -374,8 +374,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_whole_db_passthrough_v2",
-    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_db_passthrough_v2.yml",
+    name = "change_streams_whole_db_passthrough_v1",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_db_passthrough_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -404,8 +404,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "sharding_change_streams_v2",
-    config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_v2.yml",
+    name = "sharding_change_streams_v1",
+    config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -421,8 +421,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "sharding_change_streams_v2_ignore_removed_shards",
-    config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_v2_ignore_removed_shards.yml",
+    name = "sharding_change_streams_ignore_removed_shards",
+    config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_ignore_removed_shards.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -507,8 +507,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_secondary_reads_sharded_collections_v2",
-    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_secondary_reads_sharded_collections_v2.yml",
+    name = "change_streams_secondary_reads_sharded_collections_v1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_secondary_reads_sharded_collections_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -1011,8 +1011,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_whole_cluster_secondary_reads_sharded_collections_v2",
-    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_sharded_collections_v2.yml",
+    name = "change_streams_whole_cluster_secondary_reads_sharded_collections_v1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_sharded_collections_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",
@@ -1059,8 +1059,8 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
-    name = "change_streams_whole_db_secondary_reads_sharded_collections_v2",
-    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_secondary_reads_sharded_collections_v2.yml",
+    name = "change_streams_whole_db_secondary_reads_sharded_collections_v1",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_secondary_reads_sharded_collections_v1.yml",
     shard_count = 8,
     tags = [
         "change_streams",

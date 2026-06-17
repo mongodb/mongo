@@ -34,7 +34,8 @@ feature_flags:
     featureFlagChangeStreamPreciseShardTargeting:
         description: "Feature flag to enable improved handling of cluster topology changes in change streams"
         cpp_varname: gFeatureFlagChangeStreamPreciseShardTargeting
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
 
     featureFlagSbeAccumulators:
