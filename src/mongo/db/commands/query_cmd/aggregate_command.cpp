@@ -272,18 +272,12 @@ public:
             // TODO (SERVER-122847): Remove this code.
             const bool isOplogNss = (ns() == NamespaceString::kRsOplogNamespace);
             boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
-                nonDeprioMarker;
+                reshardingApplyPhaseAggregateTaskType;
             if (!gExecutionControlRemoteSpecification.isEnabledUseLastLTSFCVWhenUninitialized(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 isOplogNss && opCtx->getClient()->isInternalClient()) {
-                nonDeprioMarker.emplace(opCtx);
-            }
-
-            // TODO(CLOUDP-319941): Remove this when atlas uses the priority port for monitoring
-            // operations
-            if (_liteParsedPipeline.startsWithCurrentOpStage() && !nonDeprioMarker) {
-                nonDeprioMarker.emplace(opCtx);
+                reshardingApplyPhaseAggregateTaskType.emplace(opCtx);
             }
 
             uassertStatusOK(runAggregate(opCtx,
