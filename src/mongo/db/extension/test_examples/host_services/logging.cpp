@@ -42,13 +42,11 @@ namespace sdk = mongo::extension::sdk;
  * [0,5]. The stage will never assert on unexpected input but instead will log lines depending on
  * the stage definition provided.
  */
-class LogStageDescriptor : public sdk::AggStageDescriptor {
+class LogStageDescriptor
+    : public sdk::TestStageDescriptor<"$log", sdk::shared_test_stages::TransformAggStageParseNode> {
 public:
-    static inline const std::string kStageName = std::string("$log");
     static inline const std::string kNumInfoLogLinesField = "numInfoLogLines";
     static inline const std::string kAttributesField = "attrs";
-
-    LogStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         mongo::BSONObj bsonSpec = sdk::validateStageDefinition(stageBson, kStageName);

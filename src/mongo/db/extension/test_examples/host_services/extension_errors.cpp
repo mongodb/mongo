@@ -128,16 +128,10 @@ protected:
  *  }
  * }
  */
-class AssertStageDescriptor : public sdk::AggStageDescriptor {
+class AssertStageDescriptor : public sdk::TestStageDescriptor<"$assert", AssertParseNode> {
 public:
-    static inline const std::string kStageName = std::string("$assert");
-
-    AssertStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
+    void validate(const mongo::BSONObj& arguments) const override {
         _assertGlobalObservabilityContextIsNull();
-        auto obj = sdk::validateStageDefinition(stageBson, kStageName);
-        return std::make_unique<AssertParseNode>(kStageName, obj);
     }
 
 private:

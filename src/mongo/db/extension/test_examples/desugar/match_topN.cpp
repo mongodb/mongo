@@ -92,12 +92,8 @@ private:
     const BSONObj _limitSpec;  // {$limit: <int>}
 };
 
-class MatchTopNStageDescriptor : public sdk::AggStageDescriptor {
+class MatchTopNStageDescriptor : public sdk::TestStageDescriptor<"$matchTopN", MatchTopNParseNode> {
 public:
-    static inline const std::string kStageName = "$matchTopN";
-
-    MatchTopNStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         const auto obj = sdk::validateStageDefinition(stageBson, kStageName);
 

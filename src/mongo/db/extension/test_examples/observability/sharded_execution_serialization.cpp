@@ -65,21 +65,15 @@ DEFAULT_PARSE_NODE(ShardedExecutionSerialization);
  * This special code can be used to verify that the `serialize()` code-path in the `LogicalAggStage`
  * is actually being called.
  */
-class ShardedExecutionSerializationStageDescriptor : public sdk::AggStageDescriptor {
+class ShardedExecutionSerializationStageDescriptor
+    : public sdk::TestStageDescriptor<"$shardedExecutionSerialization",
+                                      ShardedExecutionSerializationParseNode> {
 public:
-    static inline const std::string kStageName = "$shardedExecutionSerialization";
-
-    ShardedExecutionSerializationStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
-    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
-        auto arguments = sdk::validateStageDefinition(stageBson, kStageName);
-
+    void validate(const BSONObj& arguments) const override {
         sdk_uassert(11173701,
                     "Intended assertion in sharded scenarios tripped",
                     !arguments.hasField(
                         ShardedExecutionSerializationLogicalStage::kShardedAssertFlagFieldName));
-
-        return std::make_unique<ShardedExecutionSerializationParseNode>(kStageName, arguments);
     }
 };
 

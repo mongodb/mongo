@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/log_util.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
 
 namespace sdk = mongo::extension::sdk;
@@ -229,12 +230,9 @@ private:
  * Even though users don't use $vectorSearchMetrics, we must register stage descriptor for the
  * sharded case, where the mongos serializes the pipeline and sends it to the shards.
  */
-class MetricsStageDescriptor : public sdk::AggStageDescriptor {
+class MetricsStageDescriptor
+    : public sdk::TestStageDescriptor<"$vectorSearchMetrics", MetricsParseNode> {
 public:
-    static inline const std::string kStageName = "$vectorSearchMetrics";
-
-    MetricsStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         sdk::validateStageDefinition(stageBson, kStageName);
         const auto raw = stageBson[kMetricsStageName].Obj();
@@ -408,12 +406,9 @@ private:
     const std::optional<int> _numCandidates;
 };
 
-class NativeVectorSearchStageDescriptor : public sdk::AggStageDescriptor {
+class NativeVectorSearchStageDescriptor
+    : public sdk::TestStageDescriptor<"$nativeVectorSearch", NativeVectorSearchParseNode> {
 public:
-    static inline const std::string kStageName = "$nativeVectorSearch";
-
-    NativeVectorSearchStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
     /**
      * Parses and validates the user-facing $nativeVectorSearch specification.
      *

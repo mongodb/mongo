@@ -29,6 +29,7 @@
 #pragma once
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
@@ -164,7 +165,12 @@ struct StringLiteral {
  * 'ParseNodeType'. If 'ExpectEmptyStageDefinition' is true, the stage input will be validated
  * during parsing to ensure that it is an empty object.
  *
- * Supports custom validation via validate() method override.
+ * The default parse() validates the stage definition and constructs 'ParseNodeType' (see parse()
+ * for how), covering the common case where parsing is just validate-then-construct. Two extension
+ * points let a descriptor customize this without reimplementing the whole flow:
+ *   - Override validate() to add argument checks that run before the parse node is constructed.
+ *   - Override parse() when construction itself needs custom logic (transforming the arguments,
+ *     choosing between parse nodes, etc.); 'ParseNodeType' is still the declared parse node type.
  *
  * This can be instantiated using a stage name constant or with the stage name as an inline string
  * literal: using GroupStageDescriptor = TestStageDescriptor<"$group", GroupParseNode>;
@@ -179,11 +185,24 @@ public:
 
     TestStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
 
+    /**
+     * Validates the stage definition, then builds the parse node from whichever constructor
+     * 'ParseNodeType' provides: a (name, arguments) constructor is preferred, otherwise a default
+     * constructor. A parse node with neither cannot be built generically, so its descriptor must
+     * override parse() -- the tassert flags the case where one forgot to.
+     */
     std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
         auto arguments =
             sdk::validateStageDefinition(stageBson, kStageName, ExpectEmptyStageDefinition);
         validate(arguments);
-        return std::make_unique<ParseNodeType>(kStageName, arguments);
+        if constexpr (std::is_constructible_v<ParseNodeType, std::string, mongo::BSONObj>) {
+            return std::make_unique<ParseNodeType>(kStageName, arguments);
+        } else if constexpr (std::is_default_constructible_v<ParseNodeType>) {
+            return std::make_unique<ParseNodeType>();
+        } else {
+            sdk_tasserted(11409200, "TestStageDescriptor subclass must override parse()");
+            return nullptr;  // sdk_tasserted always throws.
+        }
     }
 
     virtual void validate(const mongo::BSONObj& arguments) const {}

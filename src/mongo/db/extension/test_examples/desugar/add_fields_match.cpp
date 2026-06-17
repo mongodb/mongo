@@ -88,12 +88,9 @@ private:
     BSONObj _matchSpec;
 };
 
-class AddFieldsMatchStageDescriptor : public sdk::AggStageDescriptor {
+class AddFieldsMatchStageDescriptor
+    : public sdk::TestStageDescriptor<"$addFieldsMatch", AddFieldsMatchParseNode> {
 public:
-    static inline const std::string kStageName = kAddFieldsMatchName;
-
-    AddFieldsMatchStageDescriptor() : sdk::AggStageDescriptor(kStageName) {}
-
     std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj stageBson) const override {
         const auto obj = sdk::validateStageDefinition(stageBson, kStageName);
 

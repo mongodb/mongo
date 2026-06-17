@@ -101,36 +101,6 @@ public:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx = new ExpressionContextForTest();
 };
 
-class ExpandToIdLookupNode : public extension::sdk::AggStageParseNode {
-public:
-    ExpandToIdLookupNode() : extension::sdk::AggStageParseNode("expandToIdLookup") {}
-
-    static constexpr size_t kExpansionSize = 1;
-
-    size_t getExpandedSize() const override {
-        return kExpansionSize;
-    }
-
-    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
-        std::vector<mongo::extension::VariantNodeHandle> expanded;
-        auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
-        expanded.emplace_back(extension::sdk::HostServicesAPI::getInstance()->createIdLookup(spec));
-        return expanded;
-    }
-
-    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return BSONObj();
-    }
-
-    std::unique_ptr<AggStageParseNode> clone() const override {
-        return std::make_unique<ExpandToIdLookupNode>();
-    }
-
-    static inline std::unique_ptr<extension::sdk::AggStageParseNode> make() {
-        return std::make_unique<ExpandToIdLookupNode>();
-    }
-};
-
 TEST_F(AggStageTest, CountingParseExpansionSucceedsTest) {
     auto countingParseNode =
         new ExtensionAggStageParseNodeAdapter(shared_test_stages::CountingParse::make());
@@ -187,8 +157,9 @@ TEST_F(AggStageTest, ExpansionToHostParseNodeSucceeds) {
 }
 
 TEST_F(AggStageTest, ExpansionToIdLookupSucceeds) {
-    auto expandToIdLookupAstNode =
-        std::make_unique<ExtensionAggStageParseNodeAdapter>(ExpandToIdLookupNode::make());
+    // ExpandToHostAstParseNode expands to a host-allocated $_internalSearchIdLookup AST node.
+    auto expandToIdLookupAstNode = std::make_unique<ExtensionAggStageParseNodeAdapter>(
+        shared_test_stages::ExpandToHostAstParseNode::make());
 
     // Transfer ownership from the SDK-style unique_ptr to the OwnedHandle.
     auto handle = extension::AggStageParseNodeHandle{expandToIdLookupAstNode.release()};
