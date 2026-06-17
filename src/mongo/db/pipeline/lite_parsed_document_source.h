@@ -451,6 +451,13 @@ public:
     }
 
     /**
+     * Returns true if this is a $currentOp stage.
+     */
+    virtual bool isCurrentOpStage() const {
+        return false;
+    }
+
+    /**
      * Simple constraints for LiteParsed-level validation, mirroring a subset of
      * DocumentSource::StageConstraints.
      */
