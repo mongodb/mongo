@@ -57,29 +57,20 @@ void applyProxyProtocolTlvs(const ParserResults& results, const std::shared_ptr<
 #ifdef MONGO_CONFIG_SSL
     {
         SSLX509Name dn;
-        stdx::unordered_set<RoleName> parsedRoles;
 
-        // Extract the DN and roles from the proxy protocol SSL sub-TLVs.
+        // Extract the DN from the proxy protocol SSL sub-TLVs.
         if (results.sslTlvs) {
             for (const auto& subTLV : results.sslTlvs->subTLVs) {
                 if (subTLV.type == kProxyProtocolSSLTlvDN) {
                     auto swDN = parseDN(subTLV.data);
                     uassertStatusOK(swDN);
                     dn = std::move(swDN.getValue());
-                } else if (subTLV.type == kProxyProtocolSSLTlvPeerRoles) {
-                    ConstDataRange rolesCDR(subTLV.data);
-                    auto swRoles = parsePeerRoles(rolesCDR);
-                    uassertStatusOK(swRoles);
-                    parsedRoles = std::move(swRoles.getValue());
                 }
             }
         }
 
         // Set the SSLPeerInfo fields based on the parsed TLV data.
-        if (sni || !dn.empty() || !parsedRoles.empty()) {
-            uassert(ErrorCodes::BadValue,
-                    "Proxy protocol header contains roles without a subject DN",
-                    parsedRoles.empty() || !dn.empty());
+        if (sni || !dn.empty()) {
             auto& sslPeerInfo = SSLPeerInfo::forSession(session);
             uassert(11793600,
                     "SSLPeerInfo is not empty during proxy protocol header parsing",
@@ -87,8 +78,7 @@ void applyProxyProtocolTlvs(const ParserResults& results, const std::shared_ptr<
             // Always set the isTLS flag to false here because the actual ingress connection
             // from the proxy protocol header is not a TLS connection, even if the original client
             // used TLS to connect to the proxy
-            sslPeerInfo = std::make_shared<SSLPeerInfo>(
-                false, std::move(dn), std::move(sni), std::move(parsedRoles));
+            sslPeerInfo = std::make_shared<SSLPeerInfo>(false, std::move(dn), std::move(sni));
         }
     }
 #endif

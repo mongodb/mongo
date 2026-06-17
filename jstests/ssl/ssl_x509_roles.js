@@ -157,9 +157,13 @@ jsTest.log.info("4. Testing x.509 auth to mongos with x509 roles disabled");
 }
 
 // ============================================================================
-// Proxy protocol tests: same authAndTest exercised through a TLS-terminating proxy that
-// forwards X.509 identity (DN + roles) via PROXY protocol v2 TLVs over a Unix domain socket.
+// Proxy protocol tests: verify that X.509 role-based auth is NOT supported through a
+// TLS-terminating proxy that forwards client identity via PROXY protocol v2 TLVs.
 // Architecture:  [shell] --TLS--> [proxy] --PP2+UDS--> [mongod/mongos]
+//
+// When a proxy forwards a mongoRoles TLV, the server treats it as an unrecognized TLV and
+// ignores it. Auth with role-embedded certs therefore fails (no matching $external user).
+// Auth still succeeds for the smoke user, whose DN has a corresponding $external user.
 // ============================================================================
 if (!isWindows) {
     /**
@@ -180,7 +184,7 @@ if (!isWindows) {
         return proxy;
     }
 
-    jsTest.log.info("5. Testing x.509 auth with roles to mongod through proxy protocol");
+    jsTest.log.info("5. Testing that x.509 role-embedded cert auth fails to mongod through proxy protocol");
     {
         const kSocketPrefix = `${MongoRunner.dataDir}/proxy_roles_mongod_sockets`;
         mkdir(kSocketPrefix);
@@ -193,36 +197,15 @@ if (!isWindows) {
         const kProxyIngressPort = allocatePort();
         const proxy = startProxy(kProxyIngressPort, mongod.port, kSocketPrefix);
 
-        authAndTest(kProxyIngressPort, true);
-
-        proxy.stop();
-        MongoRunner.stopMongod(mongod);
-    }
-
-    jsTest.log.info("6. Testing disabling x.509 auth with roles to mongod through proxy protocol");
-    {
-        const kSocketPrefix = `${MongoRunner.dataDir}/proxy_roles_disabled_mongod_sockets`;
-        mkdir(kSocketPrefix);
-
-        const mongod = MongoRunner.runMongod(
-            Object.merge(x509_options, {
-                auth: "",
-                setParameter: {allowRolesFromX509Certificates: false},
-                proxyUnixSocketPrefix: kSocketPrefix,
-            }),
-        );
-        prepConn(mongod);
-
-        const kProxyIngressPort = allocatePort();
-        const proxy = startProxy(kProxyIngressPort, mongod.port, kSocketPrefix);
-
+        // Roles forwarded via PP2 TLV are ignored as unrecognized; no $external user exists
+        // for these DNs, so auth must fail.
         authAndTest(kProxyIngressPort, false);
 
         proxy.stop();
         MongoRunner.stopMongod(mongod);
     }
 
-    jsTest.log.info("7. Testing x.509 auth with roles to mongos through proxy protocol");
+    jsTest.log.info("6. Testing that x.509 role-embedded cert auth fails to mongos through proxy protocol");
     {
         const kSocketPrefix = `${MongoRunner.dataDir}/proxy_roles_mongos_sockets`;
         mkdir(kSocketPrefix);
@@ -244,35 +227,8 @@ if (!isWindows) {
         const kProxyIngressPort = allocatePort();
         const proxy = startProxy(kProxyIngressPort, st.s0.port, kSocketPrefix);
 
-        authAndTest(kProxyIngressPort, true);
-
-        proxy.stop();
-        st.stop();
-    }
-
-    jsTest.log.info("8. Testing x.509 auth with roles disabled to mongos through proxy protocol");
-    {
-        const kSocketPrefix = `${MongoRunner.dataDir}/proxy_roles_disabled_mongos_sockets`;
-        mkdir(kSocketPrefix);
-
-        const localOptions = Object.merge(x509_options, {setParameter: {allowRolesFromX509Certificates: false}});
-        let st = new ShardingTest({
-            shards: 1,
-            mongos: 1,
-            other: {
-                keyFile: "jstests/libs/key1",
-                configOptions: localOptions,
-                mongosOptions: Object.merge(localOptions, {proxyUnixSocketPrefix: kSocketPrefix}),
-                rsOptions: localOptions,
-                useHostname: false,
-            },
-        });
-
-        prepConn(st.s0);
-
-        const kProxyIngressPort = allocatePort();
-        const proxy = startProxy(kProxyIngressPort, st.s0.port, kSocketPrefix);
-
+        // Roles forwarded via PP2 TLV are ignored as unrecognized; no $external user exists
+        // for these DNs, so auth must fail.
         authAndTest(kProxyIngressPort, false);
 
         proxy.stop();

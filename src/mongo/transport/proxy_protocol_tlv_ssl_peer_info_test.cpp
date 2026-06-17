@@ -48,15 +48,8 @@ namespace {
  * proxy protocol ParserResults. The logic under test:
  *   - Extracts SNI from top-level TLVs (kProxyProtocolTypeAuthority)
  *   - Extracts DN from SSL sub-TLVs (kProxyProtocolSSLTlvDN)
- *   - Extracts roles from SSL sub-TLVs (kProxyProtocolSSLTlvPeerRoles)
  *   - Sets SSLPeerInfo on the session only when at least one field is present
  */
-
-// DER-encoded role data for a single role: role="role_name", db="Third field"
-// From ssl_manager_test.cpp
-const unsigned char kSingleRoleDer[] = {0x31, 0x1a, 0x30, 0x18, 0x0c, 0x09, 0x72, 0x6f, 0x6c, 0x65,
-                                        0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x0c, 0x0b, 0x54, 0x68, 0x69,
-                                        0x72, 0x64, 0x20, 0x66, 0x69, 0x65, 0x6c, 0x64};
 
 // Uses applyProxyProtocolTlvs() from proxy_protocol_tlv_extraction.h — the same
 // function that asio_session_impl.cpp calls in production.
@@ -69,10 +62,6 @@ protected:
 
     std::shared_ptr<Session>& session() {
         return _session;
-    }
-
-    std::string singleRoleDerString() {
-        return std::string(reinterpret_cast<const char*>(kSingleRoleDer), sizeof(kSingleRoleDer));
     }
 
 private:
@@ -90,9 +79,8 @@ TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SNIExtractedFromTopLevelAuthority) {
     ASSERT_TRUE(sslPeerInfo);
     ASSERT_TRUE(sslPeerInfo->sniName().has_value());
     ASSERT_EQ(sslPeerInfo->sniName().value(), "my.mongodb.com");
-    // No DN or roles should be set.
+    // No DN should be set.
     ASSERT_TRUE(sslPeerInfo->subjectName().empty());
-    ASSERT_TRUE(sslPeerInfo->roles().empty());
 }
 
 TEST_F(ProxyProtocolTlvSSLPeerInfoTest, DNExtractedFromSSLSubTLV) {
@@ -114,23 +102,13 @@ TEST_F(ProxyProtocolTlvSSLPeerInfoTest, DNExtractedFromSSLSubTLV) {
     ASSERT_FALSE(sslPeerInfo->sniName().has_value());
 }
 
-TEST_F(ProxyProtocolTlvSSLPeerInfoTest, RolesWithoutDNShouldFail) {
-    ParserResults results;
-    results.sslTlvs = ProxiedSSLData{};
-    results.sslTlvs->subTLVs.push_back({kProxyProtocolSSLTlvPeerRoles, singleRoleDerString()});
-
-    ASSERT_THROWS_CODE(
-        applyProxyProtocolTlvs(results, session()), DBException, ErrorCodes::BadValue);
-}
-
-TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SNIAndDNAndRolesAllPresent) {
+TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SNIAndDNAllPresent) {
     ParserResults results;
     // Top-level TLV for SNI
     results.tlvs.push_back({kProxyProtocolTypeAuthority, "my.mongodb.com"});
-    // SSL sub-TLVs for DN and roles
+    // SSL sub-TLV for DN
     results.sslTlvs = ProxiedSSLData{};
     results.sslTlvs->subTLVs.push_back({kProxyProtocolSSLTlvDN, "CN=client,O=MongoDB"});
-    results.sslTlvs->subTLVs.push_back({kProxyProtocolSSLTlvPeerRoles, singleRoleDerString()});
 
     applyProxyProtocolTlvs(results, session());
 
@@ -147,11 +125,8 @@ TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SNIAndDNAndRolesAllPresent) {
     ASSERT_OK(swCN.getStatus());
     ASSERT_EQ(swCN.getValue(), "client");
 
-    // Roles
-    ASSERT_EQ(sslPeerInfo->roles().size(), 1u);
-    auto role = *sslPeerInfo->roles().begin();
-    ASSERT_EQ(role.getRole(), "role_name");
-    ASSERT_EQ(role.getDB(), "Third field");
+    // ROLES
+    ASSERT_EQ(sslPeerInfo->roles().size(), 0);
 }
 
 TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SNIFromTopLevelNotSSLSubTLV) {
@@ -182,7 +157,7 @@ TEST_F(ProxyProtocolTlvSSLPeerInfoTest, NoSSLPeerInfoWhenNoTLVs) {
 }
 
 TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SSLTLVsWithoutRelevantSubTLVsAndNoSNI) {
-    // SSL TLVs exist but contain no DN or roles sub-TLVs.
+    // SSL TLVs exist but contain no DN sub-TLVs.
     // And no Authority TLV in top-level TLVs.
     ParserResults results;
     results.sslTlvs = ProxiedSSLData{};
@@ -206,7 +181,6 @@ TEST_F(ProxyProtocolTlvSSLPeerInfoTest, SNIOnlyWithoutSSLTLVs) {
     ASSERT_TRUE(sslPeerInfo->sniName().has_value());
     ASSERT_EQ(sslPeerInfo->sniName().value(), "standalone-sni.com");
     ASSERT_TRUE(sslPeerInfo->subjectName().empty());
-    ASSERT_TRUE(sslPeerInfo->roles().empty());
 }
 
 TEST_F(ProxyProtocolTlvSSLPeerInfoTest, MultipleTopLevelTLVsFirstAuthorityWins) {

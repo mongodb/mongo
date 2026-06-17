@@ -35,32 +35,13 @@ _unix_egress_path = None  # type: Optional[str]
 # SNI store: maps id(ssl_object) -> server_name captured via sni_callback.
 _sni_store = {}  # type: Dict[int, str]
 
-# OID for the MongoDB roles X509v3 extension.
-_MONGO_ROLES_OID_DOTTED = "1.3.6.1.4.1.34601.2.1.1"
 
-
-def _extract_cert_info(der_cert_bytes: bytes) -> Tuple[Optional[str], Optional[bytes]]:
-    """Extract subject DN (RFC 4514 string) and roles (raw DER) from a DER certificate.
-
-    Returns (dn_string, roles_der). Either may be None if not present.
-    """
+def _extract_cert_dn(der_cert_bytes: bytes) -> Optional[str]:
+    """Extract subject DN (RFC 4514 string) from a DER certificate."""
     from cryptography import x509
-    from cryptography.x509.oid import ObjectIdentifier
 
     cert = x509.load_der_x509_certificate(der_cert_bytes)
-
-    # Subject DN as RFC 4514 string (e.g. "CN=foo,OU=bar,O=baz")
-    dn_str = cert.subject.rfc4514_string()
-
-    # Roles extension (OID 1.3.6.1.4.1.34601.2.1.1) — raw DER value
-    roles_der = None
-    try:
-        ext = cert.extensions.get_extension_for_oid(ObjectIdentifier(_MONGO_ROLES_OID_DOTTED))
-        roles_der = ext.value.value  # raw DER bytes of the extension value
-    except x509.ExtensionNotFound:
-        pass
-
-    return dn_str, roles_der
+    return cert.subject.rfc4514_string()
 
 
 # See setTLVs docstring in jstests/sharding/libs/proxy_protocol.js for format.
@@ -261,18 +242,16 @@ async def _patched_run(args):
                     if sni and 0x02 not in cur_tlv:
                         cur_tlv[0x02] = sni.encode("utf-8")
 
-                    # Peer certificate → subject DN (0xE0) and roles (0xE1)
+                    # Peer certificate → subject DN (0xE0)
                     der_cert = ssl_obj.getpeercert(binary_form=True)
                     if der_cert:
                         try:
-                            dn_str, roles_der = _extract_cert_info(der_cert)
+                            dn_str = _extract_cert_dn(der_cert)
                             if dn_str and 0xE0 not in cur_ssl_tlv:
                                 cur_ssl_tlv[0xE0] = dn_str.encode("utf-8")
-                            if roles_der and 0xE1 not in cur_ssl_tlv:
-                                cur_ssl_tlv[0xE1] = roles_der
                         except Exception as e:
                             print(
-                                f"[proxy] Failed to extract cert info: {e!r}",
+                                f"[proxy] Failed to extract cert DN: {e!r}",
                                 file=sys.stderr,
                                 flush=True,
                             )

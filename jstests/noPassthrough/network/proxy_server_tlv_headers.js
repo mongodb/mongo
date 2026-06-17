@@ -42,10 +42,6 @@ proxyServer.start();
 // The subject DN from client_roles.pem in RFC 4514 format (which parseDN expects).
 const kDN = "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US";
 
-// DER-encoded roles from client_roles.pem: backup@admin, readAnyDatabase@admin.
-// This is the value of the mongodbRoles extension (OID 1.3.6.1.4.1.34601.2.1.1).
-const kRolesDer = "\x31\x2b\x30\x0f\x0c\x06backup\x0c\x05admin\x30\x18\x0c\x0freadAnyDatabase\x0c\x05admin";
-
 const kSNI = "my.mongodb.com";
 
 function isEmpty(obj) {
@@ -104,17 +100,11 @@ function runTest(tlvs, sslTlv, expectedSuccess) {
     );
 }
 
-jsTest.log.info("Test 1: Authority TLV with DN and roles in SSL sub-TLVs");
+jsTest.log.info("Test 1: Authority TLV with DN in SSL sub-TLVs");
 runTest(
     [{"type": 0x02, "value": "authority.example.com"}],
     {
-        "ssl": [
-            {"type": 0xe0, "value": kDN},
-            {
-                "type": 0xe1,
-                "value": kRolesDer,
-            },
-        ],
+        "ssl": [{"type": 0xe0, "value": kDN}],
     },
     true,
 );
@@ -153,7 +143,7 @@ runTest(
     true,
 );
 
-jsTest.log.info("Test 6: SNI + other top-level TLVs + DN + roles + version in SSL sub-TLVs");
+jsTest.log.info("Test 6: SNI + other top-level TLVs + DN + version in SSL sub-TLVs");
 runTest(
     [
         {"type": 0x01, "value": "h2"},
@@ -164,40 +154,18 @@ runTest(
         "ssl": [
             {"type": 0x21, "value": "TLSv1.3"},
             {"type": 0xe0, "value": kDN},
-            {"type": 0xe1, "value": kRolesDer},
         ],
     },
     true,
 );
 
-jsTest.log.info("Test 7: SSL sub-TLVs with version and cipher but no DN or roles");
+jsTest.log.info("Test 7: SSL sub-TLVs with version and cipher but no DN");
 runTest(
     [{"type": 0x02, "value": kSNI}],
     {
         "ssl": [
             {"type": 0x21, "value": "TLSv1.3"},
             {"type": 0x23, "value": "ECDHE-RSA-AES128-GCM-SHA256"},
-        ],
-    },
-    true,
-);
-
-jsTest.log.info("Test 8: Roles only, no DN, no SNI -- should fail");
-runTest(
-    [{"type": 0x01, "value": "h2"}],
-    {
-        "ssl": [{"type": 0xe1, "value": kRolesDer}],
-    },
-    false,
-);
-
-jsTest.log.info("Test 9: DN and roles without SNI");
-runTest(
-    [{"type": 0x01, "value": "h2"}],
-    {
-        "ssl": [
-            {"type": 0xe0, "value": kDN},
-            {"type": 0xe1, "value": kRolesDer},
         ],
     },
     true,

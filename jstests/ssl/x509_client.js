@@ -151,8 +151,7 @@ const x509_options = {
 if (!isWindows) {
     /**
      * Creates a proxy protocol server that terminates TLS on ingress, extracts the client cert DN
-     * (and roles if present) from the TLS handshake, and forwards them as PP2 TLVs to the target's
-     * proxy Unix domain socket.
+     * from the TLS handshake, and forwards it as a PP2 TLV to the target's proxy Unix domain socket.
      *
      * @param {number} ingressPort - Port the proxy listens on for client TLS connections.
      * @param {number} targetPort - The mongod/mongos port (used to derive the UDS path).
