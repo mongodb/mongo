@@ -45,7 +45,8 @@ const errorCases = [
     {
         // numMeta:2 makes the source emit 2 kMetaResult docs; $setVariableFromSubPipeline
         // expects exactly one. A passthrough mergePipeline preserves the multi-doc condition
-        // in sharded topologies (the default [{$limit: 1}] would mask the error after merge).
+        // in sharded topologies (the default $group-based merge would collapse the two docs
+        // into one and mask the error after merge).
         name: "errors when source produces multiple metadata documents",
         pipeline: [
             {

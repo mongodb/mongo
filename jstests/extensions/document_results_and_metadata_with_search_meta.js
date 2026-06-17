@@ -25,9 +25,9 @@ const expectedMeta = {
 
 describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", function () {
     let coll;
-    // The source extension runs on every shard that owns data for the collection. All shards
-    // return identical metadata, so the default merge pipeline of [{$limit: 1}] produces
-    // expectedMeta. Tests with per-shard metadata variation supply an explicit mergePipeline.
+    // The source extension runs on every shard that owns data for the collection. All shards return
+    // identical metadata, so the default merge pipeline produces expectedMeta. Tests with per-shard
+    // metadata variation supply an explicit mergePipeline.
     let nShards;
     let shardIds;
     let isSharded;
@@ -131,9 +131,6 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
     });
 
     it("returns all docs across getMore batches with metadata bound on every doc", function () {
-        // TODO SERVER-129101: Re-enable on sharded clusters. The $limit 1 meta-cursor disposal
-        // kills an in-flight shard getMore mid-Exchange-load, causing a whole shard's docs to drop.
-        if (isSharded) return;
         const numDocs = 150;
         const result = coll
             .aggregate([
@@ -172,7 +169,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
     });
 
     it("[sharded] merge-sorts uneven per-shard distributions correctly", function () {
-        if (!isSharded || nShards < 2) return;
+        if (nShards < 2) return;
         // Make shard 0 produce 10 docs, shard 1 produce 2 docs, by keying byShard on shardId.
         const byShard = {[shardIds[0]]: {numDocs: 10}, [shardIds[1]]: {numDocs: 2}};
         const result = coll
@@ -247,7 +244,7 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
     });
 
     it("[sharded] aggregates per-shard metadata via $group merge pipeline", function () {
-        if (!isSharded || nShards < 2) return;
+        if (nShards < 2) return;
         // Each shard emits a different per-shard metadata document. The merge pipeline groups them
         // into a single summed-count metadata document for $$SEARCH_META.
         const metaA = {count: {lowerBound: 10}};
@@ -278,6 +275,72 @@ describe("$_internalDocumentResultsAndMetadata with $$SEARCH_META binding", func
             {name: "doc_1", meta: mergedMeta},
             {name: "doc_2", meta: mergedMeta},
         ];
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
+    it("[sharded] aggregates metadata via a mongot-shaped $group merge pipeline", function () {
+        if (nShards < 2) return;
+        // Simulate the metaPipeline mongot emits during planning: a $group on a composite
+        // {type, path, bucket} key that $sums a per-shard meta value. Each shard emits one meta
+        // doc sharing the same key, so the merge sums them into a single document for $$SEARCH_META
+        // (DRM requires the merged meta pipeline to produce exactly one document).
+        const byShard = {
+            [shardIds[0]]: {meta: {type: "facet", path: "category", bucket: "books", metaVal: 10}},
+            [shardIds[1]]: {meta: {type: "facet", path: "category", bucket: "books", metaVal: 32}},
+        };
+        // This $group query mirrors what mongot hands the router during the planning phase.
+        const mergePipeline = [
+            {
+                $group: {
+                    _id: {type: "$type", path: "$path", bucket: "$bucket"},
+                    value: {$sum: "$metaVal"},
+                },
+            },
+        ];
+        const result = coll
+            .aggregate([
+                {
+                    $extensionMultiStream: {
+                        numDocs: 3,
+                        // Top-level meta configures DRM; per-shard overrides supply the values.
+                        meta: {type: "facet", path: "category", bucket: "books", metaVal: 0},
+                        byShard,
+                        mergePipeline,
+                    },
+                },
+                {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        const mergedMeta = {_id: {type: "facet", path: "category", bucket: "books"}, value: 42};
+        const perShardDocs = Array.from({length: 3}, (_, i) => ({
+            name: `doc_${i}`,
+            meta: mergedMeta,
+        }));
+        const expected = Array(nShards).fill(perShardDocs).flat();
+        assert.sameMembers(result, expected, {result, nShards});
+    });
+
+    it("[sharded] default merge pipeline unions metadata fields across shards", function () {
+        if (nShards < 2) return;
+        // Give two shards disjoint slices of the metadata document and supply no explicit
+        // mergePipeline. The default ($group + $mergeObjects + $replaceRoot) must incorporate a
+        // field from each shard, proving it unions across shards rather than picking one shard's
+        // doc. Any additional shards return the full top-level meta, which the union absorbs.
+        const byShard = {
+            [shardIds[0]]: {meta: {count: expectedMeta.count}},
+            [shardIds[1]]: {meta: {facets: expectedMeta.facets}},
+        };
+        const result = coll
+            .aggregate([
+                {$extensionMultiStream: {numDocs: 3, meta: expectedMeta, byShard}},
+                {$project: {_id: 0, name: 1, meta: "$$SEARCH_META"}},
+            ])
+            .toArray();
+        const perShardDocs = Array.from({length: 3}, (_, i) => ({
+            name: `doc_${i}`,
+            meta: expectedMeta,
+        }));
         const expected = Array(nShards).fill(perShardDocs).flat();
         assert.sameMembers(result, expected, {result, nShards});
     });

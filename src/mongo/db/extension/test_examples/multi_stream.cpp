@@ -139,8 +139,18 @@ struct DplConfig {
         return {
             args.hasField(kSortPatternField) ? args[kSortPatternField].Obj().getOwned()
                                              : BSON(kScoreField << -1),
-            args.hasField(kMergePipelineField) ? args[kMergePipelineField].Obj().getOwned()
-                                               : BSON_ARRAY(BSON("$limit" << 1)),
+            // Default merge unions every shard's metadata via a blocking $group/$mergeObjects +
+            // $replaceRoot. This incorporates a field from each shard's metadata document while
+            // staying schema-agnostic. A value-combining merge such as $group/$sum cannot be the
+            // default because it must name a numeric field (e.g. {$sum: "$metaVal"}). When all
+            // shards return the same metadata the union reproduces it. Tests whose per-shard
+            // metadata must be summed (or otherwise combined by value) can supply an explicit,
+            // schema-aware mergePipeline via kMergePipelineField.
+            args.hasField(kMergePipelineField)
+                ? args[kMergePipelineField].Obj().getOwned()
+                : BSON_ARRAY(BSON("$group" << BSON("_id" << BSONNULL << "doc"
+                                                         << BSON("$mergeObjects" << "$$ROOT")))
+                             << BSON("$replaceRoot" << BSON("newRoot" << "$doc"))),
         };
     }
 };
@@ -288,9 +298,6 @@ struct DplCallbackBundle {
 
 DplCallbackBundle makeDplCallback(const BSONObj& args) {
     auto* data = new DplConfig(DplConfig::parse(args));
-    // Default mergePipeline is [{$limit:1}], which picks one shard's metadata. This is correct when
-    // every shard returns the same metadata. Tests with per-shard metadata variation supply an
-    // explicit mergePipeline that aggregates across shards.
     const auto callback = [](void* userData,
                              ::MongoExtensionQueryExecutionContext* /*execCtx*/,
                              ::MongoExtensionByteBuf** sortOut,
