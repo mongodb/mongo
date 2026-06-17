@@ -62,6 +62,7 @@
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/db/storage/key_format.h"
@@ -227,6 +228,9 @@ public:
      * unsplittable or untracked, we should route to the shard which owns 'nss'. Note that this
      * decision is inherently racy and subject to become stale. This is okay because either choice
      * will work correctly, we are simply applying a heuristic optimization.
+     *
+     * TODO (SERVER-128349): Update this function to return a ShardRef once the chunk manager's APIs
+     * use ShardRef.
      */
     virtual boost::optional<ShardId> determineSpecificMergeShard(
         OperationContext* opCtx, const NamespaceString& ns) const = 0;
@@ -411,6 +415,9 @@ public:
      *
      * This function accepts an optional 'dataShard' parameter that indicates the shard where the
      * temporary collection should be created.
+     *
+     * TODO (SERVER-128349): Update this function to accept a ShardRef instead of a ShardId once
+     * the merge shard calculation uses ShardRef.
      */
     virtual void createTempCollection(OperationContext* opCtx,
                                       const NamespaceString& nss,
@@ -574,14 +581,16 @@ public:
         CurrentOpCursorMode) const = 0;
 
     /**
-     * Returns the name of the local shard if sharding is enabled, or an empty string.
+     * Returns the name of the local shard if sharding is enabled, or an empty string. Should only
+     * be used for logging, error message, and information returned to the user.
      */
     virtual std::string getShardName(OperationContext* opCtx) const = 0;
 
     /**
-     * Returns the the local shard if this process is a shardsvr, else boost::none.
+     * Returns the local shard if this process is a shardsvr, else boost::none. Should be used for
+     * any routing or other internal operations requiring a shard identifier.
      */
-    virtual boost::optional<ShardId> getShardId(OperationContext* opCtx) const = 0;
+    virtual boost::optional<ShardRef> getShardRef(OperationContext* opCtx) const = 0;
 
     /**
      * Returns whether or not this process is running as part of a sharded cluster.

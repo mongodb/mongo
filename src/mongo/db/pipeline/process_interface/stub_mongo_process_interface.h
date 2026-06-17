@@ -311,7 +311,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<ShardId> getShardId(OperationContext* opCtx) const override {
+    boost::optional<ShardRef> getShardRef(OperationContext* opCtx) const override {
         return boost::none;
     }
 

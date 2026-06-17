@@ -530,19 +530,20 @@ bool isRequiredToReadLocalData(const ShardTargetingPolicy& shardTargetingPolicy,
 }
 
 /**
- * Given a pipeline's TargetingResults and this process' ShardId, return true if we can use a local
+ * Given a pipeline's TargetingResults and this process' ShardRef, return true if we can use a local
  * read as the cursor source for the pipeline. Also considers the readConcern of the pipeline
  * (passed as argument), vs. the readConcern of the operation the pipeline is running under
  * (obtained from the provided opCtx).
  */
 bool canUseLocalReadAsCursorSource(OperationContext* opCtx,
                                    const TargetingResults& targeting,
-                                   const ShardId& localShardId,
+                                   const ShardRef& localShardRef,
                                    boost::optional<BSONObj> readConcern) {
     // If there is no targetingCri, we can't enter the shard role correctly, so we need to
     // fallback to remote read.
+    // TODO (SERVER-128349): Remove getShardId() once shard targeting methods use ShardRef.
     bool useLocalRead = !targeting.needsSplit && targeting.shardIds.size() == 1 &&
-        *targeting.shardIds.begin() == localShardId;
+        *targeting.shardIds.begin() == localShardRef.getShardId();
 
     // If subpipeline has a different read concern, we need to perform remote read to
     // satisfy it.
@@ -570,7 +571,7 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     std::unique_ptr<Pipeline>& pipelineToTarget,
     const AggregateCommandRequest& aggRequest,
     bool useCollectionDefaultCollator,
-    const ShardId& localShardId,
+    const ShardRef& localShardRef,
     std::function<void(Pipeline* pipeline)> optimizePipeline = nullptr,
     std::unique_ptr<Pipeline> preFinalizedPipeline = nullptr) {
     const auto& nss = expCtx->getNamespaceString();
@@ -583,9 +584,11 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
             optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime();
         }
 
+        // TODO (SERVER-128786): Remove getShardId once getShardVersion uses ShardRef.
         ShardVersion shardVersion = std::invoke([&] {
-            auto sv = targetingCri.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
-                                                     : ShardVersion::UNTRACKED();
+            auto sv = targetingCri.hasRoutingTable()
+                ? targetingCri.getShardVersion(localShardRef.getShardId())
+                : ShardVersion::UNTRACKED();
             if (optOriginalPlacementConflictTime.has_value())
                 sv.setPlacementConflictTime_DEPRECATED(*optOriginalPlacementConflictTime);
             return sv;
@@ -1774,11 +1777,11 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
                        shardTargetingPolicy,
                        routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString()));
 
-    const boost::optional<ShardId> localShardId =
-        expCtx->getMongoProcessInterface()->getShardId(expCtx->getOperationContext());
-    if (localShardId &&
+    const boost::optional<ShardRef> localShardRef =
+        expCtx->getMongoProcessInterface()->getShardRef(expCtx->getOperationContext());
+    if (localShardRef &&
         canUseLocalReadAsCursorSource(
-            expCtx->getOperationContext(), pipelineTargetingInfo, *localShardId, readConcern)) {
+            expCtx->getOperationContext(), pipelineTargetingInfo, *localShardRef, readConcern)) {
         if (auto pipelineWithCursor =
                 tryAttachCursorSourceForLocalRead(expCtx->getOperationContext(),
                                                   expCtx,
@@ -1786,7 +1789,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
                                                   pipelineToTarget,
                                                   aggRequest,
                                                   useCollectionDefaultCollator,
-                                                  *localShardId,
+                                                  *localShardRef,
                                                   optimizePipeline,
                                                   std::move(preFinalizedPipeline))) {
             return pipelineWithCursor;
