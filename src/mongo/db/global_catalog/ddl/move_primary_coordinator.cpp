@@ -104,6 +104,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
 MONGO_FAIL_POINT_DEFINE(hangBeforeMovePrimaryCriticalSection);
 MONGO_FAIL_POINT_DEFINE(hangAfterMovePrimaryCriticalSection);
 MONGO_FAIL_POINT_DEFINE(movePrimaryFailIfNeedToCloneMovableCollections);
+MONGO_FAIL_POINT_DEFINE(hangBeforeMovePrimaryCommitDbMetadata);
 
 /**
  * Returns true if this unsharded collection can be moved by a moveCollection command.
@@ -329,6 +330,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 if (_doc.getAuthoritativeMetadataAccessLevel() >=
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     commitCollectionsMetadataToShards(opCtx, executor, token);
+                }
+
+                if (MONGO_unlikely(hangBeforeMovePrimaryCommitDbMetadata.shouldFail())) {
+                    LOGV2(12753300, "Hit hangBeforeMovePrimaryCommitDbMetadata");
+                    hangBeforeMovePrimaryCommitDbMetadata.pauseWhileSet(opCtx);
                 }
 
                 commitDbMetadataToConfig(opCtx, preCommitDbVersion);
