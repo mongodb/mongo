@@ -300,7 +300,15 @@ bool OplogTruncateMarkers::awaitHasExpiredOplogOrDead(OperationContext* opCtx, R
                 return true;
             }
             RecordId pin(opCtx->getServiceContext()->getStorageEngine()->getPinnedOplog().asULL());
-            return newestExpiredRecord(opCtx, rs, pin, newestExpiredWallTime(opCtx)).has_value();
+            bool hasExpiredRecord =
+                newestExpiredRecord(opCtx, rs, pin, newestExpiredWallTime(opCtx)).has_value();
+            // newestExpiredRecord opens a reverse oplog cursor, which implicitly starts a read
+            // transaction. Abandon it so the idle wait that follows holds no snapshot and does not
+            // pin oldest_id for the entire check period. Abandoning on every evaluation also
+            // ensures the next check observes oplog appended during the wait rather than reusing a
+            // stale snapshot.
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+            return hasExpiredRecord;
         });
 
     // Return true only when we have detected excess oplog, not because the record store

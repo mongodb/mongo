@@ -42,9 +42,12 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/db/storage/oplog_truncation.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
@@ -52,6 +55,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -394,6 +398,35 @@ TEST_F(AsyncOplogTruncationTest, ShutdownRacesWithLiveCapMaintainerThread) {
             << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
         EXPECT_FALSE(threadRaw->running()) << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
     }
+}
+
+TEST_F(AsyncOplogTruncationTest, AwaitHasExpiredOplogAbandonsSnapshot) {
+    // awaitHasExpiredOplogOrDead evaluates its wait predicate via newestExpiredRecord, which opens
+    // a reverse oplog cursor and thereby implicitly starts a read snapshot. Verify that snapshot is
+    // abandoned before the function returns, so the idle wait that follows holds no snapshot and
+    // does not pin oldest_id for the entire check period.
+
+    // oplogMinRetentionHours is a startup option, not a runtime server parameter, so set it
+    // directly and restore it on exit. A tiny non-zero value drives the wait period to zero so the
+    // predicate is evaluated once and the call returns immediately instead of blocking.
+    double originalRetention = storageGlobalParams.oplogMinRetentionHours.load();
+    ON_BLOCK_EXIT([&] { storageGlobalParams.oplogMinRetentionHours.store(originalRetention); });
+    storageGlobalParams.oplogMinRetentionHours.store(1e-6);
+
+    auto opCtx = getOperationContext();
+    insertOplog(1, 512);
+    insertOplog(2, 512);
+
+    auto* rs = LocalOplogInfo::get(opCtx)->getRecordStore();
+    auto markers = OplogTruncateMarkers::createEmptyOplogTruncateMarkers(*rs);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    ASSERT_FALSE(ru.isActive());
+
+    markers->awaitHasExpiredOplogOrDead(opCtx, *rs);
+
+    // The snapshot opened while evaluating the predicate must have been abandoned before returning.
+    ASSERT_FALSE(ru.isActive());
 }
 
 
