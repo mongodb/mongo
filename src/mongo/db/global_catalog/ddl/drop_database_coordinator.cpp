@@ -305,7 +305,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
             opCtx,
             nss,
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites,
             getReasonForDropCollection(nss),
             _doc.getAuthoritativeMetadataAccessLevel(),
@@ -338,7 +338,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             opCtx,
             nss,
             coll.getUuid(),
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
             session,
             executor,
             token);
@@ -351,7 +351,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
 
     // We need to send the drop to all the shards because both movePrimary and
     // moveChunk leave garbage behind for sharded collections.
-    auto locallyDropCollectionOnParticipants = [&](const std::vector<ShardId>& shards,
+    auto locallyDropCollectionOnParticipants = [&](const std::vector<ShardRef>& shards,
                                                    bool fromMigrate) {
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
             opCtx,
@@ -366,7 +366,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             boost::none /* collectionUUID */,
             false /* requireCollectionEmpty */);
     };
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
     // Remove primary shard from participants
     participants.erase(std::remove_if(participants.begin(),
                                       participants.end(),
@@ -412,7 +412,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
             opCtx,
             nss,
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
             CriticalSectionBlockTypeEnum::kUnblock,
             getReasonForDropCollection(nss),
             _doc.getAuthoritativeMetadataAccessLevel(),
@@ -436,7 +436,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", dbNss);
-                const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+                const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
 
                 // Make sure we were primary when we read the collections metadata so it is safe
                 // to proceed using the collection uuids to perform destructive operations
@@ -465,7 +465,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 if (_doc.getCollInfo()) {
                     const auto coll = _doc.getCollInfo().value();
                     const auto& collChangeStreamsNotifierShardId =
-                        _doc.getCollChangeStreamsNotifier().value_or(primaryShardId);
+                        _doc.getCollChangeStreamsNotifier().value_or(primaryShardRef);
                     LOGV2_DEBUG(5494504,
                                 2,
                                 "Completing drop of tracked collection from previous primary",
@@ -492,7 +492,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);
                     newStateDoc.setCollChangeStreamsNotifier([&]() {
-                        auto changeStreamsNotifier = primaryShardId;
+                        auto changeStreamsNotifier = primaryShardRef;
                         if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
                                 VersionContext::getDecoration(opCtx),
                                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -511,7 +511,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                             }
                         }
 
-                        return changeStreamsNotifier;
+                        // TODO SERVER-128569: Remove getShardId() call
+                        return changeStreamsNotifier.getShardId();
                     }());
                     _updateStateDocument(opCtx, std::move(newStateDoc));
 
@@ -556,7 +557,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                                                                    std::move(unshardedCollUUIDs));
                 }
 
-                const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                const auto allShardRefs =
+                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
                 {
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
@@ -605,9 +607,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         dropDatabaseParticipantCmd.setFromMigrate(true);
 
                         // Remove primary shard from participants
-                        auto participants = allShardIds;
+                        auto participants = allShardRefs;
                         participants.erase(
-                            std::remove(participants.begin(), participants.end(), primaryShardId),
+                            std::remove(participants.begin(), participants.end(), primaryShardRef),
                             participants.end());
 
                         generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
@@ -675,7 +677,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         sharding_ddl_util::generatePlacementChangeNotificationOnShard(
                             opCtx,
                             notification,
-                            primaryShardId,
+                            primaryShardRef,
                             buildNewSessionFn,
                             executor,
                             token);
@@ -717,7 +719,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
             if (_doc.getAuthoritativeMetadataAccessLevel() ==
                 AuthoritativeMetadataAccessLevelEnum::kNone) {
                 const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                auto participants =
+                    Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
                 participants.erase(
                     std::remove(participants.begin(), participants.end(), primaryShardId),
                     participants.end());

@@ -63,7 +63,7 @@ namespace mongo {
 
 struct SplitPolicyParams {
     UUID collectionUUID;
-    ShardId primaryShardId;
+    ShardRef primaryShardRef;
 };
 
 class MONGO_MOD_PUBLIC InitialSplitPolicy {
@@ -118,7 +118,7 @@ public:
         const ShardKeyPattern& shardKeyPattern,
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
-        const std::vector<ShardId>& allShardIds);
+        const std::vector<ShardRef>& allShardRefs);
 };
 
 /**
@@ -136,14 +136,14 @@ public:
  */
 class MONGO_MOD_PUBLIC SingleChunkOnShardSplitPolicy : public InitialSplitPolicy {
 public:
-    SingleChunkOnShardSplitPolicy(OperationContext* opCtx, ShardId dataShard);
+    SingleChunkOnShardSplitPolicy(OperationContext* opCtx, ShardRef dataShard);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
                                             const SplitPolicyParams& params) override;
 
 private:
-    ShardId _dataShard;
+    ShardRef _dataShard;
 };
 
 /**
@@ -156,7 +156,7 @@ public:
      * Constructor used when generating split points for a hashed-prefix shard key.
      */
     SplitPointsBasedSplitPolicy(
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+        boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -169,7 +169,7 @@ public:
 
 private:
     std::vector<BSONObj> _splitPoints;
-    boost::optional<std::vector<ShardId>> _availableShardIds;
+    boost::optional<std::vector<ShardRef>> _availableShardRefs;
 };
 
 /**
@@ -183,12 +183,12 @@ public:
      */
     struct SplitInfo {
         std::vector<BSONObj> splitPoints;
-        std::vector<std::pair<ShardId, size_t>> chunkDistribution;
+        std::vector<std::pair<ShardRef, size_t>> chunkDistribution;
     };
 
     AbstractTagsBasedSplitPolicy(OperationContext* opCtx,
                                  std::vector<TagsType> tags,
-                                 boost::optional<std::vector<ShardId>> availableShardIds);
+                                 boost::optional<std::vector<ShardRef>> availableShardRefs);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -204,14 +204,14 @@ public:
         return _tags;
     }
 
-    const StringMap<std::vector<ShardId>>& getTagsToShardIds() const {
-        return _tagToShardIds;
+    const StringMap<std::vector<ShardRef>>& getTagsToShardRefs() const {
+        return _tagToShardRefs;
     }
 
 private:
     const std::vector<TagsType> _tags;
-    StringMap<std::vector<ShardId>> _tagToShardIds;
-    boost::optional<std::vector<ShardId>> _availableShardIds;
+    StringMap<std::vector<ShardRef>> _tagToShardRefs;
+    boost::optional<std::vector<ShardRef>> _availableShardRefs;
 };
 
 /**
@@ -222,8 +222,8 @@ public:
     SingleChunkPerTagSplitPolicy(
         OperationContext* opCtx,
         std::vector<TagsType> tags,
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none)
-        : AbstractTagsBasedSplitPolicy(opCtx, tags, availableShardIds) {}
+        boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none)
+        : AbstractTagsBasedSplitPolicy(opCtx, tags, availableShardRefs) {}
 
     SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
@@ -244,7 +244,7 @@ public:
         const ShardKeyPattern& shardKeyPattern,
         std::vector<TagsType> tags,
         bool isCollectionEmpty,
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+        boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none);
 
     SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
@@ -292,13 +292,13 @@ public:
                                          const ShardKeyPattern& shardKey,
                                          int numInitialChunks,
                                          boost::optional<std::vector<TagsType>> zones,
-                                         boost::optional<std::vector<ShardId>> availableShardIds,
+                                         boost::optional<std::vector<ShardRef>> availableShardRefs,
                                          int samplesPerChunk = kDefaultSamplesPerChunk);
 
     SamplingBasedSplitPolicy(int numInitialChunks,
                              boost::optional<std::vector<TagsType>> zones,
                              std::unique_ptr<SampleDocumentSource> samples,
-                             boost::optional<std::vector<ShardId>> availableShardIds);
+                             boost::optional<std::vector<ShardRef>> availableShardRefs);
 
     /**
      * Generates the initial split points and returns them in ascending shard key order. Does not
@@ -356,7 +356,7 @@ private:
     boost::optional<std::vector<TagsType>> _zones;
     std::unique_ptr<SampleDocumentSource> _samples;
     // If provided, only pick shard that is in this vector.
-    boost::optional<std::vector<ShardId>> _availableShardIds;
+    boost::optional<std::vector<ShardRef>> _availableShardRefs;
 };
 
 class ShardDistributionSplitPolicy : public InitialSplitPolicy {

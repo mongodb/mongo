@@ -111,7 +111,9 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::vector<ShardId>& shardIds) {
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    // TODO SERVER-129196: remove conversion once resharding is migrated to ShardRef.
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, std::vector<ShardRef>(shardIds.begin(), shardIds.end()));
 }
 
 template <typename CommandType>

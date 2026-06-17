@@ -79,8 +79,8 @@ MONGO_MOD_NEEDS_REPLACEMENT std::unique_ptr<InitialSplitPolicy> createPolicy(
     size_t numShards,
     bool collectionIsEmpty,
     bool isUnsplittable,
-    boost::optional<ShardId> dataShard,
-    boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+    boost::optional<ShardRef> dataShard,
+    boost::optional<std::vector<ShardRef>> availableShardRefs = boost::none);
 
 /**
  * Generates, using a ShardsvrCreateCollectionRequest as source, a CreateCommand that
@@ -180,7 +180,7 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& token,
         const NamespaceString& nss,
-        const std::vector<ShardId>& shardIds,
+        const std::vector<ShardRef>& shardRefs,
         CriticalSectionBlockTypeEnum blockType);
 
     // Enter to the critical section on all the shards. Blocks writes and reads.
@@ -226,7 +226,7 @@ private:
                                       bool throwIfReasonDiffers,
                                       std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                       const CancellationToken& token,
-                                      const std::vector<ShardId>& shardIds);
+                                      const std::vector<ShardRef>& shardRefs);
 
     // Support methods to generate the events required by change stream readers before/after the
     // commit to the global catalog.

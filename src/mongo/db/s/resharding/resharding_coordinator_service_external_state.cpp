@@ -213,16 +213,16 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
                     opCtx, shardKey, *shardDistribution, std::move(parsedZones));
                 splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
             } else {
-                std::vector<ShardId> availableShardIds;
+                std::vector<ShardRef> availableShardRefs;
                 for (const auto& shardDist : *shardDistribution) {
-                    availableShardIds.emplace_back(shardDist.getShard());
+                    availableShardRefs.emplace_back(ShardRef{shardDist.getShard()});
                 }
                 auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
                                                                       coordinatorDoc.getSourceNss(),
                                                                       shardKey,
                                                                       numInitialChunks,
                                                                       std::move(parsedZones),
-                                                                      availableShardIds,
+                                                                      availableShardRefs,
                                                                       numSamplesPerChunk);
                 splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
             }

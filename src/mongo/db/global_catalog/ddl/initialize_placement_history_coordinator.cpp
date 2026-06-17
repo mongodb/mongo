@@ -109,7 +109,7 @@ void broadcastPlacementHistoryChangedNotification(
     const OperationSessionInfo& osi,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
-    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
 
     ShardsvrNotifyShardingEventRequest request(
         notify_sharding_event::kPlacementHistoryMetadataChanged,

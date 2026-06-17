@@ -58,7 +58,9 @@ void ParticipantCausalityBarrier::_performNoopRetryableWriteOnShards(
     generic_argument_util::setMajorityWriteConcern(updateOp);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
         executor, token, updateOp);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    // TODO SERVER-127411: remove conversion once callers pass ShardRef.
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, std::vector<ShardRef>(shardIds.begin(), shardIds.end()));
 }
 
 

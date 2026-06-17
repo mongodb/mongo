@@ -541,6 +541,11 @@ std::vector<ShardId> ShardRegistry::getAllShardIds(OperationContext* opCtx) {
     return shardIds;
 }
 
+std::vector<ShardRef> ShardRegistry::getAllShardRefs_UNSAFE(OperationContext* opCtx) {
+    auto shardIds = getAllShardIds(opCtx);
+    return std::vector<ShardRef>(shardIds.cbegin(), shardIds.cend());
+}
+
 int ShardRegistry::getNumShards(OperationContext* opCtx) {
     return getAllShardIds(opCtx).size();
 }

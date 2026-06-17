@@ -62,7 +62,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void tellShardsToRefreshCollection(
  * check the responses from the shards.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void triggerFireAndForgetShardRefreshes(
-    OperationContext* opCtx, const std::vector<ShardId>& shardIds, const NamespaceString& nss);
+    OperationContext* opCtx, const std::vector<ShardRef>& shardRefs, const NamespaceString& nss);
 
 /**
  * Process the responses received from a set of requests sent to the shards. If `throwOnError=true`,

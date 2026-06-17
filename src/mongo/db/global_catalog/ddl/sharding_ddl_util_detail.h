@@ -195,17 +195,17 @@ template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardRef>& shardRefs,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError) {
-    if (shardIds.size() == 0) {
+    if (shardRefs.size() == 0) {
         return {};
     }
     if (shardVersions) {
         tassert(11532300,
                 "shardIds and shardVersions must have the same size",
-                shardIds.size() == shardVersions->size());
+                shardRefs.size() == shardVersions->size());
     }
 
     preprocessCommand(opCtx, originalOpts->cmd);
@@ -214,14 +214,14 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         opCtx,
         originalOpts.get(),
         throwOnError,
-        [&](int index) { return shardIds[index]; },
+        [&](int index) { return shardRefs[index]; },
         [&](const CancellationSource& cancelSource, auto& futures) {
-            for (size_t i = 0; i < shardIds.size(); ++i) {
+            for (size_t i = 0; i < shardRefs.size(); ++i) {
                 std::unique_ptr<async_rpc::Targeter> targeter =
                     std::make_unique<async_rpc::ShardIdTargeter>(
-                        originalOpts->exec, opCtx, shardIds[i], readPref);
+                        originalOpts->exec, opCtx, shardRefs[i], readPref);
                 auto shard = uassertStatusOK(
-                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
+                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardRefs[i]));
                 Shard::RetryStrategy::RequestStartTransactionState startTxnState =
                     originalOpts->cmd.getStartTransaction().value_or(false)
                     ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
@@ -248,7 +248,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<write_ops::UpdateCommandRequest>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>> originalOpts,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardRef>& shardRefs,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -257,7 +257,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrDropCollectionParticipant>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>> originalOpts,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardRef>& shardRefs,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -266,7 +266,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrCommitCreateDatabaseMetadata>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitCreateDatabaseMetadata>> originalOpts,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardRef>& shardRefs,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);
@@ -275,7 +275,7 @@ extern template std::vector<AsyncRequestsSender::Response>
 sendAuthenticatedCommandToShards<ShardsvrCommitDropDatabaseMetadata>(
     OperationContext* opCtx,
     std::shared_ptr<async_rpc::AsyncRPCOptions<ShardsvrCommitDropDatabaseMetadata>> originalOpts,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardRef>& shardRefs,
     const boost::optional<std::vector<ShardVersion>>& shardVersions,
     ReadPreferenceSetting readPref,
     bool throwOnError);

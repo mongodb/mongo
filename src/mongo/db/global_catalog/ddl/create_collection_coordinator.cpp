@@ -162,8 +162,8 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
     size_t numShards,
     bool collectionIsEmpty,
     bool isUnsplittable,
-    boost::optional<ShardId> dataShard,
-    boost::optional<std::vector<ShardId>> availableShardIds) {
+    boost::optional<ShardRef> dataShard,
+    boost::optional<std::vector<ShardRef>> availableShardRefs) {
 
     if (isUnsplittable) {
         // Unsharded collections
@@ -197,7 +197,7 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
                                                                 shardKeyPattern,
                                                                 std::move(tags),
                                                                 collectionIsEmpty,
-                                                                std::move(availableShardIds));
+                                                                std::move(availableShardRefs));
     }
 
     //  If the collection is empty, some optimizations for the chunk distribution may be available.
@@ -205,12 +205,12 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
         if (tags.empty() && shardKeyPattern.hasHashedPrefix()) {
             // Evenly distribute chunks across shards (in combination with hashed shard keys, this
             // should increase the probability of establishing an already balanced collection).
-            return std::make_unique<SplitPointsBasedSplitPolicy>(std::move(availableShardIds));
+            return std::make_unique<SplitPointsBasedSplitPolicy>(std::move(availableShardRefs));
         }
         if (!tags.empty()) {
             // Enforce zone constraints.
             return std::make_unique<SingleChunkPerTagSplitPolicy>(
-                opCtx, std::move(tags), std::move(availableShardIds));
+                opCtx, std::move(tags), std::move(availableShardRefs));
         }
     }
 
@@ -545,18 +545,18 @@ int getNumShards(OperationContext* opCtx) {
 // specified) the dataShard.
 void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<ShardId>& excludedDataShard,
+                             const boost::optional<ShardRef>& excludedDataShard,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
                              const CancellationToken& token,
                              const OperationSessionInfo& osi,
                              const boost::optional<UUID>& expectedUUID,
                              bool fromMigrate,
                              bool isAuthoritative) {
-    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
 
-    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
     // Remove primary shard from participants
-    std::erase(participants, primaryShardId);
+    std::erase(participants, primaryShardRef);
     if (excludedDataShard) {
         // Remove data shard from participants. If the collection existed prior to this operation,
         // we do not want to drop the user's collection.
@@ -1191,15 +1191,14 @@ void logEndCreateCollection(
 void createCollectionOnShards(OperationContext* opCtx,
                               const OperationSessionInfo& osi,
                               const boost::optional<UUID>& collectionUUID,
-                              const std::vector<ShardId>& shardIds,
+                              const std::vector<ShardRef>& shardRefs,
                               const NamespaceString& nss,
                               const OptionsAndIndexes& optionsAndIndexes) {
     std::vector<AsyncRequestsSender::Request> requests;
-    auto dbPrimaryShardId = ShardingState::get(opCtx)->shardId();
 
     const auto& [collOptions, indexes, idIndex] = optionsAndIndexes;
 
-    for (const auto& shard : shardIds) {
+    for (const auto& shard : shardRefs) {
         ShardsvrCreateCollectionParticipant createCollectionParticipantRequest(nss);
         createCollectionParticipantRequest.setCollectionUUID(*collectionUUID);
 
@@ -1497,12 +1496,12 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     bool throwIfReasonDiffers,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
-    const std::vector<ShardId>& shardIds) {
+    const std::vector<ShardRef>& shardRefs) {
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
         nss(),
-        shardIds,
+        shardRefs,
         CriticalSectionBlockTypeEnum::kUnblock,
         _critSecReason,
         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -1841,7 +1840,7 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
     translatedRequestParams.setTimeseries(optExtendedTimeseriesFields);
     _doc.setTranslatedRequestParams(std::move(translatedRequestParams));
 
-    const auto originalDataShard = [&]() -> ShardId {
+    const auto originalDataShard = [&]() -> ShardRef {
         auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
         if (!cm.hasRoutingTable()) {
@@ -1850,7 +1849,8 @@ void CreateCollectionCoordinator::_translateRequestParameters(OperationContext* 
         }
         std::set<ShardId> allShards;
         cm.getAllShardIds(&allShards);
-        return *(allShards.begin());
+        // TODO SERVER-128349: Remove conversion to ShardRef
+        return ShardRef{*(allShards.begin())};
     }();
     _doc.setOriginalDataShard(originalDataShard);
 }
@@ -1885,7 +1885,8 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
         if (targetIsConfigDb) {
             return checkIfCollectionIsEmpty(opCtx, nss(), ShardId::kConfigServerId);
         }
-        return checkIfCollectionIsEmpty(opCtx, nss(), {*_doc.getOriginalDataShard()});
+        // TODO SERVER-128911: getShardId() will fail once UUIDs are in play
+        return checkIfCollectionIsEmpty(opCtx, nss(), _doc.getOriginalDataShard()->getShardId());
     });
 
     if (targetIsConfigDb) {
@@ -1959,8 +1960,9 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
                                   _request.getUnique().value_or(false));
     }
 
-    const auto dataShardForPolicy =
-        _request.getDataShard() ? _request.getDataShard() : _doc.getOriginalDataShard();
+    const auto dataShardForPolicy = _request.getDataShard()
+        ? boost::optional<ShardRef>(*_request.getDataShard())
+        : _doc.getOriginalDataShard();
     const auto splitPolicy = create_collection_util::createPolicy(
         opCtx,
         shardKeyPattern,
@@ -1982,12 +1984,12 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator(
 
     // Save on doc the set of shards involved in the chunk distribution
     auto participantShards = [&]() {
-        std::set<ShardId> involvedShards;
+        std::set<ShardRef> involvedShards;
         for (const auto& chunk : _initialChunks->chunks) {
             involvedShards.emplace(chunk.getShard());
         }
-        return std::vector<ShardId>(std::make_move_iterator(involvedShards.begin()),
-                                    std::make_move_iterator(involvedShards.end()));
+        return std::vector<ShardRef>(std::make_move_iterator(involvedShards.begin()),
+                                     std::make_move_iterator(involvedShards.end()));
     }();
     _doc.setShardIds(std::move(participantShards));
 }
@@ -1997,13 +1999,13 @@ void CreateCollectionCoordinator::_enterCriticalSectionOnShards(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token,
     const NamespaceString& nss,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<ShardRef>& shardRefs,
     mongo::CriticalSectionBlockTypeEnum blockType) {
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::sendShardsvrParticipantBlockCommandToShards(
         opCtx,
         nss,
-        shardIds,
+        shardRefs,
         blockType,
         _critSecReason,
         _doc.getAuthoritativeMetadataAccessLevel(),
@@ -2147,13 +2149,13 @@ void CreateCollectionCoordinator::_notifyChangeStreamReadersOnUpcomingCommit(
     tassert(10649101, "Uuid is expected to be already initialized", _uuid.has_value());
     CollectionSharded notification(nss(), *_uuid, patchedRequest.toBSON());
 
-    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+    const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
     const auto supportsPreciseTargeting =
         feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    if (primaryShardId == _doc.getOriginalDataShard() || !supportsPreciseTargeting) {
+    if (primaryShardRef == _doc.getOriginalDataShard() || !supportsPreciseTargeting) {
         // Perform a local call to dispatch the notification through the coordinator.
         notifyChangeStreamsOnShardCollection(opCtx, notification);
         return;
@@ -2240,8 +2242,9 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
 
         // Re-calculate initial chunk distribution given the set of shards with the critical section
         // taken.
-        const auto& dataShardForPolicy =
-            _request.getDataShard() ? _request.getDataShard() : _doc.getOriginalDataShard();
+        const auto& dataShardForPolicy = _request.getDataShard()
+            ? boost::optional<ShardRef>(*_request.getDataShard())
+            : _doc.getOriginalDataShard();
         try {
             const auto splitPolicy = create_collection_util::createPolicy(
                 opCtx,
@@ -2346,29 +2349,32 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         const auto& cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
         cm.getAllShardIds(&involvedShardIds);
+        // TODO SERVER-128349: Following conversion will be redundant once Chunk manager returns
+        // ShardRef
+        std::set<ShardRef> involvedShardRefs{involvedShardIds.cbegin(), involvedShardIds.cend()};
 
         // If there are less shards involved in the operation than the ones persisted in the
         // document, implies that the collection has been created in some shards that are not owning
         // chunks.
-        auto allShardIds = *_doc.getShardIds();
-        std::vector<ShardId> nonInvolvedShardIds;
-        std::set_difference(allShardIds.cbegin(),
-                            allShardIds.cend(),
-                            involvedShardIds.cbegin(),
-                            involvedShardIds.cend(),
-                            std::back_inserter(nonInvolvedShardIds));
+        auto allShardRefs = *_doc.getShardIds();
+        std::vector<ShardRef> nonInvolvedShardRefs;
+        std::set_difference(allShardRefs.cbegin(),
+                            allShardRefs.cend(),
+                            involvedShardRefs.cbegin(),
+                            involvedShardRefs.cend(),
+                            std::back_inserter(nonInvolvedShardRefs));
 
         // Remove the primary shard from the list. It must always have the collection regardless if
         // it owns chunks.
-        const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-        std::erase(nonInvolvedShardIds, primaryShardId);
+        const auto primaryShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+        std::erase(nonInvolvedShardRefs, primaryShardRef);
 
         const auto session = getNewSession(opCtx);
-        if (!nonInvolvedShardIds.empty()) {
+        if (!nonInvolvedShardRefs.empty()) {
             sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
                 opCtx,
                 nss(),
-                nonInvolvedShardIds,
+                nonInvolvedShardRefs,
                 **executor,
                 token,
                 session,
@@ -2417,14 +2423,14 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     auto participants = *_doc.getShardIds();
     // Ensure the critical section is released on the data shard if the data shard is not the
     // coordinator and is not a participant.
-    if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->shardId() &&
+    if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->asShardRef(opCtx) &&
         std::find(participants.begin(), participants.end(), *_doc.getOriginalDataShard()) ==
             participants.end()) {
         participants.push_back(*_doc.getOriginalDataShard());
     }
     // The critical section on the coordinator will be released below since both the original and
     // bucket namespace critical sections need released.
-    std::erase(participants, ShardingState::get(opCtx)->shardId());
+    std::erase(participants, ShardingState::get(opCtx)->asShardRef(opCtx));
 
     _exitCriticalSectionOnShards(
         opCtx, false /* throwIfReasonDiffers */, executor, token, participants);
@@ -2471,13 +2477,13 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             }
 
 
-            std::vector<ShardId> participants;
+            std::vector<ShardRef> participants;
             if (_doc.getPhase() >= Phase::kEnterCriticalSection) {
                 participants = *_doc.getShardIds();
-                std::erase(participants, ShardingState::get(opCtx)->shardId());
+                std::erase(participants, ShardingState::get(opCtx)->asShardRef(opCtx));
             }
             if (_doc.getPhase() >= Phase::kEnterWriteCSOnDataShardAndCheckEmpty) {
-                if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->shardId() &&
+                if (*_doc.getOriginalDataShard() != ShardingState::get(opCtx)->asShardRef(opCtx) &&
                     std::find(participants.begin(),
                               participants.end(),
                               *_doc.getOriginalDataShard()) == participants.end()) {

@@ -191,13 +191,14 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
         tassert(10644529,
                 "Expected the collection to be capped to have a chunk on some shard",
                 !shards.empty());
-        _doc.setDataShard(*(shards.begin()));
+        // TODO SERVER-128349: Remove conversion to ShardRef
+        _doc.setDataShard(ShardRef{*(shards.begin())});
 
         _doc.setOriginalCollection(sharding_ddl_util::getCollectionFromConfigServer(opCtx, nss()));
     } else {
         // The collection is located on the DBPrimary if it's not tracked by the sharding catalog.
-        const auto& selfShardId = ShardingState::get(opCtx)->shardId();
-        _doc.setDataShard(selfShardId);
+        const auto& selfShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+        _doc.setDataShard(selfShardRef);
     }
 
     // Compute and persist the targetUUID of the newly capped collection before sending
@@ -278,14 +279,15 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
 
                     // Drop collection from any shard that is not db primary and does not own
                     // data (getting rid of possible stale incarnations due to SERVER-87010).
-                    std::vector<ShardId> participantsNotOwningData;
+                    std::vector<ShardRef> participantsNotOwningData;
 
-                    auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                    const auto& dataShardId = *_doc.getDataShard();
-                    const auto& selfShardId = ShardingState::get(opCtx)->shardId();
-                    for (const auto& shardId : allShards) {
-                        if (shardId != dataShardId && shardId != selfShardId) {
-                            participantsNotOwningData.push_back(shardId);
+                    auto allShards =
+                        Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx);
+                    const auto& dataShardRef = *_doc.getDataShard();
+                    const auto& selfShardRef = ShardingState::get(opCtx)->asShardRef(opCtx);
+                    for (const auto& shardRef : allShards) {
+                        if (shardRef != dataShardRef && shardRef != selfShardRef) {
+                            participantsNotOwningData.push_back(shardRef);
                         }
                     }
 
@@ -391,7 +393,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                             opCtx,
                             nss(),
                             _doc.getOriginalCollection()->getUuid(),
-                            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+                            Grid::get(opCtx)->shardRegistry()->getAllShardRefs_UNSAFE(opCtx),
                             session,
                             executor,
                             token);
