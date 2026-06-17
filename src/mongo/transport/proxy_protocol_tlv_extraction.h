@@ -36,12 +36,11 @@
 namespace mongo::transport {
 
 /**
- * Extracts SSLPeerInfo fields (SNI, DN, roles) from proxy protocol TLV data
+ * Extracts SSLPeerInfo fields (SNI, DN) from proxy protocol TLV data
  * and attaches them to the given session.
  *
  * - SNI is extracted from top-level TLVs (kProxyProtocolTypeAuthority).
- * - DN and roles are extracted from SSL sub-TLVs (kProxyProtocolSSLTlvDN,
- *   kProxyProtocolSSLTlvPeerRoles) under MONGO_CONFIG_SSL.
+ * - DN is extracted from SSL sub-TLVs (kProxyProtocolSSLTlvDN) under MONGO_CONFIG_SSL.
  * - SSLPeerInfo is set on the session only when at least one field is present.
  * - isTLS is always false (proxy protocol arrives over UDS, not TLS).
  * - tasserts if SSLPeerInfo already exists on the session.
