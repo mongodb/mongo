@@ -573,8 +573,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                             }
                         }();
 
-                        // TODO (SERVER-128449): Use NoCustomAction once resharding is
-                        // authoritative.
                         ShardingRecoveryService::get(opCtx.get())
                             ->releaseRecoverableCriticalSection(
                                 opCtx.get(),
@@ -1434,15 +1432,16 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this, factory] {
             if (!_isAlsoDonor) {
                 auto opCtx = _makeOperationContext(factory);
-                // TODO (SERVER-128449): Remove the clearShardCatalogCache flag once
-                // resharding are authoritative.
+                bool mustClearCollectionMetadata =
+                    _metadata.getAuthoritativeMetadataAccessLevel() ==
+                    ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
                 ShardingRecoveryService::get(opCtx.get())
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx.get(),
                         _metadata.getSourceNss(),
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        true /* clearShardCatalogCache */);
+                        mustClearCollectionMetadata);
             }
             reshardingPauseRecipientBeforeEnteringStrictConsistency.pauseWhileSet();
             _transitionState(RecipientStateEnum::kStrictConsistency, factory);

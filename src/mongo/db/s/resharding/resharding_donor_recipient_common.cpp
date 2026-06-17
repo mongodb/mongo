@@ -485,7 +485,7 @@ void clearCollectionMetadata(OperationContext* opCtx,
         {
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
             scopedCsr->clearCollectionMetadata(opCtx);
-            // TODO (SERVER-128449): Remove this once resharding is made authoritative.
+            // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
             scopedCsr->setNonAuthoritative();
         }
 

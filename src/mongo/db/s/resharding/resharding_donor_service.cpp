@@ -505,11 +505,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(
                         opCtx.get(), _metadata.getTempReshardingNss());
                     scopedCsr->clearCollectionMetadata(opCtx.get());
-                    // TODO (SERVER-128449): Remove this once resharding is made authoritative.
+                    // TODO (SERVER-127444): Remove once all DDLs are made authoritative.
                     scopedCsr->setNonAuthoritative();
                 }
 
-                // TODO (SERVER-128449): Use NoCustomAction once resharding is authoritative.
                 const auto onReleaseCriticalSectionAction =
                     _externalState->getOnReleaseCriticalSectionCustomAction(mustClearMetadata);
 
@@ -909,15 +908,15 @@ void ReshardingDonorService::DonorStateMachine::
         auto opCtx = _makeOperationContext(factory);
         _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
 
-        // TODO (SERVER-128449): Remove the clearShardCatalogCache flag once resharding is
-        // authoritative.
+        const bool mustClearMetadata = _metadata.getAuthoritativeMetadataAccessLevel() ==
+            ReshardingAuthoritativeMetadataAccessLevelEnum::kNone;
         ShardingRecoveryService::get(opCtx.get())
             ->acquireRecoverableCriticalSectionBlockWrites(
                 opCtx.get(),
                 _metadata.getSourceNss(),
                 _critSecReason,
                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                true /* clearShardCatalogCache */);
+                mustClearMetadata);
 
         _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                               resharding::getCurrentTime());
