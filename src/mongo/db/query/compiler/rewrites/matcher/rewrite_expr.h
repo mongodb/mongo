@@ -41,7 +41,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -59,10 +58,8 @@ public:
     class RewriteResult final {
     public:
         RewriteResult(std::unique_ptr<MatchExpression> matchExpression,
-                      std::vector<BSONObj> matchExprElemStorage,
                       bool allSubExpressionsRewritten)
             : _matchExpression(std::move(matchExpression)),
-              _matchExprElemStorage(std::move(matchExprElemStorage)),
               _allSubExpressionsRewritten(allSubExpressionsRewritten) {}
 
         MatchExpression* matchExpression() const {
@@ -75,7 +72,7 @@ public:
 
         RewriteResult clone() const {
             auto clonedMatch = _matchExpression ? _matchExpression->clone() : nullptr;
-            return {std::move(clonedMatch), _matchExprElemStorage, _allSubExpressionsRewritten};
+            return {std::move(clonedMatch), _allSubExpressionsRewritten};
         }
 
         bool allSubExpressionsRewritten() {
@@ -84,11 +81,6 @@ public:
 
     private:
         std::unique_ptr<MatchExpression> _matchExpression;
-
-        // MatchExpression nodes are constructed with BSONElement arguments that are externally
-        // owned and expected to outlive the MatchExpression. '_matchExprElemStorage' holds the
-        // underlying BSONObj storage for these arguments.
-        std::vector<BSONObj> _matchExprElemStorage;
 
         // Defaults to true, is false if there is a child in an $or/$and expression that contains
         // children that cannot be rewritten to a MatchExpression.
@@ -135,7 +127,6 @@ private:
     std::unique_ptr<MatchExpression> _rewriteInExpression(
         const boost::intrusive_ptr<ExpressionIn>& expr);
 
-    std::vector<BSONObj> _matchExprElemStorage;
     const CollatorInterface* _collator;
     bool _allSubExpressionsRewritten = true;
 };

@@ -56,27 +56,28 @@ bool validateFieldPathForExprInRewrite(const ExpressionFieldPath& fieldPathExpr)
 
 template <bool wrapConstInArray>
 std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
-    const ExpressionFieldPath& fieldPathExpr,
-    const ExpressionConstant& literalExpr,
-    std::vector<BSONObj>& cache) {
+    const ExpressionFieldPath& fieldPathExpr, const ExpressionConstant& literalExpr) {
     // Build expression BSON.
     auto fieldPath = fieldPathExpr.getFieldPath().tail().fullPath();
-    auto bob = BSONObjBuilder{};
+    BSONArray inArray;
+    auto value = literalExpr.getValue();
     if constexpr (wrapConstInArray) {
-        bob << fieldPath << BSON_ARRAY(literalExpr.getValue());
+        // Wrap `value` in a BSONArray
+        inArray = BSON_ARRAY(value);
     } else {
-        bob << fieldPath << literalExpr.getValue();
+        // Convert `value` to a BSONArray
+        BSONArrayBuilder bb;
+        for (const auto& val : value.getArray()) {
+            val.addToBsonArray(&bb);
+        }
+        inArray = bb.arr();
     }
-    auto inObj = bob.obj();
 
     // Create $in MatchExpression.
-    auto fieldName = inObj.firstElementFieldNameStringData();
-    auto inMatch = std::make_unique<InMatchExpression>(fieldName);
-    uassertStatusOK(inMatch->setEqualitiesArray(inObj.getField(fieldName).Obj()));
-
-    // Cache the backing BSON for the MatchExpression so it doesn't get destroyed while we still
-    // need it.
-    cache.push_back(std::move(inObj));
+    // setEqualitiesArray takes the backing BSONObj by value and inObj is owned — no external
+    // storage needed.
+    auto inMatch = std::make_unique<InMatchExpression>(StringData(fieldPath));
+    uassertStatusOK(inMatch->setEqualitiesArray(inArray));
 
     return inMatch;
 };
@@ -110,9 +111,7 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
                     "expression"_attr = redact(matchExpression->debugString()));
     }
 
-    return {std::move(matchExpression),
-            std::move(rewriteExpr._matchExprElemStorage),
-            rewriteExpr._allSubExpressionsRewritten};
+    return {std::move(matchExpression), rewriteExpr._allSubExpressionsRewritten};
 }
 
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteExpression(
@@ -226,10 +225,8 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteComparisonExpression(
     const auto fieldPath = lhs->getFieldPath().tail();
     BSONObjBuilder bob;
     bob << fieldPath.fullPath() << rhs->getValue();
-    auto cmpObj = bob.obj();
-    _matchExprElemStorage.push_back(cmpObj);
 
-    return _buildComparisonMatchExpression(cmpOperator, cmpObj.firstElement());
+    return _buildComparisonMatchExpression(cmpOperator, bob.obj().firstElement());
 }
 
 std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
@@ -242,6 +239,9 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
 
     std::unique_ptr<MatchExpression> matchExpr;
 
+    // The constructors for the match expression node types make copies of the unowned BSONElement
+    // and path string, so the resulting nodes are fully self-owning (without depending on BSON
+    // owned elsewhere).
     switch (comparisonOp) {
         case ExpressionCompare::EQ: {
             matchExpr = std::make_unique<InternalExprEqMatchExpression>(
@@ -365,8 +365,8 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
                     // We don't need to place additional restrictions on 'rhs' here, because $in
                     // would error out for a non-array value of 'rhs'- similarly, 'lhs' will become
                     // an array, so we don't need th same checks as in the case below.
-                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(
-                        *rhsFieldPath, *lhsConst, _matchExprElemStorage);
+                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(*rhsFieldPath,
+                                                                                     *lhsConst);
                 }
             }
         }
@@ -408,7 +408,6 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
         }
     }
 
-    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(
-        *lhsFieldPath, *rhsConst, _matchExprElemStorage);
+    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(*lhsFieldPath, *rhsConst);
 }
 }  // namespace mongo
