@@ -2291,7 +2291,7 @@ TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithLesserRetryCounterShouldEr
 }
 
 TEST_F(ShardTxnParticipantTest,
-       StartOrContinueTxnWithEqualRetryCounterAndAbortedWithoutPrepareStateShouldRestart) {
+       StartOrContinueTxnWithEqualRetryCounterAndAbortedWithoutPrepareStateShouldError) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsInProgress());
@@ -2300,10 +2300,28 @@ TEST_F(ShardTxnParticipantTest,
     txnParticipant.abortTransaction(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsAbortedWithoutPrepare());
 
+    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                           opCtx(),
+                           {*opCtx()->getTxnNumber(), 0},
+                           false /* autocommit */,
+                           TransactionParticipant::TransactionActions::kStartOrContinue),
+                       AssertionException,
+                       ErrorCodes::NoSuchTransaction);
+}
+
+TEST_F(ShardTxnParticipantTest,
+       StartTxnWithEqualRetryCounterAndAbortedWithoutPrepareStateShouldRestart) {
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsInProgress());
+
+    txnParticipant.abortTransaction(opCtx());
+    ASSERT_TRUE(txnParticipant.transactionIsAbortedWithoutPrepare());
+
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber(), 0},
                                    false /* autocommit */,
-                                   TransactionParticipant::TransactionActions::kStartOrContinue);
+                                   TransactionParticipant::TransactionActions::kStart);
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
     ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(),
               *opCtx()->getTxnNumber());

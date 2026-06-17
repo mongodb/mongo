@@ -94,6 +94,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingCoordinateCommit);
 MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic);
+MONGO_FAIL_POINT_DEFINE(hangAfterFirstRecoveryCheckout);
 
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
@@ -417,6 +418,11 @@ public:
 
             // Wait for the participant to exit prepare.
             participantExitPrepareFuture->get(opCtx);
+
+            if (MONGO_unlikely(hangAfterFirstRecoveryCheckout.shouldFail())) {
+                LOGV2(12558900, "Hit hangAfterFirstRecoveryCheckout failpoint");
+                hangAfterFirstRecoveryCheckout.pauseWhileSet(opCtx);
+            }
 
             {
                 auto sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);
