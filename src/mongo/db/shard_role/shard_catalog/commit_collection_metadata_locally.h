@@ -91,6 +91,14 @@ void commitCollectionMetadataLocally(
     boost::optional<bool> expectedAllowChunkOperations = boost::none);
 
 /**
+ * Persists collection and chunk metadata into the durable shard catalog during the setFCV
+ * authoritative metadata clone.
+ */
+void cloneCollectionMetadataLocally(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    bool isDbPrimaryShard);
+
+/**
  * Persists the collection entry, without registering any empty chunks for tracked collection.
  */
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss);

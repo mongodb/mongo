@@ -117,7 +117,12 @@ public:
 
                 const bool isPrimaryDbShard =
                     ShardingState::get(newOpCtx.get())->shardId() == request().getPrimaryShardId();
-                shard_catalog_commit::commitCollectionMetadataLocally(
+
+                // The clone does not change placement, so every node's CSR is either already up to
+                // date or kUnknown and recovers from the durable catalog once the cluster is fully
+                // upgraded. Installing the metadata in-memory or emitting an invalidate would only
+                // trigger a redundant and expensive refresh.
+                shard_catalog_commit::cloneCollectionMetadataLocally(
                     newOpCtx.get(), nss, isPrimaryDbShard);
             }
 

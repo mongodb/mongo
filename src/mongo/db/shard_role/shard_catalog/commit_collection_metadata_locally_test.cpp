@@ -181,6 +181,13 @@ protected:
         }
     }
 
+    long long countCommandOplogEntries(StringData commandField, const NamespaceString& nss) {
+        const std::string objField = "o." + std::string{commandField};
+        return findLocalDocs(NamespaceString::kRsOplogNamespace,
+                             BSON("op" << "c" << objField << nss.coll()))
+            .size();
+    }
+
 private:
     MockCatalogClient* _mockCatalogClient = nullptr;
 };
@@ -629,6 +636,65 @@ TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUse
     // TODO (SERVER-127444): there should be a single oplog entry.
     ASSERT_EQ(oplogEntries.size(), 2u);
     ASSERT_EQ(oplogEntries.back().getStringField("ns"), kTestNss.getCommandNS().ns_forTest());
+}
+
+// ---------------------------------------------------------------------------
+// Clone (setFCV) tests
+// ---------------------------------------------------------------------------
+
+// The clone persists the durable shard catalog but performs no in-memory or oplog side effects:
+// no 'c' oplog entries (neither the invalidate nor the setAllowChunkOperations) and no in-memory
+// CSR install.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneOnlyWritesDurableCatalogAndEmitsNoOplog) {
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, true /* isDbPrimaryShard */);
+
+    // The durable shard catalog is written.
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 2);
+
+    // No 'c' oplog entries are written during the clone.
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 0);
+    ASSERT_EQ(countCommandOplogEntries("setAllowChunkOperations", kTestNss), 0);
+
+    // The clone does not touch the in-memory CSR: with no prior state it stays unknown and
+    // non-authoritative, to be recovered lazily from the durable catalog when next needed.
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+    ASSERT(scopedCsr->getAuthoritativeState() ==
+           CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
+}
+
+// The clone must not clear an existing in-memory CSR when the shard owns no chunks and is not the
+// DB primary; the on-disk entry is still removed.
+TEST_F(CommitCollectionMetadataLocallyTest, CloneDoesNotClearCsrWhenShardOwnsNoChunks) {
+    // Seed an existing CSR with known metadata, as if it had been populated by the legacy catalog
+    // cache loader prior to cloning. The non-clone commit emits exactly one invalidate 'c' entry,
+    // which lets the assertion below verify the clone itself emits none.
+    auto [collType, chunks] = makeCollectionMetadata(2);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 1);
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
+    }
+
+    // Clone as a non-primary shard that owns no chunks: the durable entry is removed but the
+    // in-memory CSR is left untouched (no clear) and no further oplog entry is emitted.
+    mockCatalogClient()->setCollectionMetadata(collType, {} /* no owned chunks */);
+    shard_catalog_commit::cloneCollectionMetadataLocally(
+        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+
+    ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
+    // Still just the single invalidate from the non-clone seed; the clone added none.
+    ASSERT_EQ(countCommandOplogEntries("invalidateCollectionMetadata", kTestNss), 1);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_TRUE(scopedCsr->getCurrentMetadataIfKnown());
 }
 
 // ---------------------------------------------------------------------------

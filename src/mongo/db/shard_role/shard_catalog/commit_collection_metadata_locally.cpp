@@ -522,6 +522,26 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
     }
 }
 
+void cloneCollectionMetadataLocally(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    bool isDbPrimaryShard) {
+    auto coll = fetchCollection(opCtx, nss);
+
+    const auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
+
+    // Drop any prior chunk entries for this collection so repeated calls don't accumulate stale
+    // rows (see commitCollectionMetadataLocally for details).
+    deleteCollectionChunksMetadataLocally(opCtx, coll.getUuid());
+
+    if (isDbPrimaryShard || !ownedChunks.empty()) {
+        // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
+        writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
+    } else {
+        // The shard owns no chunks and is not the dbPrimary, so it doesn't track the collection.
+        deleteCollectionEntryLocally(opCtx, nss);
+    }
+}
+
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
     auto coll = fetchCollection(opCtx, nss);
 
