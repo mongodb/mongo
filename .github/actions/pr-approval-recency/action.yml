@@ -1,0 +1,31 @@
+name: PR Approval Recency
+description: >-
+  Diff-aware PR approval-recency check. A fully-approved PR fails if the
+  introduced code changed since the most recent approval; no-op rebases
+  (e.g. Graphite restacks) pass.
+inputs:
+  github-token:
+    description: GitHub token with contents:read and pull-requests:read
+    required: true
+  pr-number:
+    required: true
+  github-org:
+    required: true
+  github-repo:
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install PyGithub
+      # Pinned exactly: an unpinned upgrade would change merge-gate behavior with no
+      # code change in this repo.
+      run: pip install 'PyGithub==2.9.1'
+      shell: bash
+    - name: Validate PR approval recency (diff-aware)
+      run: python "${{ github.action_path }}/validate_pr_approval_recency.py"
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        GITHUB_ORG: ${{ inputs.github-org }}
+        GITHUB_REPO: ${{ inputs.github-repo }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
