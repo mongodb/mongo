@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_range_coordinator_document_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
+
+#include <memory>
 
 #include <boost/optional.hpp>
 
@@ -54,7 +63,7 @@ protected:
 
 private:
     bool _mustAlwaysMakeProgress() override {
-        return _recoveredFromDisk;
+        return true;
     }
 
     bool _shouldUseCancelableOpCtx() const override {
@@ -70,26 +79,72 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    ExecutorFuture<void> _initialExecutionFlow(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
-
     ExecutorFuture<void> _joinExistingExecution(
         std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    ExecutorFuture<void> _recoveryFlow(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                       const CancellationToken& token,
-                                       Status incomingStatus);
+    enum class MigrationOutcome { kCommitted, kAborted };
 
-    [[nodiscard]] ExecutorFuture<void> _completeMigration(
-        OperationContext* opCtx,
-        std::shared_ptr<executor::ScopedTaskExecutor> executor,
-        Status completionStatus);
+    ExecutorFuture<MigrationOutcome> _recoveryFlow(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
 
     bool _migrationCoordinatorDocumentMayExist(OperationContext* opCtx);
-    bool _mustInitiateRecovery(OperationContext* opCtx);
+
+    boost::optional<Status> _getMigrationResult() const;
+    void _writeMigrationResult(OperationContext* opCtx, Status result);
+    void _overwriteMigrationResultWithOk(OperationContext* opCtx);
+    void _writeCommitAttempted(OperationContext* opCtx);
+
+    class MigrationAttempt {
+    public:
+        MigrationAttempt(OperationContext* opCtx,
+                         CancellationToken token,
+                         NamespaceString nss,
+                         ShardsvrMoveRangeRequest request,
+                         WriteConcernOptions writeConcern,
+                         UUID migrationId);
+
+        Status migrate(OperationContext* opCtx);
+        Status commit(OperationContext* opCtx);
+
+    private:
+        class CloneMetricsSnapshot {
+        public:
+            explicit CloneMetricsSnapshot(OperationContext* opCtx)
+                : _docs(ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load()),
+                  _bytes(ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load()),
+                  _millis(ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load()) {}
+
+            long long docsCloned(OperationContext* opCtx) const {
+                return ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() - _docs;
+            }
+            long long bytesCloned(OperationContext* opCtx) const {
+                return ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() - _bytes;
+            }
+            long long cloneTimeMillis(OperationContext* opCtx) const {
+                return ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() -
+                    _millis;
+            }
+
+        private:
+            const long long _docs;
+            const long long _bytes;
+            const long long _millis;
+        };
+
+        const NamespaceString _nss;
+        const ShardsvrMoveRangeRequest _request;
+        const WriteConcernOptions _writeConcern;
+        const UUID _migrationId;
+        ServiceContext::UniqueClient _ownedClient;
+        CancelableOperationContext _ownedOpCtx;
+        CloneMetricsSnapshot _cloneMetrics;
+        std::unique_ptr<MigrationSourceManager> _msm;
+        boost::optional<Status> _migrateResult;
+        boost::optional<Status> _commitResult;
+    };
 
     const ShardsvrMoveRangeRequest _request;
-    bool _commitAttempted{false};
+    boost::optional<MigrationAttempt> _migrationAttempt;
     boost::optional<ScopedDonateChunk> _scopedDonateChunk;
 };
 

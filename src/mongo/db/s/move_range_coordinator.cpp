@@ -31,6 +31,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/client.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
@@ -66,6 +67,20 @@ ShardsvrMoveRange buildShardsvrMoveRange(const NamespaceString& nss,
     cmd.setDbName(nss.dbName());
     cmd.setShardsvrMoveRangeRequest(request);
     return cmd;
+}
+
+ConnectionString makeDonorConnStr(OperationContext* opCtx,
+                                  const ShardsvrMoveRangeRequest& request) {
+    return uassertStatusOK(
+               Grid::get(opCtx)->shardRegistry()->getShard(opCtx, request.getFromShard()))
+        ->getConnString();
+}
+
+HostAndPort makeRecipientHost(OperationContext* opCtx, const ShardsvrMoveRangeRequest& request) {
+    auto recipientShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, request.getToShard()));
+    return uassertStatusOK(recipientShard->getTargeter()->findHost(
+        opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {}));
 }
 
 }  // namespace
@@ -130,18 +145,6 @@ void MoveRangeCoordinator::_releaseLocks(OperationContext*) {
     _scopedDonateChunk.reset();
 }
 
-ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) noexcept {
-    if (!_recoveredFromDisk) {
-        return _initialExecutionFlow(executor, token);
-    }
-    return _recoveryFlow(
-        executor,
-        token,
-        Status{ErrorCodes::InterruptedDueToReplStateChange, "Migration aborted during recovery"});
-}
-
 ExecutorFuture<void> MoveRangeCoordinator::_joinExistingExecution(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     // A join token (mustExecute == false) means a legacy ScopedDonateChunk migration is still
@@ -153,117 +156,248 @@ ExecutorFuture<void> MoveRangeCoordinator::_joinExistingExecution(
     });
 }
 
-ExecutorFuture<void> MoveRangeCoordinator::_initialExecutionFlow(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) noexcept {
     if (!_scopedDonateChunk->mustExecute()) {
+        // MoveRangeCoordinators will automatically join (if they have the same parameters) or
+        // serialize (otherwise) with other MoveRangeCoordinators. The only reason we'd need to join
+        // here is if there is an ongoing migration using the legacy path.
+        // TODO SERVER-127253: Remove this when the legacy path is removed.
         return _joinExistingExecution(executor);
     }
     return ExecutorFuture<void>(**executor)
-        .then(_buildPhaseHandler(
-            Phase::kMigrate,
-            [this, anchor = shared_from_this(), executor](OperationContext* opCtx) {
-                Status migrationStatus{ErrorCodes::InternalError,
-                                       "MoveRangeCoordinator did not complete"};
-                try {
-                    const auto writeConcern =
-                        _doc.getWriteConcern().value_or(WriteConcernOptions{});
-
-                    // Resolve donor and recipient at execution time, not at coordinator-
-                    // construction time: the recipient primary may change between command
-                    // submission and the coordinator running on the fixed executor.
-                    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-                    const auto donorConnStr =
-                        uassertStatusOK(shardRegistry->getShard(opCtx, _request.getFromShard()))
-                            ->getConnString();
-                    const auto recipientHost = uassertStatusOK([&] {
-                        auto recipientShard =
-                            uassertStatusOK(shardRegistry->getShard(opCtx, _request.getToShard()));
-
-                        return recipientShard->getTargeter()->findHost(
-                            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
-                    }());
-
-                    long long totalDocsCloned =
-                        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load();
-                    long long totalBytesCloned =
-                        ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load();
-                    long long totalCloneTime =
-                        ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
-
-                    auto&& migrationSourceManager =
-                        MigrationSourceManager::createMigrationSourceManager(
-                            opCtx,
-                            buildShardsvrMoveRange(nss(), _request),
-                            WriteConcernOptions{writeConcern},
-                            donorConnStr,
-                            recipientHost,
-                            ManagementModeEnum::kMoveRangeCoordinator,
-                            _doc.getMigrationId());
-
-                    migrationSourceManager.startClone();
-                    migrationSourceManager.awaitToCatchUp();
-                    migrationSourceManager.enterCriticalSection();
-                    migrationSourceManager.commitChunkOnRecipient();
-                    // Any failure after this point may have committed on the config server, so
-                    // the recovery flow is required to determine the outcome.
-                    _commitAttempted = true;
-                    migrationSourceManager.commitChunkMetadataOnConfig();
-
-                    long long docsCloned =
-                        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() -
-                        totalDocsCloned;
-                    long long bytesCloned =
-                        ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() -
-                        totalBytesCloned;
-                    long long cloneTime =
-                        ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() -
-                        totalCloneTime;
-                    auto migrationId = migrationSourceManager.getMigrationId();
-
-                    LOGV2(12697302,
-                          "Migration finished",
-                          "migrationId"_attr = migrationId ? migrationId->toString() : "",
-                          "totalTimeMillis"_attr = migrationSourceManager.getOpTimeMillis(),
-                          "docsCloned"_attr = docsCloned,
-                          "bytesCloned"_attr = bytesCloned,
-                          "cloneTime"_attr = cloneTime);
-
-                    migrationStatus = Status::OK();
-                } catch (const DBException& ex) {
-                    migrationStatus = ex.toStatus();
+        .then(
+            _buildPhaseHandler(Phase::kMigrate,
+                               [this, anchor = shared_from_this(), token](OperationContext* opCtx) {
+                                   LOGV2(12894207,
+                                         "MoveRangeCoordinator executing kMigrate",
+                                         logAttrs(nss()),
+                                         "migrationId"_attr = _doc.getMigrationId());
+                                   uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                                           "MoveRangeCoordinator interrupted during data transfer",
+                                           !_recoveredFromDisk);
+                                   if (!_migrationAttempt) {
+                                       _migrationAttempt.emplace(
+                                           opCtx,
+                                           token,
+                                           nss(),
+                                           _request,
+                                           _doc.getWriteConcern().value_or(WriteConcernOptions{}),
+                                           _doc.getMigrationId());
+                                   }
+                                   uassertStatusOK(_migrationAttempt->migrate(opCtx));
+                               }))
+        .then(_buildPhaseHandler(Phase::kCommit,
+                                 [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                                     LOGV2(12894208,
+                                           "MoveRangeCoordinator executing kCommit",
+                                           logAttrs(nss()),
+                                           "migrationId"_attr = _doc.getMigrationId());
+                                     uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                                             "MoveRangeCoordinator interrupted during commit",
+                                             !_recoveredFromDisk);
+                                     tassert(
+                                         12894200,
+                                         "Migrate and commit must only run during the same term",
+                                         _migrationAttempt.has_value());
+                                     _writeCommitAttempted(opCtx);
+                                     uassertStatusOK(_migrationAttempt->commit(opCtx));
+                                 }))
+        .onCompletion([this, anchor = shared_from_this()](Status migrateStatus) {
+            auto opCtx = makeOperationContext(/*deprioritizable=*/false);
+            if (!migrateStatus.isOK()) {
+                // OrphanedRangeCleanUpFailed is only thrown if the migration succeeded, but
+                // _waitForDelete was requested and we failed to delete all orphans (e.g. because we
+                // were interrupted before the range deletion could complete). Arguably, we should
+                // not return success for a _waitForDelete request if we failed to delete, but
+                // legacy semantics are to return OK for any migration that succeeded to commit,
+                // regardless of the outcome of _waitForDelete.
+                if (migrateStatus.code() == ErrorCodes::OrphanedRangeCleanUpFailed) {
+                    migrateStatus = Status::OK();
+                } else {
                     LOGV2_WARNING(12697303,
                                   "Error while doing moveChunk",
                                   logAttrs(nss()),
-                                  "error"_attr = redact(migrationStatus),
-                                  "errorCode"_attr = migrationStatus.codeString());
-                    if (migrationStatus.code() == ErrorCodes::LockTimeout) {
-                        ShardingStatistics::get(opCtx).countDonorMoveChunkLockTimeout.addAndFetch(
-                            1);
+                                  "error"_attr = redact(migrateStatus),
+                                  "errorCode"_attr = migrateStatus.codeString());
+                    if (migrateStatus.code() == ErrorCodes::LockTimeout) {
+                        ShardingStatistics::get(opCtx.get())
+                            .countDonorMoveChunkLockTimeout.addAndFetch(1);
                     }
                 }
-
-                uassertStatusOK(migrationStatus);
-                return _completeMigration(opCtx, executor, Status::OK());
-            }))
-        .onError([this, anchor = shared_from_this(), executor, token](Status status) {
-            auto opCtx = makeOperationContext(/*deprioritizable=*/false);
-            if (!_mustInitiateRecovery(opCtx.get())) {
-                // The commit was never attempted and the MSM's cleanup path successfully removed
-                // the MigrationCoordinator document.
-                return _completeMigration(opCtx.get(), executor, status);
             }
-            // Either the commit was attempted, or the MigrationCoordinator document is still on
-            // disk (or we couldn't confirm it's gone). Enter the recovery flow to determine the
-            // outcome.
-            return _recoveryFlow(executor, token, status);
-        });
+            _writeMigrationResult(opCtx.get(), migrateStatus);
+        })
+        .then(_buildPhaseHandler(
+            Phase::kEnsureMigrationCoordinatorComplete,
+            [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
+                LOGV2(12894209,
+                      "MoveRangeCoordinator executing kEnsureMigrationCoordinatorComplete",
+                      logAttrs(nss()),
+                      "migrationId"_attr = _doc.getMigrationId(),
+                      "commitAttempted"_attr = _doc.getCommitAttempted());
+                if (!_migrationCoordinatorDocumentMayExist(opCtx)) {
+                    return;
+                }
+                LOGV2(12894205,
+                      "MoveRangeCoordinator recovering in-progress migration",
+                      logAttrs(nss()),
+                      "migrationId"_attr = _doc.getMigrationId(),
+                      "commitAttempted"_attr = _doc.getCommitAttempted());
+                const auto outcome = _recoveryFlow(executor, token).get(opCtx);
+                if (outcome == MigrationOutcome::kCommitted) {
+                    _overwriteMigrationResultWithOk(opCtx);
+                } else {
+                    auto result = _getMigrationResult();
+                    tassert(12894201,
+                            "Migration result must be an error after abort",
+                            result && !result->isOK());
+                }
+            }))
+        .then(_buildPhaseHandler(
+            Phase::kCompleteMigration,
+            [this, anchor = shared_from_this(), executor](OperationContext* opCtx) {
+                LOGV2(12894210,
+                      "MoveRangeCoordinator executing kCompleteMigration",
+                      logAttrs(nss()),
+                      "migrationId"_attr = _doc.getMigrationId());
+                tassert(12894202,
+                        "migrationResult must be set before kCompleteMigration",
+                        _getMigrationResult().has_value());
+                const auto completionStatus = *_getMigrationResult();
+
+                PersistentTaskStore<MigrationCoordinatorDocument> store(
+                    NamespaceString::kMigrationCoordinatorsNamespace);
+                tassert(
+                    12723002,
+                    "Expected no MigrationCoordinator document on disk before completing migration",
+                    store.count(opCtx,
+                                BSON(MigrationCoordinatorDocument::kIdFieldName
+                                     << _doc.getMigrationId())) == 0);
+                if (_recoveredFromDisk) {
+                    const auto term = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+                    RangeDeleterService::get(opCtx)->notifyRecoveryJobComplete(term);
+                }
+                _scopedDonateChunk->signalComplete(completionStatus);
+                _completeOnError = true;
+                uassertStatusOK(completionStatus);
+            }));
 }
 
-ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token,
-    Status incomingStatus) {
+MoveRangeCoordinator::MigrationAttempt::MigrationAttempt(OperationContext* opCtx,
+                                                         CancellationToken token,
+                                                         NamespaceString nss,
+                                                         ShardsvrMoveRangeRequest request,
+                                                         WriteConcernOptions writeConcern,
+                                                         UUID migrationId)
+    : _nss(std::move(nss)),
+      _request(std::move(request)),
+      _writeConcern(std::move(writeConcern)),
+      _migrationId(std::move(migrationId)),
+      _ownedClient(opCtx->getService()->makeClient("MoveRangeCoordinator::MigrationAttempt")),
+      _ownedOpCtx(_ownedClient->makeOperationContext(),
+                  token,
+                  Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()),
+      _cloneMetrics(opCtx) {
+    AlternativeClientRegion acr(_ownedClient);
+    _msm = MigrationSourceManager::createMigrationSourceManager(
+        _ownedOpCtx.get(),
+        buildShardsvrMoveRange(_nss, _request),
+        WriteConcernOptions{_writeConcern},
+        makeDonorConnStr(_ownedOpCtx.get(), _request),
+        makeRecipientHost(_ownedOpCtx.get(), _request),
+        ManagementModeEnum::kMoveRangeCoordinator,
+        _migrationId);
+}
+
+Status MoveRangeCoordinator::MigrationAttempt::migrate(OperationContext* opCtx) {
+    if (_migrateResult)
+        return *_migrateResult;
+
+    AlternativeClientRegion acr(_ownedClient);
+    try {
+        _msm->startClone();
+        _msm->awaitToCatchUp();
+        _msm->enterCriticalSection();
+        _msm->commitChunkOnRecipient();
+        _migrateResult = Status::OK();
+    } catch (const DBException& ex) {
+        _migrateResult = ex.toStatus();
+    }
+
+    return *_migrateResult;
+}
+
+Status MoveRangeCoordinator::MigrationAttempt::commit(OperationContext* opCtx) {
+    tassert(12894203, "commit() called before migrate() completed", _migrateResult.has_value());
+    if (!_migrateResult->isOK())
+        return *_migrateResult;
+
+    if (_commitResult)
+        return *_commitResult;
+
+    AlternativeClientRegion acr(_ownedClient);
+    try {
+        // Any failure after this point may have committed on the config server, so
+        // the recovery flow is required to determine the actual outcome.
+        _msm->commitChunkMetadataOnConfig();
+
+        LOGV2(12697302,
+              "Migration finished",
+              "migrationId"_attr = _migrationId.toString(),
+              "totalTimeMillis"_attr = _msm->getOpTimeMillis(),
+              "docsCloned"_attr = _cloneMetrics.docsCloned(opCtx),
+              "bytesCloned"_attr = _cloneMetrics.bytesCloned(opCtx),
+              "cloneTime"_attr = _cloneMetrics.cloneTimeMillis(opCtx));
+
+        _commitResult = Status::OK();
+    } catch (const DBException& ex) {
+        _commitResult = ex.toStatus();
+    }
+
+    return *_commitResult;
+}
+
+boost::optional<Status> MoveRangeCoordinator::_getMigrationResult() const {
+    if (_doc.getMigrationSuccess().value_or(false))
+        return Status::OK();
+    if (const auto& failure = _doc.getMigrationFailure())
+        return *failure;
+    return boost::none;
+}
+
+void MoveRangeCoordinator::_writeMigrationResult(OperationContext* opCtx, Status result) {
+    if (_doc.getMigrationSuccess().value_or(false) || _doc.getMigrationFailure()) {
+        return;
+    }
+    auto newDoc = MoveRangeCoordinatorDocument(_doc);
+    if (result.isOK()) {
+        newDoc.setMigrationSuccess(true);
+    } else {
+        newDoc.setMigrationFailure(result);
+    }
+    _updateStateDocument(opCtx, std::move(newDoc));
+}
+
+void MoveRangeCoordinator::_writeCommitAttempted(OperationContext* opCtx) {
+    auto newDoc = MoveRangeCoordinatorDocument(_doc);
+    newDoc.setCommitAttempted(true);
+    _updateStateDocument(opCtx, std::move(newDoc));
+}
+
+void MoveRangeCoordinator::_overwriteMigrationResultWithOk(OperationContext* opCtx) {
+    tassert(12894204,
+            "Cannot overwrite a migration result with success if no commit was attempted",
+            _doc.getCommitAttempted().value_or(false));
+    auto newDoc = MoveRangeCoordinatorDocument(_doc);
+    newDoc.setMigrationSuccess(true);
+    newDoc.setMigrationFailure(boost::none);
+    _updateStateDocument(opCtx, std::move(newDoc));
+}
+
+ExecutorFuture<MoveRangeCoordinator::MigrationOutcome> MoveRangeCoordinator::_recoveryFlow(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return ExecutorFuture<void>(**executor)
         .then([this, anchor = shared_from_this()] {
             tassert(12723001,
@@ -293,7 +427,16 @@ ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
                            // Can throw NamespaceNotFound if the collection/database was dropped.
                        }
                    })
-                .until([](Status status) { return status.isOK(); })
+                .until([this](Status status) {
+                    if (!status.isOK()) {
+                        LOGV2_WARNING(12894206,
+                                      "MoveRangeCoordinator migration recovery retrying",
+                                      logAttrs(nss()),
+                                      "migrationId"_attr = _doc.getMigrationId(),
+                                      "error"_attr = redact(status));
+                    }
+                    return status.isOK();
+                })
                 .withBackoffBetweenIterations(Backoff(Seconds(1), Milliseconds::max()))
                 .on(**executor, token);
         })
@@ -307,15 +450,12 @@ ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
                     "refresh; retrying recovery",
                     !_migrationCoordinatorDocumentMayExist(opCtx.get()));
         })
-        .then([this,
-               anchor = shared_from_this(),
-               executor,
-               incomingStatus = std::move(incomingStatus)] {
+        .then([this, anchor = shared_from_this()] {
             auto opCtx = makeOperationContext(/*deprioritizable=*/true);
 
             // Determine whether the migration committed or aborted by checking if the migrated
             // range's min key still belongs to this shard. If it does, the chunk never moved
-            // (migration was aborted). This mirrors the decision logic in
+            // (migration aborted). This mirrors the decision logic in
             // _recoverMigrationCoordinations.
             //
             // getMin() is always set by the time the coordinator runs: the moveChunk/moveRange
@@ -328,15 +468,7 @@ ExecutorFuture<void> MoveRangeCoordinator::_recoveryFlow(
                 return optMeta && optMeta->isSharded() && optMeta->keyBelongsToMe(min);
             }();
 
-            // Notify the range deleter that recovery is complete. Only meaningful when
-            // recovering after a failover.
-            if (_recoveredFromDisk) {
-                const auto term = repl::ReplicationCoordinator::get(opCtx.get())->getTerm();
-                RangeDeleterService::get(opCtx.get())->notifyRecoveryJobComplete(term);
-            }
-
-            return _completeMigration(
-                opCtx.get(), executor, migrationAborted ? incomingStatus : Status::OK());
+            return migrationAborted ? MigrationOutcome::kAborted : MigrationOutcome::kCommitted;
         });
 }
 
@@ -354,24 +486,5 @@ bool MoveRangeCoordinator::_migrationCoordinatorDocumentMayExist(OperationContex
     }
 }
 
-bool MoveRangeCoordinator::_mustInitiateRecovery(OperationContext* opCtx) {
-    return _commitAttempted || _migrationCoordinatorDocumentMayExist(opCtx);
-}
-
-ExecutorFuture<void> MoveRangeCoordinator::_completeMigration(
-    OperationContext* opCtx,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    Status completionStatus) {
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        NamespaceString::kMigrationCoordinatorsNamespace);
-    tassert(12723002,
-            "Expected no MigrationCoordinator document on disk before completing migration",
-            store.count(
-                opCtx, BSON(MigrationCoordinatorDocument::kIdFieldName << _doc.getMigrationId())) ==
-                0);
-    _scopedDonateChunk->signalComplete(completionStatus);
-    _completeOnError = true;
-    return ExecutorFuture<void>(**executor, completionStatus);
-}
 
 }  // namespace mongo

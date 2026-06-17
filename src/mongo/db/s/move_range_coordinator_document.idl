@@ -49,6 +49,9 @@ enums:
         values:
             kUnset: "unset"
             kMigrate: "migrate"
+            kCommit: "commit"
+            kEnsureMigrationCoordinatorComplete: "ensureMigrationCoordinatorComplete"
+            kCompleteMigration: "completeMigration"
 
 structs:
     MoveRangeCoordinatorDocument:
@@ -77,3 +80,15 @@ structs:
             writeConcern:
                 type: WriteConcern
                 optional: true
+            commitAttempted:
+                type: bool
+                optional: true
+                description: "Set to true immediately before committing chunk metadata on the config server."
+            migrationSuccess:
+                type: bool
+                optional: true
+                description: "Set to true when the migration completes successfully."
+            migrationFailure:
+                type: error_status
+                optional: true
+                description: "Set to the error status when the migration fails."

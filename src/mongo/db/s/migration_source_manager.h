@@ -112,7 +112,7 @@ public:
      *  - InvalidOptions if the operation context is missing shard version
      *  - StaleConfig if the expected placement version does not match the one known by this shard.
      */
-    static MigrationSourceManager createMigrationSourceManager(
+    static std::unique_ptr<MigrationSourceManager> createMigrationSourceManager(
         OperationContext* opCtx,
         ShardsvrMoveRange&& request,
         WriteConcernOptions&& writeConcern,

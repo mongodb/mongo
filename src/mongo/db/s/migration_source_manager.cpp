@@ -185,7 +185,7 @@ std::shared_ptr<MigrationChunkClonerSource> MigrationSourceManager::getCurrentCl
     return msm->_cloneDriver;
 }
 
-MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
+std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationSourceManager(
     OperationContext* opCtx,
     ShardsvrMoveRange&& request,
     WriteConcernOptions&& writeConcern,
@@ -268,13 +268,14 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
             args.getMoveRangeRequestBase().setMin(min);
         }
     }
-    return MigrationSourceManager(opCtx,
-                                  std::move(args),
-                                  std::move(writeConcern),
-                                  donorConnStr,
-                                  recipientHost,
-                                  managementMode,
-                                  std::move(migrationId));
+    return std::unique_ptr<MigrationSourceManager>(
+        new MigrationSourceManager(opCtx,
+                                   std::move(args),
+                                   std::move(writeConcern),
+                                   donorConnStr,
+                                   recipientHost,
+                                   managementMode,
+                                   std::move(migrationId)));
 }
 
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
@@ -399,7 +400,23 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 }
 
 MigrationSourceManager::~MigrationSourceManager() {
-    invariant(!_cloneDriver);
+    // In standalone mode, all error paths arm a ScopeGuard that calls _cleanupOnError(), and the
+    // success path calls _cleanup() directly via commitChunkMetadataOnConfig(). Either way,
+    // _cloneDriver is always cleared before the MSM is destroyed, so the invariant holds.
+    //
+    // MoveRangeCoordinator separates migrate() from commit() across a persistence boundary. A
+    // stepdown can kill the coordinator between phases, destroying the MSM without commit() — and
+    // thus _cleanup() — ever having been called. If _cloneDriver is still set here it is always
+    // because of an interruption, never a successful completion, so _cleanupOnError() is correct.
+    // The coordinator's recovery logic will drive the migration to a terminal state on the next
+    // step-up if cleanup fails.
+    if (_managementMode == ManagementModeEnum::kMoveRangeCoordinator) {
+        if (_cloneDriver) {
+            _cleanupOnError();
+        }
+    } else {
+        invariant(!_cloneDriver);
+    }
     _stats.totalDonorMoveChunkTimeMillis.addAndFetch(_entireOpTimer.millis());
 
     if (_state == kDone) {

@@ -193,12 +193,12 @@ export function waitForMoveChunkStep(shardConnection, stepNumber) {
 
             // The donor's migration thread surfaces in $currentOp with `desc === "MoveChunk"` on
             // the legacy path (the executor lambda creates a `ThreadClient("MoveChunk", ...)`) or
-            // with a `ShardingCoordinator-<N>` desc on the coordinator path (MoveRangeCoordinator
-            // runs on a ShardingCoordinatorService pool thread).
+            // with a `desc === "MoveRangeCoordinator::MigrationAttempt"` on the coordinator path
+            // (MoveRangeCoordinator creates a dedicated client for the MigrationSourceManager).
             // TODO SERVER-127253 Remove op.desc === "MoveChunk" once the legacy path is removed.
             if (
                 op.desc &&
-                (op.desc === "MoveChunk" || op.desc.startsWith("ShardingCoordinator-"))
+                (op.desc === "MoveChunk" || op.desc === "MoveRangeCoordinator::MigrationAttempt")
             ) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
