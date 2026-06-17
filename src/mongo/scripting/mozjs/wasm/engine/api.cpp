@@ -196,6 +196,7 @@ extern "C" bool exports_mongo_mozjs_mozjs_initialize_engine(
             mongo::mozjs::wasm::wasm_mozjs_error_t e{};
             mongo::mozjs::wasm::wasm_mozjs_startup_options_t opt{};
             opt.heapSize = options->heap_size_mb > 0 ? options->heap_size_mb : kDefaultHeapSizeMB;
+            opt.javascriptProtection = options->javascript_protection;
 
             int64_t rc = mongo::mozjs::wasm::g_engine.init(&opt, &e);
 

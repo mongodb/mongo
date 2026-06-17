@@ -66,6 +66,9 @@ public:
 
     void interruptAll(ServiceContextLock&) override;
 
+    void enableJavaScriptProtection(bool value) override;
+    bool isJavaScriptProtectionEnabled() const override;
+
     int getJSHeapLimitMB() const override;
     void setJSHeapLimitMB(int limit) override;
 
@@ -76,8 +79,6 @@ public:
     // unreachable for now.
     std::string getLoadPath() const override { MONGO_UNREACHABLE };
     void setLoadPath(const std::string& loadPath) override { MONGO_UNREACHABLE };
-    void enableJavaScriptProtection(bool value) override { MONGO_UNREACHABLE };
-    bool isJavaScriptProtectionEnabled() const override { MONGO_UNREACHABLE };
     std::string getInterpreterVersionString() const override { MONGO_UNREACHABLE };
 
     // Allow impl scopes to register with their OperationContext so interrupts can find them.

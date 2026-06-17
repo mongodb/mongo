@@ -1,7 +1,10 @@
 /**
+ * WASM and Native MozJS have different memory tracking mechanisms causing this split.
  * @tags: [
+ *   requires_mozjs_wasm,
  *   requires_scripting,
- *   mozjs_wasm_unsupported
+ *   # This test has different behavior between the WAsm and Native MozJS engine.
+ *   requires_fcv_90,
  * ]
  */
 
@@ -23,8 +26,8 @@ assert.commandWorked(mongosColl.insert([{x: 0}, {x: 2}]));
 // reflect a setup where allocating a string of size "arraySize" with a "tooSmallHeapSizeMB"
 // JavaScript heap limit will trigger an OOM event, whereas allocating the same array with a
 // "sufficentHeapSizeMB" JavaScript heap limit will succeed.
-const tooSmallHeapSizeMB = 10;
-const sufficentHeapSizeMB = 100;
+const tooSmallHeapSizeMB = 50;
+const sufficentHeapSizeMB = 200;
 
 const expectedOOMErrorCodes = [ErrorCodes.JSInterpreterFailure, ErrorCodes.ExceededMemoryLimit];
 
@@ -52,32 +55,18 @@ function setHeapSizeLimitMB({queryLimit, globalLimit}) {
     });
 }
 
-function setLegacyMemoryTracking({useLegacy}) {
-    st.forEachMongos((conn) => {
-        assert.commandWorked(
-            conn
-                .getDB("test")
-                .adminCommand({setParameter: 1, jsUseLegacyMemoryTracking: useLegacy}),
-        );
-    });
-    st.forEachConnection((conn) => {
-        assert.commandWorked(
-            conn
-                .getDB("test")
-                .adminCommand({setParameter: 1, jsUseLegacyMemoryTracking: useLegacy}),
-        );
-    });
-}
-
-function allocateLargeString() {
-    const arraySize = 1000000;
-    let str = new Array(arraySize).fill(0);
+// MozJS-WAsm uses a different memory tracking mechanism requiring different scenarios to OOM.
+function allocateLargeObject() {
+    let head = null;
+    for (let i = 0; i < 1_750_000; i++) {
+        head = {next: head, v: i};
+    }
     return true;
 }
 
 const mapReduce = {
     mapReduce: "coll",
-    map: allocateLargeString,
+    map: allocateLargeObject,
     reduce: function (k, v) {
         return 1;
     },
@@ -88,7 +77,11 @@ const aggregateWithJSFunction = {
     cursor: {},
     pipeline: [
         {$group: {_id: "$x"}},
-        {$project: {y: {"$function": {args: [], body: allocateLargeString, lang: "js"}}}},
+        {
+            $project: {
+                y: {"$function": {args: [], body: allocateLargeObject, lang: "js"}},
+            },
+        },
     ],
     allowDiskUse: false,
 };
@@ -102,7 +95,7 @@ const aggregateWithInternalJsReduce = {
                 value: {
                     $_internalJsReduce: {
                         data: {k: "$x", v: "$x"},
-                        eval: allocateLargeString,
+                        eval: allocateLargeObject,
                     },
                 },
             },
@@ -119,10 +112,10 @@ const aggregateWithUserDefinedAccumulator = {
                 _id: "$x",
                 value: {
                     $accumulator: {
-                        init: allocateLargeString,
-                        accumulate: allocateLargeString,
+                        init: allocateLargeObject,
+                        accumulate: allocateLargeObject,
                         accumulateArgs: [{k: "$x", v: "$x"}],
-                        merge: allocateLargeString,
+                        merge: allocateLargeObject,
                         lang: "js",
                     },
                 },
@@ -133,11 +126,13 @@ const aggregateWithUserDefinedAccumulator = {
 };
 const findWithJavaScriptFunction = {
     find: "coll",
-    filter: {$expr: {"$function": {args: [], body: allocateLargeString, lang: "js"}}},
+    filter: {
+        $expr: {"$function": {args: [], body: allocateLargeObject, lang: "js"}},
+    },
 };
 const findWithWhere = {
     find: "coll",
-    filter: {$where: allocateLargeString},
+    filter: {$where: allocateLargeObject},
 };
 
 /**
@@ -146,8 +141,6 @@ const findWithWhere = {
  * part of an aggregation pipeline.
  */
 function runCommonTests(db) {
-    setLegacyMemoryTracking({db: db, useLegacy: false});
-
     // All commands are expected to work with a sufficient JS heap size.
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: sufficentHeapSizeMB});
     assert.commandWorked(db.runCommand(aggregateWithJSFunction));
@@ -179,13 +172,6 @@ function runCommonTests(db) {
         db.runCommand(aggregateWithUserDefinedAccumulator),
         expectedOOMErrorCodes,
     );
-
-    // Enabling legacy memory tracking doesn't count large buffers, so queries should pass that otherwise fail
-    setLegacyMemoryTracking({db: db, useLegacy: true});
-    setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: tooSmallHeapSizeMB});
-    assert.commandWorked(db.runCommand(aggregateWithJSFunction));
-    assert.commandWorked(db.runCommand(aggregateWithInternalJsReduce));
-    assert.commandWorked(db.runCommand(aggregateWithUserDefinedAccumulator));
 }
 
 /**
@@ -193,13 +179,10 @@ function runCommonTests(db) {
  * only evaluated on mongod, not on mongos.
  */
 function runShardTests(db) {
-    setLegacyMemoryTracking({db: db, useLegacy: false});
-
     // All commands are expected to work with a sufficient JS heap size.
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: sufficentHeapSizeMB});
     assert.commandWorked(db.runCommand(findWithJavaScriptFunction));
-    // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
-    // assert.commandWorked(db.runCommand(findWithWhere));
+    assert.commandWorked(db.runCommand(findWithWhere));
     assert.commandWorked(db.runCommand(mapReduce));
 
     // A find command with JavaScript agg expression is expected to fail when the query specific
@@ -214,8 +197,7 @@ function runShardTests(db) {
     // succeed even if it is set too low.
     setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: sufficentHeapSizeMB});
     assert.commandWorked(db.runCommand(mapReduce));
-    // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
-    // assert.commandWorked(db.runCommand(findWithWhere));
+    assert.commandWorked(db.runCommand(findWithWhere));
 
     // All commands are expected to fail when the global heap size limit is too low, regardless
     // of the aggregation limit.
@@ -224,17 +206,8 @@ function runShardTests(db) {
         db.runCommand(findWithJavaScriptFunction),
         ErrorCodes.JSInterpreterFailure,
     );
-    // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
-    // assert.commandFailedWithCode(db.runCommand(findWithWhere), ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(findWithWhere), ErrorCodes.JSInterpreterFailure);
     assert.commandFailedWithCode(db.runCommand(mapReduce), ErrorCodes.JSInterpreterFailure);
-
-    // Enabling legacy memory tracking doesn't count large buffers, so queries should pass that otherwise fail
-    setLegacyMemoryTracking({db: db, useLegacy: true});
-    setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: tooSmallHeapSizeMB});
-    assert.commandWorked(db.runCommand(findWithJavaScriptFunction));
-    // TODO SERVER-45454: Uncomment when $where is executed via  aggregation JavaScript expression.
-    // assert.commandWorked(db.runCommand(findWithWhere));
-    assert.commandWorked(db.runCommand(mapReduce));
 }
 
 // Test command invocations that can execute JavaScript on either mongos or mongod.

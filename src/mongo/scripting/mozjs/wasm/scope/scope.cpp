@@ -35,11 +35,14 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::mozjs {
 
@@ -84,6 +87,11 @@ void WasmtimeImplScope::reset() {
     }
 
     _cachedFunctions.clear();
+    // Force loadStored() to reload system.js after the bridge is recreated above. The base class
+    // _loadedVersion is not cleared by the bridge teardown, so without this reset loadStored()
+    // would see _loadedVersion == _lastVersion and skip reloading — leaving the fresh bridge
+    // with no stored functions installed.
+    _loadedVersion = 0;
 
     init(nullptr);
     _emitCallback = nullptr;
@@ -101,6 +109,7 @@ void WasmtimeImplScope::init(const BSONObj* data) {
     }
     opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
     _storeLinearMemBytes = static_cast<int64_t>(opts.linearMemoryLimitMB) * 1024 * 1024;
+    opts.javascriptProtection = gJavascriptProtection.load();
     _bridge = std::make_unique<wasm::MozJSWasmBridge>(_wasmEngineCtx, opts);
     bool initialized = _bridge->initialize();
     uassert(ErrorCodes::BadValue, "MozJS WASM bridge failed to initialize", initialized);
@@ -350,7 +359,35 @@ int WasmtimeImplScope::type(const char* field) {
 void WasmtimeImplScope::rename(const char* from, const char* to) {
     // This method is used to rename global variables in MozJS, but it is never actually used. Keep
     // as a stub for now.
-    MONGO_UNREACHABLE;
+    uasserted(11605400, "Hit unsuported MozJS WASM scope rename");
+}
+
+bool WasmtimeImplScope::exec(StringData code,
+                             const std::string& name,
+                             bool printResult,
+                             bool reportError,
+                             bool assertOnError,
+                             int timeoutMs) {
+    std::string wrapped = "function() { " + std::string(code) + " }";
+    ScriptingFunction func = _bridge->createFunction(wrapped);
+    auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(BSONObj());
+    _deadlineMonitor.startDeadline(this, timeoutMs);
+    StatusWith<BSONObj> result =
+        _bridge->invokeFunction(func, std::move(bsonVal), /*ignoreReturn=*/true);
+    _deadlineMonitor.stopDeadline(this);
+    if (!result.isOK()) {
+        if (reportError) {
+            LOGV2_ERROR(11605401,
+                        "Error executing script",
+                        "name"_attr = name,
+                        "error"_attr = result.getStatus());
+        }
+        if (assertOnError) {
+            uassertStatusOK(result.getStatus());
+        }
+        return false;
+    }
+    return true;
 }
 
 std::string WasmtimeImplScope::getError() {

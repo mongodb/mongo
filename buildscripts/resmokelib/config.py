@@ -905,7 +905,8 @@ CONFIG_FUZZER_ENCRYPTION_OPTS = None
 
 # Indicates which JavaScript engine the tested binary was built with. Corresponds to the
 # "javascriptEngine" field returned by the buildInfo command (or --version). When set to
-# "mozjs-wasm", tests tagged with "mozjs_wasm_unsupported" will be excluded.
+# "mozjs-wasm", tests tagged with "mozjs_wasm_unsupported" will be excluded. When NOT set to
+# "mozjs-wasm", tests tagged with "requires_mozjs_wasm" will be excluded.
 JS_ENGINE = None
 
 # If resmoke is running on a build variant that specifies a mongo_mozjs_opts,

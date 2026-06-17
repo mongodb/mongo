@@ -5,8 +5,6 @@
  * @tags: [
  *   requires_non_retryable_commands,
  *   requires_scripting,
- *   # TODO SERVER-116054: Add support for $where.
- *   mozjs_wasm_unsupported,
  * ]
  */
 const collection = db.where_tolerates_js_exception;
@@ -25,7 +23,7 @@ const res = collection.runCommand("find", {
 
 assert.commandFailedWithCode(res, ErrorCodes.JSInterpreterFailure);
 assert(
-    /ReferenceError/.test(res.errmsg),
+    /ReferenceError|a\ is\ not\ defined/.test(res.errmsg),
     () => "$where didn't failed with a ReferenceError: " + tojson(res),
 );
 assert(

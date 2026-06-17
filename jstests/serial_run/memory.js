@@ -1,7 +1,9 @@
 // @tags: [
 //   requires_fast_memory,
 //   requires_scripting,
-//   # TODO SERVER-116054: Add support for $where.
+//   # TODO SERVER-127318 re-enable on WASM once per-request JS context cost is
+//   # eliminated. The ~200 MB per-mongod WASM module load combined with the test's large-document
+//   # workload OOM-kills the primary on memory-constrained hosts.
 //   mozjs_wasm_unsupported,
 // ]
 const conn = MongoRunner.runMongod({});
@@ -46,7 +48,8 @@ function assertMemoryError(func) {
     } catch (e) {
         if (
             e.message.includes("Out of memory") ||
-            e.message.includes("JavaScript execution interrupted")
+            e.message.includes("JavaScript execution interrupted") ||
+            e.message.includes("out of memory")
         ) {
             return;
         }

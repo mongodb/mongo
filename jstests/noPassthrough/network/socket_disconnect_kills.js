@@ -16,8 +16,6 @@
 //   requires_sharding,
 //   requires_scripting,
 //   grpc_incompatible,
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

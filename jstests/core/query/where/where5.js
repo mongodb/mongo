@@ -4,8 +4,6 @@
 //   # Uses $where operator
 //   requires_scripting,
 //   requires_getmore,
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 
 let t = db.where5;

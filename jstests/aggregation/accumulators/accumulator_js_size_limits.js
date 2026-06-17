@@ -2,6 +2,9 @@
 // @tags: [
 //   requires_scripting,
 //   resource_intensive,
+//   # TODO SERVER-127318 re-enable on WASM once per-request JS context cost is
+//   # eliminated. This test times out on certain systems.
+//   mozjs_wasm_unsupported,
 // ]
 const coll = db.accumulator_js_size_limits;
 

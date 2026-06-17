@@ -36,8 +36,9 @@ namespace mongo {
 namespace mozjs {
 namespace wasm {
 typedef struct {
-    size_t opTimeout;  // microseconds (0 = no timeout)
-    size_t heapSize;   // in MB
+    size_t opTimeout;           // microseconds (0 = no timeout)
+    size_t heapSize;            // in MB
+    bool javascriptProtection;  // mirrors --enableJavaScriptProtection
 } wasm_mozjs_startup_options_t;
 
 }  // namespace wasm
