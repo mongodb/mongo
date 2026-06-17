@@ -245,6 +245,11 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
     invariant(session);
 
     BlockShutdown blockShutdown(this);
+    // Ensure session destructs before the blockShutdown is released.
+    // This is necessary to prevent shutdown racing with the wrapped session's destruction, as the
+    // blockShutdown guard will clean up earlier than the passed-in session otherwise.
+    ON_BLOCK_EXIT([&session] { session.reset(); });
+
     uint64_t currentEngineEpoch = _engineEpoch.load();
     uint64_t currentRtsEpoch = _rtsEpoch.load();
     if (isShuttingDown() || session->_getEngineEpoch() != currentEngineEpoch ||
