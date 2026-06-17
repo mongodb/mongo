@@ -31,13 +31,17 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -58,6 +62,27 @@ namespace mongo {
 namespace {
 
 const auto getRegistry = ServiceContext::declareDecoration<ActiveMigrationsRegistry>();
+
+Status makeChunkOperationBlockedByFCVStatus() {
+    return {
+        ErrorCodes::ConflictingOperationInProgress,
+        "Unable to start new chunk operation while authoritative shard metadata is transitioning"};
+}
+
+bool isAuthoritativeShardMetadataTransitionInProgress(OperationContext* opCtx,
+                                                      bool isRecoveryRegistration) {
+    // (Ignore FCV check): Chunk operations may carry an OFCV from before setFCV started, but the
+    // registration gate needs to observe this node's current FCV transition state.
+    // Recovery registrations are different: they only reacquire local registry state for a
+    // persisted operation after failover, so they must be allowed to use their stable old OFCV and
+    // reach their recovery/abort path. The config-server commit gate still ignores OFCV and blocks
+    // any metadata commit while authoritative shard metadata is transitioning.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+               isRecoveryRegistration ? VersionContext::getDecoration(opCtx)
+                                      : kVersionContextIgnored_UNSAFE,
+               fcvSnapshot) == AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+}
 
 }  // namespace
 
@@ -105,7 +130,8 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx,
 
     // Wait for any ongoing chunk modifications to complete
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, lock, [this] {
-        return !(_activeMoveChunkState || _activeReceiveChunkState);
+        return !_activeMoveChunkState && !_activeReceiveChunkState &&
+            _activeSplitMergeChunkStates.empty();
     });
 
     // lock() may be called while the node is still completing its draining mode; if so, reject the
@@ -142,7 +168,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     std::unique_lock<std::mutex> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
-        return !_activeSplitMergeChunkStates.count(nss);
+        return _migrationsBlocked || !_activeSplitMergeChunkStates.count(nss);
     });
 
     if (_activeReceiveChunkState) {
@@ -177,6 +203,16 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
         return {ErrorCodes::ConflictingOperationInProgress,
                 "Unable to start new balancer operation because the ActiveMigrationsRegistry of "
                 "this shard is temporarily locked"};
+    }
+
+    // Best-effort early rejection: if this shard already observes its own FCV transitioning the
+    // authoritative shard metadata, reject the chunk operation now rather than doing work that the
+    // authoritative commit on the config server would reject anyway. This is only an optimization
+    // to fail early: it reads this node's local FCV, which may still lag the cluster-wide
+    // transition, so it cannot guarantee correctness on its own. The actual guarantee lives in the
+    // commit check on the CSRS, which is the first node to enter the transitional FCV.
+    if (isAuthoritativeShardMetadataTransitionInProgress(opCtx, bypass.has_value())) {
+        return makeChunkOperationBlockedByFCVStatus();
     }
 
     _activeMoveChunkState.emplace(nss, request);
@@ -228,6 +264,16 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
         }
     }
 
+    // Best-effort early rejection: if this shard already observes its own FCV transitioning the
+    // authoritative shard metadata, reject the chunk operation now rather than doing work that the
+    // authoritative commit on the config server would reject anyway. This is only an optimization
+    // to fail early: it reads this node's local FCV, which may still lag the cluster-wide
+    // transition, so it cannot guarantee correctness on its own. The actual guarantee lives in the
+    // commit check on the CSRS, which is the first node to enter the transitional FCV.
+    if (isAuthoritativeShardMetadataTransitionInProgress(opCtx, bypass.has_value())) {
+        return makeChunkOperationBlockedByFCVStatus();
+    }
+
     _activeReceiveChunkState.emplace(nss, chunkRange, fromShardId);
     return {ScopedReceiveChunk(this)};
 }
@@ -246,10 +292,27 @@ StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMerge
     // starting, since they would all take the collection critical section. Operations on other
     // namespaces do not block this one.
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
-        return !(_activeMoveChunkState && _activeMoveChunkState->nss == nss) &&
-            !(_activeReceiveChunkState && _activeReceiveChunkState->nss == nss) &&
-            !_activeSplitMergeChunkStates.count(nss);
+        return _migrationsBlocked ||
+            (!(_activeMoveChunkState && _activeMoveChunkState->nss == nss) &&
+             !(_activeReceiveChunkState && _activeReceiveChunkState->nss == nss) &&
+             !_activeSplitMergeChunkStates.count(nss));
     });
+
+    if (_migrationsBlocked) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                "Unable to start new chunk operation because the ActiveMigrationsRegistry of this "
+                "shard is temporarily locked"};
+    }
+
+    // Best-effort early rejection: if this shard already observes its own FCV transitioning the
+    // authoritative shard metadata, reject the chunk operation now rather than doing work that the
+    // authoritative commit on the config server would reject anyway. This is only an optimization
+    // to fail early: it reads this node's local FCV, which may still lag the cluster-wide
+    // transition, so it cannot guarantee correctness on its own. The actual guarantee lives in the
+    // commit check on the CSRS, which is the first node to enter the transitional FCV.
+    if (isAuthoritativeShardMetadataTransitionInProgress(opCtx, bypass.has_value())) {
+        return makeChunkOperationBlockedByFCVStatus();
+    }
 
     auto [it, inserted] =
         _activeSplitMergeChunkStates.emplace(nss, ActiveSplitMergeChunkState(nss, chunkRange));

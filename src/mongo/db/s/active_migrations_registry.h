@@ -156,23 +156,26 @@ public:
      *     OplogApplier thread during step-up — before ShardingCoordinatorService has transitioned
      *     out of kPaused. Without the bypass, waitForRecovery would uassert NotWritablePrimary and
      *     crash the node.
+     *   - ActiveMigrationsRegistryTestAccessor, which exists only in the unit test to exercise
+     *     recovery-bypassed registration behavior.
      *
      * Because the default constructor is private and the friend list above is the only way to
-     * reach it, code outside these two surfaces cannot bypass the recovery wait.
+     * reach it, code outside these surfaces cannot bypass the recovery wait.
      */
     class BypassRecoveryWait {
     private:
         template <typename StateDoc>
         friend class ChunkOperationShardingCoordinator;
+        friend class ActiveMigrationsRegistryTestAccessor;
         friend void migrationutil::resumeMigrationRecipientsOnStepUp(OperationContext*);
         BypassRecoveryWait() = default;
     };
 
     /**
-     * These methods can be used to block migrations temporarily. The lock() method will block if
-     * there is a migration operation in progress and will return once it is completed. Any
-     * subsequent migration operations will return ConflictingOperationInProgress until the unlock()
-     * method is called.
+     * These methods can be used to block all chunk operations (migrations as well as split/merge
+     * operations) temporarily. The lock() method will block while there is any chunk operation in
+     * progress and will return once they have all completed. Any subsequent chunk operation will
+     * return ConflictingOperationInProgress until the unlock() method is called.
      */
     void lock(OperationContext* opCtx,
               StringData reason,
@@ -348,7 +351,14 @@ private:
     stdx::unordered_map<NamespaceString, ActiveSplitMergeChunkState> _activeSplitMergeChunkStates;
 };
 
-class MigrationBlockingGuard {
+/**
+ * RAII guard that quiesces chunk operations on this shard for as long as it is in scope. On
+ * construction it acquires the ActiveMigrationsRegistry lock, which drains every in-progress chunk
+ * operation (migrations as well as split/merge operations) and blocks until they complete; while
+ * held, any newly submitted chunk operation fails with ConflictingOperationInProgress. The
+ * destructor releases the lock and lets chunk operations resume.
+ */
+class MONGO_MOD_PUBLIC MigrationBlockingGuard {
 public:
     MigrationBlockingGuard(OperationContext* opCtx, std::string reason)
         : _registry(ActiveMigrationsRegistry::get(opCtx)), _reason(std::move(reason)) {

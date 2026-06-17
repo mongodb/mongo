@@ -44,15 +44,20 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #include <memory>
 #include <string>
@@ -406,6 +411,61 @@ TEST_F(SplitChunkTest, Idempotency) {
 
     test(_nss1, Timestamp(42), BSON("a" << 1), BSON("a" << 10), {BSON("a" << 5)});
     test(_nss2, Timestamp(42), BSON("a" << 1), BSON("a" << 10), {BSON("a" << 3), BSON("a" << 7)});
+}
+
+TEST_F(SplitChunkTest, RetryCommittedSplitSucceedsDuringFCVTransition) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+    const auto collUuid = UUID::gen();
+
+    const auto chunkMin = BSON("a" << 1);
+    const auto splitPoint = BSON("a" << 5);
+    const auto chunkMax = BSON("a" << 10);
+    const std::vector<BSONObj> splitPoints{splitPoint};
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    chunk.setVersion(ChunkVersion({collEpoch, collTimestamp}, {1, 0}));
+    chunk.setShard(ShardId(_shardName));
+    chunk.setRange({chunkMin, chunkMax});
+
+    setupCollection(_nss1, _keyPattern, {chunk});
+
+    const auto doSplit = [&] {
+        return ShardingCatalogManager::get(operationContext())
+            ->commitChunkSplit(operationContext(),
+                               _nss1,
+                               collEpoch,
+                               collTimestamp,
+                               ChunkRange(chunkMin, chunkMax),
+                               splitPoints,
+                               _shardName);
+    };
+
+    ASSERT_OK(doSplit());
+
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+    // (Generic FCV reference): the retry carries a stable last LTS OFCV while server FCV
+    // transitions.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(operationContext());
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_OK(doSplit());
+
+    auto leftChunk = uassertStatusOK(
+        getChunkDoc(operationContext(), collUuid, chunkMin, collEpoch, collTimestamp));
+    ASSERT_BSONOBJ_EQ(splitPoint, leftChunk.getMax());
+
+    auto rightChunk = uassertStatusOK(
+        getChunkDoc(operationContext(), collUuid, splitPoint, collEpoch, collTimestamp));
+    ASSERT_BSONOBJ_EQ(chunkMax, rightChunk.getMax());
 }
 
 TEST_F(SplitChunkTest, PreConditionFailErrors) {

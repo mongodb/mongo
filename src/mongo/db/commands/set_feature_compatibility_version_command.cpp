@@ -630,6 +630,15 @@ public:
                 .beforeStartWithoutFCVLock(opCtx, actualVersion, requestedVersion);
 
             {
+                // On shard servers, drain any in-flight chunk operations and block new ones for
+                // the window in which we flip the local FCV document to the transitional state.
+                // TODO (SERVER-98118): Remove this guard.
+                boost::optional<MigrationBlockingGuard> drainChunkOperations;
+                if (role && role->has(ClusterRole::ShardServer)) {
+                    drainChunkOperations.emplace(opCtx,
+                                                 std::string{"setFeatureCompatibilityVersion"});
+                }
+
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(

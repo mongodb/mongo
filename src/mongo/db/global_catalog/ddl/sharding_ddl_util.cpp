@@ -1020,20 +1020,8 @@ void cloneAuthoritativeCollectionMetadataToShards(
     shardSet.insert(primaryShardId);
     const std::vector<ShardId> shardIds(shardSet.begin(), shardSet.end());
 
-    // TODO (SERVER-127654): Remove this workaround to manually stop and resume migrations once
-    // setFCV stops all chunk operations.
-    stopMigrations(opCtx,
-                   nss,
-                   boost::none /* expectedCollectionUUID */,
-                   osiGenerator,
-                   authoritativeAccessLevel);
     sendFetchCollMetadataToShards(
         opCtx, nss, shardIds, primaryShardId, osiGenerator(), executor, token);
-    resumeMigrations(opCtx,
-                     nss,
-                     boost::none /* expectedCollectionUUID */,
-                     osiGenerator,
-                     authoritativeAccessLevel);
 }
 
 void commitRefineCollectionShardKeyToShardCatalog(

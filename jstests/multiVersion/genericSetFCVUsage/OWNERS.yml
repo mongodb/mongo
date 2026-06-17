@@ -29,6 +29,10 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "authoritative_shards_setfcv_blocks_chunk_operations.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "upgrade_downgrade_sharded_cluster_remove_shard_state.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

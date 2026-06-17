@@ -30,6 +30,27 @@ const commandIsDisabledOnLastLTS = "skip command on downgrading fcv";
 const requiresParallelShell = "requires parallel shell";
 const cannotRunWhileDowngrading = "cannot run command while downgrading";
 
+// Commands that perform a chunk operation (split / merge / move), are rejected with ConflictingOperationInProgress while the authoritative shard metadata is mid-transition, i.e. while featureFlagAuthoritativeShardsDDL is enabled but featureFlagAuthoritativeShardsCRUD is not yet enabled
+// TODO (SERVER-98118): Remove this handling.
+const chunkOperationCommands = new Set([
+    "split",
+    "mergeChunks",
+    "mergeAllChunksOnShard",
+    "moveChunk",
+    "moveRange",
+    // clearJumboFlag is not itself a blocked chunk operation, but its setUp performs a split, which
+    // is rejected during the transition.
+    "clearJumboFlag",
+]);
+
+function chunkOperationsBlockedByAuthShardTransition(shardConn) {
+    const adminDB = shardConn.getDB("admin");
+    return (
+        FeatureFlagUtil.isPresentAndEnabled(adminDB, "AuthoritativeShardsDDL") &&
+        !FeatureFlagUtil.isPresentAndEnabled(adminDB, "AuthoritativeShardsCRUD")
+    );
+}
+
 const allCommands = {
     _addShard: {skip: isAnInternalCommand},
     _internalClearCollectionShardingMetadata: {skip: isAnInternalCommand},
@@ -2024,6 +2045,17 @@ let runTest = function (conn, adminDB, fixture) {
         commandsList = new Set(commandsList.concat(shardCommandsList));
     }
 
+    // On sharded clusters, chunk operations are rejected while the authoritative shard metadata is
+    // transitioning, which is exactly the state this phase exercises (the downgrade is stuck in the
+    // transitional FCV via the failDowngrading failpoint). Skip those commands for this phase only;
+    // they are exercised again after the FCV is restored to latest.
+    let skipChunkOperations = false;
+    if (FixtureHelpers.isMongos(adminDB)) {
+        skipChunkOperations = chunkOperationsBlockedByAuthShardTransition(
+            fixture.configRS.getPrimary(),
+        );
+    }
+
     for (const command of commandsList) {
         const test = allCommands[command];
 
@@ -2032,6 +2064,16 @@ let runTest = function (conn, adminDB, fixture) {
 
         if (test.skip !== undefined || test.skip === commandIsDisabledOnLastLTS) {
             jsTestLog("Skipping " + command + ": " + test.skip);
+            continue;
+        }
+
+        if (skipChunkOperations && chunkOperationCommands.has(command)) {
+            jsTestLog(
+                "Skipping " +
+                    command +
+                    " in the downgrading FCV: chunk operations are blocked while the authoritative " +
+                    "shard metadata is transitioning",
+            );
             continue;
         }
 

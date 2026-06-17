@@ -35,9 +35,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/version_context.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/version/releases.h"
 
 #include <future>
 #include <mutex>
@@ -48,6 +53,14 @@
 #include <fmt/format.h>
 
 namespace mongo {
+
+class ActiveMigrationsRegistryTestAccessor {
+public:
+    static ActiveMigrationsRegistry::BypassRecoveryWait makeRecoveryBypass() {
+        return {};
+    }
+};
+
 namespace {
 
 template <typename T>
@@ -170,6 +183,16 @@ TEST_F(MoveChunkRegistration, TestReceiveChunkIsRejectedWhenRegistryIsLocked) {
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
                   false /* waitForCompletionOfMigrationOps */));
+    _registry.unlock("dummy");
+}
+
+TEST_F(MoveChunkRegistration, TestSplitOrMergeChunkIsRejectedWhenRegistryIsLocked) {
+    _registry.lock(_opCtx, "dummy");
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerSplitOrMergeChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
     _registry.unlock("dummy");
 }
 
@@ -533,6 +556,158 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
 
     // 11. The registy locking thread has returned and this future is set.
     lockReleased.wait();
+}
+
+TEST_F(MoveChunkRegistration, TestBlockingWhileSplitOrMergeInProgress) {
+    nolint_promise<void> blockSplitMerge;
+    nolint_promise<void> readyToLock;
+    nolint_promise<void> inLock;
+
+    auto result = std::async(std::launch::async, [&] {
+        auto scopedSplitMergeChunk = _registry.registerSplitOrMergeChunk(
+            operationContext(),
+            NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)));
+        ASSERT_OK(scopedSplitMergeChunk.getStatus());
+
+        readyToLock.set_value();
+        blockSplitMerge.get_future().wait();
+    });
+
+    auto lockReleased = std::async(std::launch::async, [&] {
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        auto baton = opCtxHolder->getBaton();
+        baton->schedule([&inLock](Status) { inLock.set_value(); });
+
+        readyToLock.get_future().wait();
+        _registry.lock(opCtxHolder.get(), "dummy");
+        _registry.unlock("dummy");
+    });
+
+    inLock.get_future().wait();
+    blockSplitMerge.set_value();
+    lockReleased.wait();
+}
+
+TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWithoutOperationFCV) {
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+    // (Generic FCV reference): Put the server in the authoritative metadata transition state to
+    // verify normal chunk registrations are rejected.
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerDonateChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "DonateColl"),
+                  createMoveRangeRequestFields()));
+
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerReceiveChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
+                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+                  ShardId("shard0001"),
+                  false /* waitForCompletionOfConflictingOps */));
+
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerSplitOrMergeChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "SplitMergeColl"),
+                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
+
+    // (Generic FCV reference): Restore latest FCV to verify registration is accepted once the
+    // transition condition is gone.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+
+    auto scopedSplitMergeChunk = assertGet(_registry.registerSplitOrMergeChunk(
+        _opCtx,
+        NamespaceString::createNamespaceString_forTest("TestDB", "StableLatestColl"),
+        ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
+}
+
+TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejectDuringTransition) {
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+
+    // (Generic FCV reference): Pin the operation to last LTS before transitioning the server FCV
+    // to verify stale-OFCV registrations are still rejected outside recovery.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(_opCtx);
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerDonateChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "DonateColl"),
+                  createMoveRangeRequestFields()));
+
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerReceiveChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
+                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+                  ShardId("shard0001"),
+                  false /* waitForCompletionOfConflictingOps */));
+
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerSplitOrMergeChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "SplitMergeColl"),
+                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100))));
+}
+
+TEST_F(MoveChunkRegistration, RecoveryBypassWithStableOperationFCVAllowsRegistration) {
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+
+    // (Generic FCV reference): Pin the operation to last LTS before transitioning the server FCV
+    // to verify recovery-bypassed registrations may reacquire local state with the old OFCV.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(_opCtx);
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    {
+        auto scopedDonateChunk = assertGet(_registry.registerDonateChunk(
+            _opCtx,
+            NamespaceString::createNamespaceString_forTest("TestDB", "RecoveryDonateColl"),
+            createMoveRangeRequestFields(),
+            ActiveMigrationsRegistryTestAccessor::makeRecoveryBypass()));
+        scopedDonateChunk.signalComplete(Status::OK());
+    }
+
+    {
+        auto scopedReceiveChunk = assertGet(_registry.registerReceiveChunk(
+            _opCtx,
+            NamespaceString::createNamespaceString_forTest("TestDB", "RecoveryReceiveColl"),
+            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+            ShardId("shard0001"),
+            false /* waitForCompletionOfConflictingOps */,
+            ActiveMigrationsRegistryTestAccessor::makeRecoveryBypass()));
+    }
+
+    {
+        auto scopedSplitMergeChunk = assertGet(_registry.registerSplitOrMergeChunk(
+            _opCtx,
+            NamespaceString::createNamespaceString_forTest("TestDB", "RecoverySplitMergeColl"),
+            ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+            ActiveMigrationsRegistryTestAccessor::makeRecoveryBypass()));
+    }
 }
 
 // Fake Recoverable that gates waitForRecovery() on an externally-settable flag. Used to verify

@@ -50,6 +50,7 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -57,12 +58,16 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -200,6 +205,119 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
     ASSERT(chunkDoc1.getOnCurrentShardSince().has_value());
     ASSERT_EQ(controlChunk.getOnCurrentShardSince(), chunkDoc1.getOnCurrentShardSince());
     ASSERT(chunkDoc1.getJumbo());
+}
+
+TEST_F(CommitChunkMigrate, RejectDuringFCVTransitionWithStableOperationFCV) {
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+    // (Generic FCV reference): This test intentionally verifies commitChunkMigration behavior
+    // during an FCV transition, with a stable last LTS OFCV to ensure the server FCV being in
+    // transitional state is what rejects the migration.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(operationContext());
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    const auto collUUID = UUID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+
+    ShardType shard0;
+    shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+    shard0.setHost("shard0:12");
+
+    ShardType shard1;
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setHost("shard1:12");
+
+    setupShards({shard0, shard1});
+
+    ChunkType migratedChunk;
+    const auto version = ChunkVersion({collEpoch, collTimestamp}, {12, 7});
+    migratedChunk.setName(OID::gen());
+    migratedChunk.setCollectionUUID(collUUID);
+    migratedChunk.setVersion(version);
+    migratedChunk.setShard(ShardRef{shard0.getName()});
+    migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    migratedChunk.setHistory(
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+    migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
+
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk});
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->commitChunkMigration(operationContext(),
+                                                  kNamespace,
+                                                  migratedChunk,
+                                                  migratedChunk.getVersion().epoch(),
+                                                  collTimestamp,
+                                                  ShardId(shard0.getName()),
+                                                  ShardId(shard1.getName())),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(CommitChunkMigrate, RetryCommittedMigrationSucceedsDuringFCVTransition) {
+    const auto collUUID = UUID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(42);
+
+    ShardType shard0;
+    shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
+    shard0.setHost("shard0:12");
+
+    ShardType shard1;
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
+    shard1.setHost("shard1:12");
+
+    setupShards({shard0, shard1});
+
+    ChunkType migratedChunk;
+    const auto version = ChunkVersion({collEpoch, collTimestamp}, {12, 7});
+    migratedChunk.setName(OID::gen());
+    migratedChunk.setCollectionUUID(collUUID);
+    migratedChunk.setVersion(version);
+    migratedChunk.setShard(ShardRef{shard0.getName()});
+    migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    migratedChunk.setHistory(
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
+    migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
+
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk});
+
+    const auto doMigration = [&] {
+        return ShardingCatalogManager::get(operationContext())
+            ->commitChunkMigration(operationContext(),
+                                   kNamespace,
+                                   migratedChunk,
+                                   migratedChunk.getVersion().epoch(),
+                                   collTimestamp,
+                                   ShardId(shard0.getName()),
+                                   ShardId(shard1.getName()));
+    };
+
+    ASSERT_OK(doMigration());
+
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+    // (Generic FCV reference): the retry carries a stable last LTS OFCV while server FCV
+    // transitions.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(operationContext());
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_OK(doMigration());
+
+    auto chunkDoc =
+        uassertStatusOK(getChunkDoc(operationContext(), BSON("a" << 1), collEpoch, collTimestamp));
+    ASSERT_EQ(shard1.getName(), chunkDoc.getShard());
 }
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {

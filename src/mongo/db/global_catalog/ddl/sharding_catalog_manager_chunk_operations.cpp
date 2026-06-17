@@ -49,6 +49,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
@@ -77,6 +78,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/resource_yielder.h"
@@ -92,6 +94,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/inline_executor.h"
@@ -142,6 +145,21 @@ MONGO_FAIL_POINT_DEFINE(skipExpiringOldChunkHistory);
 MONGO_FAIL_POINT_DEFINE(mergeAllChunksFailAfterCommit);
 
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
+
+bool isAuthoritativeShardMetadataTransitionInProgress(OperationContext* opCtx) {
+    // (Ignore FCV check): Chunk operations may carry an OFCV from before setFCV started, but the
+    // commit gate needs to observe this node's current FCV transition state.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+               kVersionContextIgnored_UNSAFE, fcvSnapshot) ==
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+}
+
+void uassertChunkOperationsAllowedByFCV(OperationContext* opCtx) {
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Cannot commit chunk operation while authoritative shard metadata is transitioning",
+            !isAuthoritativeShardMetadataTransitionInProgress(opCtx));
+}
 
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.
@@ -823,6 +841,10 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
             // Chunks already existed. No need to re-log the chunks.
             splitChunkResult = {collPlacementVersion, {}};
         } else {
+            // Only check for kUpgrading or kDowngrading after we know that the operation is not a
+            // retry for idempotency.
+            uassertChunkOperationsAllowedByFCV(opCtx);
+
             // Only after we have checked the request is not a retry check for
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Can't execute splitChunk because chunk operations for this "
@@ -878,6 +900,14 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                          const ChunkRange& range,
                                          const std::vector<BSONObj>& splitPoints,
                                          const std::string& shardName) {
+    // All commit operations on chunks need a fixed FCV region, with a check ensuring they do not
+    // run while this node is in kUpgrading or kDowngrading. Protecting the ActiveMigrationsRegistry
+    // alone is not sufficient: two nodes migrating a chunk may both still be on FCV 8.0 while the
+    // cluster is already in kUpgrading with some nodes already running authoritative DDLs. Checking
+    // the commit on the CSRS handles this case because it is the first node to enter kUpgrading and
+    // kDowngrading.
+    FixedFCVRegion fcvRegion(opCtx);
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
@@ -1107,6 +1137,14 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                           const UUID& requestCollectionUUID,
                                           const ChunkRange& chunkRange,
                                           const ShardId& shardId) {
+    // All commit operations on chunks need a fixed FCV region, with a check ensuring they do not
+    // run while this node is in kUpgrading or kDowngrading. Protecting the ActiveMigrationsRegistry
+    // alone is not sufficient: two nodes migrating a chunk may both still be on FCV 8.0 while the
+    // cluster is already in kUpgrading with some nodes already running authoritative DDLs. Checking
+    // the commit on the CSRS handles this case because it is the first node to enter kUpgrading and
+    // kDowngrading.
+    FixedFCVRegion fcvRegion(opCtx);
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
@@ -1168,6 +1206,10 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
         return ShardAndCollectionPlacementVersions{currentShardPlacementVersion,
                                                    collPlacementVersion};
     }
+
+    // Only check for kUpgrading or kDowngrading after we know that the operation is not a retry for
+    // idempotency.
+    uassertChunkOperationsAllowedByFCV(opCtx);
 
     // Only check for allowChunkOperations after we know that the operation is not a retry for
     // idempotency.
@@ -1261,6 +1303,14 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                                     const ShardId& shardId,
                                                     int maxNumberOfChunksToMerge,
                                                     int maxTimeProcessingChunksMS) {
+    // All commit operations on chunks need a fixed FCV region, with a check ensuring they do not
+    // run while this node is in kUpgrading or kDowngrading. Protecting the ActiveMigrationsRegistry
+    // alone is not sufficient: two nodes migrating a chunk may both still be on FCV 8.0 while the
+    // cluster is already in kUpgrading with some nodes already running authoritative DDLs. Checking
+    // the commit on the CSRS handles this case because it is the first node to enter kUpgrading and
+    // kDowngrading.
+    FixedFCVRegion fcvRegion(opCtx);
+
     // Retry the commit a fixed number of  times before failing: the discovery of chunks to merge
     // happens before acquiring the `_kChunkOpLock` in order not to block  for too long concurrent
     // chunk operations. This implies that other chunk operations for the same collection could
@@ -1324,6 +1374,10 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                 nRetries++;
                 continue;
             }
+
+            // Only check for kUpgrading or kDowngrading after we know that the operation is not a
+            // retry for idempotency.
+            uassertChunkOperationsAllowedByFCV(opCtx);
 
             // The allowMigrations flag is updated without bumping the placement version, so it
             // must be re-read under the chunk-op lock to be sure no concurrent setAllowMigrations
@@ -1516,14 +1570,22 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                                              const Timestamp& collectionTimestamp,
                                              const ShardId& fromShard,
                                              const ShardId& toShard) {
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+    // All commit operations on chunks need a fixed FCV region, with a check ensuring they do not
+    // run while this node is in kUpgrading or kDowngrading. Protecting the ActiveMigrationsRegistry
+    // alone is not sufficient: two nodes migrating a chunk may both still be on FCV 8.0 while the
+    // cluster is already in kUpgrading with some nodes already running authoritative DDLs. Checking
+    // the commit on the CSRS handles this case because it is the first node to enter kUpgrading and
+    // kDowngrading.
+    FixedFCVRegion fcvRegion(opCtx);
+
     uassertStatusOK(
         ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMin()));
     uassertStatusOK(
         ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMax()));
-
-    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
-    // under the exclusive _kChunkOpLock happen on the same term.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Must hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
@@ -1644,6 +1706,10 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         return ShardAndCollectionPlacementVersions{currentShardPlacementVersion,
                                                    currentCollectionPlacementVersion};
     }
+
+    // Only check for kUpgrading or kDowngrading after we know that the operation is not a retry for
+    // idempotency.
+    uassertChunkOperationsAllowedByFCV(opCtx);
 
     uassert(4914702,
             str::stream() << "Migrated  chunk " << migratedChunk.toString()

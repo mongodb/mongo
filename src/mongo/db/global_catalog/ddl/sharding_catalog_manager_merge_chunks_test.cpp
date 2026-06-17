@@ -57,14 +57,19 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/version/releases.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -597,6 +602,77 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     ChunkType foundChunk = uassertStatusOK(
         ChunkType::parseFromConfigBSON(chunksVector.front(), collEpoch, collTimestamp));
     ASSERT_BSONOBJ_EQ(mergedChunk.toConfigBSON(), foundChunk.toConfigBSON());
+}
+
+TEST_F(MergeChunkTest, RetryCommittedMergeSucceedsDuringFCVTransition) {
+    const auto collEpoch = OID::gen();
+    const Timestamp collTimestamp(42);
+    const auto collUuid = UUID::gen();
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+    chunk.setVersion(ChunkVersion({collEpoch, collTimestamp}, {1, 0}));
+    chunk.setShard(_shardId);
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+
+    auto chunk2(chunk);
+    chunk2.setName(OID::gen());
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+
+    const auto chunkMin = BSON("a" << 1);
+    const auto chunkBound = BSON("a" << 5);
+    const auto chunkMax = BSON("a" << 10);
+    chunk.setRange({chunkMin, chunkBound});
+    chunk2.setRange({chunkBound, chunkMax});
+
+    setupCollection(_nss2, _keyPattern, {chunk, chunk2});
+
+    const ChunkRange rangeToBeMerged(chunkMin, chunkMax);
+    const auto doMerge = [&] {
+        return ShardingCatalogManager::get(operationContext())
+            ->commitChunksMerge(operationContext(),
+                                _nss2,
+                                collEpoch,
+                                collTimestamp,
+                                collUuid,
+                                rangeToBeMerged,
+                                _shardId);
+    };
+
+    ASSERT_OK(doMerge());
+
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+    // (Generic FCV reference): the retry carries a stable last LTS OFCV while server FCV
+    // transitions.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(operationContext());
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_OK(doMerge());
+
+    const auto query = BSON(ChunkType::collectionUUID() << collUuid);
+    auto findResponse = uassertStatusOK(
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString::kConfigsvrChunksNamespace,
+                                                 query,
+                                                 BSON(ChunkType::lastmod << -1),
+                                                 boost::none));
+    ASSERT_EQ(1u, findResponse.docs.size());
+
+    auto mergedChunk = uassertStatusOK(
+        ChunkType::parseFromConfigBSON(findResponse.docs.front(), collEpoch, collTimestamp));
+    ASSERT_BSONOBJ_EQ(chunkMin, mergedChunk.getMin());
+    ASSERT_BSONOBJ_EQ(chunkMax, mergedChunk.getMax());
 }
 
 TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
@@ -1298,6 +1374,60 @@ TEST_F(MergeAllChunksOnShardTest, AllMergeableChunksGetSquashed) {
 
         throw;
     }
+}
+
+TEST_F(MergeAllChunksOnShardTest, RetryCommittedMergeAllChunksOnShardSucceedsDuringFCVTransition) {
+    const ShardId shardId{_shards.at(0).getName()};
+    const ShardRef shardRef{shardId};
+    auto version = ChunkVersion{{_epoch, _ts}, {1, 0}};
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(_collUuid);
+    chunk.setVersion(version);
+    chunk.setShard(shardRef);
+    chunk.setRange({_keyPattern.globalMin(), BSON("x" << 0)});
+    chunk.setOnCurrentShardSince(Timestamp(0, 1));
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), shardRef}});
+
+    version.incMinor();
+    ChunkType chunk2;
+    chunk2.setName(OID::gen());
+    chunk2.setCollectionUUID(_collUuid);
+    chunk2.setVersion(version);
+    chunk2.setShard(shardRef);
+    chunk2.setRange({BSON("x" << 0), _keyPattern.globalMax()});
+    chunk2.setOnCurrentShardSince(Timestamp(0, 1));
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), shardRef}});
+
+    setupCollection(_nss, _keyPattern, {chunk, chunk2});
+
+    const auto doMergeAll = [&] {
+        return ShardingCatalogManager::get(operationContext())
+            ->commitMergeAllChunksOnShard(operationContext(), _nss, shardId);
+    };
+
+    ASSERT_OK(doMergeAll());
+
+    unittest::ServerParameterGuard ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    unittest::ServerParameterGuard crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+    const auto originalFCV =
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+    ScopeGuard restoreFCV([&] { serverGlobalParams.mutableFCV.setVersion(originalFCV); });
+    // (Generic FCV reference): the retry carries a stable last LTS OFCV while server FCV
+    // transitions.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
+    VersionContext::FixedOperationFCVRegion fixedOperationFCV(operationContext());
+    serverGlobalParams.mutableFCV.setVersion(
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_OK(doMergeAll());
+
+    const auto chunks = getChunks();
+    ASSERT_EQ(1u, chunks.size());
+    ASSERT_EQ(shardId, chunks.front().getShard());
+    ASSERT_BSONOBJ_EQ(_keyPattern.globalMin(), chunks.front().getMin());
+    ASSERT_BSONOBJ_EQ(_keyPattern.globalMax(), chunks.front().getMax());
 }
 
 }  // namespace
