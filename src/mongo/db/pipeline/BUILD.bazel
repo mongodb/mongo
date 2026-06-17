@@ -1073,6 +1073,8 @@ mongo_cc_library(
         ":change_stream_topology_helpers",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/exec/single_doc_lookup:aggregation_single_document_lookup_executor",
+        "//src/mongo/db/exec/single_doc_lookup:single_document_lookup_executor",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:sharded_agg_helpers",
         "//src/mongo/db/query/write_ops:write_ops_parsers",

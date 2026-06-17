@@ -41,6 +41,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -467,8 +468,11 @@ protected:
 
 TEST_F(ChangeStreamAddPostImageStageFnWiringTest, UpdateLookupModeBuildsUpdateLookupStage) {
     auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
-    ASSERT(dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get()));
+    auto* updateLookupStage = dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get());
+    ASSERT(updateLookupStage);
     ASSERT_FALSE(dynamic_cast<exec::agg::ChangeStreamAddPostImageStage*>(stage.get()));
+    ASSERT(dynamic_cast<const exec::agg::AggregationSingleDocumentLookupExecutor*>(
+        updateLookupStage->getLookupExecutor_forTest()));
 }
 
 TEST_F(ChangeStreamAddPostImageStageFnWiringTest, RequiredModeBuildsAddPostImageStage) {

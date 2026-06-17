@@ -32,9 +32,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/single_doc_lookup/single_document_lookup_executor.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
+
+#include <memory>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -50,7 +53,26 @@ namespace mongo::exec::agg {
 class ChangeStreamUpdateLookupStage final : public Stage {
 public:
     ChangeStreamUpdateLookupStage(StringData stageName,
-                                  const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+                                  const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                  std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor);
+
+    void detachFromOperationContext() override {
+        Stage::detachFromOperationContext();
+        _lookupExecutor->detachFromOperationContext();
+    }
+
+    void reattachToOperationContext(OperationContext* opCtx) override {
+        Stage::reattachToOperationContext(opCtx);
+        _lookupExecutor->reattachToOperationContext(opCtx);
+    }
+
+    /**
+     * Test-only: returns the injected SingleDocumentLookupExecutor so wiring tests can assert the
+     * concrete strategy type via dynamic_cast.
+     */
+    const SingleDocumentLookupExecutor* getLookupExecutor_forTest() const {
+        return _lookupExecutor.get();
+    }
 
 private:
     /**
@@ -59,9 +81,15 @@ private:
     GetNextResult doGetNext() final;
 
     /**
-     * Retrieves the current version of the document for the update event.
+     * Extracts the lookup parameters from the update event and invokes the injected executor.
+     * Returns the post-image document or boost::none.
      */
-    boost::optional<Document> performPostImageLookup(const Document& updateOp) const;
+    boost::optional<Document> performPostImageLookup(const Document& updateOp);
+
+    /**
+     * Executor responsible for fetching the latest majority-committed version of the document.
+     */
+    std::unique_ptr<SingleDocumentLookupExecutor> _lookupExecutor;
 
     /**
      * The change stream this lookup is part of. Used to resolve the lookup namespace cheaply for

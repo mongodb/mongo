@@ -127,11 +127,17 @@ boost::optional<UUID> getCollectionUUID(const Document& updateOp, bool shouldMat
 }  // namespace
 
 ChangeStreamUpdateLookupStage::ChangeStreamUpdateLookupStage(
-    StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : Stage(stageName, pExpCtx), _changeStream(ChangeStream::buildFromExpressionContext(pExpCtx)) {}
+    StringData stageName,
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    std::unique_ptr<SingleDocumentLookupExecutor> lookupExecutor)
+    : Stage(stageName, pExpCtx),
+      _lookupExecutor(std::move(lookupExecutor)),
+      _changeStream(ChangeStream::buildFromExpressionContext(pExpCtx)) {
+    tassert(12841000, "SingleDocumentLookupExecutor must be provided", _lookupExecutor);
+}
 
 boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
-    const Document& updateOp) const {
+    const Document& updateOp) {
     auto nss = getLookupNss(pExpCtx, _changeStream, updateOp);
     auto collectionUUID = getCollectionUUID(
         updateOp, pExpCtx->getChangeStreamSpec()->getMatchCollectionUUIDForUpdateLookup());
@@ -140,17 +146,14 @@ boost::optional<Document> ChangeStreamUpdateLookupStage::performPostImageLookup(
                                           BSONType::object)
                            .getDocument();
 
-    // updateLookup reads the latest majority-committed version of the document, lower-bounded by
-    // the event's clusterTime.
-    auto readConcern = BSON("level" << "majority"
-                                    << "afterClusterTime" << getClusterTime(updateOp));
-
-    // Update lookup queries sent from mongoS to shards are allowed to use speculative majority
-    // reads. Even if the lookup itself succeeded, it may not have returned any results if the
-    // document was deleted in the time since the update op.
     try {
-        return pExpCtx->getMongoProcessInterface()->lookupSingleDocument(
-            pExpCtx, nss, std::move(collectionUUID), documentKey, std::move(readConcern));
+        auto result = _lookupExecutor->performLookup(
+            pExpCtx, nss, std::move(collectionUUID), documentKey, getClusterTime(updateOp));
+        tassert(12841001,
+                "lookup executor chain must terminate in a handled result",
+                result.status !=
+                    SingleDocumentLookupExecutor::LookupResult::HandledStatus::kNotHandled);
+        return result.document;
     } catch (const ExceptionFor<ErrorCodes::TooManyMatchingDocuments>& ex) {
         uasserted(ErrorCodes::ChangeStreamFatalError, ex.what());
     }

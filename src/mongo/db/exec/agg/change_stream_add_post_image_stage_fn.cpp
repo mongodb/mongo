@@ -30,8 +30,11 @@
 #include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
 #include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/single_doc_lookup/aggregation_single_document_lookup_executor.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 
@@ -53,7 +56,9 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToS
 
     if (changeStreamAddPostImageDS->isUpdateLookup()) {
         return make_intrusive<exec::agg::ChangeStreamUpdateLookupStage>(
-            changeStreamAddPostImageDS->kStageName, changeStreamAddPostImageDS->getExpCtx());
+            changeStreamAddPostImageDS->kStageName,
+            changeStreamAddPostImageDS->getExpCtx(),
+            std::make_unique<exec::agg::AggregationSingleDocumentLookupExecutor>());
     }
 
     return make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(
