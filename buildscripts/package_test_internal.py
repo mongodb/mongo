@@ -1,13 +1,11 @@
 # This script needs to be compatible with odler versions of python since it runs on older versions of OSs when testing packaging
 # For example ubuntu 1604 uses python3.5
 
-import grp
 import json
 import logging
 import os
 import pathlib
 import platform
-import pwd
 import re
 import shutil
 import subprocess
@@ -18,18 +16,18 @@ import traceback
 from logging.handlers import WatchedFileHandler
 from typing import Dict, List, Optional, Tuple, Union
 
+try:
+    import grp
+except ImportError:
+    grp = None
+
+try:
+    import pwd
+except ImportError:
+    pwd = None
+
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
-
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setLevel(logging.DEBUG)
-file_handler = WatchedFileHandler(sys.argv[1], mode="w", encoding="utf8")
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
-stdout_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-root.addHandler(stdout_handler)
-root.addHandler(file_handler)
 
 DOCKER_SYSTEMCTL_REPO = "https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement"
 SYSTEMCTL_URL = (
@@ -40,10 +38,102 @@ JOURNALCTL_URL = (
 )
 
 TestArgs = Dict[str, Union[str, int, List[str]]]
+test_args = {}  # type: TestArgs
+
+SERVER_PACKAGE_RE = re.compile(r"^mongodb-(?:org|enterprise)(?:-unstable)?(?:-server)?$")
+CRYPT_V1_PACKAGE_RE = re.compile(r"^mongodb-enterprise(?:-unstable)?-crypt-v1$")
+_LOGGING_CONFIGURED = False
 
 
-def run_and_log(cmd: str, end_on_error: bool = True):
-    # type: (str, bool) -> 'subprocess.CompletedProcess[bytes]'
+def configure_logging(log_path: str) -> None:
+    global _LOGGING_CONFIGURED
+
+    if _LOGGING_CONFIGURED:
+        return
+
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(logging.DEBUG)
+    file_handler = WatchedFileHandler(log_path, mode="w", encoding="utf8")
+    file_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
+    stdout_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+    root.addHandler(stdout_handler)
+    root.addHandler(file_handler)
+    _LOGGING_CONFIGURED = True
+
+
+def is_server_package(package_name: str) -> bool:
+    return SERVER_PACKAGE_RE.match(package_name) is not None
+
+
+def is_crypt_v1_package(package_name: str) -> bool:
+    return CRYPT_V1_PACKAGE_RE.match(package_name) is not None
+
+
+def get_package_kind(package_names: List[str]) -> str:
+    if any(is_server_package(package_name) for package_name in package_names):
+        return "server"
+
+    if any(is_crypt_v1_package(package_name) for package_name in package_names):
+        return "crypt_v1"
+
+    raise RuntimeError("Unsupported package set: {}".format(", ".join(package_names)))
+
+
+def get_required_files(test_args: TestArgs) -> List[pathlib.Path]:
+    if test_args["package_kind"] == "server":
+        return [
+            pathlib.Path("/etc/mongod.conf"),
+            pathlib.Path("/usr/bin/mongod"),
+            pathlib.Path("/var/log/mongodb/mongod.log"),
+            pathlib.Path(test_args["systemd_units_dir"]) / "mongod.service",
+        ]
+
+    if test_args["package_kind"] == "crypt_v1":
+        return [
+            pathlib.Path("/usr/include/mongo_crypt/v1/mongo_crypt/mongo_crypt.h"),
+            pathlib.Path(test_args["lib_dir"]) / "mongo_crypt_v1.so",
+        ]
+
+    raise RuntimeError("Unknown package kind: {}".format(test_args["package_kind"]))
+
+
+def get_required_dirs(test_args: TestArgs) -> List[pathlib.Path]:
+    if test_args["package_kind"] != "server":
+        return []
+
+    required_dirs = [
+        pathlib.Path("/run/mongodb"),
+        pathlib.Path("/var/run/mongodb"),
+        pathlib.Path(test_args["mongo_work_dir"]),
+    ]  # type: List[pathlib.Path]
+
+    if test_args["package_manager"] in ("yum", "zypper"):
+        # Only RPM-based distros create the home directory. Debian/Ubuntu
+        # distros use a non-existent directory in /home
+        required_dirs.append(pathlib.Path(test_args["mongo_home_dir"]))
+
+    return required_dirs
+
+
+def get_leftover_files(test_args: TestArgs) -> List[pathlib.Path]:
+    if test_args["package_kind"] == "server":
+        return [
+            pathlib.Path("/usr/bin/mongod"),
+            pathlib.Path(test_args["systemd_units_dir"]) / "mongod.service",
+        ]
+
+    if test_args["package_kind"] == "crypt_v1":
+        return [
+            pathlib.Path("/usr/include/mongo_crypt/v1/mongo_crypt/mongo_crypt.h"),
+            pathlib.Path(test_args["lib_dir"]) / "mongo_crypt_v1.so",
+        ]
+
+    raise RuntimeError("Unknown package kind: {}".format(test_args["package_kind"]))
+
+
+def run_and_log(cmd: str, end_on_error: bool = True) -> subprocess.CompletedProcess:
     proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     logging.debug(cmd)
     logging.debug(proc.stdout.decode("UTF-8").strip())
@@ -106,8 +196,9 @@ def run_zypper_test(packages: List[str]):
     run_and_log("zypper -n --no-gpg-checks install {}".format(" ".join(packages)))
 
 
-def run_mongo_query(shell, query, should_fail=False, tries=60, interval=1.0):
-    # type: (str, bool, int, float) -> Optional[subprocess.CompletedProcess[bytes]]
+def run_mongo_query(
+    shell: str, query: str, should_fail: bool = False, tries: int = 60, interval: float = 1.0
+) -> Optional[subprocess.CompletedProcess]:
     assert tries >= 1
 
     exec_result = None  # type: Union[subprocess.CompletedProcess[bytes], None]
@@ -234,11 +325,13 @@ def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
         test_args["mongo_home_dir"] = "/var/lib/mongo"
         test_args["mongo_work_dir"] = "/var/lib/mongo"
         test_args["mongo_user_shell"] = "/bin/false"
+        test_args["lib_dir"] = run_and_log("rpm --eval '%{_libdir}'").stdout.decode("utf-8").strip()
     else:
         test_args["mongo_username"] = "mongodb"
         test_args["mongo_groupname"] = "mongodb"
         test_args["mongo_home_dir"] = "/home/mongodb"
         test_args["mongo_work_dir"] = "/var/lib/mongodb"
+        test_args["lib_dir"] = "/usr/lib"
 
         if (os_name == "debian" and os_version_major >= 10) or (
             os_name == "ubuntu" and os_version_major >= 18
@@ -268,6 +361,7 @@ def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
     for package in package_files:
         package_names.append(get_package_name(package))
     test_args["package_names"] = package_names
+    test_args["package_kind"] = get_package_kind(package_names)
 
     if pathlib.Path("/usr/bin/systemd").exists():
         test_args["systemd_path"] = "/usr/bin"
@@ -332,23 +426,8 @@ def test_start():
 def test_install_is_complete(test_args: TestArgs):
     logging.info("Checking that the installation is complete.")
 
-    required_files = [
-        pathlib.Path("/etc/mongod.conf"),
-        pathlib.Path("/usr/bin/mongod"),
-        pathlib.Path("/var/log/mongodb/mongod.log"),
-        pathlib.Path(test_args["systemd_units_dir"]) / "mongod.service",
-    ]  # type: List[pathlib.Path]
-
-    required_dirs = [
-        pathlib.Path("/run/mongodb"),
-        pathlib.Path("/var/run/mongodb"),
-        pathlib.Path(test_args["mongo_work_dir"]),
-    ]  # type: List[pathlib.Path]
-
-    if test_args["package_manager"] in ("yum", "zypper"):
-        # Only RPM-based distros create the home directory. Debian/Ubuntu
-        # distros use a non-existent directory in /home
-        required_dirs.append(pathlib.Path(test_args["mongo_home_dir"]))
+    required_files = get_required_files(test_args)
+    required_dirs = get_required_dirs(test_args)
 
     for path in required_files:
         if not (path.exists() and path.is_file()):
@@ -358,23 +437,31 @@ def test_install_is_complete(test_args: TestArgs):
         if not (path.exists() and path.is_dir()):
             raise RuntimeError("Required directory missing: {}".format(path))
 
+    if test_args["package_kind"] != "server":
+        return
+
+    grp_module = grp
+    pwd_module = pwd
+    if pwd_module is None or grp_module is None:
+        raise RuntimeError("POSIX account lookup modules are unavailable on this platform")
+
     try:
-        user_info = pwd.getpwnam(test_args["mongo_username"])
+        user_info = pwd_module.getpwnam(test_args["mongo_username"])
     except KeyError:
         raise RuntimeError("Required user missing: {}".format(test_args["mongo_username"]))
 
     try:
-        grp.getgrnam(test_args["mongo_groupname"])
+        grp_module.getgrnam(test_args["mongo_groupname"])
     except KeyError:
         raise RuntimeError("Required group missing: {}".format(test_args["mongo_username"]))
 
     # All of the supplemental groups (the .deb pattern)
     mongo_user_groups = [
-        g.gr_name for g in grp.getgrall() if test_args["mongo_username"] in g.gr_mem
+        g.gr_name for g in grp_module.getgrall() if test_args["mongo_username"] in g.gr_mem
     ]
 
     # The user's primary group (the .rpm pattern)
-    mongo_user_groups.append(grp.getgrgid(user_info.pw_gid).gr_name)
+    mongo_user_groups.append(grp_module.getgrgid(user_info.pw_gid).gr_name)
 
     if test_args["mongo_groupname"] not in mongo_user_groups:
         raise RuntimeError(
@@ -490,54 +577,68 @@ def test_uninstall(test_args: TestArgs):
 def test_uninstall_is_complete(test_args: TestArgs):
     logging.info("Checking that the uninstallation is complete.")
 
-    leftover_files = [
-        pathlib.Path("/usr/bin/mongod"),
-        pathlib.Path(test_args["systemd_units_dir"]) / "mongod.service",
-    ]  # type: List[pathlib.Path]
+    leftover_files = get_leftover_files(test_args)
 
     for path in leftover_files:
         if path.exists():
             raise RuntimeError("Failed to uninstall cleanly, found: {}".format(path))
 
 
-package_urls = sys.argv[2:]
+def main() -> int:
+    global test_args
 
-if len(package_urls) == 0:
-    logging.error("No packages to test... Failing test")
-    sys.exit(1)
+    if len(sys.argv) < 3:
+        print("Usage: {} <log-path> <package-url> [package-url ...]".format(sys.argv[0]))
+        return 1
 
-package_files = download_extract_all_packages(package_urls)
+    configure_logging(sys.argv[1])
+    package_urls = sys.argv[2:]
 
-package_manager = ""  # type: str
-apt_proc = run_and_log("apt --help", end_on_error=False)
-yum_proc = run_and_log("yum --help", end_on_error=False)
-zypper_proc = run_and_log("zypper -n --help", end_on_error=False)
-# zypper
-if apt_proc.returncode == 0:
-    run_apt_test(packages=package_files)
-    package_manager = "apt"
-elif yum_proc.returncode == 0:
-    run_yum_test(packages=package_files)
-    package_manager = "yum"
-elif zypper_proc.returncode == 0:
-    run_zypper_test(packages=package_files)
-    package_manager = "zypper"
-else:
-    logging.error("Found no supported package manager...Failing Test\n")
-    sys.exit(1)
+    if len(package_urls) == 0:
+        logging.error("No packages to test... Failing test")
+        return 1
 
-test_args = get_test_args(package_manager, package_files)
-logging.info("Test Args:\n%s", json.dumps(test_args, sort_keys=True, indent=4))
-setup(test_args)
-install_fake_systemd(test_args)
+    package_files = download_extract_all_packages(package_urls)
 
-test_start()
-test_install_is_complete(test_args)
-test_ulimits_correct()
-test_restart()
-test_stop()
-test_install_compass(test_args)
-test_uninstall(test_args)
-test_uninstall_is_complete(test_args)
+    package_manager = ""  # type: str
+    apt_proc = run_and_log("apt --help", end_on_error=False)
+    yum_proc = run_and_log("yum --help", end_on_error=False)
+    zypper_proc = run_and_log("zypper -n --help", end_on_error=False)
+    # zypper
+    if apt_proc.returncode == 0:
+        run_apt_test(packages=package_files)
+        package_manager = "apt"
+    elif yum_proc.returncode == 0:
+        run_yum_test(packages=package_files)
+        package_manager = "yum"
+    elif zypper_proc.returncode == 0:
+        run_zypper_test(packages=package_files)
+        package_manager = "zypper"
+    else:
+        logging.error("Found no supported package manager...Failing Test\n")
+        return 1
 
-sys.exit(0)
+    test_args = get_test_args(package_manager, package_files)
+    logging.info("Test Args:\n%s", json.dumps(test_args, sort_keys=True, indent=4))
+    logging.info("Detected package kind: %s", test_args["package_kind"])
+
+    if test_args["package_kind"] == "server":
+        setup(test_args)
+        install_fake_systemd(test_args)
+        test_start()
+
+    test_install_is_complete(test_args)
+
+    if test_args["package_kind"] == "server":
+        test_ulimits_correct()
+        test_restart()
+        test_stop()
+        test_install_compass(test_args)
+
+    test_uninstall(test_args)
+    test_uninstall_is_complete(test_args)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
