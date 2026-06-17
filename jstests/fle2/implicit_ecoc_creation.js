@@ -102,7 +102,7 @@ client.runEncryptionOperation(() => {
     } catch (e) {
         if (
             e.code != ErrorCodes.OperationNotSupportedInTransaction ||
-            !e.message.includes("Cannot create new collections inside distributed transactions")
+            !e.message.match(/Cannot create new collections.*inside distributed transactions/)
         ) {
             throw e;
         }
