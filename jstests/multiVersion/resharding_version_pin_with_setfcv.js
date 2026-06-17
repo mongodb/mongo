@@ -124,6 +124,8 @@ function testReshardingWithFCV(st, sourceNs, startingFCVStr, targetFCVStr, resha
     reshardingThread.join();
 
     awaitSetFCV();
+
+    assert(sourceCollection.drop());
 }
 
 function selectRandom(array, maxCount) {
@@ -145,6 +147,7 @@ describe("resharding is pinned to version while FCV is in transitional state", f
         let setParam = {
             featureFlagAuthoritativeShardsCRUD: 1,
             featureFlagAuthoritativeShardsDDL: 1,
+            orphanCleanupDelaySecs: 0,
         };
         st = new ShardingTest({
             shards: 2,
