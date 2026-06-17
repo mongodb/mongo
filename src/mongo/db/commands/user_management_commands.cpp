@@ -33,6 +33,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <shared_mutex>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -580,17 +581,24 @@ class AuthzLockGuard {
     AuthzLockGuard& operator=(AuthzLockGuard&) = delete;
 
 public:
-    enum InvalidationMode { kInvalidate, kReadOnly };
+    enum UMCMode { kWrite, kReadOnly };
 
-    AuthzLockGuard(OperationContext* opCtx, InvalidationMode mode)
+    AuthzLockGuard(OperationContext* opCtx, UMCMode mode)
         : _opCtx(opCtx),
           _authzManager(AuthorizationManager::get(opCtx->getService())),
-          _lock(_UMCMutexDecoration(opCtx->getServiceContext())),
           _mode(mode),
-          _cacheGeneration(_authzManager->getCacheGeneration()) {}
+          _cacheGeneration(_authzManager->getCacheGeneration()),
+          _readLock(_UMCMutexDecoration(_opCtx->getServiceContext()), std::defer_lock),
+          _writeLock(_UMCMutexDecoration(_opCtx->getServiceContext()), std::defer_lock) {
+        if (_mode == kReadOnly) {
+            _readLock.lock();
+        } else if (_mode == kWrite) {
+            _writeLock.lock();
+        }
+    }
 
     ~AuthzLockGuard() {
-        if (!_lock.owns_lock() || _mode == kReadOnly) {
+        if (_mode == kReadOnly || !_writeLock.owns_lock()) {
             return;
         }
 
@@ -604,17 +612,21 @@ public:
     AuthzLockGuard& operator=(AuthzLockGuard&&) = default;
 
 private:
-    static Decorable<ServiceContext>::Decoration<Mutex> _UMCMutexDecoration;
+    static Decorable<ServiceContext>::Decoration<std::shared_mutex> _UMCMutexDecoration;  // NOLINT
 
     OperationContext* _opCtx;
     AuthorizationManager* _authzManager;
-    stdx::unique_lock<Latch> _lock;
-    InvalidationMode _mode;
+
+    UMCMode _mode;
     OID _cacheGeneration;
+
+    std::shared_lock<std::shared_mutex> _readLock;    // NOLINT
+    stdx::unique_lock<std::shared_mutex> _writeLock;  // NOLINT
 };
 
-Decorable<ServiceContext>::Decoration<Mutex> AuthzLockGuard::_UMCMutexDecoration =
-    ServiceContext::declareDecoration<Mutex>();
+Decorable<ServiceContext>::Decoration<std::shared_mutex>  // NOLINT
+    AuthzLockGuard::_UMCMutexDecoration =
+        ServiceContext::declareDecoration<std::shared_mutex>();  // NOLINT
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
@@ -627,7 +639,7 @@ StatusWith<AuthzLockGuard> requireWritableAuthSchema28SCRAM(OperationContext* op
     // We take a MODE_X lock during writes because we want to be sure that we can read any
     // pinned user documents back out of the database after writing them during the user
     // management commands, and to ensure only one user management command is running at a time.
-    AuthzLockGuard lk(opCtx, AuthzLockGuard::kInvalidate);
+    AuthzLockGuard lk(opCtx, AuthzLockGuard::kWrite);
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
         return status;
