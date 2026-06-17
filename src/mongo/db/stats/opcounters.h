@@ -31,34 +31,43 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/util/aligned.h"
 #include "mongo/util/modules.h"
-
-#include <memory>
 
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
 /**
- * Abstraction over a single operation counter. Provides a simple add/value interface that hides
- * whether the counter is backed by an OTel instrument or a plain atomic.
+ * A single operation counter. Always maintains a local atomic for value() reads; optionally also
+ * reports increments to an OTel instrument for export.
  */
 class OpCounter {
 public:
-    virtual ~OpCounter() = default;
-    virtual void add(int64_t value) = 0;
-    virtual int64_t value() const = 0;
+    OpCounter() = default;
+    explicit OpCounter(otel::metrics::MetricName name);
+
+    OpCounter(const OpCounter&) = delete;
+    OpCounter& operator=(const OpCounter&) = delete;
+    OpCounter(OpCounter&&) = delete;
+    OpCounter& operator=(OpCounter&&) = delete;
+
+    void add(int64_t v) {
+        _value.fetchAndAddRelaxed(v);
+        if (_otelCounter)
+            _otelCounter->add(v);
+    }
+
+    int64_t value() const {
+        return _value.loadRelaxed();
+    }
+
+private:
+    Atomic<int64_t> _value{0};
+    otel::metrics::Counter<int64_t>* const _otelCounter = nullptr;
 };
-
-/**
- * Creates a local (non-OTel-exported) OpCounter backed by an atomic int64.
- */
-std::unique_ptr<OpCounter> makeLocalOpCounter();
-
-/**
- * Creates an OTel-exported OpCounter registered with MetricsService under the given metric name.
- */
-std::unique_ptr<OpCounter> makeOtelOpCounter(otel::metrics::MetricName metricName);
 
 /**
  * Tracks operation counters. Counter values are always owned by this struct; when metric names are
@@ -152,21 +161,21 @@ struct OpCounters {
         recordIdsReplicatedDocIdMismatches->add(1);
     }
 
-    std::unique_ptr<OpCounter> inserts;
-    std::unique_ptr<OpCounter> queries;
-    std::unique_ptr<OpCounter> updates;
-    std::unique_ptr<OpCounter> deletes;  // 'delete' is a keyword.
-    std::unique_ptr<OpCounter> getMores;
-    std::unique_ptr<OpCounter> commands;
-    std::unique_ptr<OpCounter> aggregates;
-    std::unique_ptr<OpCounter> nestedAggregates;
-    std::unique_ptr<OpCounter> insertsOnExistingDoc;
-    std::unique_ptr<OpCounter> updatesOnMissingDoc;
-    std::unique_ptr<OpCounter> deletesWasEmpty;
-    std::unique_ptr<OpCounter> deletesFromMissingNamespace;
-    std::unique_ptr<OpCounter> acceptableErrorsInCommand;
-    std::unique_ptr<OpCounter> recordIdsReplicatedDocIdMismatches;
-    std::unique_ptr<OpCounter> queriesDeprecated;
+    CacheExclusive<OpCounter> inserts;
+    CacheExclusive<OpCounter> queries;
+    CacheExclusive<OpCounter> updates;
+    CacheExclusive<OpCounter> deletes;  // 'delete' is a keyword.
+    CacheExclusive<OpCounter> getMores;
+    CacheExclusive<OpCounter> commands;
+    CacheExclusive<OpCounter> aggregates;
+    CacheExclusive<OpCounter> nestedAggregates;
+    CacheExclusive<OpCounter> insertsOnExistingDoc;
+    CacheExclusive<OpCounter> updatesOnMissingDoc;
+    CacheExclusive<OpCounter> deletesWasEmpty;
+    CacheExclusive<OpCounter> deletesFromMissingNamespace;
+    CacheExclusive<OpCounter> acceptableErrorsInCommand;
+    CacheExclusive<OpCounter> recordIdsReplicatedDocIdMismatches;
+    CacheExclusive<OpCounter> queriesDeprecated;
 };
 
 /**

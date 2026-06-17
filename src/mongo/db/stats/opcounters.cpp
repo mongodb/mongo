@@ -38,71 +38,11 @@
 
 namespace mongo {
 
-namespace {
+OpCounter::OpCounter(otel::metrics::MetricName name)
+    : _otelCounter(&otel::metrics::MetricsService::instance().createInt64Counter(
+          name, "Number of operations", otel::metrics::MetricUnit::kOperations)) {}
 
-/**
- * OpCounter backed by a plain atomic — values are tracked locally but not exported via OTel.
- */
-class LocalOpCounter final : public OpCounter {
-public:
-    void add(int64_t value) override {
-        _counter.fetchAndAdd(value);
-    }
-    int64_t value() const override {
-        return _counter.loadRelaxed();
-    }
-
-private:
-    Atomic<int64_t> _counter{0};
-};
-
-/**
- * OpCounter backed by an OTel counter registered with MetricsService.
- */
-class OtelOpCounter final : public OpCounter {
-public:
-    explicit OtelOpCounter(otel::metrics::MetricName metricName)
-        : _counter(otel::metrics::MetricsService::instance().createInt64Counter(
-              metricName, "Number of operations", otel::metrics::MetricUnit::kOperations)) {}
-
-    void add(int64_t value) override {
-        _counter.add(value);
-    }
-
-    int64_t value() const override {
-        return _counter.valueForLegacyUse();
-    }
-
-private:
-    otel::metrics::Counter<int64_t>& _counter;
-};
-
-}  // namespace
-
-std::unique_ptr<OpCounter> makeLocalOpCounter() {
-    return std::make_unique<LocalOpCounter>();
-}
-
-std::unique_ptr<OpCounter> makeOtelOpCounter(otel::metrics::MetricName metricName) {
-    return std::make_unique<OtelOpCounter>(metricName);
-}
-
-OpCounters::OpCounters()
-    : inserts(makeLocalOpCounter()),
-      queries(makeLocalOpCounter()),
-      updates(makeLocalOpCounter()),
-      deletes(makeLocalOpCounter()),
-      getMores(makeLocalOpCounter()),
-      commands(makeLocalOpCounter()),
-      aggregates(makeLocalOpCounter()),
-      nestedAggregates(makeLocalOpCounter()),
-      insertsOnExistingDoc(makeLocalOpCounter()),
-      updatesOnMissingDoc(makeLocalOpCounter()),
-      deletesWasEmpty(makeLocalOpCounter()),
-      deletesFromMissingNamespace(makeLocalOpCounter()),
-      acceptableErrorsInCommand(makeLocalOpCounter()),
-      recordIdsReplicatedDocIdMismatches(makeLocalOpCounter()),
-      queriesDeprecated(makeLocalOpCounter()) {}
+OpCounters::OpCounters() = default;
 
 OpCounters::OpCounters(otel::metrics::MetricName insertName,
                        otel::metrics::MetricName queryName,
@@ -111,21 +51,13 @@ OpCounters::OpCounters(otel::metrics::MetricName insertName,
                        otel::metrics::MetricName getMoreName,
                        otel::metrics::MetricName commandName,
                        otel::metrics::MetricName aggregateName)
-    : inserts(makeOtelOpCounter(insertName)),
-      queries(makeOtelOpCounter(queryName)),
-      updates(makeOtelOpCounter(updateName)),
-      deletes(makeOtelOpCounter(deleteOpName)),
-      getMores(makeOtelOpCounter(getMoreName)),
-      commands(makeOtelOpCounter(commandName)),
-      aggregates(makeOtelOpCounter(aggregateName)),
-      nestedAggregates(makeLocalOpCounter()),
-      insertsOnExistingDoc(makeLocalOpCounter()),
-      updatesOnMissingDoc(makeLocalOpCounter()),
-      deletesWasEmpty(makeLocalOpCounter()),
-      deletesFromMissingNamespace(makeLocalOpCounter()),
-      acceptableErrorsInCommand(makeLocalOpCounter()),
-      recordIdsReplicatedDocIdMismatches(makeLocalOpCounter()),
-      queriesDeprecated(makeLocalOpCounter()) {}
+    : inserts(insertName),
+      queries(queryName),
+      updates(updateName),
+      deletes(deleteOpName),
+      getMores(getMoreName),
+      commands(commandName),
+      aggregates(aggregateName) {}
 
 BSONObj OpCounters::getObj() const {
     BSONObjBuilder b;
