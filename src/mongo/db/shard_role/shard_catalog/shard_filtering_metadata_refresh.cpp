@@ -149,15 +149,25 @@ bool waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> re
  * Returns 'true' if there were concurrent metadata refreshes that had to be waited (in which case
  * the sharding runtime mutex is released). If there were none, returns 'false' and the sharding
  * runtime mutex continues to be held.
+ *
+ * If a second sharding runtime is passed, its mutex is also released before waiting for the
+ * critical section.
  */
-template <typename ScopedShardingRuntime>
-bool waitForCriticalSectionIfNeeded(OperationContext* opCtx,
-                                    boost::optional<ScopedShardingRuntime>* scopedShardingRuntime) {
+template <typename ScopedShardingRuntime,
+          typename AdditionalScopedShardingRuntime = ScopedShardingRuntime>
+bool waitForCriticalSectionIfNeeded(
+    OperationContext* opCtx,
+    boost::optional<ScopedShardingRuntime>* scopedShardingRuntime,
+    boost::optional<AdditionalScopedShardingRuntime>* additionalSsr = nullptr) {
     invariant(scopedShardingRuntime->has_value());
+    invariant(!additionalSsr || additionalSsr->has_value());
 
     if (auto critSect = (**scopedShardingRuntime)
                             ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
         scopedShardingRuntime->reset();
+        if (additionalSsr) {
+            additionalSsr->reset();
+        }
 
         hangBeforePlacementVersionCriticalSectionWait.pauseWhileSet(opCtx);
         uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSect));
@@ -1157,7 +1167,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                 auto scopedDsr =
                     boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
 
-                if (waitForCriticalSectionIfNeeded(opCtx, &scopedDsr)) {
+                if (waitForCriticalSectionIfNeeded(opCtx, &scopedDsr, &scopedCsr)) {
                     resetConsecutiveNoProgressAttempts("ongoing database critical section"_sd);
                     continue;
                 }
