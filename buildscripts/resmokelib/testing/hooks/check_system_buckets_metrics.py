@@ -7,7 +7,7 @@ import pymongo
 import buildscripts.util.testname as testname_utils
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
-from buildscripts.resmokelib.testing.fixtures.interface import build_client
+from buildscripts.resmokelib.testing.fixtures.interface import build_hook_client
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import _MongoSFixture
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
 from buildscripts.resmokelib.testing.hooks import interface
@@ -80,7 +80,9 @@ class CheckSystemBucketsMetrics(interface.Hook):
                 if self.shell_options and "authenticationMechanism" in self.shell_options
                 else None
             )
-            node_client = build_client(node, auth_options, pymongo.ReadPreference.PRIMARY_PREFERRED)
+            node_client = build_hook_client(
+                node, auth_options, pymongo.ReadPreference.PRIMARY_PREFERRED
+            )
             try:
                 serverStatus = node_client.admin.command("serverStatus")
                 return serverStatus["metrics"]["numCommandsTargetingSystemBuckets"]

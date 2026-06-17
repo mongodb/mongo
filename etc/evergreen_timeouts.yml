@@ -18,6 +18,12 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
+  enterprise-amazon-linux2023-arm64-all-feature-flags:
+    - task: multi_shard_multi_stmt_txn_jscore_passthrough_rate_limited
+      exec_timeout: 180 # 3 hours
+    - task: sharded_collections_jscore_passthrough_rate_limited
+      exec_timeout: 180 # 3 hours
+
   amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-replica-sets:
     - task: ^disagg_replica_sets_.*
       exec_timeout: 210 # 3.5 hours
@@ -206,6 +212,10 @@ overrides:
   enterprise-suse16-64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
+
+  linux-64-debug-required:
+    - task: sharded_collections_jscore_passthrough_rate_limited
+      exec_timeout: 180 # 3 hours
 
   suse15:
     - task: aggregation_blockprocessing_fuzzer

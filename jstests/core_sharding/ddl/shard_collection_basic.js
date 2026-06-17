@@ -157,11 +157,14 @@ assert.commandWorked(db.adminCommand({enableSharding: kDbName}));
     });
 
     // System collections can't be sharded
-    // If we are running in suites with authentication enabled we do expect a different error
-    const expectedErrorCode = TestData.auth ? ErrorCodes.Unauthorized : ErrorCodes.IllegalOperation;
+    // With auth on, a user without the required privileges will fail with Unauthorized, but a
+    // privileged user will still fail with IllegalOperation.
+    const expectedErrorCodes = TestData.auth
+        ? [ErrorCodes.Unauthorized, ErrorCodes.IllegalOperation]
+        : [ErrorCodes.IllegalOperation];
     assert.commandFailedWithCode(
         db.adminCommand({shardCollection: `${kDbName}.system.foo`, key: {_id: 1}}),
-        expectedErrorCode,
+        expectedErrorCodes,
     );
 
     // For collections in the local database the router will attempt to create the db and it will

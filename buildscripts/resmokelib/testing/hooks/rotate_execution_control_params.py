@@ -139,7 +139,7 @@ class RotateExecutionControlParams(interface.Hook):
         """
         Helper to print the current state of the execution control parameters.
         """
-        client = fixture_interface.build_client(node, self._auth_options)
+        client = fixture_interface.build_hook_client(node, self._auth_options)
         try:
             algorithm_result = client.admin.command(
                 "getParameter",
@@ -309,7 +309,7 @@ class _RotateExecutionControlParamsThread(threading.Thread):
                 params_to_set,
             )
             for node in repl_set.nodes:
-                client = fixture_interface.build_client(node, self._auth_options)
+                client = fixture_interface.build_hook_client(node, self._auth_options)
                 for param_name, param_value in params_to_set.items():
                     self._invoke_set_parameter(client, param_name, param_value)
 
@@ -319,6 +319,6 @@ class _RotateExecutionControlParamsThread(threading.Thread):
                 standalone.port,
                 params_to_set,
             )
-            client = fixture_interface.build_client(standalone, self._auth_options)
+            client = fixture_interface.build_hook_client(standalone, self._auth_options)
             for param_name, param_value in params_to_set.items():
                 self._invoke_set_parameter(client, param_name, param_value)

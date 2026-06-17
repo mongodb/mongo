@@ -331,7 +331,7 @@ class _StepdownThread(threading.Thread):
         self._is_stopped_evt.wait(timeout)
 
     def _create_client(self, node):
-        return fixture_interface.build_client(node, self._auth_options)
+        return fixture_interface.build_hook_client(node, self._auth_options)
 
     def _step_down_all(self):
         for rs_fixture in self._rs_fixtures:

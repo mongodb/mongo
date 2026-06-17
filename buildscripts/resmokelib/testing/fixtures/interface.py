@@ -13,6 +13,18 @@ import pymongo.errors
 
 from buildscripts.resmokelib.utils import registry
 
+# Appname used for administrative MongoDB client connections in resmoke.
+# Clients with this appname are exempted from ingress rate limiting, ensuring that fixture
+# setup/teardown is not affected by rate limiting fail points. This should not be used for user
+# operations.
+RESMOKE_ADMIN_APPNAME = "Resmoke-Admin"
+
+# Appname used for MongoDB client connections opened by resmoke hooks. Like RESMOKE_ADMIN_APPNAME,
+# clients with this appname are exempted from ingress rate limiting, but it is kept distinct from
+# the administrative appname so that hook traffic can be told apart from fixture setup/teardown for
+# diagnosability. This should not be used for user operations.
+RESMOKE_HOOK_APPNAME = "Resmoke-Hook"
+
 # TODO: (Ignore linting) if we ever fix the circular deps in resmoke we will be able to get rid of this
 if TYPE_CHECKING:
     from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
@@ -536,7 +548,7 @@ def create_fixture_table(fixture):
 
 
 def build_client(
-    node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY, **kwargs
+    node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY, appname=None, **kwargs
 ) -> pymongo.MongoClient:
     """Authenticate client for the 'authenticationDatabase' and return the client."""
     if auth_options is not None:
@@ -546,10 +558,38 @@ def build_client(
             authSource=auth_options["authenticationDatabase"],
             authMechanism=auth_options["authenticationMechanism"],
             read_preference=read_preference,
+            appname=appname,
             **kwargs,
         )
     else:
-        return node.mongo_client(read_preference=read_preference, **kwargs)
+        return node.mongo_client(read_preference=read_preference, appname=appname, **kwargs)
+
+
+def build_admin_client(
+    node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY, **kwargs
+) -> pymongo.MongoClient:
+    """Return a client tagged with the administrative appName.
+
+    Use for fixture setup/teardown, never for user operations (hooks should use build_hook_client).
+    The administrative appName marks this traffic as resmoke-internal so the server can distinguish
+    it from test traffic (for example, to exempt it from ingress rate limiting).
+    """
+    return build_client(
+        node, auth_options, read_preference, appname=RESMOKE_ADMIN_APPNAME, **kwargs
+    )
+
+
+def build_hook_client(
+    node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY, **kwargs
+) -> pymongo.MongoClient:
+    """Return a client tagged with the hook appName.
+
+    Use for connections opened by resmoke hooks. Like build_admin_client, the appName marks this
+    traffic as resmoke-internal so the server can distinguish it from test traffic (for example, to
+    exempt it from ingress rate limiting), but it is kept distinct from the administrative appName so
+    hook traffic can be told apart from fixture setup/teardown.
+    """
+    return build_client(node, auth_options, read_preference, appname=RESMOKE_HOOK_APPNAME, **kwargs)
 
 
 # Represents a row in a node info table.

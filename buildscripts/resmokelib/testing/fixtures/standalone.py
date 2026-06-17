@@ -325,7 +325,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
-                client = self.mongo_client(timeout_millis=500)
+                client = self.mongo_client(
+                    timeout_millis=500, appname=interface.RESMOKE_ADMIN_APPNAME
+                )
                 client.admin.command("ping")
                 break
             except pymongo.errors.OperationFailure as err:

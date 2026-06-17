@@ -2,8 +2,18 @@
 # The purpose is to verify that the rate limiter can be enabled without issue when proper
 # client retry behavior is in place. With automatic retries enabled, no rate limit errors
 # should bubble up to the test.
+#
+# Authentication is enabled so that the appName-based rate limiter exemptions are correctly
+# applied to internal replica set traffic. See overrides/rate_limiter_with_auth.yml.
 base_suite: replica_sets_jscore_passthrough_base
 overrides:
-  - "replica_set_rate_limiter.rate_limiter_mongod_params"
+  - "rate_limiter_with_auth.auth_shell_options"
+  - "rate_limiter_with_auth.auth_hooks_replica_set"
+  - "rate_limiter_with_auth.fixture_with_auth_replica_set"
 eval:
-  - "replica_set_rate_limiter.rate_limiter_shell_override"
+  - "rate_limiter_with_auth.auth_eval"
+  - "rate_limiter_with_auth.rate_limiter_shell_override"
+excludes:
+  - "rate_limiter_with_auth.auth_exclude_files_replica_set"
+  - "rate_limiter_with_auth.auth_exclude_files_fle2"
+  - "rate_limiter_with_auth.auth_exclude_tags"

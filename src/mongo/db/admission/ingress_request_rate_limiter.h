@@ -114,16 +114,6 @@ public:
      */
     void appendStats(BSONObjBuilder* bob) const;
 
-    /**
-     * Returns true if the client's application or driver name matches the
-     * ingressRequestRateLimiterApplicationExemptions list. This is only for testing, but the
-     * module linter does not like a _forTest function being called from outside of the module.
-     *
-     * TODO(SERVER-114130): Remove this function once failpoint routes through regular rate limiter
-     * pathway.
-     */
-    static bool isAppNameExempted(Client* client);
-
     /** Clears any pending deferred admission token stored on the client. */
     static void clearDeferredAdmissionToken(Client* client);
     /** Test-only helper to seed a pending DeferredToken on a client. */

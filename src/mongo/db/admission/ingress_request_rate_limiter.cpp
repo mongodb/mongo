@@ -54,6 +54,7 @@ const Status kIngressRequestRateLimitExceededError{
     ErrorCodes::IngressRequestRateLimitExceeded,
     "Request rejected: ingress request rate limit exceeded"};
 
+MONGO_FAIL_POINT_DEFINE(failIngressRequestRateLimiting);
 MONGO_FAIL_POINT_DEFINE(ingressRequestRateLimiterFractionalRateOverride);
 
 VersionedValue<CIDRList> ingressRequestRateLimiterIPExemptions;
@@ -72,10 +73,6 @@ const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
 class ClientAdmissionControlState {
 public:
     static bool isExempted(Client*);
-
-    // TODO(SERVER-114130): Remove this function once failpoint routes through regular rate limiter
-    // pathway.
-    static bool appNameIsExempted_forTest(Client* client);
 
 private:
     template <typename T>
@@ -129,10 +126,6 @@ const auto getAdmissionControlState = Client::declareDecoration<ClientAdmissionC
 
 bool ClientAdmissionControlState::isExempted(Client* client) {
     return getAdmissionControlState(client)._isExempted(client);
-}
-
-bool ClientAdmissionControlState::appNameIsExempted_forTest(Client* client) {
-    return getAdmissionControlState(client)._isApplicationExempt(client);
 }
 
 }  // namespace
@@ -206,6 +199,10 @@ bool IngressRequestRateLimiter::admitRequest(Client* client) {
         return true;
     }
 
+    if (MONGO_unlikely(failIngressRequestRateLimiting.shouldFail())) {
+        return false;
+    }
+
     auto tokenResult = _rateLimiter.acquireToken();
     if (MONGO_likely(tokenResult)) {
         if (!tokenResult->isReady()) {
@@ -255,15 +252,6 @@ void IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
 
 bool IngressRequestRateLimiter::hasDeferredAdmissionToken_forTest(Client* client) {
     return getDeferredAdmissionToken(client).has_value();
-}
-
-// This function is only for testing, but the _forTest name append makes the module linter
-// complain.
-//
-// TODO(SERVER-114130): Remove this function once failpoint routes through regular rate limiter
-// pathway.
-bool IngressRequestRateLimiter::isAppNameExempted(Client* client) {
-    return ClientAdmissionControlState::appNameIsExempted_forTest(client);
 }
 
 void IngressRequestRateLimiter::updateRateParameters(double refreshRatePerSec,

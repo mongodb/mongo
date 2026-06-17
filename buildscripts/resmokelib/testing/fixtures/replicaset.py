@@ -219,7 +219,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.nodes[0].await_ready()
             self._await_primary()  # Wait for writeable primary (this indicates replSet auto-intiiate finished).
 
-            client = interface.build_client(self.nodes[0], self.auth_options)
+            client = interface.build_admin_client(self.nodes[0], self.auth_options)
             res = client.admin.command("hello")
 
             self.logger.info(
@@ -305,7 +305,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             members.append(member_config)
 
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
-        client = interface.build_client(self.nodes[0], self.auth_options)
+        client = interface.build_admin_client(self.nodes[0], self.auth_options)
 
         if (
             client.local.system.replset.count_documents(filter={})
@@ -517,7 +517,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def await_last_op_committed(self, timeout_secs=None):
         """Wait for the last majority committed op to be visible."""
-        primary_client = interface.build_client(self.get_primary(), self.auth_options)
+        primary_client = interface.build_admin_client(self.get_primary(), self.auth_options)
 
         primary_optime = get_last_optime(primary_client, self.fixturelib)
         up_to_date_nodes = set()
@@ -559,7 +559,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
         primary = self.nodes[0]
-        client: pymongo.MongoClient = primary.mongo_client()
+        client: pymongo.MongoClient = primary.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
 
         if deadline is None:
             deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
@@ -587,7 +587,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             secondaries.append(self.initial_sync_node)
 
         for secondary in secondaries:
-            client = secondary.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
+            client = secondary.mongo_client(
+                read_preference=pymongo.ReadPreference.SECONDARY,
+                appname=interface.RESMOKE_ADMIN_APPNAME,
+            )
             while True:
                 if time.time() >= deadline:
                     raise self.fixturelib.ServerFailure(
@@ -626,7 +629,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
-        primary_client = interface.build_client(self.nodes[0], self.auth_options)
+        primary_client = interface.build_admin_client(self.nodes[0], self.auth_options)
 
         # All nodes must be in primary/secondary state prior to this point. Perform a majority
         # write to ensure there is a committed operation on the set. The commit point will
@@ -649,7 +652,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.logger.info(
                 "Waiting for node on port %d to have a stable recovery timestamp.", node.port
             )
-            client = interface.build_client(
+            client = interface.build_admin_client(
                 node, self.auth_options, read_preference=pymongo.ReadPreference.SECONDARY
             )
 
@@ -721,7 +724,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         self.logger.info("Waiting to remove all 'newlyAdded' fields")
         primary = self.get_primary()
-        client = interface.build_client(primary, self.auth_options)
+        client = interface.build_admin_client(primary, self.auth_options)
         while self._should_await_newly_added_removals_longer(client):
             if time.time() >= deadline:
                 raise self.fixturelib.ServerFailure(
@@ -742,7 +745,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         if self.default_write_concern is not None:
             cmd["defaultWriteConcern"] = self.default_write_concern
         primary = self.nodes[0]
-        primary.mongo_client().admin.command(cmd)
+        primary.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME).admin.command(cmd)
 
     # TODO: Remove this in SERVER-80010.
     def _await_auto_bootstrapped_config_shard(self):
@@ -755,7 +758,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             return deadline - time.time() <= 0.0
 
         while True:
-            client = interface.build_client(self.get_primary(), self.auth_options)
+            client = interface.build_admin_client(self.get_primary(), self.auth_options)
             config_shard_count = client.get_database("config").command(
                 {"count": "shards", "query": {"_id": "config"}}
             )
@@ -777,7 +780,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         )
 
     def _check_initial_sync_node_has_uninitialized_fcv(self, initial_sync_node):
-        sync_node_conn = initial_sync_node.mongo_client()
+        sync_node_conn = initial_sync_node.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
         self.logger.info("Checking that initial sync node has uninitialized fcv")
         try:
             fcv = sync_node_conn.admin.command(
@@ -796,7 +799,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             "configureFailPoint": "initialSyncHangAfterResettingFCV",
             "mode": "alwaysOn",
         }
-        sync_node_conn = initial_sync_node.mongo_client()
+        sync_node_conn = initial_sync_node.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
         self.logger.info("Pausing initial sync at failpoint")
         sync_node_conn.admin.command(failpointOnCmd)
         self._check_initial_sync_node_has_uninitialized_fcv(initial_sync_node)
@@ -807,7 +810,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             "mode": "off",
         }
         self.logger.info("Unpausing initial sync")
-        sync_node_conn = initial_sync_node.mongo_client()
+        sync_node_conn = initial_sync_node.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
         sync_node_conn.admin.command(failpoint_off_cmd)
 
     def _do_teardown(self, finished=False, mode=None):
@@ -912,7 +915,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
                 try:
                     if node.port not in clients:
-                        clients[node.port] = interface.build_client(node, self.auth_options)
+                        clients[node.port] = interface.build_admin_client(node, self.auth_options)
 
                     if fn(clients[node.port], node):
                         return node
@@ -943,7 +946,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             )
             self._await_read_concern_available_on_node(
                 interface.build_client(
-                    node, self.auth_options, read_preference=pymongo.ReadPreference.SECONDARY
+                    node,
+                    self.auth_options,
+                    read_preference=pymongo.ReadPreference.SECONDARY,
+                    appname=interface.RESMOKE_ADMIN_APPNAME,
                 )
             )
         self.logger.info("Read concern is available on all nodes")
@@ -1025,7 +1031,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
                 return self.nodes[chosen_index]
 
-        primary_client = interface.build_client(primary, auth_options)
+        primary_client = interface.build_admin_client(primary, auth_options)
         retry_time_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
         retry_start_time = time.time()
 
@@ -1073,7 +1079,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 node.port,
                 self.replset_name,
             )
-            client = interface.build_client(node, auth_options)
+            client = interface.build_admin_client(node, auth_options)
             client.admin.command("replSetStepUp")
             return True
         except pymongo.errors.OperationFailure:
@@ -1147,7 +1153,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
     def get_voting_members(self):
         """Return the number of voting nodes in the replica set."""
         primary = self.get_primary()
-        client = primary.mongo_client()
+        client = primary.mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
 
         members = client.admin.command({"replSetGetConfig": 1})["config"]["members"]
         voting_members = [member["host"] for member in members if member["votes"] == 1]
@@ -1301,7 +1307,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         Perform internode validation on this replica set using extended validate. Compares the 'all' and 'metadata' hashes of each collection.
         """
         self.logger.info("Waiting for all nodes to be caught up")
-        primary_client = interface.build_client(self.get_primary(), self.auth_options)
+        primary_client = interface.build_admin_client(self.get_primary(), self.auth_options)
 
         # Disable the TTL monitor to avoid inconsistent results from TTL deletes occurring between validate calls.
         previous_value = primary_client.admin.command({"getParameter": 1, "ttlMonitorEnabled": 1})
@@ -1335,7 +1341,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Exclude views.
         filter = {"type": {"$ne": "view"}}
         for node in self.nodes:
-            client = interface.build_client(node, self.auth_options)
+            client = interface.build_admin_client(node, self.auth_options)
             # Skip validating collections for arbiters.
             admin_db = client.get_database("admin")
             ret = admin_db.command("isMaster")

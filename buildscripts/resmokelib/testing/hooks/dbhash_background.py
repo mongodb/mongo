@@ -7,6 +7,7 @@ running.
 import os.path
 
 from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.hooks import jsfile
 from buildscripts.resmokelib.testing.hooks.background_job import (
     _BackgroundJob,
@@ -31,7 +32,7 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
 
     def before_suite(self, test_report):
         """Start the background thread."""
-        client = self.fixture.mongo_client()
+        client = interface.build_hook_client(self.fixture, self.fixture.auth_options)
         # mongos does not provide storageEngine information. And the hook
         # run_check_repl_dbhash_background.js will check whether the storage engine of the CSRS and
         # replica set shards supports snapshot reads.

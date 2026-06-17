@@ -1,5 +1,6 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {injectHookAppName} from "jstests/libs/hook_appname.js";
 import {
     featureFlagMandatesReplicatedTruncates,
     persistenceProviderRequiresReplicatedTruncates,
@@ -4058,7 +4059,7 @@ function _constructStartNewInstances(rst, opts) {
 }
 
 function _newMongo(host) {
-    return new Mongo(host, undefined, {gRPC: false});
+    return new Mongo(injectHookAppName(host), undefined, {gRPC: false});
 }
 
 /**

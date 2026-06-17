@@ -176,7 +176,7 @@ class _MaintenanceThread(threading.Thread):
                     chosen.port,
                     rs_fixture.replset_name,
                 )
-                client = fixture_interface.build_client(chosen, self._auth_options)
+                client = fixture_interface.build_hook_client(chosen, self._auth_options)
 
                 self.logger.info("Putting secondary into maintenance mode...")
                 self._toggle_maintenance_mode(client, enable=True)
@@ -238,7 +238,7 @@ class _MaintenanceThread(threading.Thread):
         for rs_fixture in self._rs_fixtures:
             secondaries = rs_fixture.get_secondaries()
             for secondary in secondaries:
-                client = fixture_interface.build_client(secondary, self._auth_options)
+                client = fixture_interface.build_hook_client(secondary, self._auth_options)
                 self._toggle_maintenance_mode(client, enable=False)
 
     def _toggle_maintenance_mode(self, client, enable):

@@ -1,0 +1,298 @@
+### Overrides for rate-limited suites with authentication ###
+###
+### These overrides add authentication to the rate-limiter passthrough suites,
+### for both sharded clusters (fixture_with_auth_sharded) and replica sets
+### (fixture_with_auth_replica_set).
+###
+### Authentication is required for the appName-based ingress rate limiter
+### exemptions to take effect. The limiter only applies to authenticated clients. The pre-auth
+### handshake ("hello"/auth) is always exempt, and the appName exemption list is
+### only consulted once a client has authenticated. With auth enabled, internal
+### traffic authenticates as __system and is matched against the exempt appNames
+### below, so it bypasses the limiter; without auth the handshake itself can be
+### throttled before its appName is known.
+###
+### IMPORTANT: Don't override 'eval' in shell_options - use the 'eval:' key
+### in the mapping file instead, which appends rather than replaces.
+###
+
+# Anchors for reuse - stored in a dummy entry that resmoke ignores
+- name: _anchors_do_not_use
+  value:
+    keyFile: &keyFile jstests/libs/authTestsKey
+    keyFileData: &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+    authOptions: &authOptions
+      authenticationDatabase: admin
+      authenticationMechanism: SCRAM-SHA-256
+      password: *keyFileData
+      username: __system
+
+    authTestData: &authTestData
+      auth: true
+      authMechanism: SCRAM-SHA-256
+      keyFile: *keyFile
+      keyFileData: *keyFileData
+      roleGraphInvalidationIsFatal: true
+
+    hookShellOpts: &hookShellOpts
+      <<: *authOptions
+      appName: Resmoke-Hook
+      eval: jsTest.authenticate(db.getMongo())
+      global_vars:
+        TestData:
+          <<: *authTestData
+          # Used by ReplSetTest to set appName on connections created by hooks
+          hookAppName: Resmoke-Hook
+
+    cleanEveryNHook: &cleanEveryNHook
+      class: CleanEveryN
+      n: 20
+      shell_options:
+        <<: *authOptions
+        appName: Resmoke-Hook
+
+    # Internal-client appNames that bypass the ingress rate limiter once authenticated.
+    # Sourced from https://github.com/10gen/mongotune/blob/main/crates/mongotune-dynamic-rate-limiting-ingress/src/config.rs#L77-L119
+    appNameExemptions: &appNameExemptions >
+      {"appNames":["MongoDB Internal Client",
+                  "NetworkInterfaceTL-ReplNetwork",
+                  "NetworkInterfaceTL-ReplCoordExternNetwork",
+                  "NetworkInterfaceTL-ReplNodeDbWorkerNetwork",
+                  "NetworkInterfaceTL-ReplicaSetMonitor-TaskExecutor",
+                  "NetworkInterfaceTL-HelloMe-TaskExecutor",
+                  "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
+                  "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
+                  "NetworkInterfaceTL-StandaloneNetwork",
+                  "NetworkInterfaceTL-ShardingDDLCoordinatorNetwork",
+                  "InitialSyncer",
+                  "Rollback",
+                  "Resmoke-Admin",
+                  "Resmoke-Hook"]}
+
+    rateLimiterParamsCommon: &rateLimiterParamsCommon
+      defaultClientMaxRetryAttempts: 16
+      defaultClientBaseBackoffMillis: 10
+      defaultClientMaxBackoffMillis: 1000
+      shardRetryTokenBucketCapacity: 1073741823
+
+    rateLimiterParamsMongodOnly: &rateLimiterParamsMongodOnly
+      failpoint.failIngressRequestRateLimiting:
+        mode:
+          activationProbability: 0.25
+      featureFlagIngressRateLimiting: true
+      # Defaults are to admit all requests.
+      ingressRequestRateLimiterEnabled: true
+      ingressRequestRateLimiterApplicationExemptions: *appNameExemptions
+    rateLimiterParamsMongod: &rateLimiterParamsMongod
+      <<: *rateLimiterParamsCommon
+      <<: *rateLimiterParamsMongodOnly
+
+    # Replica set rate-limiter params. Unlike the sharded suites, replica set
+    # members should never shed load from each other: defaultClientMaxRetryAttempts
+    # is 0 so that any internal RS communication that unexpectedly hits the rate
+    # limiter fails the test immediately (a canary). The failpoint short-circuits
+    # the limiter for non-exempt clients, so ingressRequestRateLimiterEnabled is
+    # not needed here; test traffic that gets rejected is retried at the shell
+    # layer via implicitly_retry_on_overload_errors.js.
+    rateLimiterParamsReplicaSet: &rateLimiterParamsReplicaSet
+      defaultClientMaxRetryAttempts: 0
+      failpoint.failIngressRequestRateLimiting:
+        mode:
+          activationProbability: 0.25
+      ingressRequestRateLimiterApplicationExemptions: *appNameExemptions
+
+- name: auth_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          <<: *authOptions
+          global_vars:
+            TestData:
+              <<: *authTestData
+
+- name: auth_eval
+  value:
+    eval: jsTest.authenticate(db.getMongo())
+
+- name: fixture_with_auth_sharded
+  value:
+    executor:
+      fixture:
+        num_mongos: 3
+        auth_options: *authOptions
+        mongos_options:
+          keyFile: *keyFile
+          set_parameters: *rateLimiterParamsCommon
+        mongod_options:
+          keyFile: *keyFile
+          set_parameters: *rateLimiterParamsMongod
+
+- name: fixture_with_auth_replica_set
+  value:
+    executor:
+      fixture:
+        auth_options: *authOptions
+        mongod_options:
+          keyFile: *keyFile
+          set_parameters: *rateLimiterParamsReplicaSet
+
+# SERVER-120171 Remove these hooks since we only need to re-define them to pass auth to the shell.
+- name: auth_hooks_sharded
+  value:
+    executor:
+      hooks:
+        - {class: CheckReplDBHash, shell_options: *hookShellOpts}
+        - {
+            class: CheckMetadataConsistencyInBackground,
+            shell_options: *hookShellOpts,
+          }
+        - {class: ValidateCollections, shell_options: *hookShellOpts}
+        - {class: CheckShardFilteringMetadata, shell_options: *hookShellOpts}
+        - {class: CheckOrphansDeleted, shell_options: *hookShellOpts}
+        - *cleanEveryNHook
+
+# SERVER-120171 Remove these hooks since we only need to re-define them to pass auth to the shell.
+- name: auth_hooks_multi_stmt_txn
+  value:
+    executor:
+      hooks:
+        - {class: CheckReplDBHashInBackground, shell_options: *hookShellOpts}
+        - {class: CheckReplDBHash, shell_options: *hookShellOpts}
+        - {
+            class: CheckMetadataConsistencyInBackground,
+            shell_options: *hookShellOpts,
+          }
+        - {class: ValidateCollections, shell_options: *hookShellOpts}
+        - {class: CheckShardFilteringMetadata, shell_options: *hookShellOpts}
+        - {class: CheckOrphansDeleted, shell_options: *hookShellOpts}
+        - *cleanEveryNHook
+
+# Re-define the replica set base suite's hooks so each hook's shell authenticates.
+# The hook list fully replaces the base suite's list, so it must stay in sync with
+# suites/replica_sets_jscore_passthrough_base.yml.
+- name: auth_hooks_replica_set
+  value:
+    executor:
+      hooks:
+        - class: RunQueryStats
+          skip_tags:
+            - inspects_command_opcounters
+            - known_query_shape_computation_problem
+          shell_options: *hookShellOpts
+        - {class: RunDBCheckInBackground, shell_options: *hookShellOpts}
+        - {class: CheckReplDBHashInBackground, shell_options: *hookShellOpts}
+        - {
+            class: ValidateCollectionsInBackground,
+            shell_options: *hookShellOpts,
+          }
+        - {class: CheckReplOplogs, shell_options: *hookShellOpts}
+        - {class: CheckReplDBHash, shell_options: *hookShellOpts}
+        - {class: ValidateCollections, shell_options: *hookShellOpts}
+        - *cleanEveryNHook
+
+# Retry rate-limited operations at the shell layer. Used by the replica set suite,
+# whose rate-limiter params keep internal-client retries at 0 (the canary).
+- name: rate_limiter_shell_override
+  value:
+    eval: >-
+      await import("jstests/libs/override_methods/implicitly_retry_on_overload_errors.js")
+
+# File exclusions for auth (core tests)
+- name: auth_exclude_files
+  value:
+    exclude_files:
+      # Auth-specific test files.
+      - jstests/core/**/*[aA]uth*.js
+      # In the context of auth on mongos, illegal namespaces trigger a different error code than they do
+      # on mongod. To keep the test simple, we avoid running it against a mongos when auth is enabled.
+      - jstests/core/**/illegal_cmd_namespace.js
+      # Logical sessions require that only one user be authenticated,
+      # but this suite puts us in a multi-auth state.
+      - jstests/core/**/list_all_sessions.js
+      - jstests/core/**/list_sessions.js
+      # These include operations the root user auth'd on the test database is not authorized to perform,
+      # e.g. reading system.views, dropping or creating system collections.
+      - jstests/core/**/list_collections_no_views.js
+      - jstests/core/**/query/disallow_system_views_user_writes.js
+      - jstests/core/**/rename_collection_system_db.js
+      - jstests/core/catalog/agg_internal_list_collections_stage.js
+      - jstests/core/catalog/views/invalid_system_views.js
+      - jstests/core/catalog/views/view_with_invalid_dbname.js
+      - jstests/core/catalog/views/views_creation.js
+      - jstests/core/catalog/views/views_drop.js
+      # TODO SERVER-120150: Re-enable all timeseries tests.
+      - jstests/core/timeseries/ddl/*.js
+      - jstests/core/timeseries/write/basic.js
+      - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
+      - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
+      - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
+      - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
+      - jstests/core/timeseries/query/timeseries_raw_data_queries.js
+      - jstests/core/timeseries/write/timeseries_raw_data_writes.js
+      - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+
+- name: auth_exclude_files_core_sharding
+  value:
+    exclude_files:
+      # These include operations the root user auth'd on the test database is not authorized to perform,
+      # e.g. reading system.views, dropping or creating system collections.
+      - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_cmd_validation.js
+      - jstests/core_sharding/resharding/*.js
+
+- name: auth_exclude_files_fle2
+  value:
+    exclude_files:
+      # This test creates unauthenticated connections.
+      - src/mongo/db/modules/*/jstests/fle2/query/update_upsert.js
+
+# File exclusions for auth on a replica set. This is the sharded auth_exclude_files
+# list minus the mongos-only entries (e.g. illegal_cmd_namespace.js), which behave
+# the same as on a standalone mongod when run against a replica set.
+- name: auth_exclude_files_replica_set
+  value:
+    exclude_files:
+      # Auth-specific test files.
+      - jstests/core/**/*[aA]uth*.js
+      # Logical sessions require that only one user be authenticated,
+      # but this suite puts us in a multi-auth state.
+      - jstests/core/**/list_all_sessions.js
+      - jstests/core/**/list_sessions.js
+      # These include operations the auth'd user is not authorized to perform, or
+      # whose behavior differs for an authenticated (internal) user, e.g. reading
+      # system.views, dropping or creating system collections.
+      - jstests/core/**/list_collections_no_views.js
+      - jstests/core/**/query/disallow_system_views_user_writes.js
+      - jstests/core/**/rename_collection_system_db.js
+      - jstests/core/catalog/agg_internal_list_collections_stage.js
+      - jstests/core/catalog/views/invalid_system_views.js
+      - jstests/core/catalog/views/view_with_invalid_dbname.js
+      - jstests/core/catalog/views/views_creation.js
+      - jstests/core/catalog/views/views_drop.js
+      # TODO SERVER-120150: Re-enable all timeseries tests.
+      - jstests/core/timeseries/ddl/*.js
+      - jstests/core/timeseries/write/basic.js
+      - jstests/core/timeseries/query/timeseries_buckets_query_explain.js
+      - jstests/core/timeseries/write/timeseries_buckets_write_explain.js
+      - jstests/core/timeseries/query/timeseries_raw_data_getmore.js
+      - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
+      - jstests/core/timeseries/query/timeseries_raw_data_queries.js
+      - jstests/core/timeseries/write/timeseries_raw_data_writes.js
+      - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+
+- name: auth_exclude_tags
+  value:
+    exclude_with_any_tags:
+      # Test requires permissions that the __system user does not have.
+      - assumes_superuser_permissions
+      # Needs a specific role that is not granted to a regular user in auth suites.
+      - needs_query_settings_user_role
+      # Test creates and authenticates users, which conflicts with the suite's auth setup.
+      - creates_and_authenticates_user
+      # MapReduce with internal merge pipelines requires special permissions.
+      - uses_map_reduce_internal_merge_pipeline
+      # Parallel shell spawns unauthenticated connections.
+      - uses_parallel_shell
+      # TODO SERVER-128736: Crash when getMore retry runs after original opCtx is destroyed.
+      - requires_getmore

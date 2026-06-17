@@ -102,7 +102,7 @@ class MultiReplicaSetFixture(interface.MultiClusterFixture):
                 {"_id": i, "connectionString": replica_set.get_driver_connection_url()}
                 for (i, replica_set) in enumerate(self.replica_sets)
             ]
-            primary_client = interface.build_client(
+            primary_client = interface.build_admin_client(
                 self.replica_sets[0].get_primary(), self.auth_options
             )
             primary_coll = primary_client[self.CONNECTION_STRING_DB_NAME][

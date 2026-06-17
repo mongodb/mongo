@@ -189,7 +189,6 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeAfterSessionCheckOut);
-MONGO_FAIL_POINT_DEFINE(failIngressRequestRateLimiting);
 MONGO_FAIL_POINT_DEFINE(hangBeforeComputeOperationTimeForMajorityRead);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
@@ -1873,63 +1872,10 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    // TODO(SERVER-114130): Move those condition inside the gIngressAdmissionControlEnabled scope.
     const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
     const auto isExemptFromAdmissionControl = isProcessInternalCommand ||
         !_invocation->isSubjectToIngressAdmissionControl() ||
         IngressAdmissionContext::get(opCtx).isHoldingTicket();
-
-    failIngressRequestRateLimiting.executeIf(
-        [&](const BSONObj& data) {
-            // TODO(SERVER-114130): Remove error label override when moving to the ingress
-            // request rate limiter.
-            BSONArrayBuilder arrayBuilder;
-            arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
-            arrayBuilder.append(ErrorLabel::kRetryableError);
-            arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
-            auto& errorLabels = errorLabelsOverride(opCtx);
-            invariant(!errorLabels);
-            errorLabels.emplace(arrayBuilder.arr());
-
-            // We simulate a request being rejected by the rate limiter.
-            uasserted(ErrorCodes::IngressRequestRateLimitExceeded,
-                      "Rejection from the 'failIngressRequestRateLimiting' fail point");
-        },
-        [&](const BSONObj& data) {
-            // Because we don't have a priority port yet, we must only simulate the rate limiter
-            // on non critical operations.
-            // TODO(SERVER-114130): Move this fail point to the ingress request rate limiter and
-            // remove this condition.
-            if (isExemptFromAdmissionControl) {
-                return false;
-            }
-
-            // Because we don't have a priority port yet, we must only simulate the rate limiter
-            // on requests directly coming from mongod and mongos. As the priority port is
-            // implemented, background checks and heatbeat won't interfere with rate-limiting
-            // behavior.
-            // TODO(SERVER-114130): Move this fail point to the ingress request rate limiter and
-            // remove this condition.
-            auto clientMetadata = ClientMetadata::get(opCtx->getClient());
-            if (clientMetadata) {
-                auto document = clientMetadata->getDocument();
-                auto clientName = clientMetadata->getApplicationName();
-                auto isFromMongoExecutable =
-                    clientName.ends_with("mongos") || clientName.ends_with("mongod");
-
-                if (!isFromMongoExecutable) {
-                    return false;
-                }
-            }
-
-            // Respect the ingressRequestRateLimiterApplicationExemptions list so that internal
-            // clients are exempt from the failpoint.
-            if (admission::IngressRequestRateLimiter::isAppNameExempted(opCtx->getClient())) {
-                return false;
-            }
-
-            return true;
-        });
 
     if (gFeatureFlagIngressRateLimiting.isEnabled()) {
         const bool exemptFromIngressRateLimit =

@@ -61,6 +61,7 @@ class CleanEveryN(interface.Hook):
                         password=self.shell_options["password"],
                         authSource=self.shell_options["authenticationDatabase"],
                         authMechanism=self.shell_options["authenticationMechanism"],
+                        appname=self.shell_options.get("appName"),
                     )
                 else:
                     client = pymongo.MongoClient(cluster.get_driver_connection_url())

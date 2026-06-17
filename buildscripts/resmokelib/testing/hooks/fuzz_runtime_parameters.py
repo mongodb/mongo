@@ -31,10 +31,10 @@ def validate_runtime_parameter_spec(spec):
 
 
 def build_client(node, auth_options):
-    """Build a pymongo MongoClient for the given node with the given auth options."""
+    """Build a pymongo admin MongoClient for the given node with the given auth options."""
     if config.IS_ASAN:
-        return fixture_interface.build_client(node, auth_options, timeout_millis=120000)
-    return fixture_interface.build_client(node, auth_options)
+        return fixture_interface.build_hook_client(node, auth_options, timeout_millis=120000)
+    return fixture_interface.build_hook_client(node, auth_options)
 
 
 class RuntimeParametersState:

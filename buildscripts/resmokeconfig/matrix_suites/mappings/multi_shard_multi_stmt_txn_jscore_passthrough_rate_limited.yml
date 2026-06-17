@@ -5,11 +5,11 @@
 # up to the driver, even with a balancer present.
 base_suite: multi_shard_multi_stmt_txn_jscore_passthrough
 overrides:
-  - "sharded_rate_limiter_with_auth.auth_shell_options"
-  - "sharded_rate_limiter_with_auth.auth_hooks_multi_stmt_txn"
-  - "sharded_rate_limiter_with_auth.fixture_with_auth"
+  - "rate_limiter_with_auth.auth_shell_options"
+  - "rate_limiter_with_auth.auth_hooks_multi_stmt_txn"
+  - "rate_limiter_with_auth.fixture_with_auth_sharded"
 eval:
-  - "sharded_rate_limiter_with_auth.auth_eval"
+  - "rate_limiter_with_auth.auth_eval"
 excludes:
-  - "sharded_rate_limiter_with_auth.auth_exclude_files"
-  - "sharded_rate_limiter_with_auth.auth_exclude_tags"
+  - "rate_limiter_with_auth.auth_exclude_files"
+  - "rate_limiter_with_auth.auth_exclude_tags"

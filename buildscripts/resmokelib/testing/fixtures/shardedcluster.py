@@ -309,7 +309,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def refresh_logical_session_cache(self, target):
         """Refresh logical session cache with no timeout."""
-        primary = target.get_primary().mongo_client()
+        primary = target.get_primary().mongo_client(appname=interface.RESMOKE_ADMIN_APPNAME)
         try:
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
         except pymongo.errors.OperationFailure as err:
@@ -323,7 +323,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def get_shard_ids(self):
         """Get the list of shard ids in the cluster."""
-        client = interface.build_client(self, self.auth_options)
+        client = interface.build_admin_client(self, self.auth_options)
         res = client.admin.command("listShards")
         return [shard_info["_id"] for shard_info in res["shards"]]
 
@@ -347,7 +347,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             for task in as_completed(tasks):
                 task.result()
 
-        client = interface.build_client(self, self.auth_options)
+        client = interface.build_admin_client(self, self.auth_options)
 
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
@@ -375,7 +375,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
-            primary_mongo_client = self.configsvr.get_primary().mongo_client()
+            primary_mongo_client = self.configsvr.get_primary().mongo_client(
+                appname=interface.RESMOKE_ADMIN_APPNAME
+            )
             refresh_logical_session_cache_with_retry(primary_mongo_client, self.configsvr)
 
         for shard in self.shards:
@@ -385,14 +387,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.run_set_cluster_parameter()
 
         if self.inject_catalog_metadata:
-            csrs_client = interface.build_client(self.configsvr, self.auth_options)
+            csrs_client = interface.build_admin_client(self.configsvr, self.auth_options)
             inject_catalog_metadata_on_the_csrs(csrs_client, self.inject_catalog_metadata)
 
         self.is_ready = True
 
     def run_set_cluster_parameter(self):
         """Set a cluster parameter for the fixture."""
-        client = interface.build_client(self, self.auth_options)
+        client = interface.build_admin_client(self, self.auth_options)
         command_request = {
             "setClusterParameter": {
                 self.set_cluster_parameter["parameter"]: self.set_cluster_parameter["value"]
@@ -404,7 +406,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # needed because mongos only refresh their cache of cluster parameters periodically.
         # Running getClusterParameter on a router causes it to refresh its cache.
         for mongos in self.mongos:
-            mongos_client = interface.build_client(mongos, self.auth_options)
+            mongos_client = interface.build_admin_client(mongos, self.auth_options)
             mongos_client.admin.command(
                 {"getClusterParameter": self.set_cluster_parameter["parameter"]}
             )
@@ -420,7 +422,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # variants).
         for attempt in range(1, self._STOP_BALANCER_MAX_ATTEMPTS + 1):
             try:
-                client = interface.build_client(self, self.auth_options, timeout_millis=timeout_ms)
+                client = interface.build_admin_client(
+                    self, self.auth_options, timeout_millis=timeout_ms
+                )
                 client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
                 break
             except (pymongo.errors.OperationFailure, pymongo.errors.ConnectionFailure) as err:
@@ -441,7 +445,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         if join_migrations:
             for shard in self.shards:
-                shard_client = interface.build_client(
+                shard_client = interface.build_admin_client(
                     shard.get_primary(), self.auth_options, timeout_millis=timeout_ms
                 )
                 shard_client.admin.command({"_shardsvrJoinMigrations": 1})
@@ -449,13 +453,13 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def start_balancer(self, timeout_ms=300000):
         """Start the balancer."""
-        client = interface.build_client(self, self.auth_options, timeout_millis=timeout_ms)
+        client = interface.build_admin_client(self, self.auth_options, timeout_millis=timeout_ms)
         client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Started the balancer")
 
     def feature_flag_present_and_enabled(self, feature_flag_name):
         full_ff_name = f"featureFlag{feature_flag_name}"
-        csrs_client = interface.build_client(self.configsvr, self.auth_options)
+        csrs_client = interface.build_admin_client(self.configsvr, self.auth_options)
         try:
             res = csrs_client.admin.command({"getParameter": 1, full_ff_name: 1})
             return bool(res[full_ff_name]["value"])
@@ -905,7 +909,9 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
 
     def setup(self):
         """Execute some setup before offically starting testing against this external cluster."""
-        client = pymongo.MongoClient(self.get_driver_connection_url())
+        client = pymongo.MongoClient(
+            self.get_driver_connection_url(), appname=interface.RESMOKE_ADMIN_APPNAME
+        )
         for i in range(50):
             if i == 49:
                 raise RuntimeError("Sharded Cluster setup has timed out.")
@@ -1087,7 +1093,9 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
 
             try:
                 # Use a shorter connection timeout to more closely satisfy the requested deadline.
-                client = self.mongo_client(timeout_millis=500)
+                client = self.mongo_client(
+                    timeout_millis=500, appname=interface.RESMOKE_ADMIN_APPNAME
+                )
                 client.admin.command("ping")
                 break
             except pymongo.errors.ConnectionFailure:
