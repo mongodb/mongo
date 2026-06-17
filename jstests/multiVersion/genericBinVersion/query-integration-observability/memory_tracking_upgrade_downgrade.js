@@ -1,8 +1,6 @@
 /**
  * Verifies that memory tracking behaves correctly in FCV upgrade/downgrade scenarios.  We do not
  * test the profiler output here because the profiler can only be run on a standalone.
- *
- * @tags: [requires_fcv_83]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
@@ -46,16 +44,12 @@ const pipeline = [
 /**
  * Helpers for checking memory tracking metrics in logs and explain output.
  */
-function getGroupStageName(db) {
+function isForceClassicEngine(db) {
     const getParam = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-    if (getParam.internalQueryFrameworkControl.value != "forceClassicEngine") {
-        return "group";
-    } else {
-        return "$group";
-    }
+    return getParam.internalQueryFrameworkControl === "forceClassicEngine";
 }
 
-function assertMemoryTrackingSlowQueryLogMetrics(db, expectMemoryMetrics) {
+function assertMemoryTrackingSlowQueryLogMetrics(db, expectMemoryMetrics, expectedNumGetMores) {
     const logLines = runPipelineAndGetDiagnostics({
         db: db,
         collName: collName,
@@ -69,13 +63,21 @@ function assertMemoryTrackingSlowQueryLogMetrics(db, expectMemoryMetrics) {
     });
     verifySlowQueryLogMetrics({
         logLines,
-        verifyOptions: {expectedNumGetMores: 3, expectMemoryMetrics: expectMemoryMetrics},
+        verifyOptions: {
+            expectedNumGetMores: expectedNumGetMores,
+            expectMemoryMetrics: expectMemoryMetrics,
+        },
     });
 }
 
 function assertMemoryTrackingExplainExecutionStatsMetrics(db, expectMemoryMetrics) {
     const explainRes = db[collName].explain("executionStats").aggregate(pipeline);
-    const stages = getAggPlanStages(explainRes, getGroupStageName(db));
+    // Search for both SBE ("group") and classic doc-source ("$group") stage names, since in a
+    // mixed-engine cluster the engines can differ between mongos and the shards.
+    const stages = [
+        ...getAggPlanStages(explainRes, "group"),
+        ...getAggPlanStages(explainRes, "$group"),
+    ];
     assert.gt(stages.length, 0, "Expected at least one $group stage in: " + tojson(explainRes));
 
     for (let stage of stages) {
@@ -152,8 +154,23 @@ function assertMemoryTrackingMetricsAppear(primaryConn) {
     const db = getDB(primaryConn);
     setServerParams(db);
 
+    // The small test query only reports its memory usage once that usage crosses
+    // internalQueryMaxWriteToCurOpMemoryUsageBytes. The cluster starts with a low value, but a node
+    // restarted during the upgrade comes back at the default, so set it again on the node that
+    // serves the query (the primary, or mongos, which merges the shard results).
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
+    );
+
+    // The number of getMores isn't stable here. batchSize is 1 so each getMore returns one group,
+    // but whether a final empty getMore is needed to observe the cursor as exhausted varies with
+    // the query engine (SBE leaves the cursor open for one more) and with whether mongos is merging
+    // shard results. Require only that at least one getMore happened, so metrics are still checked
+    // past the first batch.
+    const minNumGetMores = 1;
+
     jsTest.log.info("Checking logs for memory tracking stats...");
-    assertMemoryTrackingSlowQueryLogMetrics(db, true /*expectMemoryMetrics*/);
+    assertMemoryTrackingSlowQueryLogMetrics(db, true /*expectMemoryMetrics*/, minNumGetMores);
 
     jsTest.log.info("Checking explain for memory tracking stats...");
     assertMemoryTrackingExplainExecutionStatsMetrics(db, true /*expectMemoryMetrics*/);
@@ -200,15 +217,20 @@ function assertMemoryTrackingMetricsAppearOnOneShard(primaryConn) {
     jsTest.log.info("Checking that memory tracking stats appear on one shard for explain...");
 
     const explainRes = db[collName].explain("executionStats").aggregate(pipeline);
-    const stages = getAggPlanStages(explainRes, getGroupStageName(db));
+    // Search for both SBE ("group") and classic doc-source ("$group") stage names, since in a
+    // mixed-engine cluster the engines can differ between shards.
+    const stages = [
+        ...getAggPlanStages(explainRes, "group"),
+        ...getAggPlanStages(explainRes, "$group"),
+    ];
 
     assert.eq(stages.length, 2, "Expected 2 group stages in: " + tojson(explainRes));
 
     // Document distribution across shards based on {_id: 1} shard key:
     // Shard 0 (last-lts): _id 0-5: Coffee(4), Specialty(1), Tea(1) => 3 groups
     // Shard 1 (latest):   _id 6-11: Coffee(1), Specialty(2), Tea(2) => 3 groups
-    assert.eq(3, stages[0].nReturned);
-    assert.eq(3, stages[1].nReturned);
+    assert.eq(3, stages[0].nReturned, "Expected 3 groups on shard 0: " + tojson(stages[0]));
+    assert.eq(3, stages[1].nReturned, "Expected 3 groups on shard 1: " + tojson(stages[1]));
     const stagesWithMemoryTracking = stages.filter((stage) =>
         stage.hasOwnProperty("peakTrackedMemBytes"),
     );

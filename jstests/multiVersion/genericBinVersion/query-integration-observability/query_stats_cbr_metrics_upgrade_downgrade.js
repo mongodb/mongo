@@ -1,9 +1,8 @@
 /**
  * Verifies that CBR metrics in query stats behave correctly in FCV upgrade/downgrade scenarios.
- * Since featureFlagQueryStatsCBRMetrics is FCV-gated, we expect CBR metrics to only appear
- * when fully upgraded.
- *
- * @tags: [requires_fcv_83]
+ * featureFlagQueryStatsCBRMetrics is FCV-gated, so on a replica set the metrics appear only after
+ * the FCV is bumped. On a sharded cluster they also appear once mongos is on the latest binary,
+ * because mongos runs at the latest FCV, even while the cluster FCV is still last-LTS.
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -20,8 +19,12 @@ const collName = jsTestName();
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
 
 function runCBRQuery(db) {
-    // Query with multiple indexes to trigger multiplanning/CBR.
-    return db[collName].find({a: {$lt: 50}}).toArray();
+    // Query with multiple indexes to trigger multiplanning/CBR. Retry on transient errors: during a
+    // rolling restart the config server can briefly have no reachable node, which fails the read.
+    assert.soonNoExcept(() => {
+        db[collName].find({a: {$lt: 50}}).toArray();
+        return true;
+    });
 }
 
 /**

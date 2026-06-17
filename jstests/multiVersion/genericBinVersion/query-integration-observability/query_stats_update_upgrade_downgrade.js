@@ -1,7 +1,5 @@
 /**
  * Verifies that the query stats for updates behave correctly in FCV upgrade/downgrade scenarios.
- *
- * @tags: [requires_fcv_83]
  */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
@@ -79,9 +77,14 @@ function setupCollection(primaryConnection, shardingTest = null) {
  */
 function assertUpdateCommandsNotRecorded(primaryConn) {
     const db = getDB(primaryConn);
-    resetQueryStatsStore(db, "1MB");
-    assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
-    const queryStats = getQueryStatsUpdateCmd(db);
+    let queryStats;
+    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
+    assert.soonNoExcept(() => {
+        resetQueryStatsStore(db, "1MB");
+        assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
+        queryStats = getQueryStatsUpdateCmd(db);
+        return true;
+    });
     assert.eq(queryStats, [], "Expected no new query stats entries, but found some");
 }
 
@@ -120,9 +123,14 @@ function assertUpdateQueryStatsMetrics(entry) {
  */
 function assertUpdateCommandRecorded(primaryConn) {
     const db = getDB(primaryConn);
-    resetQueryStatsStore(db, "1MB");
-    assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
-    const queryStats = getQueryStatsUpdateCmd(db);
+    let queryStats;
+    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
+    assert.soonNoExcept(() => {
+        resetQueryStatsStore(db, "1MB");
+        assert.commandWorked(db.getCollection(collName).update({_id: 1}, {$inc: {a: 1}}));
+        queryStats = getQueryStatsUpdateCmd(db);
+        return true;
+    });
     assert.neq(queryStats, [], "Expected query stats entry for update command, but found none");
     assert.eq(queryStats.length, 1, "Expected exactly one query stats entry for update command");
     const entry = queryStats[0];
@@ -157,10 +165,14 @@ function applyOnShardServers(primaryConn, perShardFn) {
  */
 function assertUpdateCommandRecordedOnShardsExceptRouter(primaryConn) {
     const db = getDB(primaryConn);
-    resetQueryStatsStore(db, "1MB");
-    // Apply updates on one document for each shard
-    assert.commandWorked(db.getCollection(collName).update({_id: 0}, {$inc: {a: 1}}));
-    assert.commandWorked(db.getCollection(collName).update({_id: 6}, {$inc: {a: 1}}));
+    // Retry on transient errors: during a rolling restart a node can be briefly unavailable.
+    assert.soonNoExcept(() => {
+        resetQueryStatsStore(db, "1MB");
+        // Apply updates on one document for each shard
+        assert.commandWorked(db.getCollection(collName).update({_id: 0}, {$inc: {a: 1}}));
+        assert.commandWorked(db.getCollection(collName).update({_id: 6}, {$inc: {a: 1}}));
+        return true;
+    });
 
     const assertRecordedOnShardServer = (conn) => {
         const db = getDB(conn);
@@ -198,9 +210,11 @@ testPerformUpgradeReplSet({
 });
 
 /**
- * featureFlagQueryStatsUpdateCommand only enables the query stats for updates on shard servers rather than routers.
- * So we expect that there is no update commands being recorded on mongos. Having said that, this test is still useful
- * to check that there is no regression when shard servers send cursor metrics using the latest UpdateCommandReply.
+ * featureFlagQueryStatsUpdateCommand is FCV-gated, but mongos pins itself to the latest FCV, so once
+ * mongos is on the latest binary an update routed through it is recorded in the router's query stats
+ * even while the cluster FCV is still last-LTS. After the FCV is bumped, the shards take over
+ * recording instead of the router. This also checks that there is no regression when shard servers
+ * send cursor metrics using the latest UpdateCommandReply.
  */
 testPerformUpgradeSharded({
     upgradeNodeOptions: {
@@ -215,6 +229,6 @@ testPerformUpgradeSharded({
     whenOnlyConfigIsLatestBinary: assertUpdateCommandsNotRecorded,
     whenSecondariesAndConfigAreLatestBinary: assertUpdateCommandsNotRecorded,
     whenMongosBinaryIsLastLTS: assertUpdateCommandsNotRecorded,
-    whenBinariesAreLatestAndFCVIsLastLTS: assertUpdateCommandsNotRecorded,
+    whenBinariesAreLatestAndFCVIsLastLTS: assertUpdateCommandRecorded,
     whenFullyUpgraded: assertUpdateCommandRecordedOnShardsExceptRouter,
 });

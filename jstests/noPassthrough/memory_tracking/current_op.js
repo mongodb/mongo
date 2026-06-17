@@ -140,30 +140,45 @@ export function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline
     // Wait for the getMore to be blocked on the failpoint.
     failPoint.wait();
 
-    // Find the current operation for the getMore blocked command. We need to specify "localOps" to
-    // see operations on mongos. This flag has no effect on a standalone mongod.
-    let curOpDocs = db
-        .getSiblingDB("admin")
-        .aggregate([{$currentOp: {localOps: true}}, {$match: {"lsid.id": sessionId.id}}])
-        .toArray();
-    assert.eq(curOpDocs.length, 1, "Expected one current operation for the getMore command");
+    // failPoint.wait() can return before our own getMore is visible to $currentOp, because an
+    // unrelated getMore on a busy node can hit the failpoint first, so retry until it appears.
+    // We need to specify "localOps" to see operations on mongos. This flag has no effect on a
+    // standalone mongod.
+    let curOpDoc;
+    assert.soon(() => {
+        const docs = db
+            .getSiblingDB("admin")
+            .aggregate([{$currentOp: {localOps: true}}, {$match: {"lsid.id": sessionId.id}}])
+            .toArray();
+        if (docs.length === 1) {
+            curOpDoc = docs[0];
+            return true;
+        }
+        return false;
+    }, "Expected one current operation for the getMore command");
 
-    assertCurrentOpOutput(shouldAppear, curOpDocs[0]);
+    assertCurrentOpOutput(shouldAppear, curOpDoc);
 
     // Unblock the getMore command and wait for it to finish.
     failPoint.off();
     getMoreShell();
 
     // Now check that we also report memory stats for an idle cursor.
-    curOpDocs = db
-        .getSiblingDB("admin")
-        .aggregate([
-            {$currentOp: {localOps: true, idleCursors: true}},
-            {$match: {"lsid.id": sessionId.id, "type": "idleCursor"}},
-        ])
-        .toArray();
-    assert.eq(curOpDocs.length, 1, "Expected one idle cursor for unfinished query");
-    assertCurrentOpOutput(shouldAppear, curOpDocs[0]);
+    assert.soon(() => {
+        const docs = db
+            .getSiblingDB("admin")
+            .aggregate([
+                {$currentOp: {localOps: true, idleCursors: true}},
+                {$match: {"lsid.id": sessionId.id, "type": "idleCursor"}},
+            ])
+            .toArray();
+        if (docs.length === 1) {
+            curOpDoc = docs[0];
+            return true;
+        }
+        return false;
+    }, "Expected one idle cursor for unfinished query");
+    assertCurrentOpOutput(shouldAppear, curOpDoc);
 
     session.endSession();
 }
