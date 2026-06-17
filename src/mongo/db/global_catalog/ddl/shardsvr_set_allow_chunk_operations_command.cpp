@@ -37,6 +37,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
@@ -136,12 +137,20 @@ public:
 
             // Wait for all chunk operation coordinators.
             auto* const service = ShardingCoordinatorService::getService(opCtx);
-            for (const auto coordType : std::array{CoordinatorTypeEnum::kMoveRange,
-                                                   CoordinatorTypeEnum::kSplitChunk,
-                                                   CoordinatorTypeEnum::kMergeChunks,
-                                                   CoordinatorTypeEnum::kMergeAllChunks}) {
-                service->waitForCoordinatorsOfGivenTypeToComplete(opCtx, coordType);
-            }
+            service->waitForOngoingCoordinatorsToFinish(
+                opCtx, [&](const ShardingCoordinator& coord) -> bool {
+                    static constexpr std::array kChunkOperationTypes{
+                        CoordinatorTypeEnum::kMoveRange,
+                        CoordinatorTypeEnum::kSplitChunk,
+                        CoordinatorTypeEnum::kMergeChunks,
+                        CoordinatorTypeEnum::kMergeAllChunks,
+                    };
+                    const auto type = coord.operationType();
+                    const auto& coordNss = coord.originalNss();
+                    return std::ranges::any_of(kChunkOperationTypes,
+                                               [type](auto t) { return t == type; }) &&
+                        (coordNss == nss || coordNss.makeTimeseriesBucketsNamespace() == nss);
+                });
         }
 
         void typedRun(OperationContext* opCtx) {

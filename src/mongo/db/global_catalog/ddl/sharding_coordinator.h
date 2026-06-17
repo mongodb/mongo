@@ -172,11 +172,14 @@ public:
             : boost::none;
     }
 
-protected:
+    /**
+     * Returns the namespace of the coordinator's ID.
+     */
     const NamespaceString& originalNss() const {
         return _coordId.getNss();
     }
 
+protected:
     virtual const NamespaceString& nss() const {
         if (const auto& bucketNss = metadata().getBucketNss()) {
             return bucketNss.get();
