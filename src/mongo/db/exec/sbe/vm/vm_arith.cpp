@@ -597,7 +597,7 @@ void ByteCode::aggStdDevImpl(value::Array* arr, value::TagValueView rhs) {
     auto delta = genericSub(
         value::TypeTags::NumberDouble, curVal, value::TypeTags::NumberDouble, mean.value);
     auto deltaDivCount =
-        genericDiv(delta.tag(), delta.value(), value::TypeTags::NumberInt64, newCountVal);
+        genericDiv(delta.view(), value::TagValueView{value::TypeTags::NumberInt64, newCountVal});
     auto newMean = genericAdd(mean.tag, mean.value, deltaDivCount.tag(), deltaDivCount.value());
     auto newDelta =
         genericSub(value::TypeTags::NumberDouble, curVal, newMean.tag(), newMean.value());
@@ -700,38 +700,35 @@ value::TagValueMaybeOwned ByteCode::aggStdDevFinalizeImpl(value::Value fieldValu
     return {true, value::TypeTags::NumberDouble, value::bitcastFrom<double>(stdDev)};
 }
 
-value::TagValueMaybeOwned ByteCode::genericDiv(value::TypeTags lhsTag,
-                                               value::Value lhsValue,
-                                               value::TypeTags rhsTag,
-                                               value::Value rhsValue) {
+value::TagValueMaybeOwned ByteCode::genericDiv(value::TagValueView lhs, value::TagValueView rhs) {
     auto assertNonZero = [](bool nonZero) {
         uassert(4848401, "can't $divide by zero", nonZero);
     };
 
-    if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
-        switch (getWidestNumericalType(lhsTag, rhsTag)) {
+    if (value::isNumber(lhs.tag) && value::isNumber(rhs.tag)) {
+        switch (getWidestNumericalType(lhs.tag, rhs.tag)) {
             case value::TypeTags::NumberInt32: {
-                assertNonZero(numericCast<double>(rhsTag, rhsValue) != 0);
-                auto result =
-                    numericCast<double>(lhsTag, lhsValue) / numericCast<double>(rhsTag, rhsValue);
+                assertNonZero(numericCast<double>(rhs.tag, rhs.value) != 0);
+                auto result = numericCast<double>(lhs.tag, lhs.value) /
+                    numericCast<double>(rhs.tag, rhs.value);
                 return value::TagValueMaybeOwned::numberDouble(result);
             }
             case value::TypeTags::NumberInt64: {
-                assertNonZero(numericCast<double>(rhsTag, rhsValue) != 0);
-                auto result =
-                    numericCast<double>(lhsTag, lhsValue) / numericCast<double>(rhsTag, rhsValue);
+                assertNonZero(numericCast<double>(rhs.tag, rhs.value) != 0);
+                auto result = numericCast<double>(lhs.tag, lhs.value) /
+                    numericCast<double>(rhs.tag, rhs.value);
                 return value::TagValueMaybeOwned::numberDouble(result);
             }
             case value::TypeTags::NumberDouble: {
-                assertNonZero(numericCast<double>(rhsTag, rhsValue) != 0);
-                auto result =
-                    numericCast<double>(lhsTag, lhsValue) / numericCast<double>(rhsTag, rhsValue);
+                assertNonZero(numericCast<double>(rhs.tag, rhs.value) != 0);
+                auto result = numericCast<double>(lhs.tag, lhs.value) /
+                    numericCast<double>(rhs.tag, rhs.value);
                 return value::TagValueMaybeOwned::numberDouble(result);
             }
             case value::TypeTags::NumberDecimal: {
-                assertNonZero(!numericCast<Decimal128>(rhsTag, rhsValue).isZero());
-                auto result = numericCast<Decimal128>(lhsTag, lhsValue)
-                                  .divide(numericCast<Decimal128>(rhsTag, rhsValue));
+                assertNonZero(!numericCast<Decimal128>(rhs.tag, rhs.value).isZero());
+                auto result = numericCast<Decimal128>(lhs.tag, lhs.value)
+                                  .divide(numericCast<Decimal128>(rhs.tag, rhs.value));
                 auto [tag, val] = value::makeCopyDecimal(result);
                 return {true, tag, val};
             }
@@ -743,49 +740,46 @@ value::TagValueMaybeOwned ByteCode::genericDiv(value::TypeTags lhsTag,
     return value::TagValueMaybeOwned::nothing();
 }
 
-value::TagValueMaybeOwned ByteCode::genericIDiv(value::TypeTags lhsTag,
-                                                value::Value lhsValue,
-                                                value::TypeTags rhsTag,
-                                                value::Value rhsValue) {
+value::TagValueMaybeOwned ByteCode::genericIDiv(value::TagValueView lhs, value::TagValueView rhs) {
     auto assertNonZero = [](bool nonZero) {
         uassert(4848402, "can't $divide by zero", nonZero);
     };
 
-    if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
-        switch (getWidestNumericalType(lhsTag, rhsTag)) {
+    if (value::isNumber(lhs.tag) && value::isNumber(rhs.tag)) {
+        switch (getWidestNumericalType(lhs.tag, rhs.tag)) {
             case value::TypeTags::NumberInt32: {
-                assertNonZero(numericCast<int32_t>(rhsTag, rhsValue) != 0);
-                auto result =
-                    numericCast<int32_t>(lhsTag, lhsValue) / numericCast<int32_t>(rhsTag, rhsValue);
+                assertNonZero(numericCast<int32_t>(rhs.tag, rhs.value) != 0);
+                auto result = numericCast<int32_t>(lhs.tag, lhs.value) /
+                    numericCast<int32_t>(rhs.tag, rhs.value);
                 return value::TagValueMaybeOwned::numberInt32(result);
             }
             case value::TypeTags::NumberInt64: {
-                assertNonZero(numericCast<int64_t>(rhsTag, rhsValue) != 0);
-                auto result =
-                    numericCast<int64_t>(lhsTag, lhsValue) / numericCast<int64_t>(rhsTag, rhsValue);
+                assertNonZero(numericCast<int64_t>(rhs.tag, rhs.value) != 0);
+                auto result = numericCast<int64_t>(lhs.tag, lhs.value) /
+                    numericCast<int64_t>(rhs.tag, rhs.value);
                 return value::TagValueMaybeOwned::numberInt64(result);
             }
             case value::TypeTags::NumberDouble: {
-                auto lhs = representAs<int64_t>(numericCast<double>(lhsTag, lhsValue));
-                auto rhs = representAs<int64_t>(numericCast<double>(rhsTag, rhsValue));
+                auto lhsInt = representAs<int64_t>(numericCast<double>(lhs.tag, lhs.value));
+                auto rhsInt = representAs<int64_t>(numericCast<double>(rhs.tag, rhs.value));
 
-                if (!lhs || !rhs) {
+                if (!lhsInt || !rhsInt) {
                     return value::TagValueMaybeOwned::nothing();
                 }
-                assertNonZero(*rhs != 0);
-                auto result = *lhs / *rhs;
+                assertNonZero(*rhsInt != 0);
+                auto result = *lhsInt / *rhsInt;
 
                 return value::TagValueMaybeOwned::numberInt64(result);
             }
             case value::TypeTags::NumberDecimal: {
-                auto lhs = representAs<int64_t>(numericCast<Decimal128>(lhsTag, lhsValue));
-                auto rhs = representAs<int64_t>(numericCast<Decimal128>(rhsTag, rhsValue));
+                auto lhsInt = representAs<int64_t>(numericCast<Decimal128>(lhs.tag, lhs.value));
+                auto rhsInt = representAs<int64_t>(numericCast<Decimal128>(rhs.tag, rhs.value));
 
-                if (!lhs || !rhs) {
+                if (!lhsInt || !rhsInt) {
                     return value::TagValueMaybeOwned::nothing();
                 }
-                assertNonZero(*rhs != 0);
-                auto result = *lhs / *rhs;
+                assertNonZero(*rhsInt != 0);
+                auto result = *lhsInt / *rhsInt;
 
                 return value::TagValueMaybeOwned::numberInt64(result);
             }
@@ -797,38 +791,35 @@ value::TagValueMaybeOwned ByteCode::genericIDiv(value::TypeTags lhsTag,
     return value::TagValueMaybeOwned::nothing();
 }
 
-value::TagValueMaybeOwned ByteCode::genericMod(value::TypeTags lhsTag,
-                                               value::Value lhsValue,
-                                               value::TypeTags rhsTag,
-                                               value::Value rhsValue) {
+value::TagValueMaybeOwned ByteCode::genericMod(value::TagValueView lhs, value::TagValueView rhs) {
     auto assertNonZero = [](bool nonZero) {
         uassert(4848403, "can't $mod by zero", nonZero);
     };
 
-    if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
-        switch (getWidestNumericalType(lhsTag, rhsTag)) {
+    if (value::isNumber(lhs.tag) && value::isNumber(rhs.tag)) {
+        switch (getWidestNumericalType(lhs.tag, rhs.tag)) {
             case value::TypeTags::NumberInt32: {
-                assertNonZero(numericCast<int32_t>(rhsTag, rhsValue) != 0);
-                auto result = overflow::safeMod(numericCast<int32_t>(lhsTag, lhsValue),
-                                                numericCast<int32_t>(rhsTag, rhsValue));
+                assertNonZero(numericCast<int32_t>(rhs.tag, rhs.value) != 0);
+                auto result = overflow::safeMod(numericCast<int32_t>(lhs.tag, lhs.value),
+                                                numericCast<int32_t>(rhs.tag, rhs.value));
                 return value::TagValueMaybeOwned::numberInt32(result);
             }
             case value::TypeTags::NumberInt64: {
-                assertNonZero(numericCast<int64_t>(rhsTag, rhsValue) != 0);
-                auto result = overflow::safeMod(numericCast<int64_t>(lhsTag, lhsValue),
-                                                numericCast<int64_t>(rhsTag, rhsValue));
+                assertNonZero(numericCast<int64_t>(rhs.tag, rhs.value) != 0);
+                auto result = overflow::safeMod(numericCast<int64_t>(lhs.tag, lhs.value),
+                                                numericCast<int64_t>(rhs.tag, rhs.value));
                 return value::TagValueMaybeOwned::numberInt64(result);
             }
             case value::TypeTags::NumberDouble: {
-                assertNonZero(numericCast<double>(rhsTag, rhsValue) != 0);
-                auto result = fmod(numericCast<double>(lhsTag, lhsValue),
-                                   numericCast<double>(rhsTag, rhsValue));
+                assertNonZero(numericCast<double>(rhs.tag, rhs.value) != 0);
+                auto result = fmod(numericCast<double>(lhs.tag, lhs.value),
+                                   numericCast<double>(rhs.tag, rhs.value));
                 return value::TagValueMaybeOwned::numberDouble(result);
             }
             case value::TypeTags::NumberDecimal: {
-                assertNonZero(!numericCast<Decimal128>(rhsTag, rhsValue).isZero());
-                auto result = numericCast<Decimal128>(lhsTag, lhsValue)
-                                  .modulo(numericCast<Decimal128>(rhsTag, rhsValue));
+                assertNonZero(!numericCast<Decimal128>(rhs.tag, rhs.value).isZero());
+                auto result = numericCast<Decimal128>(lhs.tag, lhs.value)
+                                  .modulo(numericCast<Decimal128>(rhs.tag, rhs.value));
                 auto [tag, val] = value::makeCopyDecimal(result);
                 return {true, tag, val};
             }

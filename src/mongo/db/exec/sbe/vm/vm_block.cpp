@@ -1405,10 +1405,7 @@ value::TagValueOwned ByteCode::builtinBlockBlockArithmeticOperation(
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-            auto [resTag, resVal] =
-                genericDiv(
-                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
-                    .releaseToOwnedRaw();
+            auto [resTag, resVal] = genericDiv(leftBlock[i], rightBlock[i]).releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1452,10 +1449,7 @@ value::TagValueOwned ByteCode::builtinBlockBlockArithmeticOperation(
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-            auto [resTag, resVal] =
-                genericDiv(
-                    leftBlock[i].tag, leftBlock[i].value, rightBlock[i].tag, rightBlock[i].value)
-                    .releaseToOwnedRaw();
+            auto [resTag, resVal] = genericDiv(leftBlock[i], rightBlock[i]).releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1505,10 +1499,7 @@ value::TagValueOwned ByteCode::builtinScalarBlockArithmeticOperation(
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-            auto [resTag, resVal] =
-                genericDiv(
-                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
-                    .releaseToOwnedRaw();
+            auto [resTag, resVal] = genericDiv(scalar, extractedValues[i]).releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1552,10 +1543,7 @@ value::TagValueOwned ByteCode::builtinScalarBlockArithmeticOperation(value::TagV
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-            auto [resTag, resVal] =
-                genericDiv(
-                    scalar.tag, scalar.value, extractedValues[i].tag, extractedValues[i].value)
-                    .releaseToOwnedRaw();
+            auto [resTag, resVal] = genericDiv(scalar, extractedValues[i]).releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1605,10 +1593,7 @@ value::TagValueOwned ByteCode::builtinBlockScalarArithmeticOperation(
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-            auto [resTag, resVal] =
-                genericDiv(
-                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
-                    .releaseToOwnedRaw();
+            auto [resTag, resVal] = genericDiv(extractedValues[i], scalar).releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1652,10 +1637,7 @@ value::TagValueOwned ByteCode::builtinBlockScalarArithmeticOperation(value::Valu
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-            auto [resTag, resVal] =
-                genericDiv(
-                    extractedValues[i].tag, extractedValues[i].value, scalar.tag, scalar.value)
-                    .releaseToOwnedRaw();
+            auto [resTag, resVal] = genericDiv(extractedValues[i], scalar).releaseToOwnedRaw();
             tagsOut[i] = resTag;
             valuesOut[i] = resVal;
         }
@@ -1693,11 +1675,8 @@ value::TagValueOwned ByteCode::builtinScalarScalarArithmeticOperation(
                                             .releaseToOwnedRaw();
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
-        auto [resultTag, resultValue] = genericDiv(leftInputScalar.tag,
-                                                   leftInputScalar.value,
-                                                   rightInputScalar.tag,
-                                                   rightInputScalar.value)
-                                            .releaseToOwnedRaw();
+        auto [resultTag, resultValue] =
+            genericDiv(leftInputScalar, rightInputScalar).releaseToOwnedRaw();
         resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
     } else {
         resBlock = std::make_unique<value::MonoBlock>(valsNum, value::TypeTags::Nothing, 0);
@@ -2593,7 +2572,8 @@ value::TagValueOwned ByteCode::builtinValueBlockMod(ArityType arity) {
 
     const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
-            auto [resTag, resVal] = genericMod(tag, val, mod.tag, mod.value).releaseToOwnedRaw();
+            auto [resTag, resVal] =
+                genericMod(value::TagValueView{tag, val}, mod).releaseToOwnedRaw();
             return {resTag, resVal};
         });
 

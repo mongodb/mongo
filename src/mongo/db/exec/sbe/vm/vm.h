@@ -363,10 +363,7 @@ public:
         value::TypeTags simpleSumTag, value::Value simpleSumVal);
     static value::TagValueMaybeOwned builtinDoubleDoublePartialSumFinalizeImpl(
         value::TypeTags fieldTag, value::Value fieldValue);
-    static value::TagValueMaybeOwned genericDiv(value::TypeTags lhsTag,
-                                                value::Value lhsValue,
-                                                value::TypeTags rhsTag,
-                                                value::Value rhsValue);
+    static value::TagValueMaybeOwned genericDiv(value::TagValueView lhs, value::TagValueView rhs);
 
     static value::TagValueMaybeOwned builtinAddToArrayCappedImpl(
         value::TagValueOwned accumulatorState, value::TagValueMaybeOwned newElem, int32_t sizeCap);
@@ -469,14 +466,8 @@ private:
     void runTagCheck(const uint8_t*& pcPointer, T&& predicate);
     void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
 
-    value::TagValueMaybeOwned genericIDiv(value::TypeTags lhsTag,
-                                          value::Value lhsValue,
-                                          value::TypeTags rhsTag,
-                                          value::Value rhsValue);
-    value::TagValueMaybeOwned genericMod(value::TypeTags lhsTag,
-                                         value::Value lhsValue,
-                                         value::TypeTags rhsTag,
-                                         value::Value rhsValue);
+    value::TagValueMaybeOwned genericIDiv(value::TagValueView lhs, value::TagValueView rhs);
+    value::TagValueMaybeOwned genericMod(value::TagValueView lhs, value::TagValueView rhs);
     value::TagValueMaybeOwned genericAbs(value::TagValueView operand);
     value::TagValueMaybeOwned genericCeil(value::TagValueView operand);
     value::TagValueMaybeOwned genericFloor(value::TagValueView operand);

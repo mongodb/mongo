@@ -1535,10 +1535,7 @@ value::TagValueMaybeOwned ByteCode::integralOfTwoPointsByTrapezoidalRule(
         auto integralTagVal = genericMul(
             sumYTagVal.tag(), sumYTagVal.value(), deltaTagVal.tag(), deltaTagVal.value());
 
-        auto result = genericDiv(integralTagVal.tag(),
-                                 integralTagVal.value(),
-                                 value::TypeTags::NumberInt64,
-                                 value::bitcastFrom<int32_t>(2));
+        auto result = genericDiv(integralTagVal.view(), value::TagValueView::numberInt64(2));
         return result;
     } else {
         return value::TagValueMaybeOwned::numberInt64(0);
@@ -1840,10 +1837,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggIntegralFinalize(ArityType arity) 
 
     auto resultTagVal = aggRemovableSumFinalizeImpl(integral);
     if (unitMillis) {
-        return genericDiv(resultTagVal.tag(),
-                          resultTagVal.value(),
-                          value::TypeTags::NumberInt64,
-                          value::bitcastFrom<int64_t>(*unitMillis));
+        return genericDiv(resultTagVal.view(),
+                          value::TagValueView{value::TypeTags::NumberInt64,
+                                              value::bitcastFrom<int64_t>(*unitMillis)});
     } else {
         return resultTagVal;
     }
@@ -1904,8 +1900,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggDerivativeFinalize(ArityType arity
         }
     }
 
-    auto divTagVal =
-        genericDiv(riseTagVal.tag(), riseTagVal.value(), runTagVal.tag(), runTagVal.value());
+    auto divTagVal = genericDiv(riseTagVal.view(), runTagVal.view());
 
     if (unitMillis) {
         return genericMul(divTagVal.tag(),
@@ -2275,10 +2270,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceFinalize(ArityType arity
     }
 
     auto cXYTagVal = aggRemovableSumFinalizeImpl(cXYState);
-    return genericDiv(cXYTagVal.tag(),
-                      cXYTagVal.value(),
-                      value::TypeTags::NumberDouble,
-                      value::bitcastFrom<double>(adjustedCount));
+    return genericDiv(cXYTagVal.view(), value::TagValueView::numberDouble(adjustedCount));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggCovarianceSampFinalize(ArityType arity) {
@@ -2813,7 +2805,7 @@ value::TagValueMaybeOwned ByteCode::linearFillInterpolate(value::TagValueView x1
     auto delX = genericSub(x2.tag, x2.value, x1.tag, x1.value);
 
     // (y2 - y1) / (x2 - x1)
-    auto div = genericDiv(delY.tag(), delY.value(), delX.tag(), delX.value());
+    auto div = genericDiv(delY.view(), delX.view());
 
     // (x - x1)
     auto sub = genericSub(x.tag, x.value, x1.tag, x1.value);
