@@ -262,6 +262,26 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSON(const BSONObj& source,
     return chunk;
 }
 
+std::vector<ChunkType> ChunkType::parseConfigBSONDocuments(const std::vector<BSONObj>& chunkDocs,
+                                                           const UUID& expectedCollectionUUID,
+                                                           const OID& epoch,
+                                                           const Timestamp& timestamp) {
+    std::vector<ChunkType> chunks;
+    chunks.reserve(chunkDocs.size());
+
+    for (const auto& chunkDoc : chunkDocs) {
+        auto chunk = uassertStatusOK(parseFromConfigBSON(chunkDoc, epoch, timestamp));
+        uassert(12698702,
+                str::stream() << "Chunk " << chunk.toString()
+                              << " does not belong to collection UUID " << expectedCollectionUUID,
+                chunk.getCollectionUUID() == expectedCollectionUUID);
+        uassertStatusOK(chunk.validate());
+        chunks.push_back(std::move(chunk));
+    }
+
+    return chunks;
+}
+
 StatusWith<ChunkType> ChunkType::parseFromShardBSON(const BSONObj& source,
                                                     const OID& epoch,
                                                     const Timestamp& timestamp) {

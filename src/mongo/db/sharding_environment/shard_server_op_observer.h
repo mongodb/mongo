@@ -149,6 +149,9 @@ public:
                                         const repl::OplogEntry& op) override;
 
     void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) override;
+
+    void onApplyCollectionShardingStateDelta(OperationContext* opCtx,
+                                             const repl::OplogEntry& op) override;
 };
 
 }  // namespace mongo

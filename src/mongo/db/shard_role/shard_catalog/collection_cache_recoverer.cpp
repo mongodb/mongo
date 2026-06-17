@@ -218,8 +218,7 @@ CollectionCacheRecoverer::RecoveryRoundId CollectionCacheRecoverer::start(Operat
     return {_timestampToReadAt};
 }
 
-void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
-                                            Timestamp entryTs,
+void CollectionCacheRecoverer::onOplogEntry(Timestamp entryTs,
                                             const InvalidateCollectionMetadataOplogEntry& entry) {
 
     LOGV2_INFO(12195301,
@@ -233,8 +232,7 @@ void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
     _entriesToApply.emplace(entryTs, entry);
 }
 
-void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
-                                            Timestamp entryTs,
+void CollectionCacheRecoverer::onOplogEntry(Timestamp entryTs,
                                             const CollectionShardingStateDeltaOplogEntry& entry) {
     LOGV2_INFO(12195300,
                "Received oplog entry for delta application",
@@ -249,17 +247,21 @@ void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
 
 namespace {
 boost::optional<CollectionMetadata> applyOplogEntry(
-    OperationContext* opCtx,
-    const CollectionShardingStateDeltaOplogEntry& entry,
-    CollectionMetadata collMetadata) {
-    // TODO SERVER-121200: Actually implement the delta oplog entry application on
-    // CollectionMetadata
-    return collMetadata;
+    const CollectionShardingStateDeltaOplogEntry& entry, CollectionMetadata collMetadata) {
+    tassert(12698703,
+            "Expected recovered metadata to have a routing table when applying changed chunks",
+            collMetadata.hasRoutingTable());
+
+    const auto collPlacementVersion = collMetadata.getCollPlacementVersion();
+    return collMetadata.makeUpdated(
+        ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
+                                            collMetadata.getUUID(),
+                                            collPlacementVersion.epoch(),
+                                            collPlacementVersion.getTimestamp()));
 }
+
 boost::optional<CollectionMetadata> applyOplogEntry(
-    OperationContext* opCtx,
-    const InvalidateCollectionMetadataOplogEntry& entry,
-    CollectionMetadata collMetadata) {
+    const InvalidateCollectionMetadataOplogEntry& entry, CollectionMetadata collMetadata) {
     return boost::none;
 }
 }  // namespace
@@ -280,7 +282,7 @@ boost::optional<CollectionMetadata> CollectionCacheRecoverer::drainAndApply(
         ON_BLOCK_EXIT([&] { _entriesToApply.pop(); });
         const auto& [ts, entry] = _entriesToApply.front();
         auto newCollMetadata = std::visit(
-            [&](const auto& entry) { return applyOplogEntry(opCtx, entry, collMetadata); }, entry);
+            [&](const auto& entry) { return applyOplogEntry(entry, collMetadata); }, entry);
         if (!newCollMetadata) {
             // Draining failed, signal the caller that it must perform another round of recovery. We
             // advance the timestamp such that it gets the new valid snapshot and reset the state of

@@ -119,12 +119,8 @@ public:
      * instead enqueue the entry for recovery and only materialize the results once
      * CacheSynchronizer::drain is called.
      */
-    void onOplogEntry(OperationContext* opCtx,
-                      Timestamp entryTs,
-                      const InvalidateCollectionMetadataOplogEntry& entry);
-    void onOplogEntry(OperationContext* opCtx,
-                      Timestamp entryTs,
-                      const CollectionShardingStateDeltaOplogEntry& entry);
+    void onOplogEntry(Timestamp entryTs, const InvalidateCollectionMetadataOplogEntry& entry);
+    void onOplogEntry(Timestamp entryTs, const CollectionShardingStateDeltaOplogEntry& entry);
 
 private:
     // The following convention is used to denote what protects what:

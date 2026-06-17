@@ -170,6 +170,15 @@ public:
                                                      const Timestamp& timestamp);
 
     /**
+     * Parses the given chunk documents and validates that they belong to the given collection UUID.
+     * Returns them in the same order as the input.
+     */
+    static std::vector<ChunkType> parseConfigBSONDocuments(const std::vector<BSONObj>& chunkDocs,
+                                                           const UUID& expectedCollectionUUID,
+                                                           const OID& epoch,
+                                                           const Timestamp& timestamp);
+
+    /**
      * A helper method for using this class with PersistentTaskStore that returns an otherwise
      * invalid ChunkType object without the proper chunk version set. It is the caller's
      * responsibility to ensure the ChunkVersion is fixed afterwards.

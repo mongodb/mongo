@@ -37,6 +37,7 @@
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard_collection.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/namespace_string_util.h"
@@ -773,7 +774,7 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     //
     // The lack of this means we're free to proceed with a clear of the metadata.
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
-        recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
+        recoverer->onOplogEntry(op.getTimestamp(), entry);
     } else {
         // TODO (SERVER-127444): Remove this `setNonAuthoritative` and `getNonAuth`.
         if (entry.getNonAuth())
@@ -783,6 +784,69 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
 
         scopedCsr->clearCollectionMetadata(opCtx, entry.getForDroppedCollection());
     }
+}
+
+void ShardServerOpObserver::onApplyCollectionShardingStateDelta(OperationContext* opCtx,
+                                                                const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
+    tassert(12698705,
+            "CollectionShardingStateDelta oplog entry is missing the collection UUID",
+            op.getUuid());
+
+    const auto nss =
+        CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
+
+    const auto entry = CollectionShardingStateDeltaOplogEntry::parse(
+        op.getObject(), IDLParserContext("CollectionShardingStateDeltaOplogEntryContext"));
+
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+
+    // If cache recovery is in progress, defer applying the delta update until the recovery has
+    // installed the durable metadata snapshot read from disk. The recoverer will replay this oplog
+    // entry on top of that snapshot before the CSR publishes the recovered metadata.
+    if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
+        recoverer->onOplogEntry(op.getTimestamp(), entry);
+        return;
+    }
+
+    // Without known collection metadata there is no base to apply this delta to. Clear the
+    // in-memory metadata so the next user performs a full recovery from disk.
+    const auto collectionUuid = *op.getUuid();
+    auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
+    if (!currentMetadata) {
+        scopedCsr->setAuthoritative();
+        scopedCsr->clearCollectionMetadata(opCtx);
+        return;
+    }
+
+    tassert(12698706,
+            str::stream() << "Known metadata for " << nss.toStringForErrorMsg()
+                          << " has no routing table",
+            currentMetadata->hasRoutingTable());
+
+    tassert(12698707,
+            str::stream()
+                << "Known metadata for " << nss.toStringForErrorMsg() << " has collection UUID "
+                << currentMetadata->getUUID()
+                << ", but applyCollectionShardingStateDelta oplog entry is for collection UUID "
+                << collectionUuid,
+            currentMetadata->uuidMatches(collectionUuid));
+
+    const auto collPlacementVersion = currentMetadata->getCollPlacementVersion();
+
+    scopedCsr->setAuthoritative();
+    scopedCsr->setCollectionMetadata(
+        opCtx,
+        currentMetadata->makeUpdated(
+            ChunkType::parseConfigBSONDocuments(entry.getChangedChunks(),
+                                                currentMetadata->getUUID(),
+                                                collPlacementVersion.epoch(),
+                                                collPlacementVersion.getTimestamp())),
+        CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 }
 
 void ShardServerOpObserver::onSetAllowChunkOperations(OperationContext* opCtx,

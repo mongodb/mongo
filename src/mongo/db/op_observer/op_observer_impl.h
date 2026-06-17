@@ -298,6 +298,9 @@ public:
 
     void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) final {}
 
+    void onApplyCollectionShardingStateDelta(OperationContext* opCtx,
+                                             const repl::OplogEntry& op) final {}
+
     void onTruncateRange(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const RecordId& minRecordId,
