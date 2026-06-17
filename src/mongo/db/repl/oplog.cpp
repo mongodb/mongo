@@ -3042,7 +3042,12 @@ Status applyContainerOperations(OperationContext* opCtx,
         shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork();
     const bool assignOperationTimestamp =
         shouldAssignTimestampForOplogApplication(*opCtx, alreadyInWriteUnitOfWork, mode);
-    const auto timestamp = firstOp->getApplyOpsTimestamp().value_or(firstOp->getTimestamp());
+    // Commit at getTimestamp(), the timestamp the whole applyOps chain commits at (the chain's
+    // terminal entry optime), so these container ops commit together with the rest of the chain.
+    // getApplyOpsTimestamp() is instead the optime of the individual applyOps entry an op was
+    // extracted from; committing there would split the chain across different timestamps. The two
+    // are equal when the chain is a single applyOps entry.
+    const auto timestamp = firstOp->getTimestamp();
     // If it is determined we need to set a timestamp for this operation, there should be one. It's
     // possible for 'assignOperationTimestamp' to be false while a timestamp is supplied, we will
     // ignore it below.
@@ -3087,9 +3092,9 @@ Status applyContainerOperations(OperationContext* opCtx,
                 op->isContainerOpType());
         uassert(12337302,
                 str::stream() << "Grouped container ops must share a commit timestamp. Found "
-                              << op->getApplyOpsTimestamp().value_or(op->getTimestamp()).toString()
-                              << " but expected " << timestamp.toString(),
-                op->getApplyOpsTimestamp().value_or(op->getTimestamp()) == timestamp);
+                              << op->getTimestamp().toString() << " but expected "
+                              << timestamp.toString(),
+                op->getTimestamp() == timestamp);
 
         const auto ident = *op->getContainer();
         const BSONObj o = op->getObject();

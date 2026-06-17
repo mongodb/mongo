@@ -648,12 +648,15 @@ StatusWith<std::vector<ApplierOperation>::const_iterator> groupAndApplyContainer
     const auto groupNss = op->getNss();
     const auto groupIdent = op->getContainer();
     const auto& groupVCtx = op->getVersionContext();
-    const auto groupTs = op->getApplyOpsTimestamp().get_value_or(op->getTimestamp());
+    // Group by getTimestamp(), the timestamp the whole applyOps chain commits at, so container ops
+    // from one chain stay in the same group and commit together. getApplyOpsTimestamp() is the
+    // per-entry optime and would split them. See applyContainerOperations.
+    const auto groupTs = op->getTimestamp();
 
     auto groupEnd = std::find_if(it + 1, end, [&](const ApplierOperation& nextOp) {
         return !nextOp->isContainerOpType() || nextOp->getNss() != groupNss ||
             nextOp->getContainer() != groupIdent || nextOp->getVersionContext() != groupVCtx ||
-            nextOp->getApplyOpsTimestamp().get_value_or(nextOp->getTimestamp()) != groupTs;
+            nextOp->getTimestamp() != groupTs;
     });
 
     const size_t groupSize = std::distance(it, groupEnd);

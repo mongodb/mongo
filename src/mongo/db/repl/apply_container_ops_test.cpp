@@ -29,11 +29,14 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
+#include "mongo/db/repl/container_oplog_entry_serialization.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -83,6 +86,20 @@ DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
         .oField = o,
         .wallClockTime = Date_t::now(),
     };
+}
+
+// Builds a container-insert ReplOperation suitable for nesting inside an applyOps entry.
+ReplOperation makeContainerInsertReplOp(StringData ident, int64_t key, BSONBinData value) {
+    ContainerInsertOplogEntryO o;
+    o.setKey(ContainerKey(key));
+    o.setValue(ContainerVal(std::span<const char>{static_cast<const char*>(value.data),
+                                                  static_cast<size_t>(value.length)}));
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kContainerInsert);
+    op.setNss(NamespaceString::kContainerNamespace);
+    op.setContainer(ident);
+    op.setObject(o.toBSON());
+    return op;
 }
 
 class ApplyContainerOpsTest : public ServiceContextMongoDTest {
@@ -314,76 +331,100 @@ TEST_F(ApplyContainerOpsTest, ContainerOpApplyIntKey) {
     ASSERT_EQ(0, std::memcmp(g3.getValue().get(), v3.data, v3.length));
 }
 
-TEST_F(ApplyContainerOpsTest, ContainerOpsApplyOpsTimestampVisibility) {
-    const auto commitTs = Timestamp(20, 1);
-    const auto earlierTs = Timestamp(10, 1);
-
-    const int64_t k = 1;
-    const auto v = BSONBinData("A", 1, BinDataGeneral);
-    auto entry = makeContainerInsertOplogEntry(OpTime(), _intIdent, k, v);
-
-    // Having an applyOps timestamp and non-replicated writes matches the conditions of secondary
-    // application of container ops in a wrapping apply ops
-    entry.setApplyOpsTimestamp(commitTs);
-    {
-        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        ASSERT_OK(applyContainerOpHelper(_opCtx.get(), entry));
+// Fixture for applying container ops through the full secondary oplog applier path.
+class ContainerChainApplyTest : public OplogApplierImplTest {
+protected:
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        auto* se = _opCtx->getServiceContext()->getStorageEngine();
+        _intIdent = se->generateNewInternalIdent();
+        auto ru = se->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        _trsInt = se->getEngine()->makeInternalRecordStore(*ru, _intIdent, KeyFormat::Long);
+        swt.commit();
     }
 
-    auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
+    std::string _intIdent;
+    std::unique_ptr<RecordStore> _trsInt;
+};
 
-    // A read prior to the apply ops' timestamp should not see the write.
-    ru->abandonSnapshot();
-    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, earlierTs);
-    auto missing = _get(_opCtx.get(), _intIdent, k);
-    ASSERT_EQ(missing.getStatus(), ErrorCodes::NoSuchKey);
-
-    // A read at or after the apply ops' timestamp should see the write.
-    ru->abandonSnapshot();
-    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, commitTs);
-    auto visible = _get(_opCtx.get(), _intIdent, k);
-    ASSERT_OK(visible.getStatus());
-    ASSERT_EQ(0, std::memcmp(visible.getValue().get(), v.data, v.length));
-
-    ru->abandonSnapshot();
-    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
-}
-
-TEST_F(ApplyContainerOpsTest, GroupedContainerOpsApplyOpsTimestampVisibility) {
-    const auto commitTs = Timestamp(20, 1);
+// A multi-entry applyOps chain of container ops applied as a secondary commits all of its ops
+// together at the chain's commit (terminal) optime, not at the individual entry optimes.
+TEST_F(ContainerChainApplyTest, ChainAppliedThroughApplierCommitsAtCommitOptime) {
+    const auto t1 = Timestamp(15, 1);        // first partial entry
+    const auto t2 = Timestamp(16, 1);        // second partial entry
+    const auto commitTs = Timestamp(20, 1);  // terminal entry optime == commit optime
     const auto earlierTs = Timestamp(10, 1);
 
-    const int64_t k1 = 1;
-    const int64_t k2 = 2;
+    const int64_t k1 = 1, k2 = 2, k3 = 3;
     const auto v1 = BSONBinData("A", 1, BinDataGeneral);
     const auto v2 = BSONBinData("B", 1, BinDataGeneral);
+    const auto v3 = BSONBinData("C", 1, BinDataGeneral);
+    const auto wall = Date_t::now();
 
-    auto insert1 = makeContainerInsertOplogEntry(OpTime(), _intIdent, k1, v1);
-    auto insert2 = makeContainerInsertOplogEntry(OpTime(), _intIdent, k2, v2);
-    auto delete1 = makeContainerDeleteOplogEntry(OpTime(), _intIdent, k1);
-    insert1.setApplyOpsTimestamp(commitTs);
-    insert2.setApplyOpsTimestamp(commitTs);
-    delete1.setApplyOpsTimestamp(commitTs);
+    // Two partial entries linked by prevOpTime, then the terminal entry at the commit optime. Each
+    // entry's applyOps array holds one container insert.
+    auto partial1 = makeApplyOpsOplogEntry(OpTime(t1, 1),
+                                           {makeContainerInsertReplOp(_intIdent, k1, v1)},
+                                           {},
+                                           wall,
+                                           {},
+                                           OpTime(),
+                                           boost::none,
+                                           ApplyOpsType::kPartial);
+    auto partial2 = makeApplyOpsOplogEntry(OpTime(t2, 1),
+                                           {makeContainerInsertReplOp(_intIdent, k2, v2)},
+                                           {},
+                                           wall,
+                                           {},
+                                           OpTime(t1, 1),
+                                           boost::none,
+                                           ApplyOpsType::kPartial);
+    auto terminal = makeApplyOpsOplogEntry(OpTime(commitTs, 1),
+                                           {makeContainerInsertReplOp(_intIdent, k3, v3)},
+                                           {},
+                                           wall,
+                                           {},
+                                           OpTime(t2, 1),
+                                           boost::none,
+                                           ApplyOpsType::kTerminal);
 
-    {
-        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        std::vector<ApplierOperation> ops{{&insert1}, {&insert2}, {&delete1}};
-        ASSERT_OK(applyContainerOperations(_opCtx.get(), ops, OplogApplication::Mode::kSecondary));
+    // Production extraction: the partial entries are the in-batch cachedOps, the terminal entry
+    // drives the walk. Every op carries the terminal commit optime; getApplyOpsTimestamp() keeps
+    // the source entry's optime.
+    std::vector<OplogEntry*> cachedOps{&partial1, &partial2};
+    auto ops = readTransactionOperationsFromOplogChain(_opCtx.get(), terminal, cachedOps);
+    ASSERT_EQ(ops.size(), 3u);
+    for (const auto& op : ops) {
+        EXPECT_TRUE(op.isContainerOpType());
+        EXPECT_EQ(op.getTimestamp(), commitTs);
     }
+    ASSERT_TRUE(ops[0].getApplyOpsTimestamp());
+    ASSERT_TRUE(ops[1].getApplyOpsTimestamp());
+    ASSERT_TRUE(ops[2].getApplyOpsTimestamp());
+    EXPECT_EQ(*ops[0].getApplyOpsTimestamp(), t1);
+    EXPECT_EQ(*ops[1].getApplyOpsTimestamp(), t2);
+    EXPECT_EQ(*ops[2].getApplyOpsTimestamp(), commitTs);
 
+    // Apply through the real per-worker path, which groups the ops and commits them.
+    ASSERT_OK(runOpsSteadyState(ops));
+
+    // Nothing is visible before the commit optime -- including at the partial entries' optimes --
+    // and all three keys become visible together at the commit optime.
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
-
-    ru->abandonSnapshot();
-    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, earlierTs);
-    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
-    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k2).getStatus(), ErrorCodes::NoSuchKey);
+    for (auto readTs : {earlierTs, t1, t2}) {
+        ru->abandonSnapshot();
+        ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, readTs);
+        EXPECT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
+        EXPECT_EQ(_get(_opCtx.get(), _intIdent, k2).getStatus(), ErrorCodes::NoSuchKey);
+        EXPECT_EQ(_get(_opCtx.get(), _intIdent, k3).getStatus(), ErrorCodes::NoSuchKey);
+    }
 
     ru->abandonSnapshot();
     ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, commitTs);
-    ASSERT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
-    auto visible = _get(_opCtx.get(), _intIdent, k2);
-    ASSERT_OK(visible.getStatus());
-    ASSERT_EQ(0, std::memcmp(visible.getValue().get(), v2.data, v2.length));
+    ASSERT_OK(_get(_opCtx.get(), _intIdent, k1).getStatus());
+    ASSERT_OK(_get(_opCtx.get(), _intIdent, k2).getStatus());
+    ASSERT_OK(_get(_opCtx.get(), _intIdent, k3).getStatus());
 
     ru->abandonSnapshot();
     ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
@@ -423,6 +464,45 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsSingleOpTimestampVisibility) {
     ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
 }
 
+// A group of container ops sharing one oplog entry timestamp commits together at that timestamp.
+// The delete cancels the first insert, so at the commit timestamp only k2 is visible and nothing
+// is visible before it.
+TEST_F(ApplyContainerOpsTest, GroupedContainerOpsTimestampVisibility) {
+    const auto commitTs = Timestamp(20, 1);
+    const auto earlierTs = Timestamp(10, 1);
+
+    const int64_t k1 = 1;
+    const int64_t k2 = 2;
+    const auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    const auto v2 = BSONBinData("B", 1, BinDataGeneral);
+
+    auto insert1 = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _intIdent, k1, v1);
+    auto insert2 = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _intIdent, k2, v2);
+    auto delete1 = makeContainerDeleteOplogEntry(OpTime(commitTs, 0), _intIdent, k1);
+
+    {
+        repl::UnreplicatedWritesBlock uwb(_opCtx.get());
+        std::vector<ApplierOperation> ops{{&insert1}, {&insert2}, {&delete1}};
+        ASSERT_OK(applyContainerOperations(_opCtx.get(), ops, OplogApplication::Mode::kSecondary));
+    }
+
+    auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, earlierTs);
+    EXPECT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
+    EXPECT_EQ(_get(_opCtx.get(), _intIdent, k2).getStatus(), ErrorCodes::NoSuchKey);
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kProvided, commitTs);
+    EXPECT_EQ(_get(_opCtx.get(), _intIdent, k1).getStatus(), ErrorCodes::NoSuchKey);
+    auto visible = _get(_opCtx.get(), _intIdent, k2);
+    ASSERT_OK(visible.getStatus());
+    ASSERT_EQ(0, std::memcmp(visible.getValue().get(), v2.data, v2.length));
+
+    ru->abandonSnapshot();
+    ru->setTimestampReadSource(mongo::RecoveryUnit::ReadSource::kNoTimestamp);
+}
 
 TEST_F(ApplyContainerOpsTest, ApplyContainerOpInvalidOpType) {
     auto k = 1;
@@ -446,12 +526,12 @@ TEST_F(ApplyContainerOpsTest, ApplyContainerOpsRejectsMismatchedTimestamps) {
     const auto ts1 = Timestamp(10, 1);
     const auto ts2 = Timestamp(20, 1);
 
-    auto insert1 =
-        makeContainerInsertOplogEntry(OpTime(), _intIdent, 1, BSONBinData("A", 1, BinDataGeneral));
-    auto insert2 =
-        makeContainerInsertOplogEntry(OpTime(), _intIdent, 2, BSONBinData("B", 1, BinDataGeneral));
-    insert1.setApplyOpsTimestamp(ts1);
-    insert2.setApplyOpsTimestamp(ts2);
+    // The shared-commit-timestamp invariant is on getTimestamp(); ops grouped into one
+    // applyContainerOperations call must agree on it.
+    auto insert1 = makeContainerInsertOplogEntry(
+        OpTime(ts1, 0), _intIdent, 1, BSONBinData("A", 1, BinDataGeneral));
+    auto insert2 = makeContainerInsertOplogEntry(
+        OpTime(ts2, 0), _intIdent, 2, BSONBinData("B", 1, BinDataGeneral));
 
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     std::vector<ApplierOperation> ops{{&insert1}, {&insert2}};
@@ -467,10 +547,9 @@ TEST_F(ApplyContainerOpsTest, GroupedContainerOpsMidBatchFailureRollsBack) {
     const int64_t kMissing = 2;
     const auto v1 = BSONBinData("A", 1, BinDataGeneral);
 
-    auto insert1 = makeContainerInsertOplogEntry(OpTime(), _intIdent, k1, v1);
-    auto updateMissing = makeContainerUpdateOplogEntry(OpTime(), _intIdent, kMissing, v1);
-    insert1.setApplyOpsTimestamp(commitTs);
-    updateMissing.setApplyOpsTimestamp(commitTs);
+    auto insert1 = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _intIdent, k1, v1);
+    auto updateMissing =
+        makeContainerUpdateOplogEntry(OpTime(commitTs, 0), _intIdent, kMissing, v1);
 
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
