@@ -95,7 +95,7 @@ export function getExpectedId(
     uuid,
     samplingType,
     sampleSize,
-    expectedSchemaVersion,
+    expectedSchemaVersion = 1,
     numChunks = null,
 ) {
     let samplingTypeStr = samplingType;
@@ -140,7 +140,7 @@ export function verifySampleDoc(
         samplingMethod,
         requestedSampleSize,
         actualSampleSize,
-        expectedSchemaVersion,
+        expectedSchemaVersion = 1,
         numChunks = null,
         expectedFields = [],
     },
