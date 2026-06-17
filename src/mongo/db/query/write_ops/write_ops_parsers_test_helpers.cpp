@@ -62,7 +62,8 @@ OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence) {
 write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
                                                    long long keysExamined,
                                                    long long docsExamined,
-                                                   long long nMatched) {
+                                                   long long nMatched,
+                                                   long long nInserted) {
     CursorMetrics metrics;
     metrics.setKeysExamined(keysExamined);
     metrics.setDocsExamined(docsExamined);
@@ -81,7 +82,7 @@ write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
     metrics.setNUpserted(0);
     metrics.setNModified(nMatched);
     metrics.setNDeleted(0);
-    metrics.setNInserted(0);
+    metrics.setNInserted(nInserted);
 
     write_ops::QueryStatsMetrics qsm;
     qsm.setOriginalOpIndex(originalOpIndex);

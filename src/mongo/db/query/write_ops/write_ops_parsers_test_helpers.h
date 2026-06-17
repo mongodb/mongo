@@ -57,6 +57,7 @@ OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence);
 write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
                                                    long long keysExamined,
                                                    long long docsExamined,
-                                                   long long nMatched);
+                                                   long long nMatched,
+                                                   long long nInserted = 0);
 
 }  // namespace mongo
