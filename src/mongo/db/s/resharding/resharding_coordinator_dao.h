@@ -113,7 +113,7 @@ public:
 
     /*
      * Updates every donor shards' DocumentsToCopy value on coordinator document in the cloning
-     * phase. Will throw if called in any other phase.
+     * phase. Will invariant if called in any other phase.
      */
     ReshardingCoordinatorDocument updateNumberOfDocsToCopy(
         OperationContext* opCtx,

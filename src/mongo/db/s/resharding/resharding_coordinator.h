@@ -91,6 +91,15 @@ public:
     }
 
     /**
+     * Returns whether the operation has been aborted or the node is stepping down/shutting down.
+     * Since the abort token is a child of the stepdown token, this is equivalent to checking
+     * whether the abort token has been canceled.
+     */
+    bool isAbortedOrSteppingDown() {
+        return _abortToken.isCanceled();
+    }
+
+    /**
      * Cancels the source for the abort token and sets the abort reason to indicate that the
      * resharding operation has been aborted.
      */
@@ -421,11 +430,10 @@ private:
                                  std::shared_ptr<otel::TelemetryContext> telemetryCtx);
 
     /**
-     * If verification is enabled, fetches the number of documents to clone from all donor shards
-     * involved in resharding and persists the value for each donor shard in the coordinator state
-     * document.
+     * If verification is enabled, fetches the number of documents to clone from all donor shards.
+     * Returns the per-shard counts.
      */
-    ExecutorFuture<void> _fetchAndPersistNumDocumentsToCloneFromDonors(
+    ExecutorFuture<std::map<ShardId, int64_t>> _fetchNumDocumentsToCloneFromDonors(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
@@ -759,7 +767,7 @@ private:
     std::shared_ptr<ReshardingRecipientPostCloningDeltaCollector> _recipientDeltaCollector;
     boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _recipientDeltaFuture;
 
-    boost::optional<SharedSemiFuture<void>> _fetchNumDocumentsToCopyFuture;
+    boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _fetchNumDocumentsToCopyFuture;
 
     std::shared_ptr<ReshardingCoordinatorExternalState> _reshardingCoordinatorExternalState;
 

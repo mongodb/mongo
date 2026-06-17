@@ -1455,7 +1455,7 @@ void ReshardingCoordinator::_launchDonorValidations(
     std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     _tellAllDonorsToStartChangeStreamsMonitor(executor);
 
-    if (_fetchNumDocumentsToCopyFuture) {
+    if (_fetchNumDocumentsToCopyFuture || !_metadata.getPerformVerification()) {
         return;
     }
 
@@ -1463,20 +1463,21 @@ void ReshardingCoordinator::_launchDonorValidations(
     auto span = _startSpan(telemetryCtx,
                            otel::traces::span_names::
                                kReshardingCoordinatorFetchAndPersistNumDocumentsToCloneFromDonors);
-    _fetchNumDocumentsToCopyFuture =
-        _fetchAndPersistNumDocumentsToCloneFromDonors(executor).share();
+    _fetchNumDocumentsToCopyFuture = _fetchNumDocumentsToCloneFromDonors(executor).share();
 }
 
-ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors(
+ExecutorFuture<std::map<ShardId, int64_t>>
+ReshardingCoordinator::_fetchNumDocumentsToCloneFromDonors(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    // The exact numbers of documents to copy are only need for verification so don't fetch them if
-    // verification is not enabled. Also, if they have already fetched, don't fetch again. We only
-    // need to check 'documentsToCopy' on the first entry because it will either be set on all
-    // entries or on none of them.
-    bool needToFetch = _metadata.getPerformVerification() &&
-        !_coordinatorDoc.getDonorShards().front().getDocumentsToCopy().has_value();
-    if (!needToFetch) {
-        return ExecutorFuture<void>(**executor, Status::OK());
+    // If documentsToCopy was already persisted (e.g. after a step-down), return the existing
+    // values. We only check the first entry because it is either set on all donor shards or on none
+    // of them.
+    const auto& donorShards = _coordinatorDoc.getDonorShards();
+    if (donorShards.front().getDocumentsToCopy().has_value()) {
+        std::map<ShardId, int64_t> existing;
+        for (const auto& shard : donorShards)
+            existing[shard.getId()] = *shard.getDocumentsToCopy();
+        return ExecutorFuture<std::map<ShardId, int64_t>>(**executor, std::move(existing));
     }
 
     auto fetchToken = _ctHolder->createDocumentFetchToken();
@@ -1491,95 +1492,70 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
 
     LOGV2(9858100,
           "Start fetching the number of documents to copy from all donor shards",
-          "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+          "reshardingUUID"_attr = _metadata.getReshardingUUID());
 
     invariant(_coordinatorDoc.getCloneTimestamp());
 
-    return resharding::WithAutomaticRetry([this, executor, fetchToken, fetchOpCtxFactory] {
-               return ExecutorFuture<void>(**executor)
-                   .then([this,
-                          anchor = shared_from_this(),
-                          executor,
-                          fetchToken,
-                          fetchOpCtxFactory] {
-                       auto opCtx = resharding::makeReshardingOperationContext(
-                           *fetchOpCtxFactory, false, _forwardableOpMetadata);
+    return resharding::WithAutomaticRetry(
+               [this, executor, fetchToken, fetchOpCtxFactory, coordinatorDoc = _coordinatorDoc] {
+                   return ExecutorFuture<void>(**executor)
+                       .then([this,
+                              anchor = shared_from_this(),
+                              executor,
+                              fetchToken,
+                              fetchOpCtxFactory,
+                              coordinatorDoc] {
+                           auto opCtx = resharding::makeReshardingOperationContext(
+                               *fetchOpCtxFactory, false, _forwardableOpMetadata);
 
-                       // If running in "relaxed" mode, instruct the receiving shards to ignore
-                       // collection uuid mismatches between the local and sharding catalogs.
-                       boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
-                           routerRelaxCollectionUUIDConsistencyCheckBlock(
-                               boost::in_place_init_if, _coordinatorDoc.getRelaxed(), opCtx.get());
+                           // If running in "relaxed" mode, instruct the receiving shards to ignore
+                           // collection uuid mismatches between the local and sharding catalogs.
+                           boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
+                               routerRelaxCollectionUUIDConsistencyCheckBlock(
+                                   boost::in_place_init_if,
+                                   coordinatorDoc.getRelaxed(),
+                                   opCtx.get());
 
-                       // Use a CollectionRouter because we'll target shards according to a cached
-                       // routing table and send shard-versioned commands to them.
-                       const auto routingInformationCache =
-                           RoutingInformationCache::get(opCtx.get());
-                       sharding::router::CollectionRouter router(
-                           opCtx.get(), routingInformationCache, _coordinatorDoc.getSourceNss());
-                       return router.route(
-                           "Resharding: Fetching the number of documents to copy from each shard",
-                           [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
-                               std::map<ShardId, ShardVersion> donorShardVersions;
-                               {
-                                   uassertStatusOK(routingInformationCache
-                                                       ->getCollectionPlacementInfoWithRefresh(
-                                                           opCtx, _coordinatorDoc.getSourceNss()));
-                                   auto cri = uassertStatusOK(
-                                       routingInformationCache->getCollectionRoutingInfoAt(
-                                           opCtx,
-                                           _coordinatorDoc.getSourceNss(),
-                                           _coordinatorDoc.getCloneTimestamp().get()));
-                                   for (const auto& donorShard : _coordinatorDoc.getDonorShards()) {
-                                       donorShardVersions.emplace(
-                                           donorShard.getId(),
-                                           cri.getShardVersion(donorShard.getId()));
+                           // Use a CollectionRouter because we'll target shards according to a
+                           // cached routing table and send shard-versioned commands to them.
+                           const auto routingInformationCache =
+                               RoutingInformationCache::get(opCtx.get());
+                           sharding::router::CollectionRouter router(
+                               opCtx.get(), routingInformationCache, _metadata.getSourceNss());
+                           return router.route(
+                               "Resharding: Fetching the number of documents to copy from each "
+                               "shard",
+                               [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
+                                   std::map<ShardId, ShardVersion> donorShardVersions;
+                                   {
+                                       uassertStatusOK(routingInformationCache
+                                                           ->getCollectionPlacementInfoWithRefresh(
+                                                               opCtx, _metadata.getSourceNss()));
+                                       auto cri = uassertStatusOK(
+                                           routingInformationCache->getCollectionRoutingInfoAt(
+                                               opCtx,
+                                               _metadata.getSourceNss(),
+                                               *coordinatorDoc.getCloneTimestamp()));
+                                       for (const auto& donorShard :
+                                            coordinatorDoc.getDonorShards()) {
+                                           donorShardVersions.emplace(
+                                               donorShard.getId(),
+                                               cri.getShardVersion(donorShard.getId()));
+                                       }
                                    }
-                               }
 
-                               return _reshardingCoordinatorExternalState
-                                   ->getDocumentsToCopyFromDonors(
-                                       opCtx,
-                                       **executor,
-                                       fetchToken,
-                                       _coordinatorDoc.getReshardingUUID(),
-                                       _coordinatorDoc.getSourceNss(),
-                                       _coordinatorDoc.getCloneTimestamp().get(),
-                                       donorShardVersions);
-                           });
-                   })
-                   .then([this, fetchToken](std::map<ShardId, int64_t> documentsToCopy) {
-                       uassert(ErrorCodes::CallbackCanceled,
-                               "documentsToCopy fetch cancelled",
-                               !fetchToken.isCanceled());
-
-                       auto& donorShards = _coordinatorDoc.getDonorShards();
-                       // Before passing in the documentsToCopy map into the dao function, we need
-                       // to verify that the map contains only the shard ids for the donor shards of
-                       // this resharding operation.
-                       tassert(10324200,
-                               str::stream() << "Number of shards from documentsToCopy does not "
-                                                "match expected number of donor shards.",
-                               documentsToCopy.size() == donorShards.size());
-                       for (auto& donorShard : donorShards) {
-                           auto it = documentsToCopy.find(donorShard.getId());
-                           tassert(10324201,
-                                   str::stream() << "Donor shard " << donorShard.getId()
-                                                 << " not found in documentsToCopy map",
-                                   it != documentsToCopy.end());
-                       }
-                       auto opCtx = _makeOperationContext();
-                       auto updatedCoordinatorDoc =
-                           _coordinatorDao.updateNumberOfDocsToCopy(opCtx.get(), documentsToCopy);
-                       _installCoordinatorDoc(updatedCoordinatorDoc);
-
-                       LOGV2(9858106,
-                             "Finished fetching the number of documents to copy from all donor "
-                             "shards",
-                             "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
-                       return Status::OK();
-                   });
-           })
+                                   return _reshardingCoordinatorExternalState
+                                       ->getDocumentsToCopyFromDonors(
+                                           opCtx,
+                                           **executor,
+                                           fetchToken,
+                                           _metadata.getReshardingUUID(),
+                                           _metadata.getSourceNss(),
+                                           *coordinatorDoc.getCloneTimestamp(),
+                                           donorShardVersions);
+                               });
+                       });
+               })
         .onTransientError([](const Status& status) {
             LOGV2(1003571,
                   "Resharding coordinator encountered transient error while fetching the number of "
@@ -1589,19 +1565,10 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
         .onUnrecoverableError([](const Status& status) {
             LOGV2(10494619,
                   "Resharding coordinator encountered unrecoverable error while fetching the "
-                  "number of "
-                  "documents to copy from donor shards",
+                  "number of documents to copy from donor shards",
                   "error"_attr = status);
         })
-        .runOn(**executor, fetchToken)
-        .then([this] {
-            _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
-                                resharding::getCurrentTime());
-            // Wait for the update to the coordinator doc to be majority committed before moving to
-            // the next step.
-            return resharding::waitForMajority(_ctHolder->getAbortToken(),
-                                               *_cancelableOpCtxFactory);
-        });
+        .runOn(**executor, fetchToken);
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
@@ -1616,7 +1583,8 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
         _fetchNumDocumentsToCopyFuture);
 
     const Seconds timeout{resharding::gReshardingFetchDocumentsToCopyTimeoutSecs.load()};
-    auto timeoutFuture = sleepFor(**executor, timeout).then([] {
+    // timeoutFuture must match the value type of _fetchNumDocumentsToCopyFuture for whenAny.
+    auto timeoutFuture = sleepFor(**executor, timeout).then([]() -> std::map<ShardId, int64_t> {
         uasserted(ErrorCodes::ExceededTimeLimit,
                   "Timed out waiting for documentsToCopy fetch from donor shards");
     });
@@ -1627,32 +1595,65 @@ ExecutorFuture<void> ReshardingCoordinator::_verifyClonedCollection(
                _ctHolder->getAbortToken())
         .thenRunOn(**executor)
         .then([](auto result) { return result.result; })
-        .onCompletion([this, executor](Status status) {
-            if (ErrorCodes::isCancellationError(status)) {
-                uassertStatusOK(status);
+        .onCompletion([this](StatusWith<std::map<ShardId, int64_t>> swDocsToCopy) -> bool {
+            if (_ctHolder->isAbortedOrSteppingDown()) {
+                return false;
             }
 
-            if (!status.isOK()) {
+            _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                                resharding::getCurrentTime());
+
+            if (!swDocsToCopy.isOK()) {
                 _ctHolder->cancelDocumentFetch();
 
                 LOGV2(12042401,
                       "Skipping cloning verification: documentsToCopy fetch from donor "
                       "shards timed out or failed",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "error"_attr = status);
-                return;
+                      "error"_attr = swDocsToCopy.getStatus());
+                return false;
             }
 
-            // Re-read the coordinator doc from disk so we see the documentsToCopy values
-            // written by the fetch.
+            const auto& documentsToCopy = swDocsToCopy.getValue();
+            const auto& donorShards = _coordinatorDoc.getDonorShards();
+            if (documentsToCopy.size() != donorShards.size() ||
+                std::any_of(donorShards.begin(), donorShards.end(), [&](const auto& s) {
+                    return !documentsToCopy.count(s.getId());
+                })) {
+                LOGV2(10324200,
+                      "Skipping cloning verification: documentsToCopy map does not match donor "
+                      "shards",
+                      "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                      "expectedSize"_attr = donorShards.size(),
+                      "actualSize"_attr = documentsToCopy.size());
+                return false;
+            }
+
             auto opCtx = _makeOperationContext();
-            auto coordinatorDoc =
-                resharding::getCoordinatorDoc(opCtx.get(), _metadata.getReshardingUUID());
-            _reshardingCoordinatorExternalState->verifyClonedCollection(
-                opCtx.get(), **executor, _ctHolder->getAbortToken(), coordinatorDoc);
-            LOGV2(9858412,
-                  "Verification before applying completed",
+            auto updatedCoordinatorDoc =
+                _coordinatorDao.updateNumberOfDocsToCopy(opCtx.get(), documentsToCopy);
+            _installCoordinatorDoc(updatedCoordinatorDoc);
+
+            LOGV2(9858106,
+                  "Finished fetching the number of documents to copy from all donor shards",
                   "reshardingUUID"_attr = _metadata.getReshardingUUID());
+            return true;
+        })
+        .then([this, executor](bool shouldVerify) -> ExecutorFuture<void> {
+            if (!shouldVerify) {
+                return ExecutorFuture<void>(**executor);
+            }
+
+            return resharding::waitForMajority(_ctHolder->getAbortToken(), *_cancelableOpCtxFactory)
+                .thenRunOn(**executor)
+                .then([this, executor] {
+                    auto opCtx = _makeOperationContext();
+                    _reshardingCoordinatorExternalState->verifyClonedCollection(
+                        opCtx.get(), **executor, _ctHolder->getAbortToken(), _coordinatorDoc);
+                    LOGV2(9858412,
+                          "Verification before applying completed",
+                          "reshardingUUID"_attr = _metadata.getReshardingUUID());
+                });
         });
 }
 

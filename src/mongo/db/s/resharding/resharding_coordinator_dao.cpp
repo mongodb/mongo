@@ -230,11 +230,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::updateNumberOfDocsToCopy
 
     auto client = _clientFactory->createDaoStorageClient(txnNumber);
     auto doc = client->readState(opCtx, _reshardingUUID);
-    // The coordinator may have transitioned past kCloning while the background fetch was
-    // in flight. Throw rather than crash so the error is dropped through the detached chain.
-    uassert(ErrorCodes::IllegalOperation,
-            "Cannot persist documentsToCopy when coordinator is no longer in kCloning",
-            doc.getState() == CoordinatorStateEnum::kCloning);
+    invariant(doc.getState() == CoordinatorStateEnum::kCloning);
 
     BSONObjBuilder updateBuilder = _documentsCopyUpdateBuilder(
         doc, documentsToCopy, DonorShardEntry::kDocumentsToCopyFieldName);
