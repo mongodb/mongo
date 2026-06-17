@@ -11,8 +11,8 @@ import {
     getQueryShapeHashSetFromSlowLogs,
     getQueryStatsUpdateCmd,
     resetQueryStatsStore,
-    resetUpdateTestCollections,
 } from "jstests/libs/query/query_stats_utils.js";
+import {resetTestCollectionsShardedCluster} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test data to insert into collections.
@@ -121,7 +121,7 @@ describe("QueryShapeHash Consistency: mongos $queryStats vs mongod slow query lo
     });
 
     beforeEach(function () {
-        resetUpdateTestCollections({
+        resetTestCollectionsShardedCluster({
             routerDB: this.routerDB,
             unshardedCollName: this.collNames.unsharded,
             shardedCollName: this.collNames.sharded,

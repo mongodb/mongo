@@ -1,5 +1,5 @@
 /**
- * Test that $queryStats properly tokenizes delete commands on mongod.
+ * Test that $queryStats properly tokenizes delete commands on mongod and mongos.
  *
  * @tags: [featureFlagQueryStatsDelete]
  */
@@ -10,6 +10,7 @@ import {
     kHashedIdField,
 } from "jstests/libs/query/query_stats_utils.js";
 import {runTokenizationTestsForTopology} from "jstests/libs/query/query_stats_write_cmd_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const collName = jsTestName();
 
@@ -94,20 +95,37 @@ function deleteTokenizationTests(ctxFn) {
     });
 }
 
-// Delete query stats are only registered on mongod (not on mongos/router), so we only
-// run these tokenization tests against a standalone mongod.
 runTokenizationTestsForTopology(
     "delete command one way tokenization (Standalone)",
     () => {
         const conn = MongoRunner.runMongod({
             setParameter: {
-                internalQueryStatsRateLimit: -1,
                 internalQueryStatsWriteCmdSampleRate: 1,
             },
         });
         return {fixture: conn, testDB: conn.getDB("test")};
     },
     (fixture) => MongoRunner.stopMongod(fixture),
+    {collName, initialDocs: [{v: 1}, {v: 2}, {v: 3}]},
+    deleteTokenizationTests,
+);
+
+runTokenizationTestsForTopology(
+    "delete command one way tokenization (Sharded)",
+    () => {
+        const st = new ShardingTest({
+            shards: 2,
+            mongosOptions: {
+                setParameter: {
+                    internalQueryStatsWriteCmdSampleRate: 1,
+                },
+            },
+        });
+        const testDB = st.s.getDB("test");
+        st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+        return {fixture: st, testDB};
+    },
+    (st) => st.stop(),
     {collName, initialDocs: [{v: 1}, {v: 2}, {v: 3}]},
     deleteTokenizationTests,
 );

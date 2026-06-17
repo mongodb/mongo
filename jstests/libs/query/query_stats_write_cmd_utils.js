@@ -58,6 +58,71 @@ export function resetQueryStatsCollection(coll) {
 }
 
 /**
+ * Resets test collections for query stats tests on a sharded cluster.
+ *
+ * Drops and re-populates both an unsharded and sharded collection, creates indexes,
+ * and optionally splits/moves chunks for multi-shard tests.
+ *
+ * @param {object} options
+ * @param {object} options.routerDB - The router (mongos) database connection.
+ * @param {string} options.unshardedCollName - The unsharded collection name.
+ * @param {string} options.shardedCollName - The sharded collection name.
+ * @param {Array} options.testDocuments - Documents to insert into both collections.
+ * @param {object} [options.shardKey={v: 1}] - The shard key to use.
+ * @param {object} [options.st=null] - The ShardingTest instance (required if splitMiddle is set).
+ * @param {object} [options.splitMiddle=null] - The split point (e.g., {v: 4}). If set, chunks will
+ *     be split and the upper chunk moved to shard1.
+ * @param {object} [options.moveChunkFind=null] - The find query for moveChunk (e.g., {v: 5}).
+ *     Required if splitMiddle is set.
+ */
+export function resetTestCollectionsShardedCluster({
+    routerDB,
+    unshardedCollName,
+    shardedCollName,
+    testDocuments,
+    shardKey = {v: 1},
+    st = null,
+    splitMiddle = null,
+    moveChunkFind = null,
+}) {
+    // Reset unsharded collection.
+    const unshardedColl = routerDB[unshardedCollName];
+    unshardedColl.drop();
+    assert.commandWorked(unshardedColl.insert(testDocuments));
+    assert.commandWorked(
+        routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}),
+    );
+
+    // Reset sharded collection.
+    const shardedColl = routerDB[shardedCollName];
+    shardedColl.drop();
+    assert.commandWorked(shardedColl.insert(testDocuments));
+
+    // Create indexes.
+    unshardedColl.createIndex(shardKey);
+    shardedColl.createIndex(shardKey);
+
+    // Shard the sharded collection.
+    assert.commandWorked(
+        routerDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}),
+    );
+
+    // Optionally split and move chunks to distribute data across shards.
+    if (splitMiddle && st) {
+        assert.commandWorked(
+            routerDB.adminCommand({split: shardedColl.getFullName(), middle: splitMiddle}),
+        );
+        assert.commandWorked(
+            routerDB.adminCommand({
+                moveChunk: shardedColl.getFullName(),
+                find: moveChunkFind,
+                to: st.shard1.shardName,
+            }),
+        );
+    }
+}
+
+/**
  * Creates a standard write command query stats test suite on a single-node replica set.
  * Sets up the ReplSet fixture and query stats store / collection reset in hooks, then calls
  * bodyFn with a ctxFn accessor so inner tests can reach {conn, testDB, coll, collName}.
@@ -75,7 +140,6 @@ export function describeWriteCmdQueryStatsReplicaSetTests(label, bodyFn) {
                 nodes: 1,
                 nodeOptions: {
                     setParameter: {
-                        internalQueryStatsRateLimit: -1,
                         internalQueryStatsWriteCmdSampleRate: 1,
                     },
                 },
@@ -97,6 +161,46 @@ export function describeWriteCmdQueryStatsReplicaSetTests(label, bodyFn) {
         });
 
         bodyFn(() => ({conn, testDB, coll, collName}));
+    });
+}
+
+/**
+ * Creates a standard write command query stats test suite on a sharded cluster.
+ * Sets up the ShardingTest fixture and query stats store / collection reset in hooks, then calls
+ * bodyFn with a ctxFn accessor so inner tests can reach {conn, testDB, coll, collName}.
+ *
+ * @param {string} label - outer describe label
+ * @param {Function} bodyFn - function(ctxFn) where ctxFn() => {conn, testDB, coll, collName}
+ */
+export function describeWriteCmdQueryStatsShardedTests(label, bodyFn) {
+    describe(label, function () {
+        let st, testDB, coll;
+        const collName = jsTestName() + "_sharded";
+
+        before(function () {
+            st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {
+                    setParameter: {
+                        internalQueryStatsWriteCmdSampleRate: 1,
+                    },
+                },
+            });
+            testDB = st.s.getDB("test");
+            coll = testDB[collName];
+            st.shardColl(coll, {_id: 1}, {_id: 1});
+        });
+
+        after(function () {
+            st?.stop();
+        });
+
+        beforeEach(function () {
+            resetQueryStatsCollection(coll);
+            resetQueryStatsStore(st.s, "1MB");
+        });
+
+        bodyFn(() => ({st, testDB, coll, collName}));
     });
 }
 

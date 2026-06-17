@@ -10,6 +10,7 @@ import {
     assertWriteCmdQueryStatsSingleExec,
     describeRetryableWriteQueryStatsTests,
     describeWriteCmdQueryStatsReplicaSetTests,
+    describeWriteCmdQueryStatsShardedTests,
 } from "jstests/libs/query/query_stats_write_cmd_utils.js";
 
 function testSingleDelete(testDB, coll, collName) {
@@ -185,3 +186,22 @@ describeWriteCmdQueryStatsReplicaSetTests(
         });
     },
 );
+
+describeWriteCmdQueryStatsShardedTests("query stats delete command metrics (sharded)", (ctxFn) => {
+    describe("delete types", function () {
+        it("should record single delete metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testSingleDelete(testDB, coll, collName);
+        });
+
+        it("should record simple _id delete metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testIdDelete(testDB, coll, collName);
+        });
+
+        it("should record multi delete metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testMultiDelete(testDB, coll, collName);
+        });
+    });
+});

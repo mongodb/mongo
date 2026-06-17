@@ -5,18 +5,15 @@
  *
  * @tags: [requires_fcv_90]
  */
-import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {
-    getQueryStatsUpdateCmd,
-    resetQueryStatsStore,
-} from "jstests/libs/query/query_stats_utils.js";
+
+import {describe, it} from "jstests/libs/mochalite.js";
+import {getQueryStatsUpdateCmd} from "jstests/libs/query/query_stats_utils.js";
 import {
     assertWriteCmdQueryStatsSingleExec,
     describeRetryableWriteQueryStatsTests,
     describeWriteCmdQueryStatsReplicaSetTests,
-    resetQueryStatsCollection,
+    describeWriteCmdQueryStatsShardedTests,
 } from "jstests/libs/query/query_stats_write_cmd_utils.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testReplacementUpdate(testDB, coll, collName) {
     assert.commandWorked(
@@ -194,46 +191,26 @@ describeWriteCmdQueryStatsReplicaSetTests(
     },
 );
 
-describe("query stats update command metrics (sharded)", function () {
-    const collName = jsTestName() + "_sharded";
-    let st;
-    let testDB;
-    let coll;
-
-    before(function () {
-        st = new ShardingTest({
-            shards: 2,
-            mongosOptions: {
-                setParameter: {internalQueryStatsWriteCmdSampleRate: 1},
-            },
+describeWriteCmdQueryStatsShardedTests("query stats update command metrics (sharded)", (ctxFn) => {
+    describe("update types", function () {
+        it("should record replacement update metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testReplacementUpdate(testDB, coll, collName);
         });
-        testDB = st.s.getDB("test");
-        coll = testDB[collName];
-        st.shardColl(coll, {_id: 1}, {_id: 1});
-    });
 
-    after(function () {
-        st?.stop();
-    });
+        it("should record simple _id update metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testIdUpdate(testDB, coll, collName);
+        });
 
-    beforeEach(function () {
-        resetQueryStatsCollection(coll);
-        resetQueryStatsStore(st.s, "1MB");
-    });
+        it("should record modifier update metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testModifierUpdate(testDB, coll, collName);
+        });
 
-    it("should record replacement update metrics", function () {
-        testReplacementUpdate(testDB, coll, collName);
-    });
-
-    it("should record simple _id update metrics", function () {
-        testIdUpdate(testDB, coll, collName);
-    });
-
-    it("should record modifier update metrics", function () {
-        testModifierUpdate(testDB, coll, collName);
-    });
-
-    it("should record pipeline update metrics", function () {
-        testPipelineUpdate(testDB, coll, collName);
+        it("should record pipeline update metrics", function () {
+            const {testDB, coll, collName} = ctxFn();
+            testPipelineUpdate(testDB, coll, collName);
+        });
     });
 });

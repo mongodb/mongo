@@ -51,6 +51,11 @@ export const updateKeyFieldsComplex = [
     "hint",
 ];
 
+export const queryShapeDeleteFieldsRequired = ["cmdNs", "command", "q", "limit"];
+// Delete has the same key fields as updates.
+export const deleteKeyFieldsRequired = [...updateKeyFieldsRequired];
+export const deleteKeyFieldsComplex = [...updateKeyFieldsComplex];
+
 /**
  * Utility for checking that the aggregated queryStats metrics are logical (follows sum >= max >=
  * min, and sum = max = min if only one execution).
@@ -1236,71 +1241,6 @@ export function getQueryShapeHashSetFromSlowLogs({testDB, queryComment, options 
 }
 
 /**
- * Resets test collections for update query stats tests on a sharded cluster.
- *
- * Drops and re-populates both an unsharded and sharded collection, creates indexes,
- * and optionally splits/moves chunks for multi-shard tests.
- *
- * @param {object} options
- * @param {object} options.routerDB - The router (mongos) database connection.
- * @param {string} options.unshardedCollName - The unsharded collection name.
- * @param {string} options.shardedCollName - The sharded collection name.
- * @param {Array} options.testDocuments - Documents to insert into both collections.
- * @param {object} [options.shardKey={v: 1}] - The shard key to use.
- * @param {object} [options.st=null] - The ShardingTest instance (required if splitMiddle is set).
- * @param {object} [options.splitMiddle=null] - The split point (e.g., {v: 4}). If set, chunks will
- *     be split and the upper chunk moved to shard1.
- * @param {object} [options.moveChunkFind=null] - The find query for moveChunk (e.g., {v: 5}).
- *     Required if splitMiddle is set.
- */
-export function resetUpdateTestCollections({
-    routerDB,
-    unshardedCollName,
-    shardedCollName,
-    testDocuments,
-    shardKey = {v: 1},
-    st = null,
-    splitMiddle = null,
-    moveChunkFind = null,
-}) {
-    // Reset unsharded collection.
-    const unshardedColl = routerDB[unshardedCollName];
-    unshardedColl.drop();
-    assert.commandWorked(unshardedColl.insert(testDocuments));
-    assert.commandWorked(
-        routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}),
-    );
-
-    // Reset sharded collection.
-    const shardedColl = routerDB[shardedCollName];
-    shardedColl.drop();
-    assert.commandWorked(shardedColl.insert(testDocuments));
-
-    // Create indexes.
-    unshardedColl.createIndex(shardKey);
-    shardedColl.createIndex(shardKey);
-
-    // Shard the sharded collection.
-    assert.commandWorked(
-        routerDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}),
-    );
-
-    // Optionally split and move chunks to distribute data across shards.
-    if (splitMiddle && st) {
-        assert.commandWorked(
-            routerDB.adminCommand({split: shardedColl.getFullName(), middle: splitMiddle}),
-        );
-        assert.commandWorked(
-            routerDB.adminCommand({
-                moveChunk: shardedColl.getFullName(),
-                find: moveChunkFind,
-                to: st.shard1.shardName,
-            }),
-        );
-    }
-}
-
-/**
  * Filters slow query logs for commands with a specific comment.
  *
  * @param {object} testDB - The database connection to get logs from.
@@ -1345,14 +1285,14 @@ export function getSlowQueryLogs(testDB, queryComment, options = {}) {
                 }
             }
 
-            // Commands like "update" and "delete" produce individual op-level CurOps
-            // (entry.attr.type === commandType) in addition to a top-level command wrapper
-            // (entry.attr.type === "command"). For these, match only the op-level entries so
-            // callers can exclude the wrapper, which carries no queryShapeHash.
-            // Commands like "insert" and "find" produce only a single command-level CurOp
-            // (entry.attr.type === "command"). For these, match by the command name key.
+            // Commands like "update" and "delete" produce individual op-level CurOps in addition to
+            // a top-level command wrapper (entry.attr.type === "command"). Delete ops log with type
+            // "remove". For op-level types, match only the op-level entries so callers can exclude
+            // the wrapper, which carries no queryShapeHash. Commands like "insert" and "find"
+            // produce only a single command-level CurOp (entry.attr.type === "command"). For these,
+            // match by the command name key.
             if (commandType !== null) {
-                const kOpLevelCommandTypes = new Set(["update", "delete"]);
+                const kOpLevelCommandTypes = new Set(["update", "delete", "remove"]);
                 if (kOpLevelCommandTypes.has(commandType)) {
                     if (entry.attr.type !== commandType) {
                         return false;
