@@ -31,3 +31,28 @@ mongo_cc_unit_test(
         ":single_document_lookup_executor",
     ],
 )
+
+# Universal routed fallback strategy: wraps MongoProcessInterface::lookupSingleDocument.
+mongo_cc_library(
+    name = "aggregation_single_document_lookup_executor",
+    srcs = [
+        "aggregation_single_document_lookup_executor.cpp",
+    ],
+    deps = [
+        ":single_document_lookup_executor",
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "aggregation_single_document_lookup_executor_test",
+    srcs = [
+        "aggregation_single_document_lookup_executor_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":aggregation_single_document_lookup_executor",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline/process_interface:stub_mongo_process_interface",
+    ],
+)
