@@ -331,11 +331,23 @@ bool migrationRecipientRecoveryDocumentExists(OperationContext* opCtx,
 
 bool isFirstMigration(OperationContext* opCtx, const NamespaceString& nss) {
     const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-    if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
-        const auto& metadata = *optMetadata;
-        return metadata.isSharded() && !metadata.currentShardHasAnyChunks();
+    if (scopedCsr->getAuthoritativeState() ==
+        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
+        if (scopedCsr->isUnowned()) {
+            return true;
+        }
+        if (const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
+            const auto& metadata = *optMetadata;
+            return metadata.hasRoutingTable() && !metadata.currentShardHasAnyChunks();
+        }
+        return true;
+    } else {
+        if (const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
+            const auto& metadata = *optMetadata;
+            return metadata.isSharded() && !metadata.currentShardHasAnyChunks();
+        }
+        return false;
     }
-    return false;
 }
 
 // Throws if this configShard is currently draining.
