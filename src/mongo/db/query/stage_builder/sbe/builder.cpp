@@ -1060,9 +1060,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
 
     auto vsn = static_cast<const VirtualScanNode*>(root);
 
-    auto [inputTag, inputVal] = sbe::value::makeNewArray();
-    sbe::value::ValueGuard inputGuard{inputTag, inputVal};
-    auto inputView = sbe::value::getArrayView(inputVal);
+    sbe::value::TagValueOwned inputGuard{sbe::value::makeNewArray()};
+    auto inputView = sbe::value::getArrayView(inputGuard.value());
 
     if (vsn->docs.size()) {
         inputView->reserve(vsn->docs.size());
@@ -1072,7 +1071,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
         }
     }
 
-    inputGuard.reset();
+    auto [inputTag, inputVal] = inputGuard.releaseToRaw();
 
     // Make a VirtualScanStage, and then make a ProjectStage to unpack the elements of the array
     // produced by the scan.
@@ -4170,20 +4169,21 @@ public:
                 return SbExpr{boundSlot};
             }
             if (unit) {
-                auto [unitTag, unitVal] = sbe::value::makeNewString(serializeTimeUnit(*unit));
-                sbe::value::ValueGuard unitGuard{unitTag, unitVal};
-                auto [timezoneTag, timezoneVal] = sbe::value::makeNewString("UTC");
-                sbe::value::ValueGuard timezoneGuard{timezoneTag, timezoneVal};
+                sbe::value::TagValueOwned unitGuard{
+                    sbe::value::makeNewString(serializeTimeUnit(*unit))};
+                sbe::value::TagValueOwned timezoneGuard{sbe::value::makeNewString("UTC")};
                 auto longOffset = genericNumConvert(
                     offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
-                unitGuard.reset();
-                timezoneGuard.reset();
+                auto unitConstant = b.makeConstant(unitGuard.tag(), unitGuard.value());
+                auto timezoneConstant = b.makeConstant(timezoneGuard.tag(), timezoneGuard.value());
+                unitGuard.disown();
+                timezoneGuard.disown();
                 return b.makeFunction(sbe::EFn::kDateAdd,
                                       SbSlot{*state.getTimeZoneDBSlot()},
                                       boundSlot,
-                                      b.makeConstant(unitTag, unitVal),
+                                      std::move(unitConstant),
                                       b.makeConstant(longOffset.tag(), longOffset.value()),
-                                      b.makeConstant(timezoneTag, timezoneVal));
+                                      std::move(timezoneConstant));
             } else {
                 return b.makeBinaryOp(
                     abt::Operations::Add, boundSlot, b.makeConstant(offset.first, offset.second));

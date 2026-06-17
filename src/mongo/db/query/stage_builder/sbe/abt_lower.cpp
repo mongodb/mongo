@@ -75,12 +75,9 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::optimize(const ABT& n) 
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Constant& c) {
     auto [tag, val] = c.get();
-    auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
-    sbe::value::ValueGuard guard(copyTag, copyVal);
-
-    auto result = sbe::makeE<sbe::EConstant>(copyTag, copyVal);
-
-    guard.reset();
+    sbe::value::TagValueOwned guard{sbe::value::copyValue(tag, val)};
+    auto result = sbe::makeE<sbe::EConstant>(guard.tag(), guard.value());
+    guard.disown();
     return result;
 }
 

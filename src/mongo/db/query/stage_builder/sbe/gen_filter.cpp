@@ -961,13 +961,11 @@ public:
         // 'bsonRegex' and are considered equal to any of the regexes. For the case where both
         // regexes and equalities are present, we use the "logicOr" operator to combine the logic
         // for equalities with the logic for regexes.
-        auto [pcreArrTag, pcreArrVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard pcreArrGuard{pcreArrTag, pcreArrVal};
-        auto pcreArr = sbe::value::getArrayView(pcreArrVal);
+        sbe::value::TagValueOwned pcreArrGuard{sbe::value::makeNewArray()};
+        auto pcreArr = sbe::value::getArrayView(pcreArrGuard.value());
 
-        auto [regexSetTag, regexSetVal] = sbe::value::makeNewArraySet();
-        sbe::value::ValueGuard regexArrSetGuard{regexSetTag, regexSetVal};
-        auto regexArrSet = sbe::value::getArraySetView(regexSetVal);
+        sbe::value::TagValueOwned regexArrSetGuard{sbe::value::makeNewArraySet()};
+        auto regexArrSet = sbe::value::getArraySetView(regexArrSetGuard.value());
 
         if (auto& regexes = expr->getRegexes(); regexes.size() > 0) {
             pcreArr->reserve(regexes.size());
@@ -983,11 +981,11 @@ public:
             }
         }
 
-        auto pcreRegexesConstant = b.makeConstant(pcreArrTag, pcreArrVal);
-        pcreArrGuard.reset();
+        auto pcreRegexesConstant = b.makeConstant(pcreArrGuard.tag(), pcreArrGuard.value());
+        pcreArrGuard.disown();
 
-        auto regexSetConstant = b.makeConstant(regexSetTag, regexSetVal);
-        regexArrSetGuard.reset();
+        auto regexSetConstant = b.makeConstant(regexArrSetGuard.tag(), regexArrSetGuard.value());
+        regexArrSetGuard.disown();
 
         auto makePredicate = [&, hasNull = hasNull](SbExpr inputExpr) {
             auto resultExpr = b.makeBooleanOpTree(
@@ -1323,10 +1321,9 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
     // Build an array set of bit positions for the bitmask, and remove duplicates in the
     // bitPositions vector since duplicates aren't handled in the match expression parser by
     // checking if an item has already been seen.
-    auto [bitPosTag, bitPosVal] = sbe::value::makeNewArray();
-    sbe::value::ValueGuard arrGuard{bitPosTag, bitPosVal};
+    sbe::value::TagValueOwned arrGuard{sbe::value::makeNewArray()};
 
-    auto arr = sbe::value::getArrayView(bitPosVal);
+    auto arr = sbe::value::getArrayView(arrGuard.value());
     if (bitPositions.size()) {
         arr->reserve(bitPositions.size());
 
@@ -1340,8 +1337,7 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
         }
     }
 
-    arrGuard.reset();
-    return {bitPosTag, bitPosVal};
+    return arrGuard.releaseToRaw();
 }
 
 namespace {

@@ -2738,11 +2738,10 @@ public:
                 expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
-        auto [arrayWithEmptyStringTag, arrayWithEmptyStringVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard arrayWithEmptyStringGuard{arrayWithEmptyStringTag,
-                                                         arrayWithEmptyStringVal};
+        sbe::value::TagValueOwned arrayWithEmptyStringGuard{sbe::value::makeNewArray()};
         auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
-        sbe::value::getArrayView(arrayWithEmptyStringVal)->push_back_raw(emptyStrTag, emptyStrVal);
+        sbe::value::getArrayView(arrayWithEmptyStringGuard.value())
+            ->push_back_raw(emptyStrTag, emptyStrVal);
 
         auto delimiter = popExpr();
         auto stringExpression = popExpr();
@@ -2751,8 +2750,9 @@ public:
         SbVar varString{frameId, 0};
         SbVar varDelimiter{frameId, 1};
 
-        auto emptyResult = _b.makeConstant(arrayWithEmptyStringTag, arrayWithEmptyStringVal);
-        arrayWithEmptyStringGuard.reset();
+        auto emptyResult =
+            _b.makeConstant(arrayWithEmptyStringGuard.tag(), arrayWithEmptyStringGuard.value());
+        arrayWithEmptyStringGuard.disown();
 
         // In order to maintain MQL semantics, first check both the string expression
         // (first agument), and delimiter string (second argument) for null, undefined, or
