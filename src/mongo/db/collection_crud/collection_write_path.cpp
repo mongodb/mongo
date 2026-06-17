@@ -344,7 +344,30 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             invariant(rId,
                       "Clustered Collections must return the RecordId when returning a duplicate "
                       "key error");
-            BSONObj obj = record_id_helpers::toBSONAs(*rId, "");
+            // The clustered RecordId is a KeyString of the cluster key with the TypeBits discarded
+            // (see record_id_helpers::keyForElem), so decoding it back to BSON cannot recover types
+            // such as Decimal128 or a non-integral double and would throw a KeyString format error
+            // (SERVER-128392). Recover the key value from the document we attempted to insert,
+            // whose _id is the duplicated cluster key with its original type. Only fall back to
+            // decoding the RecordId if we cannot locate the offending document.
+            BSONObj obj;
+            size_t dupIdx = 0;
+            for (auto it = begin; it != end; ++it, ++dupIdx) {
+                if (records[dupIdx].id == *rId) {
+                    obj = it->doc["_id"].wrap("");
+                    break;
+                }
+            }
+            if (obj.isEmpty()) {
+                LOGV2_WARNING(
+                    12839200,
+                    "Could not match the duplicate clustered key RecordId to an inserted "
+                    "document. Falling back to decoding the RecordId, which may not "
+                    "recover cluster key types such as Decimal128 or non-integral doubles",
+                    "namespace"_attr = collection->ns(),
+                    "recordId"_attr = rId->toString());
+                obj = record_id_helpers::toBSONAs(*rId, "");
+            }
             status = buildDupKeyErrorStatus(obj,
                                             NamespaceString(collection->ns()),
                                             "" /* indexName */,
