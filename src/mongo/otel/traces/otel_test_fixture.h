@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/traces/mock_exporter.h"
+#include "mongo/otel/traces/span/span_names.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/util/modules.h"
 
@@ -88,20 +89,15 @@ public:
         return _mockExporter->getSpans().empty();
     }
 
-    MockRecordable* getSpan(size_t idx, const std::string& name) {
+    MockRecordable* getSpan(size_t idx, const SpanName& name) {
         const auto& spans = _mockExporter->getSpans();
         ASSERT_GREATER_THAN(spans.size(), idx);
 
         MockRecordable* mock = dynamic_cast<MockRecordable*>(spans[idx].get());
         ASSERT_TRUE(mock);
-        ASSERT_EQ(mock->name, name);
+        ASSERT_EQ(mock->name, name.getName());
 
         return mock;
-    }
-
-    int getBaseAttributesSize() {
-        // We always set the "DROP_SPAN" attribute, so we expect at least one attribute.
-        return 1;
     }
 
 protected:

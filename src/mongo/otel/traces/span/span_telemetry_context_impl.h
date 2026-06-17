@@ -44,13 +44,8 @@ namespace traces {
 
 using OtelContext = opentelemetry::context::Context;
 using ScopedSpan = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
-using OtelStringView = opentelemetry::nostd::string_view;
 using TextMapPropagator = opentelemetry::context::propagation::TextMapPropagator;
 using TextMapCarrier = opentelemetry::context::propagation::TextMapCarrier;
-
-constexpr OtelStringView keepSpanKey = "keepSpan";
-constexpr OtelStringView trueValue = "true";
-constexpr OtelStringView falseValue = "false";
 
 /**
  * SpanTelemetryContextImpl is an implementation of TelemetryContext that wraps OpenTelemetry's
@@ -60,16 +55,6 @@ class MONGO_MOD_NEEDS_REPLACEMENT SpanTelemetryContextImpl : public TelemetryCon
 public:
     explicit SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng = nullptr);
     SpanTelemetryContextImpl() = default;
-
-    /**
-     * Sets whether spans created with this context should be kept (exported) or not.
-     */
-    void keepSpan(bool keepSpan);
-
-    /**
-     * Returns whether spans created with this context should be kept (exported) or not.
-     */
-    bool shouldKeepSpan() const;
 
     /**
      * Returns this telemetry context's sampling roll: a value in [0, 1) used to make sampling
@@ -108,7 +93,6 @@ public:
 
 private:
     OtelContext _ctx;
-    bool _keepSpan{false};
     PseudoRandom* _prng{nullptr};
 
     // The sampling roll for this telemetry context: a value in [0, 1) drawn lazily on first use

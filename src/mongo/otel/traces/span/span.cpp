@@ -50,41 +50,26 @@ namespace mongo {
 namespace otel {
 namespace traces {
 
+using OtelStringView = std::string_view;
+
 static constexpr OtelStringView errorCodeKey = "errorCode";
 static constexpr OtelStringView errorCodeStringKey = "errorCodeString";
-static constexpr OtelStringView dropSpanAttributeName = "DROP_SPAN";
 
-using ScopedSpan = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
+using ScopedSpan = std::shared_ptr<opentelemetry::trace::Span>;
 
 class Span::SpanImpl {
 public:
-    SpanImpl(ScopedSpan span,
-             ScopedSpan parent,
-             std::shared_ptr<SpanTelemetryContextImpl> spanCtx,
-             bool keepSpanParent,
-             bool keepSpan)
-        : _span(std::move(span)),
-          _parent(std::move(parent)),
-          _spanCtx(std::move(spanCtx)),
-          _keepSpanParent(keepSpanParent),
-          _keepSpan(keepSpan) {
+    SpanImpl(ScopedSpan span, ScopedSpan parent, std::shared_ptr<SpanTelemetryContextImpl> spanCtx)
+        : _span(std::move(span)), _parent(std::move(parent)), _spanCtx(std::move(spanCtx)) {
         _spanCtx->setSpan(_span);
-        _spanCtx->keepSpan(keepSpan || keepSpanParent);
-        _span->SetAttribute(dropSpanAttributeName, !(_keepSpan || _keepSpanParent));
     }
 
     ~SpanImpl() {
-
         _spanCtx->setSpan(std::move(_parent));
-        _spanCtx->keepSpan(_keepSpanParent);
-
-        if (!std::uncaught_exceptions() && !_error) {
-            _span->SetStatus(opentelemetry::trace::StatusCode::kOk);
-            _span->End();
-        } else {
-            _span->SetStatus(opentelemetry::trace::StatusCode::kError);
-            _span->End();
-        }
+        const bool ok = !std::uncaught_exceptions() && !_error;
+        _span->SetStatus(ok ? opentelemetry::trace::StatusCode::kOk
+                            : opentelemetry::trace::StatusCode::kError);
+        _span->End();
     }
 
     void setAttribute(StringData key, int value) {
@@ -105,23 +90,18 @@ private:
     ScopedSpan _span;
     ScopedSpan _parent;
     std::shared_ptr<SpanTelemetryContextImpl> _spanCtx;
-    bool _keepSpanParent;
-    bool _keepSpan;
     bool _error = false;
 };
 
-Span::Span() {}
+Span::Span() = default;
 
 Span::Span(std::unique_ptr<Span::SpanImpl> impl) : _impl(std::move(impl)) {}
 
-Span::~Span() {}
+Span::~Span() = default;
 
-Span& Span::operator=(Span&& other) {
-    _impl = std::move(other._impl);
-    return *this;
-}
+Span& Span::operator=(Span&&) noexcept = default;
 
-Span::Span(Span&& other) : _impl(std::move(other._impl)) {}
+Span::Span(Span&&) noexcept = default;
 
 void Span::setAttribute(StringData key, int value) {
     if (_impl) {
@@ -141,9 +121,7 @@ void Span::setStatus(const Status& status) {
     }
 }
 
-Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx,
-                     StringData name,
-                     bool keepSpan) {
+Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx, StringData name) {
     ServiceContext* serviceContext = getGlobalServiceContext();
     if (!serviceContext) {
         return Span{};
@@ -192,23 +170,15 @@ Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx,
     opentelemetry::trace::StartSpanOptions opts;
     opts.parent = parentSpan->GetContext();
 
-    auto keepSpanParent = spanCtx->shouldKeepSpan();
-
-    return Span(std::make_unique<Span::SpanImpl>(tracer->StartSpan(std::string{name}, opts),
-                                                 std::move(parentSpan),
-                                                 std::move(spanCtx),
-                                                 keepSpanParent,
-                                                 keepSpan));
+    return Span(std::make_unique<Span::SpanImpl>(
+        tracer->StartSpan(std::string{name}, opts), std::move(parentSpan), std::move(spanCtx)));
 }
 
-Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name, bool keepSpan) {
-    return startImpl(telemetryCtx, name.getName(), keepSpan);
+Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name) {
+    return startImpl(telemetryCtx, name.getName());
 }
 
-Span Span::startImpl(OperationContext* opCtx,
-                     StringData name,
-                     bool keepSpan,
-                     bool createIfMissing) {
+Span Span::startImpl(OperationContext* opCtx, StringData name, bool createIfMissing) {
     if (opCtx == nullptr) {
         return Span{};
     }
@@ -224,31 +194,15 @@ Span Span::startImpl(OperationContext* opCtx,
         telemetryCtxHolder.setTelemetryContext(telemetryCtx);
     }
 
-    return startImpl(telemetryCtx, name, keepSpan);
+    return startImpl(telemetryCtx, name);
 }
 
-Span Span::start(OperationContext* opCtx, SpanName name, bool keepSpan) {
-    return startImpl(opCtx, name.getName(), keepSpan, /*createIfMissing=*/true);
+Span Span::start(OperationContext* opCtx, SpanName name) {
+    return startImpl(opCtx, name.getName(), /*createIfMissing=*/true);
 }
 
-Span Span::startIfExistingTraceParent(OperationContext* opCtx, SpanName name, bool keepSpan) {
-    return startImpl(opCtx, name.getName(), keepSpan, /*createIfMissing=*/false);
-}
-
-Span Span::start(OperationContext* opCtx, const std::string& name, bool keepSpan) {
-    return startImpl(opCtx, name, keepSpan, /*createIfMissing=*/true);
-}
-
-Span Span::startIfExistingTraceParent(OperationContext* opCtx,
-                                      const std::string& name,
-                                      bool keepSpan) {
-    return startImpl(opCtx, name, keepSpan, /*createIfMissing=*/false);
-}
-
-Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
-                 const std::string& name,
-                 bool keepSpan) {
-    return startImpl(telemetryCtx, name, keepSpan);
+Span Span::startIfExistingTraceParent(OperationContext* opCtx, SpanName name) {
+    return startImpl(opCtx, name.getName(), /*createIfMissing=*/false);
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {

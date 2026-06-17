@@ -29,11 +29,8 @@
 
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
-#include "mongo/logv2/log.h"
-#include "mongo/otel/traces/tracing_utils.h"
 #include "mongo/util/assert_util.h"
 
-#include <opentelemetry/baggage/baggage_context.h>
 #include <opentelemetry/trace/span_context.h>
 
 namespace mongo {
@@ -41,22 +38,7 @@ namespace otel {
 namespace traces {
 
 SpanTelemetryContextImpl::SpanTelemetryContextImpl(OtelContext ctx, PseudoRandom* prng)
-    : _ctx(ctx),
-      _keepSpan([&] {
-          auto baggage = opentelemetry::baggage::GetBaggage(ctx);
-          std::string value;
-          auto exists = baggage->GetValue(keepSpanKey, value);
-          return exists && (value == trueValue);
-      }()),
-      _prng(prng) {}
-
-void SpanTelemetryContextImpl::keepSpan(bool keepSpan) {
-    _keepSpan = keepSpan;
-}
-
-bool SpanTelemetryContextImpl::shouldKeepSpan() const {
-    return _keepSpan;
-}
+    : _ctx(std::move(ctx)), _prng(prng) {}
 
 double SpanTelemetryContextImpl::getSamplingValue() {
     if (!_samplingRoll) {
@@ -68,24 +50,7 @@ double SpanTelemetryContextImpl::getSamplingValue() {
 
 void SpanTelemetryContextImpl::propagate(TextMapPropagator& propagator,
                                          TextMapCarrier& carrier) const {
-    auto baggage = opentelemetry::baggage::GetBaggage(_ctx);
-
-    // TODO: SERVER-112886 Technically calling Delete without the key existing is valid but this
-    // causes issues in dynamic builds. Once SERVER-112886 is resolved and the fix is available in
-    // the OTEL library we can remove the check for key existing.
-    std::string keepSpanValue;
-    if (baggage->GetValue(keepSpanKey, keepSpanValue)) {
-        // Baggage is not a map and we do not want duplicate keys, so we must remove the existing
-        // key if it exists.
-        baggage = baggage->Delete(keepSpanKey);
-    }
-
-    auto value = _keepSpan ? trueValue : falseValue;
-    baggage = baggage->Set(keepSpanKey, value);
-    auto ctx = _ctx;
-    ctx = opentelemetry::baggage::SetBaggage(ctx, baggage);
-
-    propagator.Inject(carrier, ctx);
+    propagator.Inject(carrier, _ctx);
 }
 
 }  // namespace traces

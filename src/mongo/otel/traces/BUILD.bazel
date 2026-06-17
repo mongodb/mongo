@@ -262,6 +262,7 @@ mongo_cc_unit_test(
         ":tracing",
         ":tracing_initialization",
         ":tracing_test_util",
+        ":tracing_utils",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/otel",
         "//src/mongo/unittest:server_parameter_guard",

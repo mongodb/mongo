@@ -29,11 +29,8 @@
 
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
-#include "mongo/otel/traces/tracing_utils.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
-
-#include <opentelemetry/baggage/baggage_context.h>
 
 namespace mongo {
 namespace otel {
@@ -46,39 +43,6 @@ public:
         return OtelContext();
     }
 };
-
-TEST_F(SpanTelemetryContextImplTest, KeepSpanTrue) {
-    auto otelCtx = getSpanContext();
-    SpanTelemetryContextImpl impl(std::move(otelCtx));
-    impl.keepSpan(true);
-    ASSERT_TRUE(impl.shouldKeepSpan());
-}
-
-TEST_F(SpanTelemetryContextImplTest, KeepSpanFalseByDefault) {
-    auto otelCtx = getSpanContext();
-    SpanTelemetryContextImpl impl(std::move(otelCtx));
-    ASSERT_FALSE(impl.shouldKeepSpan());
-}
-
-TEST_F(SpanTelemetryContextImplTest, KeepSpanTrueIfAlreadyTrue) {
-    auto otelCtx = getSpanContext();
-    auto baggage = opentelemetry::baggage::GetBaggage(otelCtx);
-    baggage = baggage->Set(keepSpanKey, trueValue);
-    otelCtx = OtelContext(opentelemetry::baggage::SetBaggage(otelCtx, baggage));
-    SpanTelemetryContextImpl impl(std::move(otelCtx));
-    ASSERT_TRUE(impl.shouldKeepSpan());
-}
-
-TEST_F(SpanTelemetryContextImplTest, KeepSpanValueIsFalseAfterSettingToTrue) {
-    auto otelCtx = getSpanContext();
-    SpanTelemetryContextImpl impl(std::move(otelCtx));
-    ASSERT_FALSE(impl.shouldKeepSpan());
-    impl.keepSpan(true);
-    ASSERT_TRUE(impl.shouldKeepSpan());
-
-    impl.keepSpan(false);
-    ASSERT_FALSE(impl.shouldKeepSpan());
-}
 
 TEST_F(SpanTelemetryContextImplTest, SamplingRollIsInUnitInterval) {
     PseudoRandom prng(int64_t{1});

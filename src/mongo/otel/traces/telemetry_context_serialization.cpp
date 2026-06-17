@@ -36,8 +36,6 @@
 #include "mongo/otel/traces/bson_text_map_carrier.h"
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 
-#include <opentelemetry/baggage/propagation/baggage_propagator.h>
-#include <opentelemetry/context/propagation/composite_propagator.h>
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/context.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
@@ -48,8 +46,6 @@ namespace mongo {
 namespace otel {
 namespace traces {
 
-using opentelemetry::baggage::propagation::BaggagePropagator;
-using opentelemetry::context::propagation::CompositePropagator;
 using opentelemetry::context::propagation::TextMapPropagator;
 using opentelemetry::trace::propagation::HttpTraceContext;
 using OtelContext = opentelemetry::context::Context;
@@ -61,11 +57,8 @@ namespace {
 // effectively avoid runtime allocations."
 // https://opentelemetry.io/docs/specs/otel/context/api-propagators/#textmap-propagator
 // Unless this is fixed, create the propagator on demand.
-auto getPropagator() {
-    std::vector<std::unique_ptr<TextMapPropagator>> propagators;
-    propagators.emplace_back(std::make_unique<BaggagePropagator>());
-    propagators.emplace_back(std::make_unique<HttpTraceContext>());
-    return CompositePropagator{std::move(propagators)};
+HttpTraceContext getPropagator() {
+    return HttpTraceContext{};
 }
 }  // namespace
 

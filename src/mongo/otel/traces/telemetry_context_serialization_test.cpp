@@ -41,7 +41,6 @@
 
 #include <memory>
 
-#include <opentelemetry/baggage/propagation/baggage_propagator.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
 
 namespace mongo {
@@ -49,8 +48,6 @@ namespace otel {
 namespace traces {
 namespace {
 
-using DefaultSpan = opentelemetry::trace::DefaultSpan;
-using opentelemetry::baggage::propagation::BaggagePropagator;
 using opentelemetry::trace::propagation::HttpTraceContext;
 
 class TelemetryContextSerializationTest : public traces::OtelTestFixture {
@@ -63,22 +60,6 @@ protected:
 BSONObj serializeTraceContextOnly(const std::shared_ptr<TelemetryContext>& context) {
     HttpTraceContext propagator;
     return detail::toBSON(*context, propagator);
-}
-
-BSONObj serializeBaggageOnly(const std::shared_ptr<TelemetryContext>& context) {
-    BaggagePropagator propagator;
-    return detail::toBSON(*context, propagator);
-}
-
-std::shared_ptr<TelemetryContext> performRoundTrip(
-    const std::shared_ptr<TelemetryContext>& context) {
-    auto bson = TelemetryContextSerializer::toBSON(context);
-    return TelemetryContextSerializer::fromBSON(bson);
-}
-
-bool getKeepSpan(const std::shared_ptr<TelemetryContext>& context) {
-    const auto* typed = dynamic_cast<const traces::SpanTelemetryContextImpl*>(context.get());
-    return typed->shouldKeepSpan();
 }
 
 TEST_F(TelemetryContextSerializationTest, SerializeTraceContext) {
@@ -94,34 +75,12 @@ TEST_F(TelemetryContextSerializationTest, SerializeTraceContext) {
     }
 }
 
-TEST_F(TelemetryContextSerializationTest, SerializeBaggage) {
-    auto context = traces::Span::createTelemetryContext();
-    auto span = traces::Span::start(context, traces::span_names::kTest1);
-    BSONObj fullBson = TelemetryContextSerializer::toBSON(context);
-    BSONObj baggageBson = serializeBaggageOnly(context);
-    ASSERT(!baggageBson.isEmpty());
-    for (const auto& field : baggageBson) {
-        const auto& name = field.fieldName();
-        ASSERT(fullBson.hasField(name));
-        ASSERT_EQ(fullBson.getStringField(name), baggageBson.getStringField(name));
-    }
-}
-
 TEST_F(TelemetryContextSerializationTest, RoundTrip) {
     auto context = traces::Span::createTelemetryContext();
     auto span = traces::Span::start(context, traces::span_names::kTest1);
     BSONObj bson = TelemetryContextSerializer::toBSON(context);
     auto rehydratedContext = TelemetryContextSerializer::fromBSON(bson);
     ASSERT_BSONOBJ_EQ_UNORDERED(bson, TelemetryContextSerializer::toBSON(rehydratedContext));
-}
-
-TEST_F(TelemetryContextSerializationTest, KeepSpan) {
-    auto context = traces::Span::createTelemetryContext();
-    ASSERT_FALSE(getKeepSpan(context));
-    auto span = traces::Span::start(context, traces::span_names::kTest1, true);
-    ASSERT_TRUE(getKeepSpan(context));
-    context = performRoundTrip(context);
-    ASSERT_TRUE(getKeepSpan(context));
 }
 
 TEST_F(TelemetryContextSerializationTest, AppendTelemetryContextReturnsIfNoTelemetryContext) {
