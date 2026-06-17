@@ -34,7 +34,9 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
         assert.eq(true, dbMetadataFromShard.isPrimaryShardForDb, dbMetadataFromShard);
     } else {
         // A shard that does not own the database must not report itself as its primary shard.
-        // TODO(SERVER-128275): Investigate if we can assert that the DSR is empty.
+        // It may still retain legacy non-authoritative DSR metadata naming another shard as
+        // primary while transitioning to the authoritative model, so do not assert that the DSR is
+        // empty.
         assert(!dbMetadataFromShard.isPrimaryShardForDb, dbMetadataFromShard);
     }
 }

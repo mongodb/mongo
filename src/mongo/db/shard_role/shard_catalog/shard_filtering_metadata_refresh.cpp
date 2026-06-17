@@ -1145,7 +1145,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
         std::shared_ptr<CollectionCacheRecoverer> recoverer;
         SharedPromise<void> promise;
         CancellationToken cancellationToken = CancellationToken::uncancelable();
-        // Populated only when this shard is the current DB primary.
+        // Set only in Mode B. A cached primary can name another shard due to retained legacy
+        // non-authoritative DSR state.
         boost::optional<ShardId> dbPrimaryShard;
         // Snapshot of the DSR mutation counter. Used to detect ABA transitions.
         uint64_t dbMetadataMutationsSnapshot = 0;
@@ -1314,8 +1315,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
             //   * Mode B and this shard is the DB primary: `dbPrimaryShard` equals this shard, so
             //     an empty filtering entry authoritatively means the collection is not tracked.
             //   * Mode B and this shard is not the DB primary: the most we can say is that this
-            //     node holds no chunks (kUnowned).
-            // TODO (SERVER-128275): investigate if we can simply dbPrimaryShard.has_value() here.
+            //     node holds no chunks (kUnowned). This includes cases where `dbPrimaryShard` has
+            //     a value for another shard due to retained legacy non-authoritative DSR state.
             const auto noRoutingTableAs = dbPrimaryShard == ShardingState::get(opCtx)->shardId()
                 ? CollectionShardingRuntime::NoRoutingTableAs::kUntracked
                 : CollectionShardingRuntime::NoRoutingTableAs::kUnowned;

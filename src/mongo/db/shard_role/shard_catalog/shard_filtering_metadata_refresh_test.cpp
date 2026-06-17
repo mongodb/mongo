@@ -1265,6 +1265,38 @@ TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) 
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
 }
 
+// A retained DSR entry from the legacy non-authoritative model only says which shard the cached
+// metadata names as primary. It does not prove that this shard is the DB primary.
+TEST_F(AuthoritativeRefreshFixture, RetainedNonAuthoritativeDsrEntryInstallsUnownedOnEmptyDisk) {
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, kTestNss.dbName());
+        scopedDsr->setDbInfo_DEPRECATED(
+            opCtx,
+            DatabaseType{kTestNss.dbName(), ShardId("otherShard"), {UUID::gen(), Timestamp(1, 1)}});
+    }
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearCollectionMetadata(opCtx);
+        csr->setAuthoritative();
+    }
+
+    ASSERT_OK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    ASSERT_TRUE(csr->isUnowned());
+    ASSERT_FALSE(csr->getCurrentMetadataIfKnown()->isSharded());
+
+    auto stats = getStatistics(opCtx);
+    ASSERT_EQ(stats.getIntField("recoverersCreated"), 2);  // 1 Mode A + 1 Mode B, no retry.
+    ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+}
+
 // Non-ABA primary identity change: DSR starts empty, a movePrimary during the drain makes this
 // shard the new primary. Caught by the simple pre/post compare. Converges to kUntracked after
 // retry.
