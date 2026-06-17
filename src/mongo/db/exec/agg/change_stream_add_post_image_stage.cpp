@@ -30,34 +30,13 @@
 #include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
 
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
-#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToStageFn(
-    const boost::intrusive_ptr<DocumentSource>& documentSource) {
-    auto* changeStreamAddPostImageDS =
-        dynamic_cast<DocumentSourceChangeStreamAddPostImage*>(documentSource.get());
-
-    tassert(10561301,
-            "expected 'DocumentSourceChangeStreamAddPostImage' type",
-            changeStreamAddPostImageDS);
-
-    return make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(
-        changeStreamAddPostImageDS->kStageName,
-        changeStreamAddPostImageDS->getExpCtx(),
-        changeStreamAddPostImageDS->_fullDocumentMode);
-}
-
 namespace exec::agg {
-
-REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamAddPostImage,
-                           DocumentSourceChangeStreamAddPostImage::id,
-                           documentSourceChangeStreamAddPostImageToStageFn)
 
 namespace {
 constexpr auto makePostImageNotFoundErrorMsg =
@@ -94,9 +73,7 @@ GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
 
     // Create a mutable output document from the input document.
     MutableDocument output(input.releaseDocument());
-    const auto postImageDoc = (_fullDocumentMode == FullDocumentModeEnum::kUpdateLookup
-                                   ? lookupLatestPostImage(output.peek())
-                                   : generatePostImage(output.peek()));
+    const auto postImageDoc = generatePostImage(output.peek());
     uassert(ErrorCodes::NoMatchingDocument,
             str::stream() << "Change stream was configured to require a post-image for all update "
                              "events, but the post-image was not found for event: "
@@ -111,68 +88,6 @@ GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
     output.remove(DocumentSourceChangeStreamAddPostImage::kRawOplogUpdateSpecFieldName);
     output.remove(DocumentSourceChangeStreamAddPostImage::kPreImageIdFieldName);
     return output.freeze();
-}
-
-boost::optional<Document> ChangeStreamAddPostImageStage::lookupLatestPostImage(
-    const Document& updateOp) const {
-    // Make sure we have a well-formed input.
-    auto nss = assertValidNamespace(updateOp);
-
-    auto documentKey = assertFieldHasType(updateOp,
-                                          DocumentSourceChangeStream::kDocumentKeyField,
-                                          BSONType::object)
-                           .getDocument();
-
-    // Extract the resume token data from the input event.
-    auto resumeTokenData =
-        ResumeToken::parse(updateOp.metadata().getSortKey().getDocument()).getData();
-
-    auto readConcern = BSON("level" << "majority"
-                                    << "afterClusterTime" << resumeTokenData.clusterTime);
-
-    // Update lookup queries sent from mongoS to shards are allowed to use speculative majority
-    // reads. Even if the lookup itself succeeded, it may not have returned any results if the
-    // document was deleted in the time since the update op.
-    tassert(9797601, "UUID should be present in the resume token", resumeTokenData.uuid);
-    try {
-        // In case we are running $changeStreams and are performing updateLookup, we do not pass
-        // 'collectionUUID' to avoid any UUID validation on the target collection. UUID of the
-        // target collection should only be checked if 'matchCollectionUUIDForUpdateLookup' flag has
-        // been passed.
-        auto collectionUUID =
-            pExpCtx->getChangeStreamSpec()->getMatchCollectionUUIDForUpdateLookup()
-            ? boost::optional<UUID>(*resumeTokenData.uuid)
-            : boost::none;
-        return pExpCtx->getMongoProcessInterface()->lookupSingleDocument(
-            pExpCtx, nss, std::move(collectionUUID), documentKey, std::move(readConcern));
-    } catch (const ExceptionFor<ErrorCodes::TooManyMatchingDocuments>& ex) {
-        uasserted(ErrorCodes::ChangeStreamFatalError, ex.what());
-    }
-}
-
-NamespaceString ChangeStreamAddPostImageStage::assertValidNamespace(
-    const Document& inputDoc) const {
-    auto namespaceObject =
-        assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::object)
-            .getDocument();
-    auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::string);
-    auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::string);
-    NamespaceString nss(NamespaceStringUtil::deserialize(pExpCtx->getNamespaceString().tenantId(),
-                                                         dbName.getStringData(),
-                                                         collectionName.getStringData(),
-                                                         pExpCtx->getSerializationContext()));
-
-    // Change streams on an entire database only need to verify that the database names match. If
-    // the database is 'admin', then this is a cluster-wide $changeStream and we are permitted to
-    // lookup into any namespace.
-    uassert(40579,
-            str::stream() << "unexpected namespace during post image lookup: "
-                          << nss.toStringForErrorMsg() << ", expected "
-                          << pExpCtx->getNamespaceString().toStringForErrorMsg(),
-            nss == pExpCtx->getNamespaceString() ||
-                (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss)));
-
-    return nss;
 }
 
 boost::optional<Document> ChangeStreamAddPostImageStage::generatePostImage(

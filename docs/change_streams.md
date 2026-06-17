@@ -904,15 +904,26 @@ The `ChangeStreamAddPreImageStage` code is
 This stage is responsible for adding post-image data to "update" events. It is only added to change
 stream pipelines if the `fullDocument` parameter is not set to `default`.
 
+The `DocumentSourceChangeStreamAddPostImage` document source builds one of two execution stages,
+depending on the `fullDocument` mode:
+
+- `updateLookup` builds a `ChangeStreamUpdateLookupStage`, which looks up the _current_ version of
+  the updated document.
+- `whenAvailable` and `required` build a `ChangeStreamAddPostImageStage`, which reconstructs the
+  point-in-time post-image from a stored pre-image.
+
 If `fullDocument` is set to `updateLookup`, the stage will perform a lookup for the current version
 of a document that was updated by an "update" event, and store it in the `fullDocument` field of the
-"update" event if present. The lookup is performed using the `_id` value of the document from the
-change event. As the lookup is executed at a different point in time than when the change event was
-recorded, it is possible that the lookup finds a different version of the document than the one that
-was active when the change event was recorded. This can happen if the document was updated again
-between the change event and the lookup. The lookup may also find no document at all if the document
-was deleted after the "update" event, but before the lookup. In case the lookup cannot find a
-document with the requested `_id`, it will populate the `fullDocument` field with a value of `null`.
+"update" event if present. The lookup matches the document by `_id`, while the shard key fields from
+the event's `documentKey` are used to target the lookup at the relevant shard. The lookup reads the
+latest majority-committed version of the document at the change event's cluster time, passed as the
+read concern's `afterClusterTime`. As the lookup is executed at a different point in time than when
+the change event was recorded, it is possible that the lookup finds a different version of the
+document than the one that was active when the change event was recorded. This can happen if the
+document was updated again between the change event and the lookup. The lookup may also find no
+document at all if the document was deleted after the "update" event, but before the lookup. In case
+the lookup cannot find a document with the requested `_id`, it will populate the `fullDocument`
+field with a value of `null`.
 
 If `fullDocument` is set to `whenAvailable` or `required`, the stage will make use of the stored
 pre-image of the document in the system's pre-image system collection. It will fetch the pre-image
@@ -921,7 +932,9 @@ result in the `fullDocument` field.
 
 The `DocumentSourceChangeStreamAddPostImage` code is
 [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_add_post_image.h#L63).
-The `ChangeStreamAddPostImageStage` code is
+The `ChangeStreamUpdateLookupStage` code (used for `updateLookup`) is
+[here](../src/mongo/db/exec/agg/change_stream_update_lookup_stage.cpp). The
+`ChangeStreamAddPostImageStage` code (used for `whenAvailable`/`required`) is
 [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
 
 #### `$_internalChangeStreamEnsureResumeTokenPresent`

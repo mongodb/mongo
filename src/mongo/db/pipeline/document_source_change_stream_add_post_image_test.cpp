@@ -34,6 +34,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
+#include "mongo/db/exec/agg/change_stream_update_lookup_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -77,14 +79,20 @@ public:
         MutableDocument combined;
 
         // Sort key comes first, then _id, then all other fields.
-        ResumeTokenData tokenData(Timestamp(100, 1),
+        const Timestamp clusterTime(100, 1);
+        ResumeTokenData tokenData(clusterTime,
                                   ResumeTokenData::kDefaultTokenVersion,
                                   /* txnOpIndex */ 0,
                                   testUuid(),
                                   /* eventIdentifier */ Value(Document{{"_id", idValue}}));
 
-        combined.metadata().setSortKey(Value(ResumeToken(tokenData).toDocument()), true);
-        combined.addField("_id", Value(idValue));
+        auto resumeTokenDoc = Value(ResumeToken(tokenData).toDocument());
+        combined.metadata().setSortKey(resumeTokenDoc, true);
+        combined.addField("_id", resumeTokenDoc);
+
+        // Every change event mirrors its resume token's clusterTime in a top-level field; the
+        // update-lookup stage reads it from there. Mirror that here so mocks match real events.
+        combined.addField(DocumentSourceChangeStream::kClusterTimeField, Value(clusterTime));
 
         FieldIterator it(doc);
         while (it.more()) {
@@ -161,7 +169,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
     getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12840700);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperationType) {
@@ -187,11 +195,17 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
     getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12840700);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace) {
     auto expCtx = getExpCtx();
+
+    // A collection-level stream looks up its fixed namespace and skips the per-event 'ns' parse, so
+    // namespace validation runs only for db/cluster-wide streams. Use a collectionless (db-level)
+    // stream so the event's 'ns' is parsed and the missing field is rejected.
+    expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Set up the lookup change post image document source.
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
@@ -211,11 +225,17 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
     getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12840700);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongType) {
     auto expCtx = getExpCtx();
+
+    // A collection-level stream looks up its fixed namespace and skips the per-event 'ns' parse, so
+    // namespace validation runs only for db/cluster-wide streams. Use a collectionless (db-level)
+    // stream so the event's 'ns' is parsed and the wrong-typed field is rejected.
+    expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Set up the lookup change post image document source.
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
@@ -234,11 +254,17 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
     getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12840700);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMatchPipeline) {
     auto expCtx = getExpCtx();
+
+    // A collection-level stream looks up its fixed namespace and skips the per-event 'ns' parse, so
+    // namespace validation runs only for db/cluster-wide streams. Use a collectionless (db-level)
+    // stream so the event's 'ns' (in a different database) is parsed and rejected.
+    expCtx->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test")));
 
     // Set up the lookup change post image document source.
     auto lookupChangeDS = DocumentSourceChangeStreamAddPostImage::create(expCtx, getSpec());
@@ -260,7 +286,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
     getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::deque<DocumentSource::GetNextResult>{}));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12840701);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest,
@@ -288,7 +314,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
     expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
 
-    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 12840701);
 }
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOnCollectionlessNss) {
@@ -423,6 +449,38 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
 
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
     ASSERT_TRUE(lookupChangeStage->getNext().isEOF());
+}
+
+// Wire-up tests: assert documentSourceChangeStreamAddPostImageToStageFn builds the right
+// single-responsibility execution stage for each 'fullDocument' mode. This guards the split this
+// refactor introduced:
+// - 'updateLookup' -> ChangeStreamUpdateLookupStage
+// - 'required' / 'whenAvailable' -> ChangeStreamAddPostImageStage.
+class ChangeStreamAddPostImageStageFnWiringTest
+    : public DocumentSourceChangeStreamAddPostImageTest {
+protected:
+    boost::intrusive_ptr<exec::agg::Stage> buildStageForMode(FullDocumentModeEnum mode) {
+        auto ds = DocumentSourceChangeStreamAddPostImage::create(getExpCtx(), getSpec(mode));
+        return exec::agg::buildStage(ds);
+    }
+};
+
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest, UpdateLookupModeBuildsUpdateLookupStage) {
+    auto stage = buildStageForMode(FullDocumentModeEnum::kUpdateLookup);
+    ASSERT(dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get()));
+    ASSERT_FALSE(dynamic_cast<exec::agg::ChangeStreamAddPostImageStage*>(stage.get()));
+}
+
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest, RequiredModeBuildsAddPostImageStage) {
+    auto stage = buildStageForMode(FullDocumentModeEnum::kRequired);
+    ASSERT(dynamic_cast<exec::agg::ChangeStreamAddPostImageStage*>(stage.get()));
+    ASSERT_FALSE(dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get()));
+}
+
+TEST_F(ChangeStreamAddPostImageStageFnWiringTest, WhenAvailableModeBuildsAddPostImageStage) {
+    auto stage = buildStageForMode(FullDocumentModeEnum::kWhenAvailable);
+    ASSERT(dynamic_cast<exec::agg::ChangeStreamAddPostImageStage*>(stage.get()));
+    ASSERT_FALSE(dynamic_cast<exec::agg::ChangeStreamUpdateLookupStage*>(stage.get()));
 }
 
 }  // namespace

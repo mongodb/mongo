@@ -135,6 +135,10 @@ public:
                 std::string{DocumentSourceChangeStream::kFullDocumentBeforeChangeField});
             deps->fields.insert(std::string{DocumentSourceChangeStream::kRawOplogUpdateSpecField});
             deps->fields.insert(std::string{DocumentSourceChangeStream::kPreImageIdField});
+        } else {
+            // updateLookup reads the event's clusterTime to ensure the document is looked up with a
+            // higher cluster time via 'afterClusterTime'.
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kClusterTimeField});
         }
 
         // This stage does not restrict the output fields to a finite set, and has no impact on
@@ -157,10 +161,20 @@ public:
         return id;
     }
 
-private:
-    friend boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamAddPostImageToStageFn(
-        const boost::intrusive_ptr<DocumentSource>& documentSource);
+    /**
+     * Returns true if the stage performs an 'updateLookup' (looks up the current document) rather
+     * than computing a post-image from the pre-image plus the oplog update modification. Used by
+     * the stage-fn to decide which execution stage to build.
+     */
+    bool isUpdateLookup() const {
+        return _fullDocumentMode == FullDocumentModeEnum::kUpdateLookup;
+    }
 
+    FullDocumentModeEnum getFullDocument() const {
+        return _fullDocumentMode;
+    }
+
+private:
     DocumentSourceChangeStreamAddPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const FullDocumentModeEnum fullDocumentMode)
         : DocumentSourceInternalChangeStreamStage(kStageName, expCtx),

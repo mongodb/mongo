@@ -1051,6 +1051,7 @@ mongo_cc_library(
         "document_source_change_stream_transform.cpp",
         "document_source_change_stream_unwind_transaction.cpp",
         "//src/mongo/db/exec/agg:change_stream_add_post_image_stage.cpp",
+        "//src/mongo/db/exec/agg:change_stream_add_post_image_stage_fn.cpp",
         "//src/mongo/db/exec/agg:change_stream_add_pre_image_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_check_invalidate_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_check_resumability_stage.cpp",
@@ -1062,6 +1063,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:change_stream_split_large_event_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_transform_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_unwind_transaction_stage.cpp",
+        "//src/mongo/db/exec/agg:change_stream_update_lookup_stage.cpp",
         "//src/mongo/db/pipeline/optimization:change_stream_rules.cpp",
     ],
     deps = [

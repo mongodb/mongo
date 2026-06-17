@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,8 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/modules.h"
 
@@ -42,17 +41,16 @@
 
 namespace mongo::exec::agg {
 /**
- * This class handles the execution part of the change stream add post image aggregation stage and
- * is part of the execution pipeline. It computes the post-image from the pre-image plus the oplog
- * update modification for the 'fullDocument: "required"' / '"whenAvailable"' modes. The
- * 'fullDocument: "updateLookup"' path lives in ChangeStreamUpdateLookupStage. Its construction is
- * based on DocumentSourceChangeStreamAddPostImage, which handles the optimization part.
+ * Execution stage for the change stream 'fullDocument: "updateLookup"' enrichment. For each update
+ * event it looks up the current majority-committed version of the document (read at or after the
+ * event's clusterTime) and attaches it as the 'fullDocument' field. Its construction is based on
+ * DocumentSourceChangeStreamAddPostImage (in updateLookup mode), which handles the optimization
+ * part.
  */
-class ChangeStreamAddPostImageStage final : public Stage {
+class ChangeStreamUpdateLookupStage final : public Stage {
 public:
-    ChangeStreamAddPostImageStage(StringData stageName,
-                                  const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                  const FullDocumentModeEnum& fullDocumentMode);
+    ChangeStreamUpdateLookupStage(StringData stageName,
+                                  const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
     /**
@@ -61,16 +59,14 @@ private:
     GetNextResult doGetNext() final;
 
     /**
-     * Computes a post-image by taking a pre-image and applying an update modification that is
-     * stored in the oplog entry. Returns boost::none if no pre-image information is available.
+     * Retrieves the current version of the document for the update event.
      */
-    boost::optional<Document> generatePostImage(const Document& updateOp) const;
+    boost::optional<Document> performPostImageLookup(const Document& updateOp) const;
 
     /**
-     * Determines whether post-images are strictly required or may be included only when available,
-     * and whether to return a point-in-time post-image or the most current majority-committed
-     * version of the updated document.
+     * The change stream this lookup is part of. Used to resolve the lookup namespace cheaply for
+     * collection-level streams (fixed namespace, no per-event parse).
      */
-    FullDocumentModeEnum _fullDocumentMode = FullDocumentModeEnum::kDefault;
+    ChangeStream _changeStream;
 };
 }  // namespace mongo::exec::agg
