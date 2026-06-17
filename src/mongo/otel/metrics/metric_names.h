@@ -285,6 +285,30 @@ public:
 
     // Replication Team Metrics
     static constexpr MetricName kOplogApplyBytes = MetricNameMaker::make("oplog.apply.bytes");
+    static constexpr MetricName kOplogApplyBufferCount =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.count");
+    static constexpr MetricName kOplogApplyBufferSize =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.sizeBytes");
+    static constexpr MetricName kOplogApplyBufferMaxSize =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.maxSizeBytes");
+    static constexpr MetricName kOplogApplyBufferMaxCount =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.maxCount");
+    static constexpr MetricName kOplogWriteBufferCount =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.count");
+    static constexpr MetricName kOplogWriteBufferSize =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.sizeBytes");
+    static constexpr MetricName kOplogWriteBufferMaxSize =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.maxSizeBytes");
+    static constexpr MetricName kApplyBatchesNum =
+        MetricNameMaker::make("serverStatus.metrics.repl.apply.batches.num");
+    static constexpr MetricName kApplyBatchesTotalMillis =
+        MetricNameMaker::make("serverStatus.metrics.repl.apply.batches.totalMillis");
+    static constexpr MetricName kInitialSyncFailedAttempts =
+        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failedAttempts");
+    static constexpr MetricName kInitialSyncFailures =
+        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failures");
+    static constexpr MetricName kInitialSyncCompleted =
+        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.completed");
     static constexpr MetricName kGetLastErrorWtimeNum =
         MetricNameMaker::make("serverStatus.metrics.getLastError.wtime.num");
     static constexpr MetricName kGetLastErrorWtimeTotalMillis =

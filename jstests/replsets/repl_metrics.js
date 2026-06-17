@@ -6,7 +6,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Compares only key sets, ignoring the values
-function verifySameProperties(actual, expected) {
+function verifySameProperties(actual, expected, prefix = "") {
     // Helper function to get the property keys of an object
     function getKeys(obj) {
         return Object.keys(obj).sort();
@@ -20,18 +20,21 @@ function verifySameProperties(actual, expected) {
         assert(
             expected.hasOwnProperty(key),
             () =>
-                `Server Status metrics repl section has unexpected property ${key}, please fix this test`,
+                `Server Status metrics repl section ${prefix.substring(0, prefix.length - 1)}` +
+                ` has unexpected property ${key}, please fix this test`,
         );
     }
     for (let i = 0; i < keys2.length; i++) {
         const key = keys2[i];
         assert(
             actual.hasOwnProperty(key),
-            () => `Server Status metrics repl section has no expected property ${key}`,
+            () =>
+                `Server Status metrics repl section ${prefix.substring(0, prefix.length - 1)}` +
+                ` has no expected property ${key}`,
         );
         // Recursively verify nested objects
         if (typeof actual[key] === "object" && typeof expected[key] === "object") {
-            verifySameProperties(actual[key], expected[key]);
+            verifySameProperties(actual[key], expected[key], `${prefix}${key}.`);
         }
     }
 }

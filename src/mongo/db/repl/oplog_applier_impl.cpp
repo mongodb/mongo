@@ -128,9 +128,6 @@ auto& opsAppliedStats = *MetricBuilder<Counter64>{"repl.apply.ops"};
 // Tracks the oplog application batch size.
 auto& oplogApplicationBatchSize = *MetricBuilder<Counter64>{"repl.apply.batchSize"};
 
-// Number and time of each ApplyOps worker pool round
-auto& applyBatchStats = *MetricBuilder<TimerStats>("repl.apply.batches");
-
 // Total bytes of uncompressed oplog entries applied.
 auto& oplogBytesApplied = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kOplogApplyBytes,
@@ -138,6 +135,24 @@ auto& oplogBytesApplied = otel::metrics::MetricsService::instance().createInt64C
     otel::metrics::MetricUnit::kBytes,
     {.serverStatusOptions = otel::metrics::ServerStatusOptions{
          .dottedPath = "repl.apply.bytes",
+         .role = ClusterRole{ClusterRole::None},
+     }});
+
+auto& applyBatchesNumMetric = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kApplyBatchesNum,
+    "The total number of batches applied across all databases.",
+    otel::metrics::MetricUnit::kOperations,
+    {.serverStatusOptions = otel::metrics::ServerStatusOptions{
+         .dottedPath = "repl.apply.batches.num",
+         .role = ClusterRole{ClusterRole::None},
+     }});
+
+auto& applyBatchesTotalMillisMetric = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kApplyBatchesTotalMillis,
+    "Total time spent on applying oplog batches.",
+    otel::metrics::MetricUnit::kMilliseconds,
+    {.serverStatusOptions = otel::metrics::ServerStatusOptions{
+         .dottedPath = "repl.apply.batches.totalMillis",
          .role = ClusterRole{ClusterRole::None},
      }});
 
@@ -757,7 +772,12 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     std::vector<WorkerMultikeyPathInfo> multikeyVector(nWorkers);
     {
         // Each node records cumulative batch application stats for itself using this timer.
-        TimerHolder timer(&applyBatchStats);
+        Timer timer;
+        ON_BLOCK_EXIT([&] {
+            const auto elapsed = timer.elapsed();
+            applyBatchesNumMetric.add(1);
+            applyBatchesTotalMillisMetric.add(durationCount<Milliseconds>(elapsed));
+        });
 
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack

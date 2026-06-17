@@ -33,6 +33,8 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/metrics_updown_counter.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
@@ -48,6 +50,62 @@ namespace mongo {
 class OperationContext;
 
 namespace repl {
+
+inline auto& applyBufferCountMetric =
+    otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+        otel::metrics::MetricNames::kOplogApplyBufferCount,
+        "Number of oplog batches applied across all databases.",
+        otel::metrics::MetricUnit::kOperations,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.apply.count"})});
+
+inline auto& applyBufferSizeMetric =
+    otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+        otel::metrics::MetricNames::kOplogApplyBufferSize,
+        "Current size of the oplog apply buffer in bytes",
+        otel::metrics::MetricUnit::kBytes,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.apply.sizeBytes"})});
+
+inline auto& applyBufferMaxSizeMetric = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kOplogApplyBufferMaxSize,
+    "Maximum size of the apply buffer. mongod sets this value using a constant, which is not "
+    "configurable.",
+    otel::metrics::MetricUnit::kBytes,
+    {.serverStatusOptions =
+         otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.apply.maxSizeBytes"})});
+
+inline auto& applyBufferMaxCountMetric = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kOplogApplyBufferMaxCount,
+    "Maximum number of operations in the oplog apply buffer. mongod sets this value using a "
+    "constant, which is not configurable.",
+    otel::metrics::MetricUnit::kOperations,
+    {.serverStatusOptions =
+         otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.apply.maxCount"})});
+
+inline auto& writeBufferCountMetric =
+    otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+        otel::metrics::MetricNames::kOplogWriteBufferCount,
+        "Number of oplog batches applied across all databases.",
+        otel::metrics::MetricUnit::kOperations,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.write.count"})});
+
+inline auto& writeBufferSizeMetric =
+    otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+        otel::metrics::MetricNames::kOplogWriteBufferSize,
+        "Current size of the oplog write buffer in bytes",
+        otel::metrics::MetricUnit::kBytes,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.write.sizeBytes"})});
+
+inline auto& writeBufferMaxSizeMetric = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kOplogWriteBufferMaxSize,
+    "Maximum size of the write buffer. mongod sets this value using a constant, which is not "
+    "configurable.",
+    otel::metrics::MetricUnit::kBytes,
+    {.serverStatusOptions =
+         otel::metrics::ServerStatusOptions({.dottedPath = "repl.buffer.write.maxSizeBytes"})});
 
 /**
  * Interface for temporary container of oplog entries (in BSON format) from sync source by
@@ -211,6 +269,16 @@ struct OplogBuffer::Cost {
 
 class MONGO_MOD_PRIVATE OplogBuffer::Counters {
 public:
+    Counters() = delete;
+    Counters(otel::metrics::UpDownCounter<int64_t>& countMetric,
+             otel::metrics::UpDownCounter<int64_t>& sizeMetric,
+             otel::metrics::Gauge<int64_t>& maxSizeMetric,
+             boost::optional<otel::metrics::Gauge<int64_t>&> maxCountMetric)
+        : _countMetric(countMetric),
+          _sizeMetric(sizeMetric),
+          _maxSizeMetric(maxSizeMetric),
+          _maxCountMetric(maxCountMetric) {}
+
     // Number of operations in this OplogBuffer.
     Counter64 count;
 
@@ -229,6 +297,9 @@ public:
      */
     void setMaxCount(std::size_t newMaxCount) {
         maxCount.increment(newMaxCount - maxCount.get());
+        if (_maxCountMetric) {
+            _maxCountMetric->set(newMaxCount);
+        }
     }
 
     /**
@@ -236,6 +307,7 @@ public:
      * This function should only be called by a single thread.
      */
     void setMaxSize(std::size_t newMaxSize) {
+        _maxSizeMetric.set(newMaxSize);
         maxSize.increment(newMaxSize - maxSize.get());
     }
 
@@ -244,29 +316,36 @@ public:
      * This function should only be called by a single thread.
      */
     void clear() {
-        count.decrement(count.get());
-        size.decrement(size.get());
+        decrementN(count.get(), size.get());
     }
 
     void increment(const Value& value) {
-        count.increment(1);
-        size.increment(std::size_t(value.objsize()));
+        incrementN(1, static_cast<size_t>(value.objsize()));
     }
 
     void incrementN(std::size_t cnt, std::size_t sz) {
         count.increment(cnt);
+        _countMetric.add(static_cast<long>(cnt));
         size.increment(sz);
+        _sizeMetric.add(static_cast<long>(sz));
     }
 
     void decrement(const Value& value) {
-        count.decrement(1);
-        size.decrement(std::size_t(value.objsize()));
+        decrementN(1, static_cast<size_t>(value.objsize()));
     }
 
     void decrementN(std::size_t cnt, std::size_t sz) {
         count.decrement(cnt);
+        _countMetric.add(-static_cast<long>(cnt));
         size.decrement(sz);
+        _sizeMetric.add(-static_cast<long>(sz));
     }
+
+private:
+    otel::metrics::UpDownCounter<int64_t>& _countMetric;
+    otel::metrics::UpDownCounter<int64_t>& _sizeMetric;
+    otel::metrics::Gauge<int64_t>& _maxSizeMetric;
+    boost::optional<otel::metrics::Gauge<int64_t>&> _maxCountMetric;
 };
 
 class MONGO_MOD_PUB OplogBufferMetrics {
@@ -305,8 +384,12 @@ public:
     }
 
 private:
-    OplogBuffer::Counters _writeBufferCounter;
-    OplogBuffer::Counters _applyBufferCounter;
+    OplogBuffer::Counters _writeBufferCounter{
+        writeBufferCountMetric, writeBufferSizeMetric, writeBufferMaxSizeMetric, boost::none};
+    OplogBuffer::Counters _applyBufferCounter{applyBufferCountMetric,
+                                              applyBufferSizeMetric,
+                                              applyBufferMaxSizeMetric,
+                                              applyBufferMaxCountMetric};
 };
 
 /**

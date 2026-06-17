@@ -522,6 +522,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/storage/key_string",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -543,6 +544,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/storage/key_string",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -553,6 +555,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -2058,6 +2061,7 @@ mongo_cc_unit_test(
         "oplog_buffer_batched_queue_test.cpp",
         "oplog_buffer_blocking_queue_test.cpp",
         "oplog_buffer_collection_test.cpp",
+        "oplog_buffer_metrics_test.cpp",
         "oplog_buffer_proxy_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],
@@ -2071,6 +2075,7 @@ mongo_cc_unit_test(
         ":repl_coordinator_impl",
         "//src/mongo/db:server_base",
         "//src/mongo/dbtests:mocklib",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
