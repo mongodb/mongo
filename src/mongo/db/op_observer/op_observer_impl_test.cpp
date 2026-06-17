@@ -4133,6 +4133,127 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     }
 }
 
+// Verifies a retryable kGroupForAtomicWrite batch emits an applyOps tagged
+// kApplyOpsAppliedAtomically with the session metadata, and updates config.transactions.
+TEST_F(BatchedWriteOutputsTest, AtomicWriteEmitsAppliedAtomicallyTag) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    // Create the collection before resetting the oplog so its 'create' entry isn't counted below.
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+
+    // Two ops so the batch produces an applyOps rather than the single-op fast path; one carries a
+    // statement id, one doesn't (a kUninitializedStmtId insert yields an op with no statement ids).
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(StmtId(0), BSON("_id" << 0));
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 1);
+    auto entry = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // The batch replicates as a single applyOps tagged kApplyOpsAppliedAtomically.
+    EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+    EXPECT_EQ(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+
+    // Session info is stamped on the applyOps entry; statement ids live on the inner ops, not the
+    // top level. Compare the optionals directly so an absent field fails cleanly rather than
+    // throwing from value().
+    EXPECT_EQ(opCtx->getLogicalSessionId(), entry.getSessionId());
+    EXPECT_EQ(opCtx->getTxnNumber(), entry.getTxnNumber());
+    // Present but null: the only chain entry links to the (empty) session history.
+    EXPECT_EQ(entry.getPrevWriteOpTimeInTransaction(), repl::OpTime());
+    EXPECT_EQ(0, entry.getStatementIds().size());
+
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(2u, innerEntries.size());
+    ASSERT_EQ(1, innerEntries[0].getStatementIds().size());
+    EXPECT_EQ(StmtId(0), innerEntries[0].getStatementIds()[0]);
+    EXPECT_EQ(0, innerEntries[1].getStatementIds().size());
+
+    // config.transactions is updated to point at this (terminal) applyOps entry.
+    auto txnRecord = getTxnRecord(opCtx, *opCtx->getLogicalSessionId());
+    EXPECT_EQ(oplogs.back()[repl::OplogEntryBase::kTimestampFieldName].timestamp(),
+              txnRecord.getLastWriteOpTime().getTimestamp());
+    EXPECT_EQ(opCtx->getTxnNumber(), txnRecord.getTxnNum());
+}
+
+// Verifies an oversized kGroupForAtomicWrite batch replicates as a chain of applyOps entries: every
+// entry is tagged kApplyOpsAppliedAtomically and linked via prevOpTime, and config.transactions is
+// updated only once, pointing at the terminal entry. The per-applyOps op-count limit is lowered so
+// a small batch splits into multiple entries.
+TEST_F(BatchedWriteOutputsTest, AtomicWriteChainTagsAndLinksEveryEntry) {
+    unittest::ServerParameterGuard largeBatch("featureFlagLargeBatchedOperations", true);
+    unittest::ServerParameterGuard countLimit("maxNumberOfBatchedOperationsInSingleOplogEntry", 1);
+
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    // Create the collection before resetting the oplog so its 'create' entry isn't counted below.
+    reset(opCtx, _nss);
+    resetOplogAndTransactions(opCtx);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
+    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+
+    // One retryable insert plus stmtId-less inserts; with the count limit at 1, each op lands in
+    // its own applyOps entry, forming a chain.
+    const int kNumOps = 3;
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(StmtId(0), BSON("_id" << 0));
+    for (int i = 1; i < kNumOps; i++) {
+        toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << i));
+    }
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            toInsert.begin(),
+            toInsert.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(toInsert.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+    }
+
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, kNumOps);
+    repl::OpTime
+        prevOpTime;  // first chain entry links to the (empty) session history: a null optime
+    for (int i = 0; i < kNumOps; i++) {
+        auto entry = assertGet(OplogEntry::parse(oplogs[i]));
+        EXPECT_EQ(entry.getCommandType(), OplogEntry::CommandType::kApplyOps);
+        EXPECT_EQ(entry.getMultiOpType(), repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+        EXPECT_EQ(opCtx->getLogicalSessionId(), entry.getSessionId());
+        EXPECT_EQ(opCtx->getTxnNumber(), entry.getTxnNumber());
+        EXPECT_EQ(entry.getPrevWriteOpTimeInTransaction(), prevOpTime);
+        prevOpTime = entry.getOpTime();
+    }
+
+    // config.transactions points at the terminal (last) entry only.
+    auto txnRecord = getTxnRecord(opCtx, *opCtx->getLogicalSessionId());
+    EXPECT_EQ(oplogs.back()[repl::OplogEntryBase::kTimestampFieldName].timestamp(),
+              txnRecord.getLastWriteOpTime().getTimestamp());
+}
+
 // Verifies a WUOW that would result in a an oplog entry >16MB fails with TransactionTooLarge.
 TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     unittest::ServerParameterGuard featureFlagController("featureFlagLargeBatchedOperations",
