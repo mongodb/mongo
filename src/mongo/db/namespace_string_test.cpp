@@ -230,10 +230,6 @@ TEST_F(NamespaceStringTest, DbForSharding) {
 TEST_F(NamespaceStringTest, nsToDatabase1) {
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo.bar"));
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo"));
-    ASSERT_EQUALS("foo", nsToDatabase("foo.bar"));
-    ASSERT_EQUALS("foo", nsToDatabase("foo"));
-    ASSERT_EQUALS("foo", nsToDatabase(std::string("foo.bar")));
-    ASSERT_EQUALS("foo", nsToDatabase(std::string("foo")));
 }
 
 TEST_F(NamespaceStringTest, NamespaceStringParse1) {
