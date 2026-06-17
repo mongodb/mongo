@@ -46,7 +46,6 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/modules.h"
 
-#include <deque>
 #include <functional>
 #include <map>
 #include <tuple>
@@ -247,7 +246,11 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    std::deque<SimpleMemoryUsageTokenWith<Value>> _deque;
+    // We avoid using SimpleMemoryUsageTokenWith<> here due to significant overhead in the move
+    // constructor as we add/remove values.
+    std::vector<std::pair<Value, int64_t>> _ring;
+    size_t _ringHead = 0;
+    size_t _ringCount = 0;
     Sense _variant;
 };
 

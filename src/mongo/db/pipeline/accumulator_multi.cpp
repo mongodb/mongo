@@ -311,7 +311,7 @@ const char* AccumulatorMaxN::getName() {
 }
 
 AccumulatorFirstLastN::AccumulatorFirstLastN(ExpressionContext* const expCtx, FirstLastSense sense)
-    : AccumulatorN(expCtx), _deque(), _variant(sense) {
+    : AccumulatorN(expCtx), _variant(sense) {
     _memUsageTracker.set(sizeof(*this));
 }
 
@@ -347,24 +347,28 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 }
 
 void AccumulatorFirstLastN::_processValue(const Value& val) {
-    // Convert missing values to null.
     auto valToProcess = val.missing() ? Value(BSONNULL) : val;
 
-    // Only insert in the lastN case if we have 'n' elements.
-    if (static_cast<long long>(_deque.size()) == *_n) {
-        if (_variant == Sense::kLast) {
-            _deque.pop_front();
-        } else {
-            // If our deque has 'n' elements and this is $firstN, we don't need to call process
+    if (_ringCount == static_cast<size_t>(*_n)) {
+        if (_variant == Sense::kFirst) {
+            // Once _ring contains 'n' elements and this is $firstN, we don't need to call process
             // anymore.
             _needsInput = false;
             return;
         }
+        // $lastN full: evict the oldest slot. The stored size lets us update the tracker without
+        // recomputing getApproximateSize() on the outgoing value.
+        const int64_t newSize = valToProcess.getApproximateSize();
+        _memUsageTracker.add(newSize - _ring[_ringHead].second);
+        _ring[_ringHead] = {std::move(valToProcess), newSize};
+        _ringHead = (_ringHead + 1) % _ring.size();
+    } else {
+        const int64_t newSize = valToProcess.getApproximateSize();
+        _memUsageTracker.add(newSize);
+        _ring.push_back({std::move(valToProcess), newSize});
+        ++_ringCount;
     }
 
-    _deque.emplace_back(
-        SimpleMemoryUsageToken{valToProcess.getApproximateSize(), &_memUsageTracker},
-        std::move(valToProcess));
     checkMemUsage();
 }
 
@@ -398,11 +402,21 @@ boost::intrusive_ptr<Expression> AccumulatorFirstLastN::parseExpression(
 }
 
 void AccumulatorFirstLastN::reset() {
-    _deque = std::deque<SimpleMemoryUsageTokenWith<Value>>();
+    _ring.clear();
+    // memoryUsageTracker doesn't track reserved space so get rid of it.
+    _ring.shrink_to_fit();
+    _memUsageTracker.set(sizeof(*this));
+    _ringHead = 0;
+    _ringCount = 0;
 }
 
 Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
-    return convertToValueFromMemoryTokenWithValue(_deque.begin(), _deque.end(), _deque.size());
+    std::vector<Value> result;
+    result.reserve(_ringCount);
+    for (size_t i = 0; i < _ringCount; ++i) {
+        result.emplace_back(_ring[(_ringHead + i) % _ring.size()].first);
+    }
+    return Value{std::move(result)};
 }
 
 const char* AccumulatorFirstN::getName() {
