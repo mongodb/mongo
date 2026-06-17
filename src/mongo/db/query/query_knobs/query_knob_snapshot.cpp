@@ -29,7 +29,10 @@
 
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 
+#include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/static_immortal.h"
 
 #include <algorithm>
 #include <utility>
@@ -40,13 +43,21 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangInQueryKnobSnapshotCacheRead);
 MONGO_FAIL_POINT_DEFINE(hangInQueryKnobSnapshotCacheUpdate);
 
+namespace {
+static StaticImmortal<std::unique_ptr<QueryKnobSnapshotCache>> gQueryKnobSnapshotCache(nullptr);
+};
+
 QueryKnobSnapshot::QueryKnobSnapshot(std::vector<QueryKnobValue> values,
                                      std::vector<KnobSource> sources)
-    : _values(std::move(values)), _sources(std::move(sources)) {}
+    : _storage(std::make_shared<Storage>(std::move(values), std::move(sources))) {}
+
+QueryKnobSnapshot QueryKnobSnapshot::clone() const {
+    return {_storage->values, _storage->sources};
+}
 
 KnobSource QueryKnobSnapshot::getSource(QueryKnobId id) const {
-    tassert(12312301, "QueryKnobSnapshot index out of bounds", id.value < _sources.size());
-    return _sources[id.value];
+    tassert(12312301, "QueryKnobSnapshot index out of bounds", id.value < size());
+    return _storage->sources[id.value];
 }
 
 size_t QueryKnobSnapshot::size() const {
@@ -56,7 +67,8 @@ size_t QueryKnobSnapshot::size() const {
 QueryKnobSnapshotBuilder::QueryKnobSnapshotBuilder(size_t size) : _values(size), _sources(size) {}
 
 QueryKnobSnapshotBuilder::QueryKnobSnapshotBuilder(QueryKnobSnapshot snapshot)
-    : _values(std::move(snapshot._values)), _sources(std::move(snapshot._sources)) {}
+    : _values(std::move(snapshot._storage->values)),
+      _sources(std::move(snapshot._storage->sources)) {}
 
 QueryKnobSnapshotBuilder& QueryKnobSnapshotBuilder::set(QueryKnobId id,
                                                         QueryKnobValue value,
@@ -77,6 +89,11 @@ QueryKnobSnapshot QueryKnobSnapshotBuilder::build() && {
                 return !std::holds_alternative<DeleteQueryKnobOverride>(v);
             }));
     return QueryKnobSnapshot(std::move(_values), std::move(_sources));
+}
+
+const QueryKnobSnapshotCache& QueryKnobSnapshotCache::instance() {
+    tassert(12736300, "QueryKnobSnapshotCache is not initialized", *gQueryKnobSnapshotCache);
+    return **gQueryKnobSnapshotCache;
 }
 
 QueryKnobSnapshotCache::QueryKnobSnapshotCache(QueryKnobSnapshot snapshot)
@@ -111,6 +128,27 @@ void QueryKnobSnapshotCache::updateKnobValue(QueryKnobId id,
     // Use std::swap() so the outgoing snapshot is destroyed after both locks are released.
     auto writeLock = _rwLock.writeLock();
     std::swap(_snapshot, *outgoing);
+    _version.fetchAndAdd(1);
 }
+
+REGISTER_QUERY_KNOBS_LISTENER(QueryKnobSnapshotCacheUpdater, [](const QueryKnobChange& change) {
+    static auto* cache = [] {
+        invariant(*gQueryKnobSnapshotCache);
+        return gQueryKnobSnapshotCache->get();
+    }();
+    cache->updateKnobValue(change.id, change.newValue, KnobSource::kSetParameter);
+    return Status::OK();
+})
+
+MONGO_INITIALIZER_GENERAL(QueryKnobSnapshotCacheInit,
+                          ("QueryKnobRegistryInit"),
+                          ("QueryKnobChangeNotifierInit"))(InitializerContext*) {
+    auto&& entries = QueryKnobRegistry::instance().entries();
+    QueryKnobSnapshotBuilder builder(entries.size());
+    for (auto&& entry : entries) {
+        builder.set(entry.id, entry.readGlobal(), KnobSource::kDefault);
+    }
+    *gQueryKnobSnapshotCache = std::make_unique<QueryKnobSnapshotCache>(std::move(builder).build());
+};
 
 }  // namespace mongo

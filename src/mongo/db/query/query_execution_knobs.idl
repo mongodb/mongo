@@ -33,6 +33,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/query_knob_expressions.h"
+        - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/platform/atomic_word.h"
     mod_visibility: public
@@ -433,7 +434,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: SbeHashAggIncreasedSpillingMode
-            data: synchronized_value<SbeHashAggIncreasedSpillingModeEnum>
+            data: WithOnUpdateHook<synchronized_value<SbeHashAggIncreasedSpillingModeEnum>>
         default:
             expr: SbeHashAggIncreasedSpillingModeEnum::kInDebug
         redact: false
@@ -543,7 +544,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: QueryFrameworkControl
-            data: synchronized_value<QueryFrameworkControlEnum>
+            data: WithOnUpdateHook<synchronized_value<QueryFrameworkControlEnum>>
         default:
             expr: QueryFrameworkControlEnum::kTrySbeRestricted
         redact: false

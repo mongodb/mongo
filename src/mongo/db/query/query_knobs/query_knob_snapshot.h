@@ -64,8 +64,6 @@ static_assert(static_cast<uint8_t>(KnobSource::kDefault) == 0,
  * get<EnumT>() casts back to the enum type.
  *
  * Construct via QueryKnobSnapshotBuilder.
- *
- * TODO SERVER-127363: Make the snapshot storage refcounted.
  */
 class QueryKnobSnapshot {
     friend class QueryKnobSnapshotBuilder;
@@ -76,9 +74,11 @@ public:
     QueryKnobSnapshot(QueryKnobSnapshot&&) noexcept = default;
     QueryKnobSnapshot& operator=(QueryKnobSnapshot&&) noexcept = default;
 
+    QueryKnobSnapshot clone() const;
+
     template <typename T>
     T get(QueryKnobId id) const {
-        tassert(12312300, "QueryKnobSnapshot index out of bounds", id.value < _values.size());
+        tassert(12312300, "QueryKnobSnapshot index out of bounds", id.value < size());
         const QueryKnobValue& val = _values[id.value];
         if constexpr (std::is_enum_v<T>) {
             return static_cast<T>(std::get<int>(val));
@@ -94,8 +94,14 @@ public:
 private:
     QueryKnobSnapshot(std::vector<QueryKnobValue> values, std::vector<KnobSource> sources);
 
-    std::vector<QueryKnobValue> _values;
-    std::vector<KnobSource> _sources;
+    struct Storage {
+        std::vector<QueryKnobValue> values;
+        std::vector<KnobSource> sources;
+    };
+    std::shared_ptr<const Storage> _storage;
+
+    // Cache a span of values for fast access without dereferencing the shared_ptr.
+    std::span<const QueryKnobValue> _values = _storage->values;
 };
 
 /**
@@ -133,10 +139,28 @@ class QueryKnobSnapshotCache {
 public:
     explicit QueryKnobSnapshotCache(QueryKnobSnapshot snapshot);
 
+    static const QueryKnobSnapshotCache& instance();
+
     /**
      * Returns a copy of the current snapshot. Safe to call concurrently from any thread.
      */
     [[nodiscard]] QueryKnobSnapshot getSnapshot() const;
+
+    /**
+     * Returns a copy of the current snapshot, cached in thread-local storage. Safe to call
+     * concurrently from any thread.
+     */
+    [[nodiscard]] QueryKnobSnapshot getThreadLocalSnapshot() const {
+        thread_local boost::optional<QueryKnobSnapshot> localCache = boost::none;
+        thread_local uint64_t localVersion = 0;
+        auto currentVersion = _version.loadRelaxed();
+        const bool cacheHit = localCache && localVersion == currentVersion;
+        if (MONGO_unlikely(!cacheHit)) {
+            localCache = getSnapshot().clone();
+            localVersion = currentVersion;
+        }
+        return *localCache;
+    }
 
     /**
      * Updates a single knob in the snapshot. Serialized against concurrent writers; readers
@@ -148,6 +172,7 @@ private:
     mutable WriteRarelyRWMutex _rwLock;
     std::mutex _intentLock;
     QueryKnobSnapshot _snapshot;
+    alignas(64) AtomicWord<uint8_t> _version{0};
 };
 
 }  // namespace mongo

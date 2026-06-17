@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/query_knobs/query_knob_change_notifier.h"
 
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
+
 #include <utility>
 
 namespace mongo {
@@ -54,4 +56,21 @@ Status QueryKnobChangeNotifier::fireEvent(const QueryKnobChange& event) const {
     return Status::OK();
 }
 
+namespace detail {
+namespace {
+std::vector<QueryKnobChangeNotifier::Listener> gRegisteredListeners;
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(QueryKnobChangeNotifierInit,
+                                     ("QueryKnobRegistryInit"))(InitializerContext*) {
+    auto notifier = QueryKnobChangeNotifier::create(std::move(detail::gRegisteredListeners));
+    for (auto&& entry : QueryKnobRegistry::instance().entries()) {
+        entry.attachOnUpdate(notifier.get());
+    }
+};
+}  // namespace
+
+void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener) {
+    gRegisteredListeners.push_back(std::move(listener));
+}
+}  // namespace detail
 }  // namespace mongo

@@ -31,9 +31,11 @@
 
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/util/fail_point.h"
 
 #include <chrono>
@@ -370,6 +372,33 @@ TEST(QueryKnobSnapshotCacheTest, ConcurrentReadersDontBlockEachOther) {
     fp.reset();
     readerAFut.get();
     readerBFut.get();
+}
+
+TEST(QueryKnobSnapshotCacheTest, SnapshotReflectsSetParameterUpdate) {
+    ASSERT_EQ(QueryKnobSnapshotCache::instance().getSnapshot().get<int>(test_knobs::testIntKnob.id),
+              42);
+    {
+        unittest::ServerParameterGuard ctrl("testIntKnob", 999);
+        auto snap = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
+        ASSERT_EQ(snap.get<int>(test_knobs::testIntKnob.id), 999);
+        ASSERT_EQ(snap.getSource(test_knobs::testIntKnob.id), KnobSource::kSetParameter);
+    }
+    auto snap = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
+    ASSERT_EQ(snap.get<int>(test_knobs::testIntKnob.id), 42);
+}
+
+TEST(QueryKnobSnapshotCacheTest, SnapshotReflectsSetParameterUpdateEnum) {
+    ASSERT_EQ(QueryKnobSnapshotCache::instance().getSnapshot().get<TestKnobModeEnum>(
+                  test_knobs::testEnumKnob.id),
+              TestKnobModeEnum::kAlpha);
+    {
+        unittest::ServerParameterGuard ctrl("testEnumKnob", "beta");
+        auto snap = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
+        ASSERT_EQ(snap.get<TestKnobModeEnum>(test_knobs::testEnumKnob.id), TestKnobModeEnum::kBeta);
+        ASSERT_EQ(snap.getSource(test_knobs::testEnumKnob.id), KnobSource::kSetParameter);
+    }
+    auto snap = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
+    ASSERT_EQ(snap.get<TestKnobModeEnum>(test_knobs::testEnumKnob.id), TestKnobModeEnum::kAlpha);
 }
 
 }  // namespace

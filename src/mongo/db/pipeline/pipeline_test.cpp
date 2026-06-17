@@ -4386,18 +4386,11 @@ TEST_F(PipelineOptimizationTest, MatchNotPushedBeforeMultipleReplaceWithsSamePre
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
-auto enablePipelineOptimizationAdditionalTestingRules() {
-    bool previousQueryKnobValue =
-        internalEnablePipelineOptimizationAdditionalTestingRules.swap(true);
-    return mongo::ScopeGuard([=] {
-        internalEnablePipelineOptimizationAdditionalTestingRules.store(previousQueryKnobValue);
-    });
-}
-
 // 'a' is unset, therefore it cannot have type array.
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArray) {
     unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
-    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    unittest::ServerParameterGuard enableAdditionalTestingRules{
+        "internalEnablePipelineOptimizationAdditionalTestingRules", true};
     std::string inputPipe =
         "["
         " {$unset: 'a'},"
@@ -4419,7 +4412,8 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArray) {
 // 'a' is computed and could be array or null (if $b is null).
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenCanBeArray) {
     unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
-    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    unittest::ServerParameterGuard enableAdditionalTestingRules{
+        "internalEnablePipelineOptimizationAdditionalTestingRules", true};
     std::string inputPipe =
         "["
         " {$set: {a: {$objectToArray: ['$b']}}},"
@@ -4440,7 +4434,8 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenCanBeArray) {
 
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArrayMultiple) {
     unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
-    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    unittest::ServerParameterGuard enableAdditionalTestingRules{
+        "internalEnablePipelineOptimizationAdditionalTestingRules", true};
     std::string inputPipe =
         "["
         " {$unset: 'a'},"
@@ -4465,7 +4460,8 @@ TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArrayMultiple) {
 
 TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenMixedArray) {
     unittest::ServerParameterGuard featureFlag{"featureFlagImprovedDepsAnalysis", true};
-    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    unittest::ServerParameterGuard enableAdditionalTestingRules{
+        "internalEnablePipelineOptimizationAdditionalTestingRules", true};
     std::string inputPipe =
         "["
         " {$set: {a: {$objectToArray: ['$d']}}},"

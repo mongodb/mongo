@@ -33,6 +33,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/query_knob_expressions.h"
+        - "mongo/db/query/query_knobs/with_on_update_util.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/db/query/util/memory_util.h"
         - "mongo/platform/atomic_word.h"
@@ -554,7 +555,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: JoinReorderMode
-            data: synchronized_value<JoinReorderModeEnum>
+            data: WithOnUpdateHook<synchronized_value<JoinReorderModeEnum>>
         default:
             expr: JoinReorderModeEnum::kBottomUp
         redact: false
@@ -567,7 +568,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: JoinPlanTreeShape
-            data: synchronized_value<JoinPlanTreeShapeEnum>
+            data: WithOnUpdateHook<synchronized_value<JoinPlanTreeShapeEnum>>
         default:
             expr: JoinPlanTreeShapeEnum::kZigZag
         redact: false
@@ -687,7 +688,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: ForcedJoinMethod
-            data: synchronized_value<ForcedJoinMethodEnum>
+            data: WithOnUpdateHook<synchronized_value<ForcedJoinMethodEnum>>
         default:
             expr: ForcedJoinMethodEnum::kAny
         redact: false
@@ -786,7 +787,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: QueryPlanRankerMode
-            data: synchronized_value<QueryPlanRankerModeEnum>
+            data: WithOnUpdateHook<synchronized_value<QueryPlanRankerModeEnum>>
         default:
             expr: QueryPlanRankerModeEnum::kAutomaticCE
         redact: false
@@ -802,7 +803,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode
-            data: synchronized_value<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>
+            data: WithOnUpdateHook<synchronized_value<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>>
         default:
             expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRForNoMultiplanningResults
         redact: false
@@ -820,7 +821,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: SamplingConfidenceInterval
-            data: synchronized_value<SamplingConfidenceIntervalEnum>
+            data: WithOnUpdateHook<synchronized_value<SamplingConfidenceIntervalEnum>>
         default:
             expr: SamplingConfidenceIntervalEnum::k95
         redact: false
@@ -859,7 +860,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: CBRSamplingCEMethod
-            data: synchronized_value<SamplingCEMethodEnum>
+            data: WithOnUpdateHook<synchronized_value<SamplingCEMethodEnum>>
         default:
             expr: SamplingCEMethodEnum::kChunk
         redact: false
@@ -876,7 +877,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_class:
             name: JoinSamplingCEMethod
-            data: synchronized_value<SamplingCEMethodEnum>
+            data: WithOnUpdateHook<synchronized_value<SamplingCEMethodEnum>>
         default:
             expr: SamplingCEMethodEnum::kRandom
         redact: false

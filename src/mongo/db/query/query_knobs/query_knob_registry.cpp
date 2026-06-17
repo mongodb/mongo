@@ -46,7 +46,6 @@ namespace {
 struct QueryKnobInitializerContext {
     QueryKnobId::value_t numKnobs = 0;
     std::vector<QueryKnobRegistry::Entry> entries;
-    std::vector<QueryKnobChangeNotifier::Listener> listeners;
 } globalQueryKnobInitializerContext;
 
 boost::optional<multiversion::FeatureCompatibilityVersion> extractMinFcv(StringData paramName,
@@ -199,22 +198,13 @@ void registerQueryKnob(QueryKnobRegistry::Entry&& entry) {
     globalQueryKnobInitializerContext.entries.push_back(std::move(entry));
 }
 
-void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener) {
-    globalQueryKnobInitializerContext.listeners.push_back(std::move(listener));
-}
-
 namespace {
 MONGO_INITIALIZER_WITH_PREREQUISITES(QueryKnobRegistryInit, ("EndServerParameterRegistration"))
 (InitializerContext*) {
     auto&& params = ServerParameterSet::getNodeParameterSet();
-    detectOrphanAnnotations(globalQueryKnobInitializerContext.entries, *params);
+    auto&& entries = globalQueryKnobInitializerContext.entries;
+    detectOrphanAnnotations(entries, *params);
     QueryKnobRegistry::init(std::move(globalQueryKnobInitializerContext.entries));
-
-    auto notifier =
-        QueryKnobChangeNotifier::create(std::move(globalQueryKnobInitializerContext.listeners));
-    for (auto&& entry : QueryKnobRegistry::instance().entries()) {
-        entry.attachOnUpdate(notifier.get());
-    }
 }
 
 }  // namespace

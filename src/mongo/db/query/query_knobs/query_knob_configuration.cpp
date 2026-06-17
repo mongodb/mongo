@@ -31,7 +31,6 @@
 
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_knob_descriptors_optimization.h"
-#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 
@@ -44,22 +43,19 @@ namespace {
  * per-query QuerySettings overrides applied on top.
  */
 QueryKnobSnapshot makeQueryKnobSnapshot(const query_settings::QuerySettings& querySettings) {
-    auto&& registry = QueryKnobRegistry::instance();
-    QueryKnobSnapshotBuilder builder(registry.knobCount());
-
-    // Load the global knob values.
-    for (auto&& entry : registry.entries()) {
-        builder.set(entry.id, entry.readGlobal(), KnobSource::kDefault);
-    }
+    auto snapshot = QueryKnobSnapshotCache::instance().getThreadLocalSnapshot();
 
     // Apply query settings overrides if needed.
     if (auto queryFramework = querySettings.getQueryFramework()) {
+        QueryKnobSnapshotBuilder builder(std::move(snapshot));
         QueryKnobValue queryFrameworkValue(static_cast<int>(*queryFramework));
         builder.set(query_knobs::kQueryFrameworkControl.id,
                     std::move(queryFrameworkValue),
                     KnobSource::kQuerySettings);
+        return std::move(builder).build();
     }
-    return std::move(builder).build();
+
+    return snapshot;
 }
 }  // namespace
 

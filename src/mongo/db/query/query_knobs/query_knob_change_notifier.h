@@ -66,15 +66,13 @@ public:
         }
 
         if constexpr (EnumServerParameter<SPT>) {
-            // TODO SERVER-127363: Convert this early-exit guard into a static assertion once all
-            // the query knob storage types are migrated.
             using KnobValueType = decltype(detail::queryKnobValueType<SPT>());
-            if constexpr (HasOnUpdateHook<decltype(sp->_data), KnobValueType>) {
-                sp->_data.setOnUpdate([this, id, anchor = anchor()](const auto& newVal) {
-                    static_assert(std::is_enum_v<KnobValueType>);
-                    return fireEvent({.id = id, .newValue = static_cast<int>(newVal)});
-                });
-            }
+            static_assert(HasOnUpdateHook<decltype(sp->_data), KnobValueType>,
+                          "Enum query knobs must use a data type with an on-update hook");
+            sp->_data.setOnUpdate([this, id, anchor = anchor()](const auto& newVal) {
+                static_assert(std::is_enum_v<KnobValueType>);
+                return fireEvent({.id = id, .newValue = static_cast<int>(newVal)});
+            });
         } else {
             // IDL server parameters types have built-in on-update hooks. Attach directly.
             sp->setOnUpdate([this, id, anchor = anchor()](const auto& newVal) {
@@ -93,4 +91,20 @@ private:
     std::vector<Listener> _listeners;
 };
 
+namespace detail {
+void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener);
+}  // namespace detail
+
+// clang-format off
+// Registers a knob-change listener. `name` is the initializer name (must be a unique
+// identifier); `listener` is any expression convertible to QueryKnobChangeNotifier::Listener
+// (Status(const QueryKnobChange&)). Place at namespace scope in a .cpp.
+#define REGISTER_QUERY_KNOBS_LISTENER(name, listener)                                           \
+    namespace {                                                                                 \
+    MONGO_INITIALIZER_GENERAL(name, ("QueryKnobRegistryInit"), ("QueryKnobChangeNotifierInit")) \
+        (InitializerContext*) {                                                                 \
+            detail::registerQueryKnobListener(listener);                                        \
+        }                                                                                       \
+    } // namespace
+// clang-format on
 }  // namespace mongo

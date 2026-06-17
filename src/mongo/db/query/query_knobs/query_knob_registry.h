@@ -157,9 +157,6 @@ QueryKnobId allocateQueryKnobId();
 // Appends an entry to the global initializer context. Called by REGISTER_QUERY_KNOBS and
 // consumed by QueryKnobRegistryInit.
 void registerQueryKnob(QueryKnobRegistry::Entry&& entry);
-
-// Listener counterpart to registerQueryKnob; consumed by QueryKnobRegistryInit into the notifier.
-void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener);
 }  // namespace detail
 
 // clang-format off
@@ -193,16 +190,5 @@ void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener);
 #define REGISTER_QUERY_KNOBS(group, EXPAND)            \
     EXPAND(MONGO_DETAIL_DEFINE_QUERY_KNOB)             \
     MONGO_DETAIL_INITIALIZE_QUERY_KNOBS(group, EXPAND)
-
-// Registers a knob-change listener. `name` is the initializer name (must be a unique
-// identifier); `listener` is any expression convertible to QueryKnobChangeNotifier::Listener
-// (Status(const QueryKnobChange&)). Place at namespace scope in a .cpp.
-#define REGISTER_QUERY_KNOBS_LISTENER(name, listener)                                \
-    namespace {                                                                      \
-    MONGO_INITIALIZER_GENERAL(name, (), ("QueryKnobRegistryInit"))                   \
-        (InitializerContext*) {                                                      \
-            detail::registerQueryKnobListener(listener); \
-        }                                                                            \
-    } // namespace
 // clang-format on
 }  // namespace mongo
