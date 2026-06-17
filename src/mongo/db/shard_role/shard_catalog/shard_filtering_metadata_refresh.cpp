@@ -86,7 +86,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/future_util.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -541,56 +540,62 @@ void FilteringMetadataCache::forceCollectionMetadataRefresh_DEPRECATED(Operation
     scopedCsr->setCollectionMetadata(opCtx, std::move(metadata));
 }
 
-Status FilteringMetadataCache::onDbVersionMismatch(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& clientDbVersion) noexcept {
+Status FilteringMetadataCache::onDbVersionMismatch(OperationContext* opCtx,
+                                                   const DatabaseName& dbName,
+                                                   const DatabaseVersion& clientDbVersion) noexcept
+    try {
     while (true) {
         const auto refresh = FilteringMetadataRefreshTracker::get(opCtx)->acquire(opCtx);
         const bool isAuthoritative = (refresh.kind == FilteringMetadataRefreshKind::kAuthoritative);
 
-        try {
-            if (isAuthoritative) {
-                _onDbVersionMismatchAuthoritative(
-                    opCtx, dbName, clientDbVersion, refresh.cancellationToken);
-            } else {
-                _onDbVersionMismatch(opCtx, dbName, clientDbVersion, refresh.cancellationToken);
-            }
-            if (refresh.cancellationToken.isCanceled()) {
-                LOGV2(12436401,
-                      "Database version mismatch refresh was canceled by an authoritativeness "
-                      "change, retrying",
-                      logAttrs(dbName),
-                      "isAuthoritative"_attr = isAuthoritative);
-                continue;
-            }
-            return Status::OK();
-        } catch (const DBException& ex) {
-            LOGV2(22065,
-                  "Failed to refresh databaseVersion",
-                  "db"_attr = dbName,
-                  "error"_attr = redact(ex));
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+        invariant(!opCtx->getClient()->isInDirectClient());
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
 
-            const auto status = ex.toStatus();
+        Timer t;
+        ScopeGuard finishTiming([&] {
+            CurOp::get(opCtx)->debug().databaseVersionRefreshMillis += Milliseconds(t.millis());
+        });
 
-            // If the error indicates an FCV transition, retry the operation. This ensures the
-            // secondary node correctly transitions to the authoritative model.
-            if (status != ErrorCodes::MetadataRefreshCanceledDueToFCVTransition) {
-                return status;
-            }
+        const bool shouldRetry = runRefreshInChildOperationContext(
+            opCtx, refresh.cancellationToken, [&](OperationContext* refreshOpCtx) {
+                if (isAuthoritative) {
+                    _onDbVersionMismatchAuthoritative(refreshOpCtx, dbName, clientDbVersion);
+                } else {
+                    _onDbVersionMismatch(refreshOpCtx, dbName, clientDbVersion);
+                }
+            });
+        if (shouldRetry) {
+            LOGV2(12436401,
+                  "Database placement version mismatch refresh was canceled; retrying",
+                  logAttrs(dbName),
+                  "isAuthoritative"_attr = isAuthoritative);
+            continue;
         }
+        return Status::OK();
     }
+} catch (const DBException& ex) {
+    LOGV2(
+        22065, "Failed to refresh databaseVersion", "db"_attr = dbName, "error"_attr = redact(ex));
+    return ex.toStatus();
 }
 
 Status FilteringMetadataCache::forceDatabaseMetadataRefresh_DEPRECATED(
     OperationContext* opCtx, const DatabaseName& dbName) noexcept {
     try {
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+        invariant(!opCtx->getClient()->isInDirectClient());
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
         const auto refresh = FilteringMetadataRefreshTracker::get(opCtx)->acquire(
             opCtx, FilteringMetadataRefreshKind::kNonAuthoritative);
-        _onDbVersionMismatch(opCtx, dbName, boost::none, refresh.cancellationToken);
+        const bool shouldRetry = runRefreshInChildOperationContext(
+            opCtx, refresh.cancellationToken, [&](OperationContext* refreshOpCtx) {
+                _onDbVersionMismatch(refreshOpCtx, dbName, boost::none);
+            });
         uassert(ErrorCodes::MetadataRefreshCanceledDueToFCVTransition,
                 "Database metadata refresh was canceled",
-                !refresh.cancellationToken.isCanceled());
+                !shouldRetry);
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(10250102,
@@ -884,12 +889,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshDbVersion(
 void FilteringMetadataCache::_onDbVersionMismatch(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    boost::optional<DatabaseVersion> receivedDbVersion,
-    const CancellationToken& rootCancellationToken) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
+    boost::optional<DatabaseVersion> receivedDbVersion) {
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
     }
@@ -898,18 +898,15 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             fmt::format("Can't check version of {} database", dbName.toStringForErrorMsg()),
             !dbName.isAdminDB() && !dbName.isConfigDB());
 
-    Timer t{};
-    ScopeGuard finishTiming([&] {
-        CurOp::get(opCtx)->debug().databaseVersionRefreshMillis += Milliseconds(t.millis());
-    });
-
     LOGV2_DEBUG(6697200,
                 2,
                 "Handle database version mismatch",
                 "db"_attr = dbName,
                 "receivedDbVersion"_attr = receivedDbVersion);
 
-    while (!rootCancellationToken.isCanceled()) {
+    while (true) {
+        opCtx->checkForInterrupt();
+
         if (receivedDbVersion) {
             auto scopedDsr =
                 boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
@@ -954,7 +951,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             // refresh in progress (holding the exclusive lock on the DSS).
             // Therefore, the future to refresh the database metadata can be set.
 
-            CancellationSource cancellationSource(rootCancellationToken);
+            CancellationSource cancellationSource(opCtx->getCancellationToken());
             CancellationToken cancellationToken = cancellationSource.token();
             (*scopedDsr)
                 ->setDbMetadataRefreshFuture_DEPRECATED(
@@ -976,14 +973,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
 }
 
 void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const DatabaseVersion& receivedDbVersion,
-    const CancellationToken& rootCancellationToken) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
+    OperationContext* opCtx, const DatabaseName& dbName, const DatabaseVersion& receivedDbVersion) {
     tassert(ErrorCodes::IllegalOperation,
             fmt::format("Can't check version of {} database", dbName.toStringForErrorMsg()),
             !dbName.isAdminDB() && !dbName.isConfigDB());
@@ -1007,19 +997,13 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
     const auto targetOpTime =
         repl::OpTime(receivedDbVersion.getTimestamp(), repl::OpTime::kUninitializedTerm);
 
-    try {
-        auto majorityFuture =
-            repl::ReplicationCoordinator::get(opCtx)->registerWaiterForMajorityReadOpTime(
-                opCtx, targetOpTime);
-        future_util::withCancellation(std::move(majorityFuture), rootCancellationToken).get(opCtx);
-    } catch (const ExceptionFor<ErrorCodes::CallbackCanceled>&) {
-        tassert(12436400,
-                "Majority wait canceled but refresh root token is not",
-                rootCancellationToken.isCanceled());
-        return;
-    }
+    repl::ReplicationCoordinator::get(opCtx)
+        ->registerWaiterForMajorityReadOpTime(opCtx, targetOpTime)
+        .get(opCtx);
 
-    while (!rootCancellationToken.isCanceled()) {
+    while (true) {
+        opCtx->checkForInterrupt();
+
         auto scopedDsr =
             boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
 
@@ -1823,11 +1807,14 @@ void FilteringMetadataRefreshTracker::_release(
     auto& list = kind == FilteringMetadataRefreshKind::kAuthoritative
         ? _activeAuthoritativeRefreshes
         : _activeNonAuthoritativeRefreshes;
+    if (cancellationIt->token().isCanceled()) {
+        _canceled.notify_all();
+    }
     list.erase(cancellationIt);
 }
 
 void FilteringMetadataRefreshTracker::interruptIncompatibleRefreshes(OperationContext* opCtx) {
-    std::lock_guard lk(_mutex);
+    std::unique_lock lk(_mutex);
     const bool authoritativeEnabled = feature_flags::gAuthoritativeShardsCRUD.isEnabled(
         VersionContext::getDecoration(opCtx),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
@@ -1836,6 +1823,11 @@ void FilteringMetadataRefreshTracker::interruptIncompatibleRefreshes(OperationCo
     for (auto& source : list) {
         source.cancel();
     }
+    // Wait for all refreshes that were ongoing to be canceled. New refreshes are appended to the
+    // end of the list, so we can wait until the refresh at the front of the list isn't canceled.
+    // TODO(SERVER-127444): Wait until the list is empty, since new refreshes are of the other kind.
+    opCtx->waitForConditionOrInterrupt(
+        _canceled, lk, [&] { return list.empty() || !list.front().token().isCanceled(); });
 }
 
 }  // namespace mongo

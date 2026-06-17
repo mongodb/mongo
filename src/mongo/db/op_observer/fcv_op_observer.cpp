@@ -131,6 +131,8 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
             killSessionsAbortUnpreparedTransactions(
                 opCtx, matcherAllSessions, ErrorCodes::InterruptedDueToFCVChange);
         }
+
+        FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
     } catch (const DBException&) {
         // Swallow the error when running within a recovery unit to avoid process termination.
         // The failure can be ignored here, assuming that the setFCV command will also be
@@ -139,8 +141,6 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
             throw;
         }
     }
-
-    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
 
     const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet = replCoordinator->getSettings().isReplSet();

@@ -39,6 +39,7 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
@@ -211,13 +212,11 @@ private:
 
     void _onDbVersionMismatch(OperationContext* opCtx,
                               const DatabaseName& dbName,
-                              boost::optional<DatabaseVersion> receivedDbVersion,
-                              const CancellationToken& rootCancellationToken);
+                              boost::optional<DatabaseVersion> receivedDbVersion);
 
     void _onDbVersionMismatchAuthoritative(OperationContext* opCtx,
                                            const DatabaseName& dbName,
-                                           const DatabaseVersion& receivedDbVersion,
-                                           const CancellationToken& rootCancellationToken);
+                                           const DatabaseVersion& receivedDbVersion);
 
     /**
      * Creates a CollectionCacheRecoverer and drives a full metadata recovery from disk to
@@ -339,7 +338,7 @@ public:
     /**
      * Cancels in-flight refreshes that are incompatible with the current value of the Authoritative
      * Shards feature flag (i.e. cancels non-authoritative refreshes when the flag is enabled,
-     * authoritative refreshes when it is disabled).
+     * authoritative refreshes when it is disabled) and waits until they drain.
      */
     void interruptIncompatibleRefreshes(OperationContext* opCtx);
 
@@ -348,6 +347,8 @@ private:
                   std::list<CancellationSource>::iterator cancellationIt);
 
     std::mutex _mutex;
+    // Notified when a canceled refresh is released, so we can wait for them to drain.
+    stdx::condition_variable _canceled;
     // Cancellation source for each ongoing filtering metadata refresh. We do not use a single
     // "root" CancellationSource in order to avoid the memory leak described in SERVER-92333.
     std::list<CancellationSource> _activeAuthoritativeRefreshes;

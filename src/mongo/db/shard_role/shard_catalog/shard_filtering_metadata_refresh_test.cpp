@@ -1329,7 +1329,21 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
 }
 
-class RefreshCancellationFixture : public ShardServerTestFixtureWithCatalogCacheLoaderMock {};
+class RefreshCancellationFixture : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
+protected:
+    // Cancel incompatible refreshes off-thread (interrupt blocks on drain), then unhang `fp`.
+    void interruptRefreshesThenUnhangFailpoint(FailPoint* fp) {
+        stdx::thread interruptThread([&] {
+            auto client = getGlobalServiceContext()->getService()->makeClient("bgInterrupt");
+            auto interruptOpCtx = client->makeOperationContext();
+            FilteringMetadataRefreshTracker::get(interruptOpCtx.get())
+                ->interruptIncompatibleRefreshes(interruptOpCtx.get());
+        });
+        sleepmillis(15);  // Best effort wait for the interrupt to happen before unhanging.
+        fp->setMode(FailPoint::off);
+        interruptThread.join();
+    }
+};
 
 TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
     auto* opCtx = operationContext();
@@ -1360,9 +1374,7 @@ TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
     unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
                                                          false);
 
-    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
-
-    fp->setMode(FailPoint::off);
+    interruptRefreshesThenUnhangFailpoint(fp);
     t.join();
 
     // The retry-after-cancel log must have fired for the canceled auth attempt.
@@ -1402,9 +1414,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
-    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
-
-    fp->setMode(FailPoint::off);
+    interruptRefreshesThenUnhangFailpoint(fp);
     t.join();
 
     // The retry-after-cancel log must have fired for the canceled non-auth attempt.
@@ -1456,9 +1466,7 @@ TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthor
     unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
                                                          false);
 
-    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
-
-    fp->setMode(FailPoint::off);
+    interruptRefreshesThenUnhangFailpoint(fp);
     t.join();
 
     // The retry-after-cancel log must have fired for the canceled auth attempt.
@@ -1504,9 +1512,7 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthor
     // Flip the flag before cancelling so the outer retry dispatches to the auth path.
     unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
 
-    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
-
-    fp->setMode(FailPoint::off);
+    interruptRefreshesThenUnhangFailpoint(fp);
     t.join();
 
     // The retry-after-cancel log must have fired for the canceled non-auth attempt.
@@ -1547,6 +1553,47 @@ TEST_F(RefreshCancellationFixture, MaxTimeMsOnOperationContextInterruptsRefresh)
 
     t.join();
     fp->setMode(FailPoint::off);
+}
+
+// Tests that after interrupted refreshes, we block until they have drained.
+TEST_F(RefreshCancellationFixture, InterruptIncompatibleRefreshesWaitsForDrain) {
+    auto* opCtx = operationContext();
+    unittest::ServerParameterGuard nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                         false);
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
+    const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(2, 0));
+
+    // Hang a non-authoritative refresh then interrupt it.
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshDbVersionThread");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+    stdx::thread t([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgNonAuth");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(FilteringMetadataCache::get(bgOpCtx.get())
+                      ->onDbVersionMismatch(bgOpCtx.get(), kTestNss.dbName(), receivedDbVersion));
+    });
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(2, 0));
+    unittest::ServerParameterGuard authoritativeScope("featureFlagAuthoritativeShardsCRUD", true);
+
+    AtomicWord<bool> interruptFinished{false};
+    stdx::thread interruptThread([&] {
+        auto client = getGlobalServiceContext()->getService()->makeClient("bgInterrupt");
+        auto interruptOpCtx = client->makeOperationContext();
+        FilteringMetadataRefreshTracker::get(interruptOpCtx.get())
+            ->interruptIncompatibleRefreshes(interruptOpCtx.get());
+        interruptFinished.store(true);
+    });
+
+    // Interrupt can't return while the refresh is hung; unhanging it lets the interrupt drain.
+    sleepmillis(15);
+    ASSERT_FALSE(interruptFinished.load());
+    fp->setMode(FailPoint::off);
+    interruptThread.join();
+    ASSERT_TRUE(interruptFinished.load());
+
+    t.join();
 }
 
 }  // namespace
