@@ -458,7 +458,8 @@ public:
         return std::make_unique<StageParamsT>(_originalBson);
     }
 
-    std::unique_ptr<LiteParsedDocumentSource> clone() const final {
+private:
+    std::unique_ptr<LiteParsedDocumentSource> _doClone() const final {
         return std::make_unique<DocumentSourceChangeStreamLiteParsedInternal>(*this);
     }
 };

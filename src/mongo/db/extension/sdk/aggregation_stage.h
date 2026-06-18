@@ -742,6 +742,15 @@ public:
 
     virtual std::unique_ptr<class AggStageParseNode> parse(BSONObj stageBson) const = 0;
 
+    /**
+     * Returns the type of client permitted to specify this stage. Defaults to internal-only so a
+     * descriptor that forgets to declare its client type fails closed (rejected from user
+     * pipelines) rather than silently becoming user-facing.
+     */
+    virtual ::MongoExtensionClientType getClientType() const {
+        return ::kMongoExtensionClientTypeInternal;
+    }
+
 protected:
     AggStageDescriptor() = delete;  // No default constructor.
     explicit AggStageDescriptor(std::string name) : _name(std::move(name)) {}
@@ -812,8 +821,18 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggStageDescriptorVTable VTABLE = {.get_name = &_extGetName,
-                                                                        .parse = &_extParse};
+    static ::MongoExtensionClientType _extGetClientType(
+        const ::MongoExtensionAggStageDescriptor* descriptor) noexcept {
+        return static_cast<const ExtensionAggStageDescriptorAdapter*>(descriptor)
+            ->getImpl()
+            .getClientType();
+    }
+
+    static constexpr ::MongoExtensionAggStageDescriptorVTable VTABLE = {
+        .get_name = &_extGetName,
+        .get_client_type = &_extGetClientType,
+        .parse = &_extParse,
+    };
 
     std::unique_ptr<AggStageDescriptor> _descriptor;
 };

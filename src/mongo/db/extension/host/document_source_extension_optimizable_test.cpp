@@ -109,6 +109,9 @@ protected:
     sdk::ExtensionAggStageDescriptorAdapter _transformStaticDescriptor{
         sdk::shared_test_stages::TransformAggStageDescriptor::make()};
 
+    sdk::ExtensionAggStageDescriptorAdapter _internalTransformStaticDescriptor{
+        sdk::shared_test_stages::InternalTransformAggStageDescriptor::make()};
+
     static inline BSONObj kValidSpec = BSON(
         sdk::shared_test_stages::TransformAggStageDescriptor::kStageName << BSON("foo" << true));
     static inline BSONObj kInvalidSpec =
@@ -142,6 +145,24 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
     // serializes to its query shape. The transform extension's query shape is just its stage
     // definition.
     ASSERT_BSONOBJ_EQ(serializedPipeline[0], kValidSpec);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, RegisterInternalStageRestrictsClientType) {
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    portal.getImpl().registerStageDescriptor(&_internalTransformStaticDescriptor);
+
+    BSONObj internalSpec =
+        BSON(sdk::shared_test_stages::InternalTransformAggStageDescriptor::kStageName << BSONObj());
+    auto lpds = LiteParsedDocumentSource::parse(_nss, internalSpec, LiteParserOptions{});
+    ASSERT_EQUALS(lpds->getClientType(), AllowedWithClientType::kInternal);
+
+    // clone() must preserve the metadata: the router copies the LiteParsedPipeline (cloning every
+    // stage spec) before validating, so a clone that dropped kInternal would escape client-type
+    // validation on mongos.
+    auto cloned = lpds->clone();
+    ASSERT_EQUALS(cloned->getClientType(), AllowedWithClientType::kInternal);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, ExpandToExtAst) {

@@ -471,6 +471,17 @@ typedef enum MongoExtensionAggStageNodeType : uint32_t {
 } MongoExtensionAggStageNodeType;
 
 /**
+ * Determines the type of client which is permitted to specify a stage in its command request.
+ * Stages declared internal are rejected when they appear in a user (external client) pipeline.
+ */
+typedef enum MongoExtensionClientType : uint32_t {
+    // The stage can be specified in the command request of any client.
+    kMongoExtensionClientTypeAny = 0,
+    // The stage can be specified in the command request of an internal client only.
+    kMongoExtensionClientTypeInternal = 1,
+} MongoExtensionClientType;
+
+/**
  * An AggStageDescriptor describes features of a stage that are not bound to the stage
  * definition. This object functions as a factory to create logical stage through parsing.
  *
@@ -482,12 +493,20 @@ typedef struct MongoExtensionAggStageDescriptor {
 
 /**
  * Virtual function table for MongoExtensionAggStageDescriptor.
+ *
+ * Methods without a MongoExtensionStatus return must not fail and must not let exceptions escape
+ * across the API boundary.
  */
 typedef struct MongoExtensionAggStageDescriptorVTable {
     /**
      * Returns a MongoExtensionByteView containing the name of this aggregation stage.
      */
     MongoExtensionByteView (*get_name)(const MongoExtensionAggStageDescriptor* descriptor);
+
+    /**
+     * Returns the type of client permitted to specify this stage.
+     */
+    MongoExtensionClientType (*get_client_type)(const MongoExtensionAggStageDescriptor* descriptor);
 
     /**
      * Parse the user provided stage definition into a parse node.

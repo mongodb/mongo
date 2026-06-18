@@ -307,18 +307,18 @@ public:
      */
     static bool isRegisteredExtensionStage(StringData stageName);
 
-    void setApiStrict(AllowedWithApiStrict& apiStrict) {
+    void setApiStrict(AllowedWithApiStrict apiStrict) {
         _apiStrict = apiStrict;
     }
 
-    void setClientType(AllowedWithClientType& clientType) {
+    void setClientType(AllowedWithClientType clientType) {
         _clientType = clientType;
     }
 
-    const AllowedWithApiStrict& getApiStrict() {
+    const AllowedWithApiStrict& getApiStrict() const {
         return _apiStrict;
     };
-    const AllowedWithClientType& getClientType() {
+    const AllowedWithClientType& getClientType() const {
         return _clientType;
     };
 
@@ -645,8 +645,17 @@ public:
      * is destroyed.
      *
      * Call makeOwned() on an unowned clone if the external BSON lifetime cannot be guaranteed.
+     *
+     * Subclasses customize the copy by implementing _doClone(); this wrapper then carries over the
+     * parse-time validation metadata (apiStrict, clientType) that parse() stamps on every instance,
+     * so a subclass that reconstructs rather than copy-constructs cannot silently drop it.
      */
-    virtual std::unique_ptr<LiteParsedDocumentSource> clone() const = 0;
+    std::unique_ptr<LiteParsedDocumentSource> clone() const {
+        auto cloned = _doClone();
+        cloned->setApiStrict(getApiStrict());
+        cloned->setClientType(getClientType());
+        return cloned;
+    }
 
     /**
      * Converts the LiteParsedDocumentSource to own the BSON it holds, similar to
@@ -711,6 +720,13 @@ protected:
     }
 
 private:
+    /**
+     * Subclass hook for clone(): returns a copy carrying all subclass state. The base-class
+     * validation metadata is applied by clone() and need not be copied here. Private so that only
+     * clone() can invoke it (NVI); overrides may be private too.
+     */
+    virtual std::unique_ptr<LiteParsedDocumentSource> _doClone() const = 0;
+
     /**
      * Give access to 'parserMap' so we can remove a registered parser with
      * 'unregisterParser_forTest'.
@@ -794,7 +810,8 @@ public:
         return false;
     }
 
-    std::unique_ptr<LiteParsedDocumentSource> clone() const override {
+private:
+    std::unique_ptr<LiteParsedDocumentSource> _doClone() const override {
         return std::make_unique<Derived>(static_cast<const Derived&>(*this));
     }
 };

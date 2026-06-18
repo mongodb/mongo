@@ -206,6 +206,11 @@ public:
     }
 
     virtual void validate(const mongo::BSONObj& arguments) const {}
+
+    // Test stages are user-facing by default; internal-only test stages override this.
+    ::MongoExtensionClientType getClientType() const override {
+        return ::kMongoExtensionClientTypeAny;
+    }
 };
 }  // namespace mongo::extension::sdk
 

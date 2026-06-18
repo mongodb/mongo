@@ -119,4 +119,22 @@ public:
     }
 };
 
+constexpr char kInternalTransformName[] = "$_internalTransformStage";
+
+/**
+ * An internal-only variant of the transform stage: reuses the transform chain but declares itself
+ * internal-only so it is rejected from user pipelines.
+ */
+class InternalTransformAggStageDescriptor
+    : public TestStageDescriptor<kInternalTransformName, TransformAggStageParseNode> {
+public:
+    ::MongoExtensionClientType getClientType() const override {
+        return ::kMongoExtensionClientTypeInternal;
+    }
+
+    static std::unique_ptr<sdk::AggStageDescriptor> make() {
+        return std::make_unique<InternalTransformAggStageDescriptor>();
+    }
+};
+
 }  // namespace mongo::extension::sdk::shared_test_stages

@@ -115,4 +115,16 @@ inline FirstStageViewApplicationPolicy toFirstStageApplicationPolicy(
     MONGO_UNREACHABLE_TASSERT(11507600);
 }
 }  // namespace view_util
+
+namespace descriptor_util {
+inline AllowedWithClientType toAllowedWithClientType(MongoExtensionClientType clientType) {
+    switch (clientType) {
+        case MongoExtensionClientType::kMongoExtensionClientTypeAny:
+            return AllowedWithClientType::kAny;
+        case MongoExtensionClientType::kMongoExtensionClientTypeInternal:
+            return AllowedWithClientType::kInternal;
+    }
+    MONGO_UNREACHABLE_TASSERT(11436401);
+}
+}  // namespace descriptor_util
 }  // namespace mongo::extension::host

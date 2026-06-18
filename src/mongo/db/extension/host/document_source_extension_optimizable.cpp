@@ -312,7 +312,8 @@ void DocumentSourceExtensionOptimizable::registerStage(AggStageDescriptorHandle 
         {.parser = std::move(parser),
          .fromExtension = true,
          .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
-         .allowedWithClientType = AllowedWithClientType::kAny});
+         .allowedWithClientType =
+             descriptor_util::toAllowedWithClientType(descriptor->getClientType())});
 }
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);

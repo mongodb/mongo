@@ -75,6 +75,14 @@ public:
      */
     AggStageParseNodeHandle parse(BSONObj stageBson) const;
 
+    /**
+     * Returns the type of client permitted to specify this stage in a command request. Queried at
+     * registration time to decide whether the stage is internal-only.
+     */
+    ::MongoExtensionClientType getClientType() const {
+        return _vtable().get_client_type(get());
+    }
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(10930102,
                 "ExtensionAggStageDescriptorAdapter 'get_name' is null",
@@ -82,6 +90,9 @@ public:
         tassert(10930104,
                 "ExtensionAggStageDescriptorAdapter 'parse' is null",
                 vtable.parse != nullptr);
+        tassert(11436400,
+                "ExtensionAggStageDescriptorAdapter 'get_client_type' is null",
+                vtable.get_client_type != nullptr);
     }
 };
 

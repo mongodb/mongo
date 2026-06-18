@@ -190,11 +190,6 @@ public:
             return false;
         }
 
-        std::unique_ptr<LiteParsedDocumentSource> clone() const override {
-            return std::make_unique<LiteParsedExpandable>(
-                getOriginalBson(), _parseNode->clone(), _nss, _options);
-        }
-
         bool hasCustomBsonForLog() const override {
             return true;
         }
@@ -241,6 +236,11 @@ public:
         static LiteParsedDesugarer::StageExpander stageExpander;
 
     private:
+        std::unique_ptr<LiteParsedDocumentSource> _doClone() const override {
+            return std::make_unique<LiteParsedExpandable>(
+                getOriginalBson(), _parseNode->clone(), _nss, _options);
+        }
+
         /**
          * Carries per-invocation validation state for recursive expansion performed by
          * LiteParsedExpandable. The state is instantiated at the top-level expand() and passed by
@@ -345,11 +345,6 @@ public:
             return properties.has_value() && !properties->empty();
         }
 
-        std::unique_ptr<LiteParsedDocumentSource> clone() const override {
-            return std::make_unique<LiteParsedExpanded>(
-                getParseTimeName(), _astNode->clone(), _nss, _ifrContext);
-        }
-
         bool hasExtensionVectorSearchStage() const override;
 
         bool hasExtensionSearchStage() const override;
@@ -380,6 +375,11 @@ public:
         bool isSelectionStage() const override;
 
     private:
+        std::unique_ptr<LiteParsedDocumentSource> _doClone() const override {
+            return std::make_unique<LiteParsedExpanded>(
+                getParseTimeName(), _astNode->clone(), _nss, _ifrContext);
+        }
+
         AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
         const NamespaceString _nss;
