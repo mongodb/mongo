@@ -1108,6 +1108,9 @@ private:
             CommandHelpers::ensureValidCollectionName(nss.nss());
         }
 
+        Variables::validateRuntimeConstantsArePermitted(opCtx,
+                                                        findCommand->getLegacyRuntimeConstants());
+
         // TODO: SERVER-73632 Remove Feature Flag for PM-635.
         // Forbid users from passing 'querySettings' explicitly.
         uassert(7746901,
