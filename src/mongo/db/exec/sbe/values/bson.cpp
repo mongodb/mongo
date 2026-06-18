@@ -419,9 +419,9 @@ void appendValueToBsonArr(ArrayBuilder& builder, value::TypeTags tag, value::Val
 template <class ObjBuilder>
 void convertToBsonObj(ObjBuilder& builder, value::Object* obj) {
     for (size_t idx = 0; idx < obj->size(); ++idx) {
-        auto [tag, val] = obj->getAt(idx);
+        auto tagVal = obj->getAt(idx);
         const auto& name = obj->field(idx);
-        appendValueToBsonObj(builder, name, tag, val);
+        appendValueToBsonObj(builder, name, tagVal.tag, tagVal.value);
     }
 }
 

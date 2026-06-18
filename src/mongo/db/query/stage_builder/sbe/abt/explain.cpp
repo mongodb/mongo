@@ -988,8 +988,8 @@ static void printBSONstr(PrinterType& printer,
                     local.print(", ");
                     local.newLine();
                 }
-                const auto [tag1, val1] = array->getAt(index);
-                printBSONstr(local, tag1, val1);
+                const auto eltTagVal = array->getAt(index);
+                printBSONstr(local, eltTagVal.tag, eltTagVal.value);
             }
             printer.print("[").print(local).print("]");
 
@@ -1006,8 +1006,8 @@ static void printBSONstr(PrinterType& printer,
                     local.newLine();
                 }
                 local.fieldName(obj->field(index));
-                const auto [tag1, val1] = obj->getAt(index);
-                printBSONstr(local, tag1, val1);
+                const auto eltTagVal = obj->getAt(index);
+                printBSONstr(local, eltTagVal.tag, eltTagVal.value);
             }
             printer.print("{").print(local).print("}");
 

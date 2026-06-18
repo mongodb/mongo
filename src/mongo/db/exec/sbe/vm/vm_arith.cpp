@@ -596,8 +596,7 @@ void ByteCode::aggStdDevImpl(value::Array* arr, value::TagValueView rhs) {
 
     auto delta = genericSub(
         value::TypeTags::NumberDouble, curVal, value::TypeTags::NumberDouble, mean.value);
-    auto deltaDivCount =
-        genericDiv(delta.view(), value::TagValueView{value::TypeTags::NumberInt64, newCountVal});
+    auto deltaDivCount = genericDiv(delta.view(), value::TagValueView::numberInt64(count));
     auto newMean = genericAdd(mean.tag, mean.value, deltaDivCount.tag(), deltaDivCount.value());
     auto newDelta =
         genericSub(value::TypeTags::NumberDouble, curVal, newMean.tag(), newMean.value());

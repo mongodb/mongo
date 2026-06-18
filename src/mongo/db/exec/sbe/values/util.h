@@ -63,8 +63,8 @@ bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
     } else if (tag == TypeTags::Array) {
         auto array = getArrayView(val);
         for (size_t i = 0; i < array->size(); ++i) {
-            auto [t, v] = array->getAt(i);
-            if (cb(t, v)) {
+            auto tagVal = array->getAt(i);
+            if (cb(tagVal.tag, tagVal.value)) {
                 return true;
             }
         }
@@ -190,8 +190,8 @@ inline void objectForEach(TypeTags tag, Value val, const Cb& cb) {
         auto obj = getObjectView(val);
         bool done = false;
         for (size_t i = 0; !done && (i < obj->size()); i++) {
-            auto [eltTag, eltVal] = obj->getAt(i);
-            done = cb(obj->field(i), eltTag, eltVal, nullptr);
+            auto eltTagVal = obj->getAt(i);
+            done = cb(obj->field(i), eltTagVal.tag, eltTagVal.value, nullptr);
         }
     }
 }

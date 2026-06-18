@@ -347,9 +347,9 @@ void walkObject(ObjectWalkNode<ProjectionRecorder>* node,
     size_t i = 0;
     while (numChildrenWalked < node->numChildren() && i < obj->size()) {
         if (auto child = node->findChild(obj->field(i)); child != nullptr) {
-            auto [eltTag, eltVal] = obj->getAt(i);
+            auto eltTagVal = obj->getAt(i);
             walkField<ProjectionRecorder>(
-                child, eltTag, eltVal, nullptr /*bsonPtr*/, cb, traverseArrays);
+                child, eltTagVal.tag, eltTagVal.value, nullptr /*bsonPtr*/, cb, traverseArrays);
             numChildrenWalked++;
         }
         i++;

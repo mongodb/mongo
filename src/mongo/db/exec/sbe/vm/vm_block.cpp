@@ -761,8 +761,8 @@ int updateWorstPair(value::Array* mergeArr,
 }
 
 std::pair<value::Array*, value::TagValueView> getWorst(value::Array* mergeArr) {
-    auto [worstTag, worstVal] = mergeArr->getAt(0);
-    auto worstArr = value::getArrayView(worstVal);
+    auto worstTagVal = mergeArr->getAt(0);
+    auto worstArr = value::getArrayView(worstTagVal.value);
     return {worstArr, worstArr->getAt(0)};
 }
 
@@ -1185,8 +1185,9 @@ public:
         if (_sense == TopBottomSense::kTop) {
             for (size_t i = 0; i < sortPattern.size(); i++) {
                 auto [keyTag, keyVal] = _keys[i][_blockIndex];
-                auto [itemTag, itemVal] = itemArray->getAt(i);
-                int32_t cmp = compare<TopBottomSense::kTop>(keyTag, keyVal, itemTag, itemVal);
+                auto itemTagVal = itemArray->getAt(i);
+                int32_t cmp =
+                    compare<TopBottomSense::kTop>(keyTag, keyVal, itemTagVal.tag, itemTagVal.value);
 
                 if (cmp != 0) {
                     return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;
@@ -1195,8 +1196,9 @@ public:
         } else {
             for (size_t i = 0; i < sortPattern.size(); i++) {
                 auto [keyTag, keyVal] = _keys[i][_blockIndex];
-                auto [itemTag, itemVal] = itemArray->getAt(i);
-                int32_t cmp = compare<TopBottomSense::kBottom>(keyTag, keyVal, itemTag, itemVal);
+                auto itemTagVal = itemArray->getAt(i);
+                int32_t cmp = compare<TopBottomSense::kBottom>(
+                    keyTag, keyVal, itemTagVal.tag, itemTagVal.value);
 
                 if (cmp != 0) {
                     return sortPattern[i].isAscending ? cmp < 0 : cmp > 0;

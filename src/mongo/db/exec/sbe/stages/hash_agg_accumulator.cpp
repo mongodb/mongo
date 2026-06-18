@@ -233,18 +233,20 @@ void ArithmeticAverageHashAggAccumulatorBase::accumulateTransformedValue(
 
     // Add the input value to the sum, which is a subarray at index position 0 of 'arrayState'
     // described by the header for enum AggSumValueElems.
-    auto [tagSum, valSum] = arrayState->getAt(0);
-    value::Array* arraySum = reinterpret_cast<value::Array*>(valSum);
+    auto sumTagVal = arrayState->getAt(0);
+    value::Array* arraySum = reinterpret_cast<value::Array*>(sumTagVal.value);
     vm::ByteCode::aggDoubleDoubleSumImpl(
         arraySum, field.tag(), field.value());  // updates 'arraySum'
 
     // Increment the count, which is in index position 1.
-    auto [tagCount, valCount] = arrayState->getAt(1);
+    auto countTagVal = arrayState->getAt(1);
     uassert(8186801,
             "Expected count to have 64-bit integer type",
-            tagCount == value::TypeTags::NumberInt64);
-    valCount = value::bitcastFrom<int64_t>(value::bitcastTo<int64_t>(valCount) + 1);
-    arrayState->setAt(1 /* idx */, tagCount, valCount);
+            countTagVal.tag == value::TypeTags::NumberInt64);
+    arrayState->setAt(
+        1 /* idx */,
+        countTagVal.tag,
+        value::bitcastFrom<int64_t>(value::bitcastTo<int64_t>(countTagVal.value) + 1));
 }
 
 void ArithmeticAverageHashAggAccumulatorBase::mergeRecoveredState(
@@ -265,28 +267,28 @@ void ArithmeticAverageHashAggAccumulatorBase::mergeRecoveredState(
 
     // The sum elements of the recovered state and the accumulator state should each be a
     // 'value::Array' structured appropriately for the SBE VM's "double double sum" instructions.
-    auto [tagRecoveredSum, valRecoveredSum] = recoveredStateArray->getAt(0);
-    auto [tagAccumulatedSum, valAccumulatedSum] = accumulatorStateArray->getAt(0);
+    auto recoveredSumTagVal = recoveredStateArray->getAt(0);
+    auto accumulatedSumTagVal = accumulatorStateArray->getAt(0);
     tassert(8186805,
             "Expected partial sum to have array type",
-            tagAccumulatedSum == value::TypeTags::Array);
+            accumulatedSumTagVal.tag == value::TypeTags::Array);
 
     // Merge the partial sum from the recovered partial aggregate into the partial sum in the
     // running total aggregate.
-    vm::ByteCode::aggMergeDoubleDoubleSumsImpl(value::getArrayView(valAccumulatedSum),
-                                               tagRecoveredSum,
-                                               valRecoveredSum);  // updates 'arraySum'
+    vm::ByteCode::aggMergeDoubleDoubleSumsImpl(value::getArrayView(accumulatedSumTagVal.value),
+                                               recoveredSumTagVal.tag,
+                                               recoveredSumTagVal.value);  // updates 'arraySum'
 
     // Add the counts from the partial aggregate and running total aggregate and store the result in
     // the running total aggregate.
-    auto [tagRecoveredCount, valRecoveredCount] = recoveredStateArray->getAt(1);
-    auto [tagAccumulatedCount, valAccumulatedCount] = accumulatorStateArray->getAt(1);
+    auto recoveredCountTagVal = recoveredStateArray->getAt(1);
+    auto accumulatedCountTagVal = accumulatorStateArray->getAt(1);
     tassert(8186806,
             "Expected partial aggregate counts to have 64-bit integer type",
-            tagRecoveredCount == value::TypeTags::NumberInt64 &&
-                tagAccumulatedCount == value::TypeTags::NumberInt64);
-    auto mergedCount = value::bitcastTo<int64_t>(valAccumulatedCount) +
-        value::bitcastTo<int64_t>(valRecoveredCount);
+            recoveredCountTagVal.tag == value::TypeTags::NumberInt64 &&
+                accumulatedCountTagVal.tag == value::TypeTags::NumberInt64);
+    auto mergedCount = value::bitcastTo<int64_t>(accumulatedCountTagVal.value) +
+        value::bitcastTo<int64_t>(recoveredCountTagVal.value);
     accumulatorStateArray->setAt(
         1, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(mergedCount));
 }  // SinglePurposeHashAggAccumulatorAvg::diskMergeFn
@@ -298,25 +300,24 @@ void ArithmeticAverageHashAggAccumulatorTerminal::finalizePartialAggregate(
             partialAggregate.tag() == value::TypeTags::Array);
     value::Array* partialAggregateArray = value::getArrayView(partialAggregate.value());
 
-    auto [tagPartialSum, valPartialSum] = partialAggregateArray->getAt(0);
+    auto partialSumTagVal = partialAggregateArray->getAt(0);
     tassert(8186809,
             "Expected partial sum to have array type",
-            tagPartialSum == value::TypeTags::Array);
-    value::Array* partialSum = value::getArrayView(valPartialSum);
+            partialSumTagVal.tag == value::TypeTags::Array);
+    value::Array* partialSum = value::getArrayView(partialSumTagVal.value);
 
-    auto [tagCount, valCount] = partialAggregateArray->getAt(1);
+    auto countTagVal = partialAggregateArray->getAt(1);
     tassert(8186811,
             "Expected partial aggregate count to have 64-bit integer type",
-            tagCount == value::TypeTags::NumberInt64);
-    if (value::bitcastTo<int64_t>(valCount) == 0) {
+            countTagVal.tag == value::TypeTags::NumberInt64);
+    if (value::bitcastTo<int64_t>(countTagVal.value) == 0) {
         result.reset(value::TagValueView::null());
         return;
     }
 
     auto finalSum = vm::ByteCode::aggDoubleDoubleSumFinalizeImpl(partialSum);
 
-    result.reset(
-        vm::ByteCode::genericDiv(finalSum.view(), value::TagValueView{tagCount, valCount}));
+    result.reset(vm::ByteCode::genericDiv(finalSum.view(), countTagVal));
 }
 
 void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
@@ -332,12 +333,14 @@ void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
             partialAggregate.tag() == value::TypeTags::Array);
     value::Array* partialAggregateArray = reinterpret_cast<value::Array*>(partialAggregate.value());
 
-    auto [tagCount, valCount] = partialAggregateArray->getAt(1);
-    resultObject->push_back_raw(mongo::stage_builder::countName, tagCount, valCount);
+    auto countTagVal = partialAggregateArray->getAt(1);
+    resultObject->push_back_raw(
+        mongo::stage_builder::countName, countTagVal.tag, countTagVal.value);
 
-    auto [tagPartialSum, valPartialSum] = partialAggregateArray->getAt(0);
+    auto partialSumTagVal = partialAggregateArray->getAt(0);
     auto [ownedFinalizedSum, tagFinalizedSum, valFinalizedSum] =
-        vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagPartialSum, valPartialSum)
+        vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(partialSumTagVal.tag,
+                                                                partialSumTagVal.value)
             .releaseToRaw();
     tassert(12084100,
             "Expected builtinDoubleDoublePartialSumFinalizeImpl to return owned value",
@@ -451,28 +454,28 @@ void PushHashAggAccumulator::mergeRecoveredState(
             recoveredState.tag() == value::TypeTags::Array);
     auto recoveredStateArr = value::getArrayView(recoveredState.value());
 
-    auto [tagNewArrayElementsSize, valNewArrayElementsSize] =
+    auto newArrayElementsSizeTagVal =
         recoveredStateArr->getAt(static_cast<size_t>(vm::AggArrayWithSize::kSizeOfValues));
     tassert(11004201,
             "Expected recovered array size to be 64-bit integer",
-            tagNewArrayElementsSize == value::TypeTags::NumberInt64);
+            newArrayElementsSizeTagVal.tag == value::TypeTags::NumberInt64);
 
     // Note that ownership of both 'valNewArrayElements' and 'valAccumulatorState' passes to the
     // 'setUnionAccumImpl()' function.
     auto newArrayElements = [&]() {
-        auto [tagNewArrayElements, valNewArrayElements] =
+        auto newArrayElementsTagVal =
             recoveredStateArr->getAt(static_cast<size_t>(vm::AggArrayWithSize::kValues));
         return value::TagValueOwned::fromRaw(
-            value::copyValue(tagNewArrayElements, valNewArrayElements));
+            value::copyValue(newArrayElementsTagVal.tag, newArrayElementsTagVal.value));
     }();
 
     value::TagValueOwned ownedAccumulatorState = accumulatorState.copyOrMoveValue();
 
-    value::TagValueMaybeOwned result =
-        vm::ByteCode::concatArraysAccumImpl(std::move(ownedAccumulatorState),
-                                            std::move(newArrayElements),
-                                            value::bitcastTo<int64_t>(valNewArrayElementsSize),
-                                            _sizeCap);
+    value::TagValueMaybeOwned result = vm::ByteCode::concatArraysAccumImpl(
+        std::move(ownedAccumulatorState),
+        std::move(newArrayElements),
+        value::bitcastTo<int64_t>(newArrayElementsSizeTagVal.value),
+        _sizeCap);
     accumulatorState.reset(std::move(result));
 }
 

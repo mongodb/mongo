@@ -61,9 +61,9 @@ EstimationResult estimateCardinality(const ScalarHistogram& h,
         size_t len = h.getBuckets().size();
         while (len > 0) {
             const size_t half = len >> 1;
-            const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex + half);
+            const auto boundTagVal = h.getBounds().getAt(bucketIndex + half);
 
-            if (compareValues(boundTag, boundVal, tag, val) < 0) {
+            if (compareValues(boundTagVal.tag, boundTagVal.value, tag, val) < 0) {
                 bucketIndex += half + 1;
                 len -= half + 1;
             } else {
@@ -87,8 +87,8 @@ EstimationResult estimateCardinality(const ScalarHistogram& h,
     }
 
     const Bucket& bucket = h.getBuckets().at(bucketIndex);
-    const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex);
-    const bool isEndpoint = compareValues(boundTag, boundVal, tag, val) == 0;
+    const auto boundTagVal = h.getBounds().getAt(bucketIndex);
+    const bool isEndpoint = compareValues(boundTagVal.tag, boundTagVal.value, tag, val) == 0;
 
     if (isEndpoint) {
         switch (type) {
@@ -160,7 +160,7 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
                                              size_t bucketIndex) {
 
     const Bucket& bucket = h.getBuckets().at(bucketIndex);
-    const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex);
+    const auto boundTagVal = h.getBounds().getAt(bucketIndex);
 
     double resultCard = bucket._cumulativeFreq - bucket._equalFreq - bucket._rangeFreq;
     double resultNDV = bucket._cumulativeNDV - bucket._ndv - 1.0;
@@ -171,7 +171,7 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
     //
     // For example, let bound 1 = 1000, bound 2 = "abc". The value 100000000 falls in bucket 2 the
     // first bucket for strings, but should not get cardinality/ ndv fraction from it.
-    if (!sameTypeBracket(tag, boundTag)) {
+    if (!sameTypeBracket(tag, boundTagVal.tag)) {
         if (type == EstimationType::kEqual) {
             return {0.0, 0.0};
         } else {
@@ -198,11 +198,11 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
     // the bucket estimates otherwise.
     double ratio = 0.5;
     if (bucketIndex > 0) {
-        const auto [lowBoundTag, lowBoundVal] = h.getBounds().getAt(bucketIndex - 1);
-        if (sameTypeBracket(lowBoundTag, boundTag) &&
-            !mongo::sbe::value::isInfinity(lowBoundTag, lowBoundVal)) {
-            double doubleLowBound = valueToDouble(lowBoundTag, lowBoundVal);
-            double doubleUpperBound = valueToDouble(boundTag, boundVal);
+        const auto lowBoundTagVal = h.getBounds().getAt(bucketIndex - 1);
+        if (sameTypeBracket(lowBoundTagVal.tag, boundTagVal.tag) &&
+            !mongo::sbe::value::isInfinity(lowBoundTagVal.tag, lowBoundTagVal.value)) {
+            double doubleLowBound = valueToDouble(lowBoundTagVal.tag, lowBoundTagVal.value);
+            double doubleUpperBound = valueToDouble(boundTagVal.tag, boundTagVal.value);
             double doubleVal = valueToDouble(tag, val);
             ratio = (doubleVal - doubleLowBound) / (doubleUpperBound - doubleLowBound);
         }

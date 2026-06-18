@@ -598,19 +598,19 @@ value::TagValueMaybeOwned ByteCode::addToSetCappedImpl(value::TagValueOwned accu
 
     // Check that the accumulated size of the set won't exceed the limit after adding the new value,
     // and if so, add the value.
-    auto [tagAccSet, valAccSet] =
-        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(
-        10936802, "Expected ArraySet in accumulator state", tagAccSet == value::TypeTags::ArraySet);
-    auto accSet = value::getArraySetView(valAccSet);
+    auto accSetTagVal = accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(10936802,
+            "Expected ArraySet in accumulator state",
+            accSetTagVal.tag == value::TypeTags::ArraySet);
+    auto accSet = value::getArraySetView(accSetTagVal.value);
     if (!accSet->values().contains(newElem.raw())) {
         auto elemSize = value::getApproximateSize(newElem.tag(), newElem.value());
-        auto [tagAccSize, valAccSize] =
+        auto accSizeTagVal =
             accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
         tassert(10936803,
                 "Expected integer value for ArraySet size",
-                tagAccSize == value::TypeTags::NumberInt64);
-        const int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
+                accSizeTagVal.tag == value::TypeTags::NumberInt64);
+        const int64_t currentSize = value::bitcastTo<int64_t>(accSizeTagVal.value);
         int64_t newSize = currentSize + elemSize;
 
         uassert(ErrorCodes::ExceededMemoryLimit,
@@ -670,19 +670,19 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
             "Set accumulator with invalid length",
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
-    auto [tagAccSet, valAccSet] =
-        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(
-        7039523, "Expected ArraySet in accumulator state", tagAccSet == value::TypeTags::ArraySet);
-    auto accSet = value::getArraySetView(valAccSet);
+    auto accSetTagVal = accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(7039523,
+            "Expected ArraySet in accumulator state",
+            accSetTagVal.tag == value::TypeTags::ArraySet);
+    auto accSet = value::getArraySetView(accSetTagVal.value);
 
     // Extract the current size of the accumulator. As we add elements to the set, we will increment
     // the current size accordingly and throw an exception if we ever exceed the size limit. We
     // cannot simply sum the two sizes, since the two sets could have a substantial intersection.
-    auto [accSizeTag, accSizeVal] =
+    auto accSizeTagVal =
         accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
-    tassert(7039524, "expected 64-bit int", accSizeTag == value::TypeTags::NumberInt64);
-    int64_t currentSize = value::bitcastTo<int64_t>(accSizeVal);
+    tassert(7039524, "expected 64-bit int", accSizeTagVal.tag == value::TypeTags::NumberInt64);
+    int64_t currentSize = value::bitcastTo<int64_t>(accSizeTagVal.value);
 
     if (newSetMembers.tag() != value::TypeTags::Nothing) {
         value::arrayForEach<true>(
@@ -728,43 +728,41 @@ ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
             "The accumulator state should have correct number of elements",
             state->size() == static_cast<size_t>(AggMultiElems::kSizeOfArray));
 
-    auto [arrayTag, arrayVal] = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
+    auto arrayTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
     uassert(7548602,
             "Internal array component is not of correct type",
-            arrayTag == value::TypeTags::Array);
-    auto array = value::getArrayView(arrayVal);
+            arrayTagVal.tag == value::TypeTags::Array);
+    auto array = value::getArrayView(arrayTagVal.value);
 
-    auto [startIndexTag, startIndexVal] =
-        state->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
+    auto startIndexTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kStartIdx));
     uassert(7548700,
             "Index component be a 64-bit integer",
-            startIndexTag == value::TypeTags::NumberInt64);
-    int64_t startIndex = value::bitcastTo<int64_t>(startIndexVal);
+            startIndexTagVal.tag == value::TypeTags::NumberInt64);
+    int64_t startIndex = value::bitcastTo<int64_t>(startIndexTagVal.value);
 
-    auto [maxSizeTag, maxSizeVal] = state->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
+    auto maxSizeTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMaxSize));
     uassert(7548603,
             "MaxSize component should be a 64-bit integer",
-            maxSizeTag == value::TypeTags::NumberInt64);
-    int64_t maxSize = value::bitcastTo<int64_t>(maxSizeVal);
+            maxSizeTagVal.tag == value::TypeTags::NumberInt64);
+    int64_t maxSize = value::bitcastTo<int64_t>(maxSizeTagVal.value);
 
-    auto [memUsageTag, memUsageVal] = state->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
+    auto memUsageTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMemUsage));
     uassert(7548612,
             "MemUsage component should be a 32-bit integer",
-            memUsageTag == value::TypeTags::NumberInt32);
-    int32_t memUsage = value::bitcastTo<int32_t>(memUsageVal);
+            memUsageTagVal.tag == value::TypeTags::NumberInt32);
+    int32_t memUsage = value::bitcastTo<int32_t>(memUsageTagVal.value);
 
-    auto [memLimitTag, memLimitVal] = state->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
+    auto memLimitTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kMemLimit));
     uassert(7548613,
             "MemLimit component should be a 32-bit integer",
-            memLimitTag == value::TypeTags::NumberInt32);
-    auto memLimit = value::bitcastTo<int32_t>(memLimitVal);
+            memLimitTagVal.tag == value::TypeTags::NumberInt32);
+    auto memLimit = value::bitcastTo<int32_t>(memLimitTagVal.value);
 
-    auto [isGroupAccumTag, isGroupAccumVal] =
-        state->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
+    auto isGroupAccumTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
     uassert(8070611,
             "IsGroupAccum component should be a boolean",
-            isGroupAccumTag == value::TypeTags::Boolean);
-    auto isGroupAccum = value::bitcastTo<bool>(isGroupAccumVal);
+            isGroupAccumTagVal.tag == value::TypeTags::Boolean);
+    auto isGroupAccum = value::bitcastTo<bool>(isGroupAccumTagVal.value);
 
     return {state, array, startIndex, maxSize, memUsage, memLimit, isGroupAccum};
 }
@@ -873,46 +871,44 @@ ByteCode::genericRemovableSumState(value::Array* state) {
             "incorrect size of state array",
             state->size() == static_cast<size_t>(AggRemovableSumElems::kSizeOfArray));
 
-    auto [sumAccTag, sumAccVal] = state->getAt(static_cast<size_t>(AggRemovableSumElems::kSumAcc));
+    auto sumAccTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kSumAcc));
     uassert(7795102,
             "sum accumulator elem should be of array type",
-            sumAccTag == value::TypeTags::Array);
-    auto sumAcc = value::getArrayView(sumAccVal);
+            sumAccTagVal.tag == value::TypeTags::Array);
+    auto sumAcc = value::getArrayView(sumAccTagVal.value);
 
-    auto [nanCountTag, nanCountVal] =
-        state->getAt(static_cast<size_t>(AggRemovableSumElems::kNanCount));
+    auto nanCountTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kNanCount));
     uassert(7795103,
             "nanCount elem should be of int64 type",
-            nanCountTag == value::TypeTags::NumberInt64);
-    auto nanCount = value::bitcastTo<int64_t>(nanCountVal);
+            nanCountTagVal.tag == value::TypeTags::NumberInt64);
+    auto nanCount = value::bitcastTo<int64_t>(nanCountTagVal.value);
 
-    auto [posInfinityCountTag, posInfinityCountVal] =
+    auto posInfinityCountTagVal =
         state->getAt(static_cast<size_t>(AggRemovableSumElems::kPosInfinityCount));
     uassert(7795104,
             "posInfinityCount elem should be of int64 type",
-            posInfinityCountTag == value::TypeTags::NumberInt64);
-    auto posInfinityCount = value::bitcastTo<int64_t>(posInfinityCountVal);
+            posInfinityCountTagVal.tag == value::TypeTags::NumberInt64);
+    auto posInfinityCount = value::bitcastTo<int64_t>(posInfinityCountTagVal.value);
 
-    auto [negInfinityCountTag, negInfinityCountVal] =
+    auto negInfinityCountTagVal =
         state->getAt(static_cast<size_t>(AggRemovableSumElems::kNegInfinityCount));
     uassert(7795105,
             "negInfinityCount elem should be of int64 type",
-            negInfinityCountTag == value::TypeTags::NumberInt64);
-    auto negInfinityCount = value::bitcastTo<int64_t>(negInfinityCountVal);
+            negInfinityCountTagVal.tag == value::TypeTags::NumberInt64);
+    auto negInfinityCount = value::bitcastTo<int64_t>(negInfinityCountTagVal.value);
 
-    auto [doubleCountTag, doubleCountVal] =
-        state->getAt(static_cast<size_t>(AggRemovableSumElems::kDoubleCount));
+    auto doubleCountTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kDoubleCount));
     uassert(7795106,
             "doubleCount elem should be of int64 type",
-            doubleCountTag == value::TypeTags::NumberInt64);
-    auto doubleCount = value::bitcastTo<int64_t>(doubleCountVal);
+            doubleCountTagVal.tag == value::TypeTags::NumberInt64);
+    auto doubleCount = value::bitcastTo<int64_t>(doubleCountTagVal.value);
 
-    auto [decimalCountTag, decimalCountVal] =
+    auto decimalCountTagVal =
         state->getAt(static_cast<size_t>(AggRemovableSumElems::kDecimalCount));
     uassert(7795107,
             "decimalCount elem should be of int64 type",
-            decimalCountTag == value::TypeTags::NumberInt64);
-    auto decimalCount = value::bitcastTo<int64_t>(decimalCountVal);
+            decimalCountTagVal.tag == value::TypeTags::NumberInt64);
+    auto decimalCount = value::bitcastTo<int64_t>(decimalCountTagVal.value);
 
     return {sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount};
 }

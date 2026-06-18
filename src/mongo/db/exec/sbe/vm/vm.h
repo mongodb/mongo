@@ -916,7 +916,7 @@ private:
     value::TagValueMaybeOwned builtinAggDenseRankColl(ArityType arity);
     value::TagValueMaybeOwned builtinAggRankFinalize(ArityType arity);
     value::TagValueMaybeOwned builtinAggExpMovingAvg(ArityType arity);
-    value::TagValueMaybeOwned builtinAggExpMovingAvgFinalize(ArityType arity);
+    value::TagValueOwned builtinAggExpMovingAvgFinalize(ArityType arity);
     template <int sign>
     value::TagValueMaybeOwned builtinAggRemovableSum(ArityType arity);
     value::TagValueMaybeOwned builtinAggRemovableSumFinalize(ArityType arity);

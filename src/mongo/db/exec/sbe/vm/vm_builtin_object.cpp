@@ -83,8 +83,8 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
 
             if (restrictFieldsSet.count(sv) == 0) {
 
-                auto [tag, val] = objRoot->getAt(idx);
-                auto [copyTag, copyVal] = value::copyValue(tag, val);
+                auto tagVal = objRoot->getAt(idx);
+                auto [copyTag, copyVal] = value::copyValue(tagVal.tag, tagVal.value);
                 obj->push_back_raw(sv, copyTag, copyVal);
             }
         }
@@ -140,8 +140,8 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
             std::string_view sv(objRoot->field(idx));
 
             if (keepFieldsSet.count(sv) == 1) {
-                auto [tag, val] = objRoot->getAt(idx);
-                auto [copyTag, copyVal] = value::copyValue(tag, val);
+                auto tagVal = objRoot->getAt(idx);
+                auto [copyTag, copyVal] = value::copyValue(tagVal.tag, tagVal.value);
                 obj->push_back_raw(sv, copyTag, copyVal);
             }
         }

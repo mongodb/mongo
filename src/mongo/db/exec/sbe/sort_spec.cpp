@@ -106,10 +106,13 @@ std::pair<TypeTags, Value> SortSpec::compare(TypeTags leftTag,
     }
 
     for (size_t i = 0; i < _sortPattern.size(); i++) {
-        auto [leftElemTag, leftElemVal] = leftArray->getAt(i);
-        auto [rightElemTag, rightElemVal] = rightArray->getAt(i);
-        auto [cmpTag, cmpVal] =
-            value::compareValue(leftElemTag, leftElemVal, rightElemTag, rightElemVal, collator);
+        auto leftElemTagVal = leftArray->getAt(i);
+        auto rightElemTagVal = rightArray->getAt(i);
+        auto [cmpTag, cmpVal] = value::compareValue(leftElemTagVal.tag,
+                                                    leftElemTagVal.value,
+                                                    rightElemTagVal.tag,
+                                                    rightElemTagVal.value,
+                                                    collator);
         if (cmpTag == TypeTags::NumberInt32) {
             if (cmpVal != 0) {
                 auto sign = _sortPattern[i].isAscending ? 1 : -1;

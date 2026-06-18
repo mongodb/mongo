@@ -459,17 +459,17 @@ std::shared_ptr<const CEHistogram> createCEHistogram(const std::vector<SBEValue>
             // We only count types once per occurrence per array for histogram CE.
             std::set<value::TypeTags> perArrayTags;
             for (size_t i = 0; i < arrSize; i++) {
-                const auto [elemTag, elemVal] = arr->getAt(i);
+                const auto elemTagVal = arr->getAt(i);
 
-                perArrayTags.insert(elemTag);
-                if (!canEstimateTypeViaHistogram(elemTag)) {
+                perArrayTags.insert(elemTagVal.tag);
+                if (!canEstimateTypeViaHistogram(elemTagVal.tag)) {
                     // If the elements of this array are not histogrammable, then we can only update
                     // the array type counters; we cannot add this value to the histogram.
                     continue;
                 }
-                double doubleVal = valueToDouble(elemTag, elemVal);
+                double doubleVal = valueToDouble(elemTagVal.tag, elemTagVal.value);
                 if (std::isnan(doubleVal)) {
-                    if (!sbe::value::isNumber(elemTag)) {
+                    if (!sbe::value::isNumber(elemTagVal.tag)) {
                         uasserted(7280701,
                                   str::stream() << "Non numeric tag type"
                                                 << " is interpreted as NaN");
@@ -478,7 +478,7 @@ std::shared_ptr<const CEHistogram> createCEHistogram(const std::vector<SBEValue>
                     continue;
                 }
 
-                const auto [tagCopy, valCopy] = value::copyValue(elemTag, elemVal);
+                const auto [tagCopy, valCopy] = value::copyValue(elemTagVal.tag, elemTagVal.value);
                 arrayElements.emplace_back(tagCopy, valCopy);
             }
 

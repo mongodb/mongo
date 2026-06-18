@@ -1017,7 +1017,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::aggExpMovingAvg:
             return builtinAggExpMovingAvg(arity).releaseToRaw();
         case Builtin::aggExpMovingAvgFinalize:
-            return builtinAggExpMovingAvgFinalize(arity).releaseToRaw();
+            return builtinAggExpMovingAvgFinalize(arity).releaseToMaybeOwnedRaw();
         case Builtin::aggRemovableSumAdd:
             return builtinAggRemovableSum<1 /*sign*/>(arity).releaseToRaw();
         case Builtin::aggRemovableSumRemove:

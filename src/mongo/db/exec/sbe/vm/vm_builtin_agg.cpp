@@ -1296,27 +1296,26 @@ value::TagValueMaybeOwned ByteCode::builtinAggExpMovingAvg(ArityType arity) {
     return stateTagVal;
 }
 
-value::TagValueMaybeOwned ByteCode::builtinAggExpMovingAvgFinalize(ArityType arity) {
+value::TagValueOwned ByteCode::builtinAggExpMovingAvgFinalize(ArityType arity) {
     auto stateTagVal = value::TagValueMaybeOwned::fromRaw(getFromStack(0));
 
     uassert(7821204, "State should be of array type", stateTagVal.tag() == value::TypeTags::Array);
     auto state = value::getArrayView(stateTagVal.value());
 
-    auto [resultTag, resultVal] = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
-    if (resultTag == value::TypeTags::Null) {
-        return value::TagValueMaybeOwned::null();
+    auto resultTagVal = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
+    if (resultTagVal.tag == value::TypeTags::Null) {
+        return value::TagValueOwned::null();
     }
-    uassert(7821205, "Unexpected result type", resultTag == value::TypeTags::NumberDecimal);
+    uassert(7821205, "Unexpected result type", resultTagVal.tag == value::TypeTags::NumberDecimal);
 
     auto isDecimalTagVal = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kIsDecimal));
     uassert(7821206, "Unexpected isDecimal type", isDecimalTagVal.tag == value::TypeTags::Boolean);
 
     if (value::bitcastTo<bool>(isDecimalTagVal.value)) {
-        std::tie(resultTag, resultVal) = value::copyValue(resultTag, resultVal);
-        return {true, resultTag, resultVal};
+        return value::copyValue(resultTagVal.tag, resultTagVal.value);
     } else {
-        auto result = value::bitcastTo<Decimal128>(resultVal).toDouble();
-        return value::TagValueMaybeOwned::numberDouble(result);
+        auto result = value::bitcastTo<Decimal128>(resultTagVal.value).toDouble();
+        return value::TagValueOwned::numberDouble(result);
     }
 }
 
@@ -2121,11 +2120,11 @@ void updateRemovableSumState(value::Array* state,
 }
 
 void aggRemovableSumReset(value::Array* state) {
-    auto [sumAccTag, sumAccVal] = state->getAt(static_cast<size_t>(AggRemovableSumElems::kSumAcc));
+    auto sumAccTagVal = state->getAt(static_cast<size_t>(AggRemovableSumElems::kSumAcc));
     tassert(7820807,
             "sum accumulator elem should be of array type",
-            sumAccTag == value::TypeTags::Array);
-    auto sumAcc = value::getArrayView(sumAccVal);
+            sumAccTagVal.tag == value::TypeTags::Array);
+    auto sumAcc = value::getArrayView(sumAccTagVal.value);
     ByteCode::genericResetDoubleDoubleSumState(sumAcc);
     updateRemovableSumState(state, 0, 0, 0, 0, 0);
 }
@@ -2349,9 +2348,9 @@ value::TagValueMaybeOwned pushConcatArraysCommonFinalize(value::Array* state) {
         if (idx >= queueBuffer->size()) {
             idx -= queueBuffer->size();
         }
-        auto [tag, val] = queueBuffer->getAt(idx);
-        std::tie(tag, val) = value::copyValue(tag, val);
-        result->push_back_raw(tag, val);
+        auto srcTagVal = queueBuffer->getAt(idx);
+        auto [copyTag, copyVal] = value::copyValue(srcTagVal.tag, srcTagVal.value);
+        result->push_back_raw(copyTag, copyVal);
     }
     return resultTagVal;
 }
@@ -2705,11 +2704,11 @@ linearFillState(value::TypeTags stateTag, value::Value stateVal) {
     auto x2 = state->getAt(static_cast<size_t>(AggLinearFillElems::kX2));
     auto y2 = state->getAt(static_cast<size_t>(AggLinearFillElems::kY2));
     auto prevX = state->getAt(static_cast<size_t>(AggLinearFillElems::kPrevX));
-    auto [countTag, countVal] = state->getAt(static_cast<size_t>(AggLinearFillElems::kCount));
+    auto countTagVal = state->getAt(static_cast<size_t>(AggLinearFillElems::kCount));
     tassert(7971202,
             "Expected count element to be of int64 type",
-            countTag == value::TypeTags::NumberInt64);
-    auto count = value::bitcastTo<int64_t>(countVal);
+            countTagVal.tag == value::TypeTags::NumberInt64);
+    auto count = value::bitcastTo<int64_t>(countTagVal.value);
 
     return {state, x1, y1, x2, y2, prevX, count};
 }

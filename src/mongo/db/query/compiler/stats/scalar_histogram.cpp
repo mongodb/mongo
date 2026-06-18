@@ -49,9 +49,9 @@ void validate(const sbe::value::Array& bounds, const std::vector<Bucket>& bucket
     // Pair-wise comparison validating that bounds are unique and sorted in increasing order.
     size_t l = 0;
     for (size_t r = 1; r < bounds.size(); r++) {
-        const auto [lt, lv] = bounds.getAt(l);
-        const auto [rt, rv] = bounds.getAt(r);
-        const auto comp = compareValues(lt, lv, rt, rv);
+        const auto lTagVal = bounds.getAt(l);
+        const auto rTagVal = bounds.getAt(r);
+        const auto comp = compareValues(lTagVal.tag, lTagVal.value, rTagVal.tag, rTagVal.value);
         if (comp > 0) {
             uasserted(7131006, "Scalar histogram must have sorted bound values");
         } else if (comp == 0) {

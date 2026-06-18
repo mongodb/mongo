@@ -58,8 +58,8 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestPosition(ArityType arity) {
 
     auto isBitSet = false;
     for (size_t idx = 0; idx < bitPositions->size(); ++idx) {
-        auto [tagBitPosition, valueBitPosition] = bitPositions->getAt(idx);
-        auto bitPosition = value::bitcastTo<int64_t>(valueBitPosition);
+        auto bitPositionTagVal = bitPositions->getAt(idx);
+        auto bitPosition = value::bitcastTo<int64_t>(bitPositionTagVal.value);
         if (bitPosition >= binDataSize * 8) {
             // If position to test is longer than the data to test against, zero-extend.
             isBitSet = false;

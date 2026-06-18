@@ -78,8 +78,8 @@ int getApproximateSize(TypeTags tag, Value val) {
             auto arr = getArrayView(val);
             result += sizeof(*arr);
             for (size_t idx = 0; idx < arr->size(); ++idx) {
-                auto [tag, val] = arr->getAt(idx);
-                result += getApproximateSize(tag, val);
+                auto tagVal = arr->getAt(idx);
+                result += getApproximateSize(tagVal.tag, tagVal.value);
             }
             return result;
         }
@@ -104,8 +104,8 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += sizeof(*obj);
             for (size_t idx = 0; idx < obj->size(); ++idx) {
                 result += obj->field(idx).size();
-                auto [tag, val] = obj->getAt(idx);
-                result += getApproximateSize(tag, val);
+                auto tagVal = obj->getAt(idx);
+                result += getApproximateSize(tagVal.tag, tagVal.value);
             }
             return result;
         }

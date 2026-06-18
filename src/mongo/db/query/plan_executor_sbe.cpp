@@ -521,9 +521,9 @@ Value convertToValue(sbe::value::TypeTags tag, sbe::value::Value val) {
 Document convertToDocument(const sbe::value::Object& obj) {
     MutableDocument doc;
     for (size_t idx = 0; idx < obj.size(); ++idx) {
-        auto [tag, val] = obj.getAt(idx);
+        auto tagVal = obj.getAt(idx);
         const auto& name = obj.field(idx);
-        doc.addField(name, convertToValue(tag, val));
+        doc.addField(name, convertToValue(tagVal.tag, tagVal.value));
     }
     return doc.freeze();
 }

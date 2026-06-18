@@ -166,20 +166,21 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
             accumulatorState->size() == static_cast<size_t>(AggArrayWithSize::kLast));
 
     // Compute the size of the array after adding the new element.
-    auto [tagAccArraySize, valAccArraySize] =
+    auto accArraySizeTagVal =
         accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
     tassert(11004214,
             "Expected integer value for array size",
-            tagAccArraySize == value::TypeTags::NumberInt64);
-    int64_t currentSize = value::bitcastTo<int64_t>(valAccArraySize);
+            accArraySizeTagVal.tag == value::TypeTags::NumberInt64);
+    int64_t currentSize = value::bitcastTo<int64_t>(accArraySizeTagVal.value);
     int newElemSize = value::getApproximateSize(newElem.tag(), newElem.value());
     int64_t newSize = currentSize + newElemSize;
 
     // Check that array with the new element will not exceed the limit.
-    auto [tagAccArray, valAccArray] =
-        accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(11004215, "Expected Array in accumulator state", tagAccArray == value::TypeTags::Array);
-    auto accArray = value::getArrayView(valAccArray);
+    auto accArrayTagVal = accumulatorState->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(11004215,
+            "Expected Array in accumulator state",
+            accArrayTagVal.tag == value::TypeTags::Array);
+    auto accArray = value::getArrayView(accArrayTagVal.value);
 
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream() << "Used too much memory for a single array. Memory limit: " << sizeCap
