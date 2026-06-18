@@ -138,7 +138,7 @@ filters:
       - 10gen/query-execution-query-settings
   - "document_source_sequential_document_cache*":
     approvers:
-      - 10gen/query-execution-classic
+      - 10gen/query-optimization
   - "document_source_set_variable_from_subpipeline*":
     approvers:
       - 10gen/query-integration-search
