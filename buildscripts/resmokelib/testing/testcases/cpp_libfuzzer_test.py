@@ -1,6 +1,7 @@
 """The libfuzzertest.TestCase for C++ libfuzzer tests."""
 
 import datetime
+import glob
 import os
 from typing import Optional
 
@@ -52,6 +53,40 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         os.makedirs(self.corpus_directory, exist_ok=True)
 
         interface.append_process_tracking_options(self.program_options, self._id)
+
+    def run_test(self):
+        """Run the test, then fail if any crash files were recorded in the corpus."""
+        try:
+            self.proc = self._make_process()
+            self._execute(self.proc)
+        except self.failureException:
+            raise
+        except:
+            self.logger.exception(
+                "Encountered an error running %s %s", self.test_kind, self.basename()
+            )
+            raise
+
+        # Centipede's corpus database stores known-reproducible crashes (deduped
+        # by signature) under <corpus>/<binary>/<test>/crashing/. It self-prunes
+        # entries that no longer reproduce on the next run, so a non-empty
+        # directory after the fuzzer exits means there are still-reproducible
+        # crashes that this build is responsible for.
+        crash_files = glob.glob(
+            os.path.join(
+                self.corpus_directory,
+                self.short_name(),
+                "LLVMFuzzer.TestOneInput",
+                "crashing",
+                "*",
+            )
+        )
+        crash_files = [f for f in crash_files if os.path.isfile(f)]
+        if crash_files:
+            self.return_code = 1
+            msg = f"{self.short_description()} has {len(crash_files)} reproducible crash(es) in the corpus database: {crash_files}"
+            self.logger.error(msg)
+            raise self.failureException(msg)
 
     def _make_process(self):
         default_args = [
