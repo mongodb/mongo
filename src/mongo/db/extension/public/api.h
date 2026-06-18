@@ -56,7 +56,7 @@ extern "C" {
  * server and the extension.
  *
  * The version is composed of two parts: major and minor. The major version is incremented
- * for incompatible changes and the minor version for for backward-compatible changes.
+ * for incompatible changes and the minor version for backward-compatible changes.
  */
 typedef struct {
     uint32_t major;
@@ -108,18 +108,8 @@ typedef struct MongoExtensionByteBuf {
     const struct MongoExtensionByteBufVTable* const vtable;
 } MongoExtensionByteBuf;
 
-/**
- * Virtual function table for MongoExtensionByteBuf.
- */
 typedef struct MongoExtensionByteBufVTable {
-    /**
-     * Destroy `ptr` and free all associated resources.
-     */
     void (*destroy)(MongoExtensionByteBuf* ptr);
-
-    /**
-     * Get a read-only view of the contents of `ptr`.
-     */
     MongoExtensionByteView (*get_view)(const MongoExtensionByteBuf* ptr);
 } MongoExtensionByteBufVTable;
 
@@ -154,13 +144,7 @@ typedef struct MongoExtensionStatus {
     const struct MongoExtensionStatusVTable* const vtable;
 } MongoExtensionStatus;
 
-/**
- * Virtual function table for MongoExtensionStatus.
- */
 typedef struct MongoExtensionStatusVTable {
-    /**
-     * Destroy `status` and free all associated resources.
-     */
     void (*destroy)(MongoExtensionStatus* status);
 
     /**
@@ -174,20 +158,9 @@ typedef struct MongoExtensionStatusVTable {
      */
     MongoExtensionByteView (*get_reason)(const MongoExtensionStatus* status);
 
-    /**
-     * Set an error code associated with `status`
-     */
     void (*set_code)(MongoExtensionStatus* status, int32_t newCode);
-
-    /**
-     * Set a reason associated with `status`. May be empty.
-     */
     MongoExtensionStatus* (*set_reason)(MongoExtensionStatus* status,
                                         MongoExtensionByteView newReason);
-
-    /**
-     * Clone this instance of MongoExtensionStatus.
-     */
     MongoExtensionStatus* (*clone)(const MongoExtensionStatus* status,
                                    MongoExtensionStatus** output);
 } MongoExtensionStatusVTable;
@@ -200,9 +173,6 @@ typedef struct MongoExtensionStatusVTable {
 //
 ////////////////////////////////////////////////////////////////
 
-/**
- * Log severity levels for extension log messages.
- */
 typedef enum MongoExtensionLogSeverity : uint32_t {
     kError,
     kWarning,
@@ -241,9 +211,6 @@ typedef struct MongoExtensionOperationMetrics {
 } MongoExtensionOperationMetrics;
 
 typedef struct MongoExtensionOperationMetricsVTable {
-    /**
-     * Destroy `metrics` and free any related resources.
-     */
     void (*destroy)(MongoExtensionOperationMetrics* metrics);
 
     /**
@@ -314,30 +281,20 @@ typedef struct MongoExtensionLogger {
     const struct MongoExtensionLoggerVTable* const vtable;
 } MongoExtensionLogger;
 
-/**
- * Virtual function table for MongoExtensionLogger.
- */
 typedef struct MongoExtensionLoggerVTable {
-    /**
-     * Logs a message from the extension. The log may be a severity log with severity INFO, WARNING,
-     * or ERROR. It may also be a debug log w/ a numeric debug log level.
-     */
     MongoExtensionStatus* (*log)(const MongoExtensionLogMessage* rawLog);
 
     /**
      * This provides an optimization to the logging service, as it compares the provided log
      * level/severity against the server's current log level before materializing and sending a log
      * over the wire. 'logType' indicates whether levelOrSeverity is a level (kDebug) or a severity
-     * (kLog), as in the latter case in case we need to transform the value to a logv2::LogSeverity.
+     * (kLog), as in the latter case we need to transform the value to a logv2::LogSeverity.
      */
     MongoExtensionStatus* (*should_log)(MongoExtensionLogSeverity levelOrSeverity,
                                         ::MongoExtensionLogType logType,
                                         bool* out);
 } MongoExtensionLoggerVTable;
 
-/**
- * Possible explain verbosity levels.
- */
 typedef enum MongoExtensionExplainVerbosity : uint32_t {
     /**
      * Command does not have explain enabled.
@@ -348,7 +305,7 @@ typedef enum MongoExtensionExplainVerbosity : uint32_t {
      */
     kQueryPlanner = 1,
     /**
-     * In addition reporting basic information about the pipeline, runs the pipeline and reports
+     * In addition to reporting basic information about the pipeline, runs the pipeline and reports
      * execution-related stats.
      */
     kExecStats = 2,
@@ -492,15 +449,10 @@ typedef struct MongoExtensionAggStageDescriptor {
 } MongoExtensionAggStageDescriptor;
 
 /**
- * Virtual function table for MongoExtensionAggStageDescriptor.
- *
  * Methods without a MongoExtensionStatus return must not fail and must not let exceptions escape
  * across the API boundary.
  */
 typedef struct MongoExtensionAggStageDescriptorVTable {
-    /**
-     * Returns a MongoExtensionByteView containing the name of this aggregation stage.
-     */
     MongoExtensionByteView (*get_name)(const MongoExtensionAggStageDescriptor* descriptor);
 
     /**
@@ -520,7 +472,6 @@ typedef struct MongoExtensionAggStageDescriptorVTable {
                                    struct MongoExtensionAggStageParseNode** parseNode);
 } MongoExtensionAggStageDescriptorVTable;
 
-// Forward declare.
 struct MongoExtensionAggStageAstNode;
 
 typedef struct MongoExtensionExpandedArrayElement {
@@ -554,13 +505,7 @@ typedef struct MongoExtensionExpandedArrayContainer {
     const struct MongoExtensionExpandedArrayContainerVTable* const vtable;
 } MongoExtensionExpandedArrayContainer;
 
-/**
- * Virtual function table for MongoExtensionExpandedArrayContainer.
- */
 typedef struct MongoExtensionExpandedArrayContainerVTable {
-    /**
-     * Destroy `container` and free all associated resources.
-     */
     void (*destroy)(MongoExtensionExpandedArrayContainer* container);
 
     /**
@@ -581,6 +526,7 @@ typedef struct MongoExtensionExpandedArrayContainerVTable {
     MongoExtensionStatus* (*transfer)(MongoExtensionExpandedArrayContainer* container,
                                       MongoExtensionExpandedArray* array);
 } MongoExtensionExpandedArrayContainerVTable;
+
 /**
  * MongoExtensionAggStageParseNode is responsible for validating the user provided syntax,
  * generating a query shape, and expanding into a resolved list of nodes that can be either AST
@@ -591,18 +537,8 @@ typedef struct MongoExtensionAggStageParseNode {
     const struct MongoExtensionAggStageParseNodeVTable* const vtable;
 } MongoExtensionAggStageParseNode;
 
-/**
- * Virtual function table for MongoExtensionAggStageParseNode.
- */
 typedef struct MongoExtensionAggStageParseNodeVTable {
-    /**
-     * Destroys object and frees related resources.
-     */
     void (*destroy)(MongoExtensionAggStageParseNode* parseNode);
-
-    /**
-     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
-     */
     MongoExtensionByteView (*get_name)(const MongoExtensionAggStageParseNode* parseNode);
 
     /**
@@ -641,15 +577,13 @@ typedef struct MongoExtensionAggStageParseNodeVTable {
                                              MongoExtensionByteBuf** output);
 } MongoExtensionAggStageParseNodeVTable;
 
-/**
- * Types of first stage view application policies that an extension can implement.
- */
 typedef enum MongoExtensionFirstStageViewApplicationPolicy : uint32_t {
-    // If this stage is at the front of the pipeline, the pipeline should
-    // prepend the view.
+    /** If this stage is at the front of the pipeline, the pipeline should prepend the view. */
     kDefaultPrepend = 0,
-    // If this stage is at the front of the pipeline, the pipeline should not
-    // prepend the view. The stage will apply the view pipeline itself internally.
+    /**
+     * If this stage is at the front of the pipeline, the pipeline should not prepend the view.
+     * The stage will apply the view pipeline itself internally.
+     */
     kDoNothing = 1,
 } MongoExtensionFirstStageViewApplicationPolicy;
 
@@ -661,21 +595,10 @@ typedef struct MongoExtensionAggStageAstNode {
     const struct MongoExtensionAggStageAstNodeVTable* const vtable;
 } MongoExtensionAggStageAstNode;
 
-// Forward declare.
 struct MongoExtensionLogicalAggStage;
 
-/**
- * Virtual function table for MongoExtensionAggStageAstNode.
- */
 typedef struct MongoExtensionAggStageAstNodeVTable {
-    /**
-     * Destroys `astNode` and free any related resources.
-     */
     void (*destroy)(MongoExtensionAggStageAstNode* astNode);
-
-    /**
-     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
-     */
     MongoExtensionByteView (*get_name)(const MongoExtensionAggStageAstNode* astNode);
 
     /**
@@ -738,7 +661,6 @@ typedef struct MongoExtensionLogicalAggStage {
     const struct MongoExtensionLogicalAggStageVTable* const vtable;
 } MongoExtensionLogicalAggStage;
 
-// Forward declare.
 struct MongoExtensionPipelineRewriteContext;
 
 /**
@@ -749,18 +671,8 @@ typedef enum MongoExtensionStreamType : uint8_t {
     kMongoExtensionStreamTypeMetaResult = 1,
 } MongoExtensionStreamType;
 
-/**
- * Virtual function table for MongoExtensionLogicalAggStage.
- */
 typedef struct MongoExtensionLogicalAggStageVTable {
-    /**
-     * Destroy `logicalStage` and free any related resources.
-     */
     void (*destroy)(MongoExtensionLogicalAggStage* logicalStage);
-
-    /**
-     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
-     */
     MongoExtensionByteView (*get_name)(const MongoExtensionLogicalAggStage* logicalStage);
 
     /**
@@ -787,9 +699,8 @@ typedef struct MongoExtensionLogicalAggStageVTable {
                                      MongoExtensionByteBuf** output);
 
     /**
-     * compile: On success, "compiles" the LogicalStage into an ExecutableStage, populating the
-     * output parameter ExecutableStage pointer with the extension's executable stage. Ownership is
-     * transferred to the caller.
+     * On success, populates the output with the compiled ExecutableStage. Ownership is transferred
+     * to the caller.
      */
     MongoExtensionStatus* (*compile)(const MongoExtensionLogicalAggStage* logicalStage,
                                      struct MongoExtensionExecAggStage** output);
@@ -819,7 +730,6 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      */
     MongoExtensionStatus* (*set_vector_search_limit_for_optimization_deprecated)(
         MongoExtensionLogicalAggStage* logicalStage, long long* extractedLimitVal);
-
 
     /**
      * Evaluates the precondition of the rule identified by `ruleName`. This method is called to
@@ -907,9 +817,6 @@ typedef struct MongoExtensionLogicalAggStageVTable {
         const MongoExtensionLogicalAggStage* logicalStage, MongoExtensionByteBuf** output);
 } MongoExtensionLogicalAggStageVTable;
 
-/**
- * Code indicating the result of a getNext() call.
- */
 typedef enum MongoExtensionGetNextResultCode : uint8_t {
     /**
      * getNext() yielded a document.
@@ -947,13 +854,7 @@ typedef struct MongoExtensionExecAggStage {
     const struct MongoExtensionExecAggStageVTable* const vtable;
 } MongoExtensionExecAggStage;
 
-/**
- * Virtual function table for MongoExtensionExecAggStage.
- */
 typedef struct MongoExtensionExecAggStageVTable {
-    /**
-     * Destroys object and frees related resources.
-     */
     void (*destroy)(MongoExtensionExecAggStage* execAggStage);
 
     /**
@@ -978,9 +879,6 @@ typedef struct MongoExtensionExecAggStageVTable {
                                       MongoExtensionQueryExecutionContext* execCtxPtr,
                                       MongoExtensionGetNextResult* getNextResult);
 
-    /**
-     * Returns a MongoExtensionByteView containing the name of the associated aggregation stage.
-     */
     MongoExtensionByteView (*get_name)(const MongoExtensionExecAggStage* astNode);
 
     /**
@@ -997,6 +895,7 @@ typedef struct MongoExtensionExecAggStageVTable {
      */
     MongoExtensionStatus* (*set_source)(MongoExtensionExecAggStage* execAggStage,
                                         MongoExtensionExecAggStage* sourceStage);
+
     /**
      * Initializes the stage and positions it before the first result.
      * Resources should be acquired during open() and avoided in getNext() for better
@@ -1029,7 +928,6 @@ typedef struct MongoExtensionExecAggStageVTable {
                                      MongoExtensionExplainVerbosity verbosity,
                                      MongoExtensionByteBuf** output);
 } MongoExtensionExecAggStageVTable;
-
 
 /**
  * MongoExtensionQueryExecutionContext exposes helpers for an extension to call certain
@@ -1092,6 +990,7 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
 //
 //
 ////////////////////////////////////////////////////////////////
+
 /**
  * Tags that control when and how a pipeline rewrite rule is evaluated.
  *
@@ -1122,9 +1021,6 @@ typedef struct MongoExtensionPipelineRewriteRule {
     MongoExtensionPipelineRewriteRuleTags tags;
 } MongoExtensionPipelineRewriteRule;
 
-/**
- * Enum specifying the type of constraint represented by a DocsNeededConstraint object.
- */
 typedef enum MongoExtensionDocsNeededConstraintType : uint32_t {
     /** Constraint is unknown (cannot infer a bound). */
     kDocsNeededConstraintUnknown = 0,
@@ -1144,9 +1040,6 @@ typedef struct MongoExtensionDocsNeededConstraint {
     uint64_t value;
 } MongoExtensionDocsNeededConstraint;
 
-/**
- * Encapsulates the min and max bounds of documents needed by the pipeline.
- */
 typedef struct MongoExtensionDocsNeededBounds {
     MongoExtensionDocsNeededConstraint minBounds;
     MongoExtensionDocsNeededConstraint maxBounds;
@@ -1161,10 +1054,6 @@ typedef struct MongoExtensionPipelineRewriteContext {
 } MongoExtensionPipelineRewriteContext;
 
 typedef struct MongoExtensionPipelineRewriteContextVTable {
-    /**
-     * Returns the nth next stage stored in the underlying pipeline wrapped by
-     * MongoExtensionPipelineRewriteContext at the given index as a MongoExtensionLogicalAggStage.
-     */
     MongoExtensionStatus* (*get_nth_next_stage)(const MongoExtensionPipelineRewriteContext* ctx,
                                                 size_t index,
                                                 MongoExtensionLogicalAggStage** out);
@@ -1178,11 +1067,6 @@ typedef struct MongoExtensionPipelineRewriteContextVTable {
                                                   size_t index,
                                                   bool* result);
 
-    /**
-     * Populates out with true if the underlying pipeline wrapped by
-     * MongoExtensionPipelineRewriteContext has a stage at the given index. Populates out with false
-     * otw.
-     */
     MongoExtensionStatus* (*has_at_least_n_next_stages)(
         const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* result);
 
@@ -1220,9 +1104,6 @@ typedef struct MongoExtensionPipelineDependenciesVTable {
                                             MongoExtensionByteView name,
                                             bool* result);
 
-    /**
-     * Populates 'out' with true if the pipeline requires the full document.
-     */
     MongoExtensionStatus* (*needs_whole_document)(const MongoExtensionPipelineDependencies* deps,
                                                   bool* result);
 
@@ -1244,12 +1125,9 @@ typedef struct MongoExtensionPipelineDependenciesVTable {
 //
 ////////////////////////////////////////////////////////////////
 
-/**
- * Types of elements that can be in a MongoExtensionDPLArray.
- */
 typedef enum MongoExtensionDPLArrayElementType : uint32_t {
-    kParse = 0,   // Parse node
-    kLogical = 1  // Logical stage
+    kParse = 0,
+    kLogical = 1,
 } MongoExtensionDPLArrayElementType;
 
 /**
@@ -1260,7 +1138,6 @@ typedef enum MongoExtensionDPLArrayElementType : uint32_t {
  * generated it.
  */
 typedef struct MongoExtensionDPLArrayElement {
-    // Indicates what type the element is.
     MongoExtensionDPLArrayElementType type;
     union {
         MongoExtensionAggStageParseNode* parseNode;
@@ -1292,13 +1169,7 @@ typedef struct MongoExtensionDPLArrayContainer {
     const struct MongoExtensionDPLArrayContainerVTable* const vtable;
 } MongoExtensionDPLArrayContainer;
 
-/**
- * Virtual function table for MongoExtensionDPLArrayContainer.
- */
 typedef struct MongoExtensionDPLArrayContainerVTable {
-    /**
-     * Destroy `container` and free all associated resources.
-     */
     void (*destroy)(MongoExtensionDPLArrayContainer* container);
 
     /**
@@ -1330,9 +1201,6 @@ typedef struct MongoExtensionDistributedPlanLogic {
 } MongoExtensionDistributedPlanLogic;
 
 typedef struct MongoExtensionDistributedPlanLogicVTable {
-    /**
-     * Destroys `distributedPlanLogic` and frees any related resources.
-     */
     void (*destroy)(MongoExtensionDistributedPlanLogic* distributedPlanLogic);
 
     /**
@@ -1427,8 +1295,8 @@ typedef struct MongoExtension {
 
 /**
  * MongoExtensionHostPortal serves as the entry point for extensions to integrate with the
- * server. It exposes a function pointer, registerStageDescriptor, which allows extensions to
- * register custom aggregation stages.
+ * server. It exposes function pointers for registering aggregation stages and pipeline
+ * optimization rules.
  */
 typedef struct MongoExtensionHostPortal {
     const struct MongoExtensionHostPortalVTable* const vtable;
@@ -1446,21 +1314,11 @@ typedef struct MongoExtensionHostPortal {
     int32_t hostMongoDBMaxWireVersion;
 } MongoExtensionHostPortal;
 
-/**
- * Virtual function table for MongoExtensionHostPortal.
- */
 typedef struct MongoExtensionHostPortalVTable {
-    /**
-     * Register an aggregation stage descriptor with the host.
-     */
     MongoExtensionStatus* (*register_stage_descriptor)(
         const MongoExtensionHostPortal* hostPortal,
         const MongoExtensionAggStageDescriptor* descriptor);
 
-    /**
-     * Returns a MongoExtensionByteView containing the raw extension options associated with this
-     * extension.
-     */
     MongoExtensionByteView (*get_extension_options)(const MongoExtensionHostPortal* portal);
 
     /**
@@ -1475,8 +1333,6 @@ typedef struct MongoExtensionHostPortalVTable {
 
 /**
  * MongoExtensionHostServices exposes services provided by the host to the extension.
- *
- * Currently, the VTable struct is a placeholder for future services.
  */
 typedef struct MongoExtensionHostServices {
     const struct MongoExtensionHostServicesVTable* const vtable;
@@ -1506,13 +1362,7 @@ typedef MongoExtensionStatus* (*MongoExtensionDocResultsDPLCallback)(
     MongoExtensionByteBuf** docSortPatternOut,
     MongoExtensionByteBuf** metadataMergePipelineOut);
 
-/**
- * Virtual function table for MongoExtensionHostServices.
- */
 typedef struct MongoExtensionHostServicesVTable {
-    /**
-     * Retrieve the static logging instance on the host.
-     */
     MongoExtensionLogger* (*get_logger)();
 
     /**
@@ -1539,7 +1389,7 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*mark_idle_thread_block)(MongoExtensionIdleThreadBlock** idleThreadBlock,
                                                     const char* location);
-    /*
+    /**
      * Creates a host-defined parse node. Use this function when you need to instantiate a parse
      * node implemented by the host during extension parse node expansion.
      *
@@ -1586,9 +1436,6 @@ typedef struct MongoExtensionHostServicesVTable {
         MongoExtensionAggStageAstNode** node);
 } MongoExtensionHostServicesVTable;
 
-/**
- * Virtual function table for MongoExtension.
- */
 typedef struct MongoExtensionVTable {
     /**
      * Initialize the extension, passing in a pointer to the host portal.
