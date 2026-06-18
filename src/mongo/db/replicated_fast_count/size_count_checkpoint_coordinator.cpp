@@ -162,11 +162,8 @@ void SizeCountCheckpointCoordinator::_runTailerThread(ServiceContext* service,
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtxHolder->opCtx(), AdmissionContext::Priority::kExempt);
 
-    try {
-        _oplogTailer->run(opCtxHolder->opCtx(), startCheckpointingAfterTS, *_buffer);
-    } catch (const DBException& ex) {
-        _handleWorkerFailure(ex.toStatus(), "SizeCountCheckpointCoordinator tailer thread failure");
-    }
+    // Run until no longer a primary.
+    _oplogTailer->run(opCtxHolder->opCtx(), startCheckpointingAfterTS, *_buffer);
 }
 
 void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
@@ -187,21 +184,8 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtxHolder->opCtx(), AdmissionContext::Priority::kExempt);
 
-    try {
-        _flusher->run(opCtxHolder->opCtx(), *_buffer);
-    } catch (const DBException& ex) {
-        _handleWorkerFailure(ex.toStatus(), "SizeCountCheckpointCoordinator flush thread failure");
-    }
-}
-
-void SizeCountCheckpointCoordinator::_handleWorkerFailure(Status status, StringData message) {
-    LOGV2_WARNING(12101804,
-                  "SizeCountCheckpointCoordinator worker failure",
-                  "reason"_attr = message,
-                  "error"_attr = status);
-    // If one worker fails, the others should not attempt to make further progress.
-    std::lock_guard lk(_mutex);
-    _opCtxGroup.interrupt(status.code());
+    // Run until no longer a primary.
+    _flusher->run(opCtxHolder->opCtx(), *_buffer);
 }
 
 }  // namespace mongo::replicated_fast_count

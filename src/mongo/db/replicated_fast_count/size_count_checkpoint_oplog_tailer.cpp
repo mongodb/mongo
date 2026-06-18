@@ -143,28 +143,60 @@ bool runOneIteration(OperationContext* opCtx,
 void SizeCountCheckpointOplogTailer::run(OperationContext* opCtx,
                                          Timestamp startAfter,
                                          SizeCountCheckpointBuffer& buffer) {
-    auto notifier = acquireInsertNotifier(opCtx);
-    auto state = _bootstrap(opCtx, startAfter, buffer);
+    std::shared_ptr<CappedInsertNotifier> notifier;
+    boost::optional<TailerState> state = boost::none;
 
-    // If the oplog starts out empty.
     while (!state) {
-        opCtx->checkForInterrupt();
-        auto waitVersion = notifier->getVersion();
-        state = _bootstrap(opCtx, startAfter, buffer);
-        // Don't wait forever, as this shouldn't be the state for long durations.
-        notifier->waitUntil(opCtx, waitVersion, Date_t::now() + Seconds(1));
+        try {
+            if (!notifier) {
+                notifier = acquireInsertNotifier(opCtx);
+            }
+            opCtx->checkForInterrupt();
+            auto waitVersion = notifier->getVersion();
+            state = _bootstrap(opCtx, startAfter, buffer);
+            if (!state) {
+                // The oplog is still empty.
+                notifier->waitUntil(opCtx, waitVersion, Date_t::now() + Seconds(1));
+            }
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
+                LOGV2_DEBUG(12917800,
+                            2,
+                            "SizeCountCheckpointOplogTailer interrupted due to replication state",
+                            "error"_attr = ex.toStatus());
+                return;
+            } else {
+                // The `state` is necessarily none here, so nothing to discard.
+                LOGV2_WARNING(12917801,
+                              "Exception handled in SizeCountCheckpointOplogTailer::run()",
+                              "error"_attr = ex.toStatus());
+            }
+        }
     }
 
-    invariant(state.has_value());
-
     while (true) {
-        opCtx->checkForInterrupt();
-        auto waitVersion = notifier->getVersion();
-        bool madeProgress = runOneIteration(opCtx, *state, buffer);
-        if (!madeProgress) {
-            state->cursor.reset();
+        try {
+            opCtx->checkForInterrupt();
+            auto waitVersion = notifier->getVersion();
+            bool madeProgress = runOneIteration(opCtx, *state, buffer);
+            if (!madeProgress) {
+                state->cursor.reset();
+            }
+            notifier->waitUntil(opCtx, waitVersion, Date_t::max());
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
+                LOGV2_DEBUG(12917802,
+                            2,
+                            "SizeCountCheckpointOplogTailer interrupted due to replication state",
+                            "error"_attr = ex.toStatus());
+                return;
+            } else {
+                LOGV2_WARNING(12917803,
+                              "Exception handled in SizeCountCheckpointOplogTailer::run()",
+                              "error"_attr = ex.toStatus());
+                state->cursor.reset();
+            }
         }
-        notifier->waitUntil(opCtx, waitVersion, Date_t::max());
     }
 }
 

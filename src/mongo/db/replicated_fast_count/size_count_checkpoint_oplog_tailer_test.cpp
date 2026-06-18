@@ -293,10 +293,10 @@ TEST_F(SizeCountCheckpointOplogTailerTest, RunInterruptedWhileWaitingExitsPrompt
     });
 
     std::move(future).get();
-    ocg.interrupt(ErrorCodes::Interrupted);
+    ocg.interrupt(ErrorCodes::InterruptedDueToReplStateChange);
     t.join();
 
-    ASSERT_EQ(threadStatus.code(), ErrorCodes::Interrupted);
+    ASSERT_OK(threadStatus.code());
 }
 
 }  // namespace

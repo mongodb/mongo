@@ -197,16 +197,6 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, IsRunningGaugeSetByStartup) {
     EXPECT_EQ(_capturer.readInt64Gauge(MetricNames::kReplicatedFastCountIsRunning), 1);
 }
 
-TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDuringFailure) {
-    auto& failDuringFlushFp = *globalFailPointRegistry().find("failDuringFlush");
-
-    failDuringFlushFp.setMode(FailPoint::alwaysOn);
-    _fastCountManager->flushSync_ForTest(operationContext());
-    failDuringFlushFp.setMode(FailPoint::off);
-
-    EXPECT_EQ(_capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushFailureCount), 1);
-}
-
 // TODO SERVER-122992: Re-enable once the number of entries inserted versus updated are
 // communicated.
 // TEST_F(ReplicatedFastCountManagerMetricsTest,

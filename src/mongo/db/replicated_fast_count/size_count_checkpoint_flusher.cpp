@@ -62,12 +62,29 @@ void SizeCountCheckpointFlusher::run(OperationContext* opCtx, SizeCountCheckpoin
     });
 
     while (true) {
-        {
-            std::unique_lock lk(_mutex);
-            opCtx->waitForConditionOrInterrupt(_flushCv, lk, [this] { return _flushRequested; });
-            _flushRequested = false;
+        try {
+            {
+                std::unique_lock lk(_mutex);
+                opCtx->waitForConditionOrInterrupt(
+                    _flushCv, lk, [this] { return _flushRequested; });
+                _flushRequested = false;
+            }
+            _runOneFlushCycle(opCtx, buffer);
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
+                ex.code() == ErrorCodes::NotWritablePrimary) {
+                LOGV2_DEBUG(12917804,
+                            2,
+                            "SizeCountCheckpointFlusher interrupted due to replication state",
+                            "error"_attr = ex.toStatus());
+                return;
+            } else {
+                _metrics.incrementFlushFailureCount();
+                LOGV2_WARNING(12917805,
+                              "Exception handled in SizeCountCheckpointFlusher::run()",
+                              "error"_attr = ex.toStatus());
+            }
         }
-        _runOneFlushCycle(opCtx, buffer);
     }
 }
 
@@ -93,25 +110,7 @@ void SizeCountCheckpointFlusher::_runOneFlushCycle(OperationContext* opCtx,
                                                    SizeCountCheckpointBuffer& buffer) {
     const Date_t flushStart = Date_t::now();
     size_t entryWriteCount = 0;
-    try {
-        entryWriteCount = _doFlush(opCtx, buffer);
-    } catch (const DBException& ex) {
-        // _doFlush() guarantees that the checkpoint snapshot is only released from the buffer once
-        // success if acknowledged. Thus, swallowing DBExceptions shouldn't impact correctness with
-        // respect to the buffer state.
-        if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-            ex.code() == ErrorCodes::NotWritablePrimary) {
-            LOGV2_DEBUG(12101808,
-                        2,
-                        "SizeCountCheckpointCoordinator flush interrupted due to replication state",
-                        "error"_attr = ex.toStatus());
-        } else {
-            _metrics.incrementFlushFailureCount();
-            LOGV2_WARNING(12101809,
-                          "Failed to persist collection sizeCount metadata",
-                          "error"_attr = ex.toStatus());
-        }
-    }
+    entryWriteCount = _doFlush(opCtx, buffer);
 
     if (_fpSleepAfterFlush) {
         _fpSleepAfterFlush->execute([](const BSONObj& data) {
