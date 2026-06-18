@@ -859,9 +859,29 @@ const char* ExpressionCond::getOpName() const {
 
 /* ---------------------- ExpressionConstant --------------------------- */
 
+namespace {
+// The Column (7) BinData subtype is not allowed in $const or $literal.
+void assertNoBSONColumn(const BSONElement& elem) {
+    if (elem.type() == BSONType::binData) {
+        uassert(ErrorCodes::FailedToParse,
+                "BSONColumn (BinData subtype 7) is not allowed as an expression literal",
+                elem.binDataType() != BinDataType::Column);
+    } else if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+        for (const auto& child : elem.embeddedObject()) {
+            assertNoBSONColumn(child);
+        }
+    } else if (elem.type() == BSONType::codeWScope) {
+        for (const auto& child : elem.codeWScopeObject()) {
+            assertNoBSONColumn(child);
+        }
+    }
+}
+}  // namespace
+
 intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const expCtx,
                                                     BSONElement exprElement,
                                                     const VariablesParseState& vps) {
+    assertNoBSONColumn(exprElement);
     return new ExpressionConstant(expCtx, Value(exprElement));
 }
 

@@ -1900,6 +1900,9 @@ private:
                                   << typeCode,
                     // Allowed ranges are 0-8 (pre-defined types) and 128-255 (user-defined types).
                     isValidBinDataType(typeCode) || isValidUserDefinedBinDataType(typeCode));
+            uassert(12910300,
+                    "$convert to BinData subtype Column (7) is not allowed",
+                    typeCode != static_cast<int>(BinDataType::Column));
 
             return static_cast<BinDataType>(typeCode);
         }

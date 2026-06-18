@@ -279,6 +279,15 @@ const invalidArgumentValueDocs = [
     // Invalid type.
     {_id: 5, input: 123, target: {type: -2}, expectedCode: ErrorCodes.FailedToParse},
     {_id: 6, input: 123, target: -2, expectedCode: ErrorCodes.FailedToParse},
+    {
+        // Conversion to BinData subtype Column (7), reserved for the internal BSONColumn format, is
+        // not allowed.
+        _id: 7,
+        input: "hn3uUsMxSE6S0cVkebjmfg==",
+        target: {type: "binData", subtype: 7},
+        format: "base64",
+        expectedCode: 12910300,
+    },
 ];
 
 runConvertTests({coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});

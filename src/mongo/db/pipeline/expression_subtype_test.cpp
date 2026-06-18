@@ -61,6 +61,7 @@ public:
 };
 
 TEST_F(ExpressionSubtypeTest, WithDefinedBinDataSubtype) {
+    // Exclude Column from this list, since it cannot be used as a literal.
     const std::vector<BinDataType> binDataTypes{BinDataGeneral,
                                                 Function,
                                                 ByteArrayDeprecated,
@@ -68,7 +69,6 @@ TEST_F(ExpressionSubtypeTest, WithDefinedBinDataSubtype) {
                                                 newUUID,
                                                 MD5Type,
                                                 Encrypt,
-                                                Column,
                                                 Sensitive,
                                                 Vector,
                                                 bdtCustom};
@@ -76,6 +76,16 @@ TEST_F(ExpressionSubtypeTest, WithDefinedBinDataSubtype) {
         BSONBinData binData{"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, subtype};
         assertEvaluateSubtype(Value(binData), Value(static_cast<int>(subtype)));
     }
+}
+
+TEST_F(ExpressionSubtypeTest, BsonColumnThrowsWhenUsedAsLiteral) {
+    // Assert that we throw when the Column type is used as a literal.
+    auto expCtx = getExpCtx();
+    BSONBinData columnBinData{"gf1UcxdHTJ2HQ/EGQrO7mQ==", 16, Column};
+    BSONObj spec = BSON("$subtype" << Value(columnBinData));
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
 }
 
 TEST_F(ExpressionSubtypeTest, WithUndefinedBinDataSubtype) {

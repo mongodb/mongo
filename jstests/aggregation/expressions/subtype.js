@@ -11,9 +11,14 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({}));
 
-function runAndAssert(operand, result) {
-    // Test with constant-folding optimization.
-    testExpression(coll, {$subtype: operand}, result);
+function runAndAssert(operand, result, allowedAsLiteral = true) {
+    // Test with constant-folding optimization, if this operand is allowed as a literal.
+    if (allowedAsLiteral) {
+        testExpression(coll, {$subtype: operand}, result);
+    } else {
+        // The operand is rejected as a literal and should fail to parse.
+        assert.throwsWithCode(() => testExpression(coll, {$subtype: operand}, result), ErrorCodes.FailedToParse);
+    }
     coll.drop();
 
     // Insert args as document.
@@ -44,7 +49,8 @@ runAndAssert(BinData(3, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 3);
 runAndAssert(BinData(4, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 4);
 runAndAssert(BinData(5, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 5);
 runAndAssert(BinData(6, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 6);
-runAndAssert(BinData(7, "CQDoAwAAAAAAAAA="), 7);
+// BinData subtype 7 (BSONColumn) is not allowed as a literal in a query.
+runAndAssert(BinData(7, "CQDoAwAAAAAAAAA="), 7, false /*allowedAsLiteral*/);
 runAndAssert(BinData(8, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 8);
 runAndAssert(BinData(9, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 9);
 runAndAssert(BinData(128, "gf1UcxdHTJ2HQ/EGQrO7mQ=="), 128);
